@@ -1,0 +1,46 @@
+# Python (Backend)
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/venv/
+backend/.env
+backend/.pytest_cache/
+backend/.coverage
+backend/coverage.xml
+backend/htmlcov/
+backend/build/
+backend/dist/
+backend/*.egg-info/
+backend/pip-wheel-metadata/
+
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Database/Logs
+*.log
+*.sql.backup
+supabase/  # Local Supabase mocks if any
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Deploy Artifacts
+.Dockerfile.cache
+render.yaml.lock  # If generated
+
+# Misc
+*.bak
+*.tmp
