@@ -15,10 +15,13 @@ KRAFZEN AI is an AI-powered SaaS platform that converts voice and text instructi
 - **Monitoring**: Sentry (error tracking) + Health checks
 - **Environment**: Multi-environment support (dev/staging/production)
 
-### Frontend (for reference)
-- **Framework**: Next.js with Tailwind CSS
+### Frontend
+- **Framework**: Next.js 14+ with Tailwind CSS
 - **Hosting**: Vercel (Multi-environment)
 - **State Management**: React Context API
+- **Auth**: Supabase (JWT sessions)
+- **Monitoring**: Sentry + PostHog
+- **Testing**: Vitest
 
 ## Team
 - **Kiruthika Ponnan** - Tech Lead / Architect
@@ -45,6 +48,14 @@ KRAFZEN-AI-/
 │   ├── render.yaml             # Multi-environment deployment config
 │   ├── DEPLOYMENT.md           # Backend deployment guide
 │   └── app/                    # Application modules
+├── app/                         # Next.js frontend
+│   ├── page.tsx                 # Home page
+│   ├── layout.tsx               # Root layout
+│   └── globals.css              # Global styles
+├── components/                  # React components
+│   ├── Hero.tsx                 # Hero section
+│   ├── Navbar.tsx               # Navigation
+│   └── ui/                      # UI components
 ├── .github/                    # GitHub Actions & configs
 │   ├── workflows/              # CI/CD pipelines
 │   ├── CODEOWNERS             # Code ownership rules
@@ -63,6 +74,12 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload
+```
+
+### Frontend Setup
+```bash
+npm install
+npm run dev
 ```
 
 ### API Endpoints
@@ -85,12 +102,14 @@ SENTRY_DSN=your_dsn_here
 
 ### Staging Environment
 - **Branch**: `staging`
-- **URL**: `krafzen-staging.onrender.com`
+- **Backend URL**: `krafzen-staging.onrender.com`
+- **Frontend URL**: `staging.krafzen.com`
 - **Auto-deploy**: On push to `staging` branch
 
 ### Production Environment
 - **Branch**: `main`
-- **URL**: `api.krafzen.com` (when configured)
+- **Backend URL**: `api.krafzen.com` (when configured)
+- **Frontend URL**: `app.krafzen.com`
 - **Auto-deploy**: On merge to `main` branch
 
 ### CI/CD Pipeline
@@ -114,3 +133,78 @@ SENTRY_DSN=your_dsn_here
 ## License
 Proprietary - KRAFZEN AI
 
+---
+
+## 🧭 Contributing Guidelines – Krafzen AI Frontend (Next.js)
+
+### 🌿 Branch Strategy
+
+| Branch Name | Purpose |
+|--------------|----------|
+| `main`       | Production-ready code |
+| `staging`    | Integration testing & pre-demo before merging into main |
+| `feature/*`   | Active branch on to add new feature |
+
+### ✍️ Commit Message Format
+
+We follow **[Conventional Commits](https://www.conventionalcommits.org/)**.
+
+**Format:**
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+**Types:**
+- `feat`: new feature (e.g. `feat: add voice recording UI`)
+- `fix`: bug fix (e.g. `fix: handle Supabase auth refresh`)
+- `chore`: setup or minor update (e.g. `chore: setup Sentry + PostHog`)
+- `refactor`: code improvement
+- `style`: UI or CSS updates
+- `docs`: documentation updates
+
+### 🚀 Development Workflow
+
+```bash
+# Check for staging branch locally 
+git checkout staging
+
+# Fetch the fresh changes from staging branch
+git pull upstream staging
+
+# Create branch feature/details to make a meaningful commit
+git checkout -b feature/setup
+
+# Make your changes and commit
+git add .
+git commit -m "feat: add new component"
+
+# Push to your fork
+git push origin feature/setup
+
+# Create a Pull Request to staging branch
+```
+
+### 🧪 Testing
+
+```bash
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+### 📝 Code Style
+
+- Use TypeScript for all new files
+- Follow ESLint rules
+- Use Prettier for formatting
+- Write meaningful commit messages
+- Add tests for new features
