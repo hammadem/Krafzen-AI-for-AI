@@ -1,20 +1,24 @@
-"""Pydantic models for validation."""
-from pydantic import BaseModel
-from typing import Optional, Dict
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
 from datetime import datetime
 
-class ProjectBase(BaseModel):
-    user_id: str
+class ProjectCreate(BaseModel):
+    user_id: str = Field(..., description="Supabase Auth UUID")
     input_text: str
 
-class ProjectCreate(ProjectBase):
-    pass
-
-class ProjectOut(ProjectBase):
-    id: str
-    created_at: datetime
-    parsed_json: Optional[Dict] = None
+class ProjectUpdate(BaseModel):
+    input_text: Optional[str] = None
+    parsed_json: Optional[Dict[str, Any]] = None
     dxf_url: Optional[str] = None
 
+class ProjectOut(BaseModel):
+    id: str
+    user_id: str
+    input_text: str
+    parsed_json: Optional[Dict[str, Any]] = None
+    dxf_url: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
     class Config:
-        from_attributes = True
+        from_attributes = True  # Allows ORM-ish mapping

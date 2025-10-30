@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     # Supabase
     SUPABASE_URL: str
     SUPABASE_ANON_KEY: str  # Client-side
-    SUPABASE_SERVICE_KEY: str  # Server-side ops
+    SUPABASE_SERVICE_ROLE_KEY: str  # Server-side ops
     
     # OpenAI (Weeks 3-4)
     OPENAI_API_KEY: str

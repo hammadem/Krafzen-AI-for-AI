@@ -4,7 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.logging_config import init_sentry
 from app.utils.error_handler import add_exception_handlers
-from app.routes import project_routes  # Stub import
+from app.routes import project_routes
+from app.db.supabase_client import db  
+
 
 app = FastAPI(
     title="KRAFZEN AI Backend",
@@ -14,7 +16,8 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS for Vercel frontend
+
+# CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL],
@@ -23,21 +26,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers (expand for jobs/files)
-app.include_router(project_routes.router, prefix="/api/v1", tags=["projects"])
 
+# Include API routers
+app.include_router(project_routes.router, prefix="/api/v1")  
+
+
+# Health check route
 @app.get("/health")
 async def health_check():
-    # Quick DB ping (provisional)
+    """Check API and DB connectivity."""
     try:
-        count = len(db.table("projects").select("count").execute().data)
-        return {"status": "healthy", "db_projects": count}
-    except:
-        return {"status": "healthy", "db": "pending"}
+        result = db.table("projects").select("id", count="exact").execute()
+        return {"status": "healthy", "db_project_count": result.count}
+    except Exception as e:
+        print(f"Health check error: {e}")
+        return {"status": "degraded", "db": "unreachable"}
 
-# Init logging/Sentry/error handlers
+
+# Init logging / Sentry / error handlers
 init_sentry(settings.SENTRY_DSN)
 add_exception_handlers(app)
+
 
 if __name__ == "__main__":
     import uvicorn

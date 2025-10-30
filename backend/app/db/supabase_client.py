@@ -10,7 +10,7 @@ class SupabaseClient:
         if self._instance is None:
             self._instance = create_client(
                 settings.SUPABASE_URL,
-                settings.SUPABASE_SERVICE_KEY,  # Server-side full access
+                settings.SUPABASE_SERVICE_ROLE_KEY,  # Server-side full access
             )
         return getattr(self._instance, name)
     

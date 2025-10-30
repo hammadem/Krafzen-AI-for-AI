@@ -40,11 +40,12 @@ ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users view own projects" ON projects FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users insert own projects" ON projects FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Similar for jobs/files
+-- Jobs policies
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users view own jobs" ON jobs FOR ALL USING (auth.uid() = (SELECT user_id FROM projects WHERE id = project_id));
 CREATE POLICY "Users insert own jobs" ON jobs FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM projects WHERE id = project_id));
 
+-- Files policies (FIXED: job_id instead of file_id)
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users view own files" ON files FOR ALL USING (auth.uid() = (SELECT user_id FROM jobs j JOIN projects p ON j.project_id = p.id WHERE j.id = file_id));
-CREATE POLICY "Users insert own files" ON files FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM jobs j JOIN projects p ON j.project_id = p.id WHERE j.id = file_id));
+CREATE POLICY "Users view own files" ON files FOR ALL USING (auth.uid() = (SELECT user_id FROM jobs j JOIN projects p ON j.project_id = p.id WHERE j.id = files.job_id));
+CREATE POLICY "Users insert own files" ON files FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM jobs j JOIN projects p ON j.project_id = p.id WHERE j.id = files.job_id));

@@ -1,7 +1,6 @@
 """Centralized logging + Sentry integration."""
 import logging
 import structlog
-from sentry_sdk.integrations.logging import SentryLoggingIntegration
 from app.core.config import settings
 
 # Basic stdlib setup
@@ -25,10 +24,18 @@ structlog.configure(
 )
 
 def init_sentry(dsn: str):
+    """Initialize Sentry with structured logging integration."""
     if dsn:
         import sentry_sdk
+        from sentry_sdk.integrations.logging import LoggingIntegration
+
+        sentry_logging = LoggingIntegration(
+            level=logging.INFO,        
+            event_level=logging.ERROR  
+        )
+
         sentry_sdk.init(
             dsn=dsn,
-            integrations=[SentryLoggingIntegration(level=logging.INFO)],
+            integrations=[sentry_logging],
             traces_sample_rate=1.0,
         )
