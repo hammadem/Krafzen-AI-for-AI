@@ -1,0 +1,20 @@
+# Global code owners
+* @kiruthika
+
+# Backend specific
+/backend/ @kiruthika
+
+# Frontend specific (when added)
+/frontend/ @kiruthika
+
+# Documentation
+*.md @kiruthika
+
+# CI/CD Configuration
+/.github/ @kiruthika
+
+# Environment and deployment files
+*.yaml @kiruthika
+*.yml @kiruthika
+Dockerfile @kiruthika
+render.yaml @kiruthika
