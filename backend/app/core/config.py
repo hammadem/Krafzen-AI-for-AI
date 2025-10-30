@@ -3,6 +3,7 @@ Configuration settings for KRAFZEN AI backend
 """
 
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import List
 
 class Settings(BaseSettings):
@@ -21,6 +22,21 @@ class Settings(BaseSettings):
         "https://staging.krafzen.com",
         "https://app.krafzen.com"
     ]
+    
+    @field_validator('ALLOWED_ORIGINS', mode='before')
+    @classmethod
+    def parse_allowed_origins(cls, v):
+        """Parse ALLOWED_ORIGINS from environment variable"""
+        if v is None or v == "":
+            return [
+                "http://localhost:3000",
+                "https://*.vercel.app",
+                "https://staging.krafzen.com",
+                "https://app.krafzen.com"
+            ]
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
+        return v
     
     # OpenAI API
     OPENAI_API_KEY: str = ""
