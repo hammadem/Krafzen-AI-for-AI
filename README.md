@@ -23,21 +23,6 @@ KRAFZEN AI is an AI-powered SaaS platform that converts voice and text instructi
 - **Monitoring**: Sentry + PostHog
 - **Testing**: Vitest
 
-## Team
-- **Kiruthika Ponnan** - Tech Lead / Architect
-- **Sonu** - Frontend Lead
-- **Krishnarajan V** - Full Stack Developer
-- **Laxmi Pranitha Muskula** - Data/Systems Analyst
-- **Ashwani Kumar** - Jr. Developer / QA Engineer
-
-## ✅ Week 1-2 Completed (Kiruthika)
-- ✅ Configure FastAPI backend on Render (Multi-environment)
-- ✅ Set up CI/CD via GitHub Actions with branch protection
-- ✅ Ensure API response time <1s and uptime >99% monitoring
-- ✅ Implement Sentry error monitoring
-- ✅ Create comprehensive deployment strategy
-- ✅ Set up GitHub branch protection rules
-
 ## Project Structure
 ```
 KRAFZEN-AI-/
