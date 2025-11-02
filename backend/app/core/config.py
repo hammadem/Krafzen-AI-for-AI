@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
-        "https://*.vercel.app",
+        "https://krafzen-ai-staging.vercel.app",
+        "https://*.vercel.app",  # Keep for other Vercel deployments
         "https://staging.krafzen.com",
         "https://app.krafzen.com"
     ]
@@ -27,15 +28,21 @@ class Settings(BaseSettings):
     @classmethod
     def parse_allowed_origins(cls, v):
         """Parse ALLOWED_ORIGINS from environment variable"""
+        # If not provided or empty, use defaults
         if v is None or v == "":
             return [
                 "http://localhost:3000",
-                "https://*.vercel.app",
+                "https://krafzen-ai-staging.vercel.app",
+                "https://*.vercel.app",  # Keep for other Vercel deployments
                 "https://staging.krafzen.com",
                 "https://app.krafzen.com"
             ]
+        # If it's a string (from env var), split by comma
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(',') if origin.strip()]
+        # If it's already a list, return as is
+        if isinstance(v, list):
+            return v
         return v
     
     # OpenAI API

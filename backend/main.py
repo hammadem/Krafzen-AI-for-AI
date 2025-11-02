@@ -3,9 +3,11 @@ KRAFZEN AI - Main FastAPI Application
 Entry point for the backend service
 """
 
+import re
 import sentry_sdk
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from app.api import health, transcriber
 from app.core.config import settings
 
@@ -24,14 +26,50 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Custom CORS middleware to handle wildcards
+class WildcardCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin")
+        
+        # Check if origin is allowed
+        is_allowed = False
+        if origin:
+            for allowed_origin in settings.ALLOWED_ORIGINS:
+                if allowed_origin == origin:
+                    is_allowed = True
+                    break
+                elif '*' in allowed_origin:
+                    # Convert wildcard to regex
+                    pattern = allowed_origin.replace('.', r'\.').replace('*', '.*')
+                    if re.match(pattern, origin):
+                        is_allowed = True
+                        break
+        
+        # Handle OPTIONS preflight request
+        if request.method == "OPTIONS":
+            response = Response()
+            if is_allowed:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+                response.headers["Access-Control-Allow-Headers"] = "*"
+                response.headers["Access-Control-Max-Age"] = "600"
+            return response
+        
+        # Process request
+        response = await call_next(request)
+        
+        # Add CORS headers if allowed
+        if is_allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+        
+        return response
+
+# Use custom middleware for wildcard support
+app.add_middleware(WildcardCORSMiddleware)
 
 # Include routers
 app.include_router(health.router, prefix="/health", tags=["Health"])
