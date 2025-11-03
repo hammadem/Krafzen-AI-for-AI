@@ -27,27 +27,30 @@ KRAFZEN AI is an AI-powered SaaS platform that converts voice and text instructi
 ```
 KRAFZEN-AI-/
 ├── README.md                    # This file
+|
 ├── backend/                     # FastAPI backend
 │   ├── main.py                  # Application entry point
 │   ├── requirements.txt         # Python dependencies
-│   ├── render.yaml             # Multi-environment deployment config
-│   ├── DEPLOYMENT.md           # Backend deployment guide
-│   └── app/                    # Application modules
-├── app/                         # Next.js frontend
-│   ├── page.tsx                 # Home page
-│   ├── layout.tsx               # Root layout
-│   └── globals.css              # Global styles
-├── components/                  # React components
-│   ├── Hero.tsx                 # Hero section
-│   ├── Navbar.tsx               # Navigation
-│   └── ui/                      # UI components
-├── .github/                    # GitHub Actions & configs
-│   ├── workflows/              # CI/CD pipelines
-│   ├── CODEOWNERS             # Code ownership rules
-│   └── BRANCH_PROTECTION.md   # Branch protection guidelines
-└── docs/                      # Project documentation
-    ├── DEPLOYMENT_STRATEGY.md # CTO's deployment strategy
-    └── *.pdf                  # Project planning documents
+│   ├── render.yaml              # Multi-environment deployment config
+│   ├── DEPLOYMENT.md            # Backend deployment guide
+│   └── app/                     # Application modules
+|
+├── frontend/                    # Next.js frontend
+|   ├── components/              # React components
+│   ├── app/                     # App structure
+|   |   ├── page.tsx             # Home page
+|   |   ├── layout.tsx           # Root layout
+|   |   └── globals.css          # Global styles
+|   ├── lib/                     # Helper functions  
+|   ├── public/                  # Static assets and images 
+|
+├── .github/                     # GitHub Actions & configs
+│   ├── workflows/               # CI/CD pipelines
+│   ├── CODEOWNERS               # Code ownership rules
+│   └── BRANCH_PROTECTION.md     # Branch protection guidelines
+└── docs/                        # Project documentation
+    ├── DEPLOYMENT_STRATEGY.md   # CTO's deployment strategy
+    └── *.pdf                    # Project planning documents
 ```
 
 ## Getting Started
@@ -63,6 +66,7 @@ uvicorn main:app --reload
 
 ### Frontend Setup
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
@@ -141,6 +145,7 @@ We follow **[Conventional Commits](https://www.conventionalcommits.org/)**.
 [optional body]
 
 [optional footer(s)]
+
 ```
 
 **Types:**
@@ -171,6 +176,7 @@ git commit -m "feat: add new component"
 git push origin feature/setup
 
 # Create a Pull Request to staging branch
+# Do not merge the pull request untill someone from the team reviews it
 ```
 
 ### 🧪 Testing
@@ -179,11 +185,9 @@ git push origin feature/setup
 # Run tests
 npm test
 
-# Run tests in watch mode
-npm run test:watch
+# Run tests in UI mode
+npm run test:ui
 
-# Run tests with coverage
-npm run test:coverage
 ```
 
 ### 📝 Code Style

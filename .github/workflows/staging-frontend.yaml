@@ -1,0 +1,65 @@
+name: Lint, Test, Build & Deploy Frontend (Staging)
+
+on:
+  push:
+    branches:
+      - staging
+      - feature/*
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches:
+      - staging
+    paths:
+      - 'frontend/**'
+
+jobs:
+  staging-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run lint check
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Run tests
+        run: |
+          cd frontend
+          npm run test -- --run
+
+      - name: Build project
+        run: |
+          cd frontend
+          npm run build
+
+      # This is to check if the secrets are availaible in the provided repo
+      - name: Debug Vercel secrets
+        run: |
+          echo "VERCEL_TOKEN set? ${{ secrets.VERCEL_TOKEN != '' }}"
+          echo "VERCEL_ORG_ID set? ${{ secrets.VERCEL_ORG_ID != '' }}"
+          echo "VERCEL_PROJECT_ID set? ${{ secrets.VERCEL_PROJECT_ID != '' }}"
+
+      - name: Deploy to Vercel (Preview)
+      
+        if: success()
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./
+          prod: false  # preview deploy (not production)
