@@ -13,6 +13,7 @@ backend/build/
 backend/dist/
 backend/*.egg-info/
 backend/pip-wheel-metadata/
+__pycache__
 
 # Frontend (Next.js)
 frontend/node_modules/

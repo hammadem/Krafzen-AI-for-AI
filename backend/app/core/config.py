@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str  # Client-side
     SUPABASE_SERVICE_ROLE_KEY: str  # Server-side ops
     
-    # OpenAI (Weeks 3-4)
+    # OpenAI 
     OPENAI_API_KEY: str
     
     # App/Security
