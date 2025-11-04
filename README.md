@@ -55,37 +55,119 @@ KRAFZEN-AI-/
 
 ## Getting Started
 
-### Backend Setup
+### Prerequisites
+- **Python 3.11+** installed on your system
+- **Node.js 18+** and npm installed
+- **Git** for cloning the repository
+
+### Local Development Setup
+
+#### 1. Clone the Repository
+```bash
+git clone git@github.com:KRAFZEN/KRAFZEN-AI-.git
+cd KRAFZEN-AI-
+```
+
+#### 2. Backend Setup
+
+**Step 1: Create and activate virtual environment**
 ```bash
 cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn main:app --reload
 ```
 
-### Frontend Setup
+**Step 2: Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+
+**Step 3: Configure environment variables**
+```bash
+# Copy the example env file to create your .env file
+# Note: This is a manual step - copy the file and update with your actual values
+cp env.example .env
+
+# Edit .env with your preferred text editor and add your actual API keys:
+# - OPENAI_API_KEY (required for transcription)
+# - SUPABASE_URL and SUPABASE_KEY (required for database)
+# - SENTRY_DSN (optional, for error tracking)
+# - Other optional variables as needed
+```
+
+**Important**: The `.env` file is gitignored and will not be committed to the repository. Always use `env.example` as a template and never commit your actual `.env` file with real secrets.
+
+**Step 4: Start the backend server**
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+The backend will be available at:
+- **API**: http://localhost:8000
+- **Health Check**: http://localhost:8000/health/
+- **API Documentation (Swagger)**: http://localhost:8000/docs
+
+#### 3. Frontend Setup
+
+**Step 1: Install dependencies**
 ```bash
 cd frontend
 npm install
+```
+
+**Step 2: Start the development server**
+```bash
+npm run dev
+```
+
+The frontend will be available at:
+- **Application**: http://localhost:3000
+
+#### 4. Running Both Servers
+
+You'll need to run both the backend and frontend servers simultaneously. Open two terminal windows:
+
+**Terminal 1 - Backend:**
+```bash
+cd backend
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
 npm run dev
 ```
 
 ### API Endpoints
+
 - **Health Check**: `GET /health/`
 - **Detailed Health**: `GET /health/detailed`
 - **API Documentation**: `GET /docs` (Swagger UI)
 - **Transcription**: `POST /api/v1/transcribe` (placeholder)
 
 ### Environment Variables
-Copy `backend/env.example` to `backend/.env` and configure:
+
+The backend requires a `.env` file in the `backend/` directory. Copy `backend/env.example` to `backend/.env` and configure:
+
 ```bash
+# Required
 ENVIRONMENT=development
-OPENAI_API_KEY=your_key_here
-SUPABASE_URL=your_url_here
-SUPABASE_KEY=your_key_here
-SENTRY_DSN=your_dsn_here
+OPENAI_API_KEY=your_key_here          # Required for AI features
+SUPABASE_URL=your_url_here            # Required for database
+SUPABASE_KEY=your_key_here            # Required for database
+
+# Optional
+SENTRY_DSN=your_dsn_here              # For error tracking
+RENDER_SERVICE_ID_PRODUCTION=         # For production deployments
+RENDER_SERVICE_ID_STAGING=            # For staging deployments
+
+# CORS Origins (comma-separated)
+ALLOWED_ORIGINS=http://localhost:3000,https://*.vercel.app,https://staging.krafzen.com,https://app.krafzen.com
 ```
+
+**Note**: The backend will start even without all environment variables configured, but some features (like transcription) will require valid API keys.
 
 ## Deployment
 
