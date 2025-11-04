@@ -3,7 +3,6 @@ Configuration settings for KRAFZEN AI backend
 """
 
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
 from typing import List
 
 class Settings(BaseSettings):
@@ -15,35 +14,22 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
     
-    # CORS
-    ALLOWED_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "https://krafzen-ai-staging.vercel.app",
-        "https://*.vercel.app",  # Keep for other Vercel deployments
-        "https://staging.krafzen.com",
-        "https://app.krafzen.com"
-    ]
+    # CORS - Store as string to avoid JSON parsing issues with List[str]
+    # Access via ALLOWED_ORIGINS_LIST property which converts to list
+    ALLOWED_ORIGINS: str = "http://localhost:3000,https://krafzen-ai-staging.vercel.app,https://*.vercel.app,https://staging.krafzen.com,https://app.krafzen.com"
     
-    @field_validator('ALLOWED_ORIGINS', mode='before')
-    @classmethod
-    def parse_allowed_origins(cls, v):
-        """Parse ALLOWED_ORIGINS from environment variable"""
-        # If not provided or empty, use defaults
-        if v is None or v == "":
+    @property
+    def ALLOWED_ORIGINS_LIST(self) -> List[str]:
+        """Get ALLOWED_ORIGINS as a list"""
+        if not self.ALLOWED_ORIGINS:
             return [
                 "http://localhost:3000",
                 "https://krafzen-ai-staging.vercel.app",
-                "https://*.vercel.app",  # Keep for other Vercel deployments
+                "https://*.vercel.app",
                 "https://staging.krafzen.com",
                 "https://app.krafzen.com"
             ]
-        # If it's a string (from env var), split by comma
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(',') if origin.strip()]
-        # If it's already a list, return as is
-        if isinstance(v, list):
-            return v
-        return v
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',') if origin.strip()]
     
     # OpenAI API
     OPENAI_API_KEY: str = ""
@@ -58,9 +44,14 @@ class Settings(BaseSettings):
     # Monitoring
     SENTRY_DSN: str = ""
     
+    # Render Configuration (optional)
+    RENDER_SERVICE_ID_PRODUCTION: str = ""
+    RENDER_SERVICE_ID_STAGING: str = ""
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"  # Ignore extra fields in .env file
 
 settings = Settings()
 
