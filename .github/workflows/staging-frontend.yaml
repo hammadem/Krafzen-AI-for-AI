@@ -54,12 +54,11 @@ jobs:
           echo "VERCEL_PROJECT_ID set? ${{ secrets.VERCEL_PROJECT_ID != '' }}"
 
       - name: Deploy to Vercel (Preview)
-      
         if: success()
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./
+          working-directory: ./frontend
           prod: false  # preview deploy (not production)
