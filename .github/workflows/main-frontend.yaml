@@ -1,0 +1,80 @@
+# Not fully ready yet
+
+name: Lint, Test, Build & Deploy Frontend (Production)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+
+jobs:
+  production-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run lint check
+        run: |
+          cd frontend
+          npm run lint
+
+      - name: Run tests
+        run: |
+          cd frontend
+          npm run test -- --run
+
+      - name: Build project
+        run: |
+          cd frontend
+          npm run build
+
+        # This is to check if the secrets are availaible in the provided repo
+      - name: Debug Vercel secrets
+        run: |
+          echo "VERCEL_TOKEN set? ${{ secrets.VERCEL_TOKEN != '' }}"
+          echo "VERCEL_ORG_ID set? ${{ secrets.VERCEL_ORG_ID != '' }}"
+          echo "VERCEL_PROJECT_ID set? ${{ secrets.VERCEL_PROJECT_ID != '' }}"
+
+      - name: Deploy to Vercel (Production)
+        
+        if: ${{ success() }}
+        environment:
+            name: production
+
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+        run: |
+          cd frontend
+          npx vercel deploy \
+            --token $VERCEL_TOKEN \
+            --scope $VERCEL_ORG_ID \
+            --yes \
+            --prod
+
+
+# To Be Done Yet 
+# Add NPM caching for faster builds
+# while in production add manual approoval gates or github inbuilt approovals
+
