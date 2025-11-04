@@ -34,7 +34,7 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
         # Check if origin is allowed
         is_allowed = False
         if origin:
-            for allowed_origin in settings.ALLOWED_ORIGINS:
+            for allowed_origin in settings.ALLOWED_ORIGINS_LIST:
                 if allowed_origin == origin:
                     is_allowed = True
                     break
