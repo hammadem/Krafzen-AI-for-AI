@@ -4,22 +4,21 @@ import { Button } from "./ui/button";
 import Features from "./Features";
 import Pricing from "./Pricing";
 import FAQ from "./FAQs";
-import ContactCTA from "./ContactCTA";
 import Partners from "./Partners";
 
 export default async function Hero() {
     return (
         <>
-            <section className="h-200 sm:h-150 relative w-full flex items-center justify-center">
+            <section className="h-150 sm:h-150 relative w-full flex items-center justify-center">
                 <Image
                     src="/hero/heroimage.png"
                     alt="Hero Image"
                     fill
                     className="opacity-[400%]"
-                    loading="lazy"
+                    loading="eager"
                 />
 
-                <div className="z-999 flex flex-col items-center">
+                <div className="z-99 flex flex-col items-center">
                     <span
                         className="sm:h-110 h-50"
                     ></span>
@@ -63,16 +62,11 @@ export default async function Hero() {
 
             </section>
             
-            { /** Trusted by partners */}
             <Partners />
-
             <Features />
-
             <Pricing />
-
             <FAQ />
 
-            <ContactCTA />
         </>
     );
 }
