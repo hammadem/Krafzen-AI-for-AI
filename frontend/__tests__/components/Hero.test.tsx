@@ -4,10 +4,6 @@ import Hero from "@/components/Hero";
 // Buttons testing needs to be done yet to check if button does the correct thing
 // logging actions form submits and other actions
 
-// Mock the imported components so we test only Hero structure
-vi.mock("@/components/ContactCTA", () => ({
-    default: () => <div data-testid="contact-cta">Mock ContactCTA</div>,
-}));
 vi.mock("@/components/FAQs", () => ({
     default: () => <div data-testid="FAQs">Mock FAQs</div>,
 }));
@@ -39,7 +35,6 @@ describe("Hero Component", () => {
         expect(screen.getByRole("button", { name: /Book a Demo/i })).toBeInTheDocument();
 
         //Assertions
-        expect(screen.getByTestId("contact-cta")).toBeInTheDocument();
         expect(screen.getByTestId("FAQs")).toBeInTheDocument();
         expect(screen.getByTestId("features")).toBeInTheDocument();
         expect(screen.getByTestId("partners")).toBeInTheDocument();
