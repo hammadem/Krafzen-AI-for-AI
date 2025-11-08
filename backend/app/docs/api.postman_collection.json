@@ -1,0 +1,8 @@
+{
+  "info": {"name": "KRAFZEN API Tests", "_postman_id": "initial"},
+  "item": [
+    {"name": "Health", "request": {"method": "GET", "url": "{{base_url}}/health"}},
+    {"name": "Create Project", "request": {"method": "POST", "url": "{{base_url}}/api/v1/projects/", "body": {"mode": "raw", "raw": "{\"user_id\": \"test\", \"input_text\": \"Draw rectangle\"}"}}}
+  ],
+  "variable": [{"key": "base_url", "value": "http://localhost:8000"}]
+}

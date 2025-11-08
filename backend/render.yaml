@@ -4,13 +4,17 @@ services:
     name: krafzen-api-prod
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
         sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: PORT
         value: 8000
@@ -18,7 +22,9 @@ services:
         value: production
       - key: SENTRY_DSN
         sync: false
-    healthCheckPath: /health/
+      - key: SECRET_KEY
+        sync: false
+    healthCheckPath: /health
     plan: starter  # Free tier for MVP
 
   # Staging API
@@ -26,7 +32,7 @@ services:
     name: krafzen-api-staging
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: OPENAI_API_KEY
         sync: false
@@ -34,12 +40,17 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
       - key: PORT
         value: 8000
       - key: ENVIRONMENT
         value: staging
       - key: SENTRY_DSN
         sync: false
-    healthCheckPath: /health/
+      - key: SECRET_KEY
+        sync: false
+    healthCheckPath: /health
     plan: starter  # Free tier for MVP
-
