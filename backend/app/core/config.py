@@ -3,7 +3,10 @@ Configuration settings for KRAFZEN AI backend
 """
 
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Settings(BaseSettings):
     """Application settings"""
@@ -31,18 +34,26 @@ class Settings(BaseSettings):
             ]
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',') if origin.strip()]
     
+    # Supabase
+    SUPABASE_URL: str = ""
+    SUPABASE_KEY: str = ""  # Alias for SUPABASE_ANON_KEY (backward compatibility)
+    SUPABASE_ANON_KEY: str = ""  # Client-side
+    SUPABASE_SERVICE_ROLE_KEY: str = ""  # Server-side ops
+    
     # OpenAI API
     OPENAI_API_KEY: str = ""
     
-    # Supabase
-    SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""
+    # App/Security
+    SECRET_KEY: str = ""
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    FRONTEND_URL: str = "http://localhost:3000"
     
     # Render
     PORT: int = 8000
     
     # Monitoring
-    SENTRY_DSN: str = ""
+    SENTRY_DSN: Optional[str] = None
+    LOG_LEVEL: str = "INFO"
     
     # Render Configuration (optional)
     RENDER_SERVICE_ID_PRODUCTION: str = ""
@@ -54,4 +65,3 @@ class Settings(BaseSettings):
         extra = "ignore"  # Ignore extra fields in .env file
 
 settings = Settings()
-

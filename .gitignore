@@ -1,22 +1,19 @@
-node_modules
-
-# Next.js build outputs
-.next/
-out/
-build/
-dist/
-
-# Next.js
-next-env.d.ts
-
-# Environment variables
+# Python (Backend)
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/venv/
 backend/.env
 backend/.env.backup
-.env
-.env.local
-.env.*.local
-
-# Python
+backend/.pytest_cache/
+backend/.coverage
+backend/coverage.xml
+backend/htmlcov/
+backend/build/
+backend/dist/
+backend/*.egg-info/
+backend/pip-wheel-metadata/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -29,9 +26,44 @@ ENV/
 dist/
 build/
 
-# IDE
+# Frontend (Next.js)
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+build/
+dist/
+next-env.d.ts
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+.env
+.env.local
+.env.*.local
+
+# Database/Logs
+*.log
+*.sql.backup
+supabase/  # Local Supabase mocks if any
+
+# OS/Editor
+.DS_Store
+Thumbs.db
 .vscode/
+.vscode/settings.json
 .idea/
 *.swp
 *.swo
 *~
+
+# Deploy Artifacts
+.Dockerfile.cache
+render.yaml.lock  # If generated
+
+# Misc
+*.bak
+*.tmp
