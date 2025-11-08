@@ -5,6 +5,9 @@ Supabase service for database operations
 from supabase import create_client, Client
 from app.core.config import settings
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SupabaseService:
     """Supabase database service"""
@@ -15,13 +18,19 @@ class SupabaseService:
     
     def _initialize_client(self):
         """Initialize Supabase client"""
+        # Check for SUPABASE_KEY (backward compatibility) or SUPABASE_ANON_KEY
+        supabase_key = settings.SUPABASE_KEY or settings.SUPABASE_ANON_KEY
+        
+        if not settings.SUPABASE_URL or not supabase_key:
+            logger.warning("Supabase credentials not configured. Some features may not work.")
+            self.client = None
+            return
+        
         try:
-            if settings.SUPABASE_URL and settings.SUPABASE_KEY:
-                self.client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-            else:
-                print("Warning: Supabase credentials not configured")
+            self.client = create_client(settings.SUPABASE_URL, supabase_key)
+            logger.info("Supabase client initialized successfully")
         except Exception as e:
-            print(f"Error initializing Supabase client: {e}")
+            logger.warning(f"Failed to initialize Supabase client: {e}")
             self.client = None
     
     def test_connection(self) -> dict:
