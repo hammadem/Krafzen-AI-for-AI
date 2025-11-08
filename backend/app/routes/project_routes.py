@@ -10,7 +10,8 @@ from app.db.queries.project_queries import (
 from app.models.project_model import ProjectCreate, ProjectUpdate, ProjectOut
 from app.core.config import settings
 
-router = APIRouter(prefix="/projects", tags=["projects"])
+router = APIRouter(prefix="/projects", tags=["Projects"])
+
 
 
 # CREATE PROJECT
