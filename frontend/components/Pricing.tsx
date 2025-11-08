@@ -8,6 +8,7 @@ function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ')
 };
 
+
 export default function Pricing() {
     const [monthly, setMonthly] = useState(true);
 
@@ -17,7 +18,7 @@ export default function Pricing() {
             {/** Pricing text */}
             <div className="text-white bg-black flex flex-col items-center justify-evenly">
                 <h1 className="font-bold text-[5vh]">Pricing Plans</h1>
-                <p>Choose the plan that works best for you.</p>
+                <p className="text-center px-1">Choose the plan that works best for you.</p>
 
                 <div className="mt-10 relative bg-[#1d1c1cff] border-2 border-[#1d1c1cff] rounded-full flex">
                     <div
