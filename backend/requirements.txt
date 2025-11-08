@@ -8,7 +8,7 @@ uvicorn[standard]==0.30.6
 python-multipart==0.0.6
 
 # Database / Supabase
-supabase==2.5.1
+supabase>=2.5.1
 # postgrest is a dependency of supabase, let it manage the version
 python-dotenv==1.0.1
 
