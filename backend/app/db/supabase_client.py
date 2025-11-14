@@ -12,13 +12,13 @@ class SupabaseClient:
         if self._client is None:
             # Only try to initialize if credentials are provided
             if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
-                try:
-                    self._client = create_client(
-                        settings.SUPABASE_URL,
-                        settings.SUPABASE_SERVICE_ROLE_KEY
-                    )
-                    logger.info("✅ Supabase service client initialized")
-                except Exception as e:
+            try:
+                self._client = create_client(
+                    settings.SUPABASE_URL,
+                    settings.SUPABASE_SERVICE_ROLE_KEY
+                )
+                logger.info("✅ Supabase service client initialized")
+            except Exception as e:
                     logger.warning(f"⚠️ Supabase init error: {e}")
                     self._client = None
             else:
