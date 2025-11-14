@@ -18,7 +18,7 @@ async def create_file_route(
     file: FileCreate,
     authorization: Optional[str] = Header(None)
 ):
-    result = await create_file(file.dict(), authorization)
+    result = await create_file(file.model_dump(), authorization)
     if not result or result.get("error"):
         raise HTTPException(status_code=400, detail=result.get("error", "File creation failed"))
     return result
@@ -53,7 +53,7 @@ async def update_file_route(
     updates: FileUpdate,
     authorization: Optional[str] = Header(None)
 ):
-    updated = await update_file(file_id, updates.dict(exclude_unset=True), authorization)
+    updated = await update_file(file_id, updates.model_dump(exclude_unset=True), authorization)
     if not updated or updated.get("error"):
         raise HTTPException(status_code=400, detail=updated.get("error", "File update failed"))
     return updated

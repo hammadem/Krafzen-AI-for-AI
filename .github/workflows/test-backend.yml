@@ -71,8 +71,19 @@ jobs:
         cd backend
         timeout 10s uvicorn main:app --host 0.0.0.0 --port 8000 &
         sleep 5
-        curl -s http://localhost:8000/docs | grep -q "Jobs" && echo "✅ Jobs routes found" || echo "❌ Jobs routes not found"
-        curl -s http://localhost:8000/docs | grep -q "Files" && echo "✅ Files routes found" || echo "❌ Files routes not found"
+        # Check OpenAPI JSON for route tags (more reliable than HTML)
+        if curl -s http://localhost:8000/openapi.json | grep -q '"tags":\["Jobs"\]'; then
+          echo "✅ Jobs routes found"
+        else
+          echo "❌ Jobs routes not found"
+          exit 1
+        fi
+        if curl -s http://localhost:8000/openapi.json | grep -q '"tags":\["Files"\]'; then
+          echo "✅ Files routes found"
+        else
+          echo "❌ Files routes not found"
+          exit 1
+        fi
     
     - name: Run unit tests
       run: |

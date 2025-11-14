@@ -85,7 +85,7 @@ async def get_project(project_id: str, authorization: str) -> Optional[Dict[str,
 # UPDATE
 async def update_project(project_id: str, update_data: ProjectUpdate, authorization: str) -> Optional[Dict[str, Any]]:
     try:
-        payload = update_data.dict(exclude_unset=True)
+        payload = update_data.model_dump(exclude_unset=True)
         payload["updated_at"] = datetime.utcnow().isoformat() 
         print(f"DEBUG: project_id='{project_id}', payload={payload}")
 
