@@ -8,8 +8,8 @@ uvicorn[standard]==0.30.6
 python-multipart==0.0.6
 
 # Database / Supabase
-supabase>=2.5.1
-# postgrest is a dependency of supabase, let it manage the version
+supabase==2.5.1
+postgrest>=0.14,<0.17
 python-dotenv==1.0.1
 
 # Auth & Security
@@ -35,8 +35,5 @@ pydantic-settings==2.5.2
 pytest==8.3.3
 pytest-asyncio==0.24.0
 httpx==0.27.2
-requests==2.31.0  # For API testing
-sounddevice==0.4.6  # For microphone recording
-soundfile==0.12.1  # For audio file I/O
-numpy==1.26.4  # Required by sounddevice/soundfile
-# anyio version managed by dependencies (openai requires <4, httpx requires anyio)
+requests==2.31.0  # For integration tests
+anyio<4,>=3.5.0

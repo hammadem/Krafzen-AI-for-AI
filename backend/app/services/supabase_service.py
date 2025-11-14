@@ -4,62 +4,67 @@ Supabase service for database operations
 
 from supabase import create_client, Client
 from app.core.config import settings
+from app.utils.logger import logger
 from typing import Optional
-import logging
 
-logger = logging.getLogger(__name__)
 
 class SupabaseService:
-    """Supabase database service"""
-    
+    """Handles Supabase client initialization and basic operations"""
+
     def __init__(self):
         self.client: Optional[Client] = None
-        self._initialize_client()
-    
-    def _initialize_client(self):
+        self.init_client()
+
+    def init_client(self):
         """Initialize Supabase client"""
-        # Check for SUPABASE_KEY (backward compatibility) or SUPABASE_ANON_KEY
-        supabase_key = settings.SUPABASE_KEY or settings.SUPABASE_ANON_KEY
-        
-        if not settings.SUPABASE_URL or not supabase_key:
-            logger.warning("Supabase credentials not configured. Some features may not work.")
-            self.client = None
-            return
-        
         try:
-            self.client = create_client(settings.SUPABASE_URL, supabase_key)
+            # Use the Service Role Key for backend operations (higher privileges)
+            url = getattr(settings, "SUPABASE_URL", None)
+            key = getattr(settings, "SUPABASE_SERVICE_ROLE_KEY", None) or getattr(settings, "SUPABASE_KEY", None)
+
+            if not url or not key:
+                # Only log at debug level to reduce noise in test environments
+                logger.debug("Missing Supabase credentials (SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY). This is expected in test environments.")
+                self.client = None
+                return
+
+            self.client = create_client(url, key)
             logger.info("Supabase client initialized successfully")
+
         except Exception as e:
-            logger.warning(f"Failed to initialize Supabase client: {e}")
+            logger.error("Error initializing Supabase client", error=str(e), exc_info=True)
             self.client = None
-    
+
+    def is_connected(self) -> bool:
+        """Check if Supabase client is initialized"""
+        return self.client is not None
+
     def test_connection(self) -> dict:
-        """Test Supabase connection"""
+        """Quick connectivity check"""
         if not self.client:
             return {
                 "status": "error",
                 "message": "Supabase client not initialized",
                 "connected": False
             }
-        
+
         try:
-            # Simple query to test connection
-            response = self.client.table("_test_connection").select("*").limit(1).execute()
+            # Perform a lightweight query on an existing table
+            response = self.client.table("projects").select("id").limit(1).execute()
+            connected = response is not None
             return {
-                "status": "success",
-                "message": "Supabase connection successful",
-                "connected": True
+                "status": "success" if connected else "warning",
+                "message": "Supabase connection successful" if connected else "Supabase responded but no data found",
+                "connected": connected
             }
+
         except Exception as e:
             return {
                 "status": "error",
                 "message": f"Supabase connection failed: {str(e)}",
                 "connected": False
             }
-    
-    def is_connected(self) -> bool:
-        """Check if Supabase is connected"""
-        return self.client is not None
 
-# Global instance
+
+# Global instance (auto-initialized on import)
 supabase_service = SupabaseService()

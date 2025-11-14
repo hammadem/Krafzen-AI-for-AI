@@ -53,9 +53,12 @@ KRAFZEN-AI-/
 │   └── public/                  # Static assets
 │
 ├── .github/                     # GitHub Actions & configs
-│   └── workflows/               # CI/CD pipelines
+│   ├── workflows/               # CI/CD pipelines
+│   ├── CODEOWNERS               # Code ownership rules
+│   └── BRANCH_PROTECTION.md     # Branch protection guidelines
 │
 └── docs/                        # Project documentation
+    ├── DEPLOYMENT_STRATEGY.md   # CTO's deployment strategy
     └── *.pdf                    # Planning documents (reference)
 ```
 
@@ -93,6 +96,8 @@ pip install -r requirements.txt
 cp env.example .env
 # Edit .env with your actual credentials (see Credentials section below)
 ```
+
+**Important**: The `.env` file is gitignored and will not be committed to the repository. Always use `env.example` as a template and never commit your actual `.env` file with real secrets.
 
 **Step 4: Start the backend server**
 ```bash
@@ -307,7 +312,6 @@ Add these in: **Settings** → **Secrets and variables** → **Actions**
 - Backend: `https://api.krafzen.com` (when configured)
 
 ## Monitoring & Observability
-
 - **Error Tracking**: Sentry integration
 - **Health Monitoring**: Response time and uptime tracking
 - **Performance**: <1s response time target
@@ -414,6 +418,12 @@ npm run test:ui  # UI mode
 - Ensure variables start with `NEXT_PUBLIC_`
 - Restart dev server after changing `.env.local`
 
+## Documentation
+- **Deployment Guide**: `backend/DEPLOYMENT.md`
+- **Deployment Strategy**: `docs/DEPLOYMENT_STRATEGY.md`
+- **Branch Protection**: `.github/BRANCH_PROTECTION.md`
+- **API Documentation**: Available at `/docs` endpoint
+
 ## License
 Proprietary - KRAFZEN AI
 
@@ -427,3 +437,77 @@ Proprietary - KRAFZEN AI
 - **Sentry Dashboard**: https://sentry.io
 - **Render Dashboard**: https://dashboard.render.com
 - **Vercel Dashboard**: https://vercel.com/dashboard
+
+## 🧭 Contributing Guidelines – Krafzen AI Frontend (Next.js)
+
+### 🌿 Branch Strategy
+
+| Branch Name | Purpose |
+|--------------|----------|
+| `main`       | Production-ready code |
+| `staging`    | Integration testing & pre-demo before merging into main |
+| `feature/*`   | Active branch on to add new feature |
+
+### ✍️ Commit Message Format
+
+We follow **[Conventional Commits](https://www.conventionalcommits.org/)**.
+
+**Format:**
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+
+```
+
+**Types:**
+- `feat`: new feature (e.g. `feat: add voice recording UI`)
+- `fix`: bug fix (e.g. `fix: handle Supabase auth refresh`)
+- `chore`: setup or minor update (e.g. `chore: setup Sentry + PostHog`)
+- `refactor`: code improvement
+- `style`: UI or CSS updates
+- `docs`: documentation updates
+
+### 🚀 Development Workflow
+
+```bash
+# Check for staging branch locally 
+git checkout staging
+
+# Fetch the fresh changes from staging branch
+git pull upstream staging
+
+# Create branch feature/details to make a meaningful commit
+git checkout -b feature/setup
+
+# Make your changes and commit
+git add .
+git commit -m "feat: add new component"
+
+# Push to your fork
+git push origin feature/setup
+
+# Create a Pull Request to staging branch
+# Do not merge the pull request untill someone from the team reviews it
+```
+
+### 🧪 Testing
+
+```bash
+# Run tests
+npm test
+
+# Run tests in UI mode
+npm run test:ui
+
+```
+
+### 📝 Code Style
+
+- Use TypeScript for all new files
+- Follow ESLint rules
+- Use Prettier for formatting
+- Write meaningful commit messages
+- Add tests for new features
