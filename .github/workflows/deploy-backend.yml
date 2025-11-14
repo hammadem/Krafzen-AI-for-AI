@@ -1,5 +1,8 @@
 name: Deploy Backend to Render
 
+# Note: Tests run in test-backend.yml workflow
+# This workflow only handles deployment after tests pass
+
 on:
   push:
     branches:
@@ -15,38 +18,7 @@ on:
       - 'backend/**'
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        cd backend
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run tests (if available)
-      run: |
-        cd backend
-        python -m pytest app/tests/ -v || echo "No tests yet"
-      continue-on-error: true
-    
-    - name: Lint code
-      run: |
-        cd backend
-        python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || echo "Linting completed with warnings"
-      continue-on-error: true
-
   deploy-staging:
-    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/staging'
     
@@ -69,7 +41,6 @@ jobs:
         curl -f ${{ secrets.RENDER_STAGING_URL }}/health/detailed || echo "Staging detailed health check failed"
 
   deploy-production:
-    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     

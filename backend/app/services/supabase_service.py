@@ -4,6 +4,7 @@ Supabase service for database operations
 
 from supabase import create_client, Client
 from app.core.config import settings
+from app.utils.logger import logger
 from typing import Optional
 
 
@@ -22,15 +23,16 @@ class SupabaseService:
             key = getattr(settings, "SUPABASE_SERVICE_ROLE_KEY", None) or getattr(settings, "SUPABASE_KEY", None)
 
             if not url or not key:
-                print("⚠️  Warning: Missing Supabase credentials (SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY).")
+                # Only log at debug level to reduce noise in test environments
+                logger.debug("Missing Supabase credentials (SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY). This is expected in test environments.")
                 self.client = None
                 return
 
             self.client = create_client(url, key)
-            print("✅ Supabase client initialized successfully.")
+            logger.info("Supabase client initialized successfully")
 
         except Exception as e:
-            print(f"❌ Error initializing Supabase client: {e}")
+            logger.error("Error initializing Supabase client", error=str(e), exc_info=True)
             self.client = None
 
     def is_connected(self) -> bool:

@@ -1,19 +1,24 @@
 from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
+from app.utils.logger import logger
 
 
 async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = None) -> Optional[Dict[str, Any]]:
     try:
-        token = None
+        # Validate authorization format
         if authorization:
-            parts = authorization.split(" ")
-            if len(parts) == 2:
-                token = parts[1]
+            if not authorization.startswith("Bearer "):
+                logger.warning("[create_job] Invalid authorization format", authorization_format=authorization[:20] + "...")
+                return {"error": "Invalid authorization format. Expected 'Bearer <token>'"}
+            # TODO: Implement full JWT validation against Supabase
+            # For now, we validate format but don't verify the token
+            token = authorization.split(" ")[1]
+            logger.debug("[create_job] Authorization token provided", token_length=len(token))
 
         project_id = job_data.get("project_id")
         if not project_id:
-            print("[create_job] Missing project_id in payload")
+            logger.warning("[create_job] Missing project_id in payload")
             return {"error": "project_id is required"}
 
         project_check = await run_in_threadpool(
@@ -25,7 +30,7 @@ async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = No
         )
 
         if not project_check.data:
-            print(f"[create_job] Project {project_id} not found")
+            logger.warning("[create_job] Project not found", project_id=project_id)
             return {"error": f"Project with id {project_id} does not exist"}
 
         payload = {
@@ -46,9 +51,9 @@ async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = No
     except Exception as e:
         error_msg = str(e)
         if "foreign key constraint" in error_msg.lower():
-            print("[create_job] Foreign key violation")
+            logger.error("[create_job] Foreign key violation", project_id=job_data.get("project_id"), exc_info=True)
             return {"error": "Invalid project_id. Project not found"}
-        print(f"[create_job] Unexpected error: {e}")
+        logger.error("[create_job] Unexpected error", error=str(e), exc_info=True)
         return {"error": "Unexpected server error"}
 
 
@@ -62,7 +67,7 @@ async def get_jobs(project_id: str, authorization: Optional[str] = None) -> List
         )
         return response.data or []
     except Exception as e:
-        print(f"[get_jobs] Error: {e}")
+        logger.error("[get_jobs] Error", project_id=project_id, error=str(e), exc_info=True)
         return []
 
 
@@ -77,18 +82,21 @@ async def get_job(job_id: str, authorization: Optional[str] = None) -> Optional[
         )
         return response.data
     except Exception as e:
-        print(f"[get_job] Error: {e}")
+        logger.error("[get_job] Error", job_id=job_id, error=str(e), exc_info=True)
         return None
 
 
 async def update_job(job_id: str, update_data: Dict[str, Any], authorization: Optional[str] = None) -> Optional[Dict[str, Any]]:
     try:
         if not update_data:
-            print("[update_job] Missing update data")
+            logger.warning("[update_job] Missing update data", job_id=job_id)
             return {"error": "No update fields provided"}
 
-        # Clean out None values
+        # Clean out None values and add updated_at
+        from datetime import datetime
         update_payload = {k: v for k, v in update_data.items() if v is not None}
+        update_payload["updated_at"] = datetime.utcnow().isoformat()
+        
         if not update_payload:
             return {"error": "No valid update fields provided"}
 
@@ -102,11 +110,11 @@ async def update_job(job_id: str, update_data: Dict[str, Any], authorization: Op
         if response and response.data:
             return response.data[0]
 
-        print(f"[update_job] No job found with id {job_id}")
+        logger.warning("[update_job] Job not found", job_id=job_id)
         return {"error": f"Job with id {job_id} not found"}
 
     except Exception as e:
-        print(f"[update_job] Error: {e}")
+        logger.error("[update_job] Error", job_id=job_id, error=str(e), exc_info=True)
         return {"error": str(e)}
 
 
@@ -120,5 +128,5 @@ async def delete_job(job_id: str, authorization: Optional[str] = None) -> bool:
         )
         return bool(response.data)
     except Exception as e:
-        print(f"[delete_job] Error: {e}")
+        logger.error("[delete_job] Error", job_id=job_id, error=str(e), exc_info=True)
         return False
