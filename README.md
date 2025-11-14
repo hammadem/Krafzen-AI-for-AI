@@ -192,28 +192,32 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ## API Endpoints
 
 ### Health & Status
-- `GET /health/` - Basic health check
-- `GET /health/detailed` - Detailed health with dependency status
+- **`GET /health/`** - Basic health check endpoint returning service status and timestamp
+- **`GET /health/detailed`** - Comprehensive health check with system info, dependency status, and response time metrics
 
-### Transcription (Whisper)
-- `POST /api/v1/transcribe` - Transcribe audio file
+### Transcription (Whisper Service)
+- **`POST /api/v1/transcribe`** - Converts uploaded audio files (mp3, wav, m4a, ogg, flac, webm) to text using OpenAI Whisper
   - **Body**: `multipart/form-data` with `file` field
   - **Query**: `language` (optional, default: "en", use "auto" for auto-detection)
-- `POST /api/v1/transcribe-url` - Transcribe from audio URL
-  - **Body**: `{"audio_url": "https://...", "language": "en"}`
+  - **Response**: `{"status": "success", "text": "...", "language": "en", "duration": 5.2, ...}`
+- **`POST /api/v1/transcribe-url`** - Transcribes audio files from remote URLs using OpenAI Whisper
+  - **Query**: `audio_url` (required), `language` (optional)
+  - **Response**: Same format as file upload endpoint
 
-### Parsing (GPT-4)
-- `POST /api/v1/parse` - Parse text into CAD instructions
-  - **Body**: `{"text": "...", "file_type": "dxf", "additional_context": "..."}`
-- `POST /api/v1/parse-transcription` - Parse stored transcription
+### Parsing (GPT-4 Service)
+- **`POST /api/v1/parse`** - Converts transcribed text into structured CAD instructions (DXF, DWG, Revit) using GPT-4
+  - **Body**: `{"text": "...", "file_type": "dxf|dwg|revit", "additional_context": "..."}`
+  - **Response**: `{"status": "success", "instructions": [...], "file_type": "dxf", ...}`
+- **`POST /api/v1/parse-transcription`** - Convenience endpoint for parsing transcription text directly
   - **Body**: `{"transcription_id": "...", "file_type": "dxf"}`
 
-### Projects
-- `GET /api/v1/projects/` - List projects
-- `POST /api/v1/projects/` - Create project
-- `GET /api/v1/projects/{project_id}` - Get project
-- `PATCH /api/v1/projects/{project_id}` - Update project
-- `DELETE /api/v1/projects/{project_id}` - Delete project
+### Projects Management API
+The Projects Management API provides complete CRUD operations for managing user projects:
+- **`GET /api/v1/projects/`** - Retrieves list of all projects for a specific user with optional filtering
+- **`POST /api/v1/projects/`** - Creates a new project with metadata and stores it in Supabase database
+- **`GET /api/v1/projects/{project_id}`** - Fetches detailed information for a specific project by ID
+- **`PATCH /api/v1/projects/{project_id}`** - Updates project metadata and properties for an existing project
+- **`DELETE /api/v1/projects/{project_id}`** - Removes a project and its associated data from the database
 
 ### API Documentation
 - **Swagger UI**: http://localhost:8000/docs
@@ -228,6 +232,16 @@ python3.12 test_endpoints.py
 
 # With audio file:
 python3.12 test_endpoints.py --audio /path/to/audio.mp3
+```
+
+### Microphone Testing (Whisper Transcription)
+Test the complete workflow: Record from microphone → Transcribe → Parse
+```bash
+cd backend
+source venv/bin/activate
+python test_full_workflow.py
+# Or test transcription only:
+python test_whisper_mic.py
 ```
 
 ### Manual Testing
@@ -255,6 +269,7 @@ curl http://localhost:8000/health/detailed
 **Frontend (Vercel)**
 - Auto-deploys on push to `staging` or `main`
 - Preview deployments for PRs
+- **Sharing Preview Deployments**: Use Vercel's "Shareable Links" feature to share preview URLs with external collaborators (designers, stakeholders) who don't have Vercel accounts. Go to Vercel Dashboard → Deployments → Select deployment → Click "Share" → Select "Anyone with the link"
 
 **Backend (Render)**
 - Auto-deploys via GitHub Actions
