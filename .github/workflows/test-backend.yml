@@ -78,18 +78,20 @@ jobs:
           fi
           sleep 1
         done
-        # Check OpenAPI JSON for route tags - look for tag names in the JSON
+        # Check OpenAPI JSON for actual endpoint paths (most reliable)
         OPENAPI_JSON=$(curl -s http://localhost:8000/openapi.json)
-        if echo "$OPENAPI_JSON" | grep -q '"Jobs"'; then
+        # Check for Jobs endpoints
+        if echo "$OPENAPI_JSON" | grep -q '"/api/v1/jobs'; then
           echo "✅ Jobs routes found"
         else
-          echo "❌ Jobs routes not found in OpenAPI JSON"
+          echo "❌ Jobs routes not found - /api/v1/jobs endpoint missing"
           exit 1
         fi
-        if echo "$OPENAPI_JSON" | grep -q '"Files"'; then
+        # Check for Files endpoints
+        if echo "$OPENAPI_JSON" | grep -q '"/api/v1/files'; then
           echo "✅ Files routes found"
         else
-          echo "❌ Files routes not found in OpenAPI JSON"
+          echo "❌ Files routes not found - /api/v1/files endpoint missing"
           exit 1
         fi
     
