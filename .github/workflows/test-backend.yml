@@ -1,5 +1,9 @@
 name: Test Backend
 
+# Main test workflow for backend
+# Runs unit tests, integration tests (HTTP requests), linting, and validation
+# Used by deploy-backend.yml workflow (tests must pass before deployment)
+
 on:
   push:
     branches:

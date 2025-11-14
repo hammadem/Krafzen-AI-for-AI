@@ -1,5 +1,8 @@
 name: Deploy Backend to Render
 
+# Note: Tests run in test-backend.yml workflow
+# This workflow only handles deployment after tests pass
+
 on:
   push:
     branches:
@@ -15,63 +18,7 @@ on:
       - 'backend/**'
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        cd backend
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Run unit tests
-      run: |
-        cd backend
-        python -m pytest app/tests/test_jobs.py app/tests/test_files.py app/tests/test_health.py app/tests/test_projects.py -v --tb=short
-      continue-on-error: true
-    
-    - name: Run integration tests
-      run: |
-        cd backend
-        # Start server in background
-        python -m uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
-        SERVER_PID=$!
-        echo "Server PID: $SERVER_PID"
-        
-        # Wait for server to start
-        for i in {1..30}; do
-          if curl -f http://localhost:8000/health > /dev/null 2>&1; then
-            echo "✅ Server started"
-            break
-          fi
-          sleep 1
-        done
-        
-        # Run integration tests
-        python -m pytest app/tests/test_integration.py -v --tb=short
-        
-        # Cleanup: Stop server
-        kill $SERVER_PID 2>/dev/null || true
-        wait $SERVER_PID 2>/dev/null || true
-      continue-on-error: true
-    
-    - name: Lint code
-      run: |
-        cd backend
-        python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || echo "Linting completed with warnings"
-      continue-on-error: true
-
   deploy-staging:
-    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/staging'
     
@@ -94,7 +41,6 @@ jobs:
         curl -f ${{ secrets.RENDER_STAGING_URL }}/health/detailed || echo "Staging detailed health check failed"
 
   deploy-production:
-    needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     
