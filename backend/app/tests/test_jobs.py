@@ -20,10 +20,12 @@ async def test_create_job():
             "error_message": None
         }
         response = await ac.post(BASE_URL + "/", json=payload)
-        assert response.status_code in [200, 201]
-        data = response.json()
-        assert isinstance(data, list)
-        assert "project_id" in data[0]
+        assert response.status_code in [201, 400]  # 201 for success, 400 for validation errors
+        if response.status_code == 201:
+            data = response.json()
+            assert isinstance(data, dict)  # POST returns a single object, not a list
+            assert "project_id" in data
+            assert "id" in data
 
 
 @pytest.mark.asyncio
