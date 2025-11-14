@@ -1,0 +1,87 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+    paths:
+      - 'backend/**'
+  push:
+    branches:
+      - staging
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    name: Integration Tests (HTTP Requests)
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Set up environment variables
+      run: |
+        cd backend
+        # Create minimal .env for testing (if needed)
+        if [ ! -f .env ]; then
+          cp env.example .env || echo "No env.example found"
+        fi
+        # Set test environment
+        echo "ENVIRONMENT=development" >> .env || true
+    
+    - name: Start server and run integration tests
+      run: |
+        cd backend
+        # Start server in background
+        python -m uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
+        SERVER_PID=$!
+        echo "Server PID: $SERVER_PID"
+        
+        # Wait for server to start (max 30 seconds)
+        echo "Waiting for server to start..."
+        for i in {1..30}; do
+          if curl -f http://localhost:8000/health > /dev/null 2>&1; then
+            echo "✅ Server started successfully after ${i} seconds"
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "❌ Server failed to start"
+            cat /tmp/server.log || true
+            exit 1
+          fi
+          sleep 1
+        done
+        
+        # Run integration tests
+        echo "Running integration tests..."
+        python -m pytest app/tests/test_integration.py -v --tb=short
+        
+        # Cleanup: Stop server
+        echo "Stopping server..."
+        kill $SERVER_PID 2>/dev/null || true
+        wait $SERVER_PID 2>/dev/null || true
+        echo "✅ Server stopped"
+    
+    - name: Upload server logs (on failure)
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: server-logs
+        path: /tmp/server.log
+        retention-days: 1
+
