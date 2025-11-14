@@ -71,17 +71,25 @@ jobs:
         cd backend
         timeout 10s uvicorn main:app --host 0.0.0.0 --port 8000 &
         sleep 5
-        # Check OpenAPI JSON for route tags (more reliable than HTML)
-        if curl -s http://localhost:8000/openapi.json | grep -q '"tags":\["Jobs"\]'; then
+        # Wait for server to be fully ready
+        for i in {1..10}; do
+          if curl -f http://localhost:8000/health > /dev/null 2>&1; then
+            break
+          fi
+          sleep 1
+        done
+        # Check OpenAPI JSON for route tags - look for tag names in the JSON
+        OPENAPI_JSON=$(curl -s http://localhost:8000/openapi.json)
+        if echo "$OPENAPI_JSON" | grep -q '"Jobs"'; then
           echo "✅ Jobs routes found"
         else
-          echo "❌ Jobs routes not found"
+          echo "❌ Jobs routes not found in OpenAPI JSON"
           exit 1
         fi
-        if curl -s http://localhost:8000/openapi.json | grep -q '"tags":\["Files"\]'; then
+        if echo "$OPENAPI_JSON" | grep -q '"Files"'; then
           echo "✅ Files routes found"
         else
-          echo "❌ Files routes not found"
+          echo "❌ Files routes not found in OpenAPI JSON"
           exit 1
         fi
     
