@@ -64,5 +64,5 @@ class SupabaseService:
             }
 
 
-# 🔹 Global instance (auto-initialized on import)
+# Global instance (auto-initialized on import)
 supabase_service = SupabaseService()
