@@ -127,15 +127,6 @@ class TestJobsIntegration:
         assert "status" in data
         assert data["status"] in ["healthy", "degraded"]
     
-    def test_jobs_debug_endpoint_protected(self):
-        """Test that debug endpoint is accessible in dev/staging"""
-        response = requests.get(f"{API_BASE}/jobs/debug/env", timeout=5)
-        # Should be 200 in dev/staging, 403 in production
-        assert response.status_code in [200, 403]
-        if response.status_code == 200:
-            data = response.json()
-            assert "SUPABASE_URL" in data
-    
     def test_create_job_invalid_project_id(self):
         """Test creating a job with invalid project_id returns 400"""
         response = requests.post(
@@ -220,15 +211,6 @@ class TestJobsIntegration:
 
 class TestFilesIntegration:
     """Integration tests for Files endpoints using actual HTTP requests"""
-    
-    def test_files_debug_endpoint_protected(self):
-        """Test that debug endpoint is accessible in dev/staging"""
-        response = requests.get(f"{API_BASE}/files/debug/env", timeout=5)
-        # Should be 200 in dev/staging, 403 in production
-        assert response.status_code in [200, 403]
-        if response.status_code == 200:
-            data = response.json()
-            assert "SUPABASE_URL" in data
     
     def test_create_file_invalid_job_id(self):
         """Test creating a file with invalid job_id returns 400"""

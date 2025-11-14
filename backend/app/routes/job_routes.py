@@ -8,7 +8,6 @@ from app.db.queries.job_queries import (
     delete_job
 )
 from app.models.job_model import JobCreate, JobUpdate, JobResponse
-from app.core.config import settings
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -56,16 +55,3 @@ async def delete_job_route(job_id: str, authorization: str = Header(None)):
     if not deleted:
         raise HTTPException(status_code=400, detail="Job deletion failed")
     return {"message": "Job deleted successfully"}
-
-
-# Debug endpoint (development only)
-@router.get("/debug/env")
-async def debug_env():
-    """Debug endpoint - only available in development/staging"""
-    if settings.ENVIRONMENT == "production":
-        raise HTTPException(status_code=403, detail="Debug endpoint not available in production")
-    return {
-        "SUPABASE_URL": settings.SUPABASE_URL,
-        "SERVICE_ROLE_KEY": settings.SUPABASE_SERVICE_ROLE_KEY[:8] + "..." if settings.SUPABASE_SERVICE_ROLE_KEY else None,
-        "ANON": settings.SUPABASE_ANON_KEY[:8] + "..." if settings.SUPABASE_ANON_KEY else None
-    }

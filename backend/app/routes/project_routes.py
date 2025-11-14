@@ -8,7 +8,6 @@ from app.db.queries.project_queries import (
     delete_project
 )
 from app.models.project_model import ProjectCreate, ProjectUpdate, ProjectOut
-from app.core.config import settings
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -71,13 +70,3 @@ async def delete_project_route(
     if not deleted:
         raise HTTPException(status_code=400, detail="Delete failed")
     return {"message": "Project deleted successfully"}
-
-
-# DEBUG ENV
-@router.get("/debug/env")
-async def debug_env():
-    return {
-        "SUPABASE_URL": settings.SUPABASE_URL,
-        "SERVICE_ROLE_KEY": settings.SUPABASE_SERVICE_ROLE_KEY[:8] + "...",
-        "ANON": settings.SUPABASE_ANON_KEY[:8] + "..."
-    }
