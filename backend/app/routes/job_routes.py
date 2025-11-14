@@ -13,7 +13,7 @@ from app.core.config import settings
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 
-# 🟢 Create Job
+# Create Job
 @router.post("/", response_model=JobResponse, status_code=201)
 async def create_job_route(job: JobCreate, authorization: str = Header(None)):
     result = await create_job_query(job.dict(), authorization)
@@ -21,8 +21,7 @@ async def create_job_route(job: JobCreate, authorization: str = Header(None)):
         raise HTTPException(status_code=400, detail=result.get("error", "Job creation failed"))
     return result
 
-
-# 🟡 Get All Jobs (by project_id)
+# Get All Jobs (by project_id)
 @router.get("/", response_model=List[JobResponse])
 async def list_jobs(
     project_id: str = Query(..., description="Filter jobs by project_id"),
@@ -32,7 +31,7 @@ async def list_jobs(
     return jobs
 
 
-# 🟢 Get Single Job
+# Get Single Job
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job_route(job_id: str, authorization: str = Header(None)):
     job = await get_job(job_id, authorization)
@@ -41,7 +40,7 @@ async def get_job_route(job_id: str, authorization: str = Header(None)):
     return job
 
 
-# 🟣 Update Job (PATCH)
+# Update Job (PATCH)
 @router.patch("/{job_id}", response_model=JobResponse)
 async def update_job_route(job_id: str, updates: JobUpdate, authorization: str = Header(None)):
     updated = await update_job(job_id, updates.dict(exclude_unset=True), authorization)
@@ -50,7 +49,7 @@ async def update_job_route(job_id: str, updates: JobUpdate, authorization: str =
     return updated
 
 
-# 🔴 Delete Job
+# Delete Job
 @router.delete("/{job_id}")
 async def delete_job_route(job_id: str, authorization: str = Header(None)):
     deleted = await delete_job(job_id, authorization)
@@ -59,7 +58,7 @@ async def delete_job_route(job_id: str, authorization: str = Header(None)):
     return {"message": "Job deleted successfully"}
 
 
-# 🧩 Debug endpoint (optional)
+# Debug endpoint (optional)
 @router.get("/debug/env")
 async def debug_env():
     return {
