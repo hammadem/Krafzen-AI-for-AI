@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react"
 import About from "@/app/(main)/about/page";
-import { aboutData } from "@/lib/data";
+import { aboutData } from "@/app/lib/data";
 
 describe("About Page", () => {
     it("renders the About Page", () => {

@@ -5,7 +5,7 @@ import { ExportHistory } from "./Examples";
 import { useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { classNames } from "@/lib/utils";
+import { classNames } from "@/app/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 export default function Exports() {

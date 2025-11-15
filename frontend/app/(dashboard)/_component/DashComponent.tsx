@@ -2,7 +2,7 @@
 import Image from "next/image";
 import { Example, Heading, SideExample } from "./Examples";
 import Toolbar from "./Toolbar";
-import { classNames } from "@/lib/utils";
+import { classNames } from "@/app/lib/utils";
 import { useDashboard } from "@/context/DashboardContex";
 import { Button } from "@/components/ui/button";
 

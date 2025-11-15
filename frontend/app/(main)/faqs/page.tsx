@@ -2,7 +2,7 @@
 import NavHeader from "@/components/NavHeader";
 import { Button } from "@/components/ui/button";
 import { ComboboxDemo } from "@/components/ui/combobox";
-import { faqs } from "@/lib/data";
+import { faqs } from "@/app/lib/data";
 import { useState } from "react";
 
 function classNames(...classes: string[]) {

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { BellRing, CircleQuestionMark } from "lucide-react";
 import Image from "next/image";
 import { History, NavLinks, Projects } from "./Examples";
-import { historyData } from "@/lib/data";
+import { historyData } from "@/app/lib/data";
 import { useDashboard } from "@/context/DashboardContex";
 
 export default function Sidebar() {

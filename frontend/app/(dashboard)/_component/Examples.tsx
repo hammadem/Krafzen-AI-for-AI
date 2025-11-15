@@ -1,8 +1,8 @@
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { PricingPlans } from "@/lib/data";
-import { classNames } from "@/lib/utils";
+import { PricingPlans } from "@/app/lib/data";
+import { classNames } from "@/app/lib/utils";
 import { CreditCardIcon, Download, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, LucideLayoutTemplate, RotateCw, Settings } from "lucide-react";
 import Image from "next/image";
 

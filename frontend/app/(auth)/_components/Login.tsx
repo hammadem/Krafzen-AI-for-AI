@@ -1,6 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/supabaseClient";
+import { createClient } from "@/app/lib/supabase/supabaseClient";
 import Image from "next/image";
 import Link from "next/link";
 

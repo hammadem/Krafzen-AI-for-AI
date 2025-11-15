@@ -1,5 +1,5 @@
 "use client";
-import { classNames } from "@/lib/utils";
+import { classNames } from "@/app/lib/utils";
 import { Plus, Mic, ArrowUp } from "lucide-react";
 import { ChangeEvent, useRef } from "react";
 import { useDashboard } from "@/context/DashboardContex";

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Field, FieldError, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { changePassword } from "@/lib/validation";
+import { changePassword } from "@/app/lib/validation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 // import { useState } from "react";

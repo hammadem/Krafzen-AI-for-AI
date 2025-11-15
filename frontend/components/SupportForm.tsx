@@ -23,7 +23,7 @@ import {
     InputGroupText,
     InputGroupTextarea,
 } from "@/components/ui/input-group";
-import { formSchema } from "@/lib/validation";
+import { formSchema } from "@/app/lib/validation";
 
 
 export default function SupportForm() {

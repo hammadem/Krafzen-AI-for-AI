@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import Faqs from "@/app/(main)/faqs/page";
-import { faqs } from "@/lib/data";
+import { faqs } from "@/app/lib/data";
 
 describe("FAQs Page", () => {
     it("renders the About Page", () => {

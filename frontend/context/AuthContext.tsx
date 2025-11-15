@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/supabaseClient";
+import { createClient } from "@/app/lib/supabase/supabaseClient";
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
 interface AuthContextType {

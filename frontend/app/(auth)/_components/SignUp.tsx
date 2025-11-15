@@ -14,7 +14,7 @@ import {
     FieldGroup,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { loginSchema } from "@/lib/validation";
+import { loginSchema } from "@/app/lib/validation";
 import Link from "next/link";
 
 

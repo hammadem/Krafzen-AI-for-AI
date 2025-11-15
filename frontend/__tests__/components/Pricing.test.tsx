@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import Pricing from "@/components/Pricing";
-import { PricingPlans } from "@/lib/data";
+import { PricingPlans } from "@/app/lib/data";
 
 describe("Pricing Component", () => {
     it("renders monthly and annual plans correctly on toggle", () => {

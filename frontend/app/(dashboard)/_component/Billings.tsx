@@ -3,7 +3,7 @@ import { Progress } from "@/components/ui/progress";
 import { Download, LucideCreditCard, Plus } from "lucide-react";
 import { SeePlans } from "./Examples";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
-import { PricingPlans } from "@/lib/data";
+import { PricingPlans } from "@/app/lib/data";
 
 export default function Billings() {
     return (

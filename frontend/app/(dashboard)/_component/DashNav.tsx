@@ -1,7 +1,7 @@
 "use client";
 import CompanyLogo from "@/components/CompanyLogo";
 import { Button } from "@/components/ui/button";
-import { classNames } from "@/lib/utils";
+import { classNames } from "@/app/lib/utils";
 import { useDashboard } from "@/context/DashboardContex";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";

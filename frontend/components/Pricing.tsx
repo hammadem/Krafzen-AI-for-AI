@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Button } from "./ui/button";
 import PricingDiv from "./ui/PricingDiv";
-import { PricingPlans } from "@/lib/data";
+import { PricingPlans } from "@/app/lib/data";
 
 function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ')
