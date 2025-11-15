@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
 from app.utils.logger import logger
+import uuid
 
 
 async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -20,6 +21,13 @@ async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = No
         if not project_id:
             logger.warning("[create_job] Missing project_id in payload")
             return {"error": "project_id is required"}
+        
+        # Validate UUID format
+        try:
+            uuid.UUID(project_id)
+        except (ValueError, TypeError):
+            logger.warning("[create_job] Invalid UUID format", project_id=project_id)
+            return {"error": f"Invalid project_id format: {project_id}. Must be a valid UUID."}
 
         project_check = await run_in_threadpool(
             lambda: db.table("projects")
@@ -50,8 +58,12 @@ async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = No
 
     except Exception as e:
         error_msg = str(e)
+        # Check for invalid UUID or Supabase client errors
+        if "missing response" in error_msg.lower() or "postgrest" in error_msg.lower() or "204" in error_msg:
+            logger.warning("[create_job] Invalid UUID or database error", project_id=job_data.get("project_id"), error=error_msg)
+            return {"error": "Invalid project_id format or database error"}
         if "foreign key constraint" in error_msg.lower():
-            logger.error("[create_job] Foreign key violation", project_id=job_data.get("project_id"), exc_info=True)
+            logger.warning("[create_job] Foreign key violation", project_id=job_data.get("project_id"))
             return {"error": "Invalid project_id. Project not found"}
         logger.error("[create_job] Unexpected error", error=str(e), exc_info=True)
         return {"error": "Unexpected server error"}

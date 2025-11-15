@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
 from app.utils.logger import logger
+import uuid
 
 
 # CREATE
@@ -11,6 +12,13 @@ async def create_file(file_data: Dict[str, Any], authorization: Optional[str] = 
         if not job_id:
             logger.warning("[create_file] Missing job_id in payload")
             return {"error": "job_id is required"}
+        
+        # Validate UUID format
+        try:
+            uuid.UUID(job_id)
+        except (ValueError, TypeError):
+            logger.warning("[create_file] Invalid UUID format", job_id=job_id)
+            return {"error": f"Invalid job_id format: {job_id}. Must be a valid UUID."}
 
         # Check if the job exists
         job_check = await run_in_threadpool(
@@ -40,6 +48,11 @@ async def create_file(file_data: Dict[str, Any], authorization: Optional[str] = 
         return response.data[0] if response and hasattr(response, 'data') and response.data else None
 
     except Exception as e:
+        error_msg = str(e)
+        # Check for invalid UUID or Supabase client errors
+        if "missing response" in error_msg.lower() or "postgrest" in error_msg.lower() or "204" in error_msg:
+            logger.warning("[create_file] Invalid UUID or database error", job_id=file_data.get("job_id"), error=error_msg)
+            return {"error": "Invalid job_id format or database error"}
         logger.error("[create_file] Error", job_id=file_data.get("job_id"), error=str(e), exc_info=True)
         return {"error": str(e)}
 
