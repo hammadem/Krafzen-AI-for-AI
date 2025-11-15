@@ -29,7 +29,7 @@ async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = No
                         .execute()
         )
 
-        if not project_check.data:
+        if not project_check or not hasattr(project_check, 'data') or not project_check.data:
             logger.warning("[create_job] Project not found", project_id=project_id)
             return {"error": f"Project with id {project_id} does not exist"}
 
@@ -46,7 +46,7 @@ async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = No
                         .execute()
         )
 
-        return response.data[0] if response.data else None
+        return response.data[0] if response and hasattr(response, 'data') and response.data else None
 
     except Exception as e:
         error_msg = str(e)
@@ -65,7 +65,7 @@ async def get_jobs(project_id: str, authorization: Optional[str] = None) -> List
                         .eq("project_id", project_id)
                         .execute()
         )
-        return response.data or []
+        return response.data if response and hasattr(response, 'data') and response.data else []
     except Exception as e:
         logger.error("[get_jobs] Error", project_id=project_id, error=str(e), exc_info=True)
         return []
@@ -80,6 +80,8 @@ async def get_job(job_id: str, authorization: Optional[str] = None) -> Optional[
                         .maybe_single()
                         .execute()
         )
+        if not response or not hasattr(response, 'data') or not response.data:
+            return None
         return response.data
     except Exception as e:
         logger.error("[get_job] Error", job_id=job_id, error=str(e), exc_info=True)
@@ -107,7 +109,7 @@ async def update_job(job_id: str, update_data: Dict[str, Any], authorization: Op
                         .execute()
         )
 
-        if response and response.data:
+        if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
             return response.data[0]
 
         logger.warning("[update_job] Job not found", job_id=job_id)
@@ -126,7 +128,7 @@ async def delete_job(job_id: str, authorization: Optional[str] = None) -> bool:
                         .eq("id", job_id)
                         .execute()
         )
-        return bool(response.data)
+        return bool(response and hasattr(response, 'data') and response.data)
     except Exception as e:
         logger.error("[delete_job] Error", job_id=job_id, error=str(e), exc_info=True)
         return False

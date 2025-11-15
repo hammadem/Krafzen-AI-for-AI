@@ -98,7 +98,7 @@ jobs:
     - name: Run unit tests
       run: |
         cd backend
-        python -m pytest tests/unit/test_jobs.py tests/unit/test_files.py tests/unit/test_health.py tests/unit/test_projects.py -v --tb=short
+        python -m pytest tests/unit/ -v --tb=short
       continue-on-error: true
     
     - name: Run integration tests (HTTP requests)
