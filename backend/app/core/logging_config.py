@@ -28,19 +28,19 @@ def init_sentry(dsn: str | None):
     # Only initialize if DSN is provided and not a placeholder
     if dsn and dsn.strip() and not dsn.startswith("your_") and "sentry.io" in dsn:
         try:
-        import sentry_sdk
-        from sentry_sdk.integrations.logging import LoggingIntegration
+            import sentry_sdk
+            from sentry_sdk.integrations.logging import LoggingIntegration
 
-        sentry_logging = LoggingIntegration(
-            level=logging.INFO,        
-            event_level=logging.ERROR  
-        )
+            sentry_logging = LoggingIntegration(
+                level=logging.INFO,        
+                event_level=logging.ERROR  
+            )
 
-        sentry_sdk.init(
-            dsn=dsn,
-            integrations=[sentry_logging],
-            traces_sample_rate=1.0,
-        )
+            sentry_sdk.init(
+                dsn=dsn,
+                integrations=[sentry_logging],
+                traces_sample_rate=1.0,
+            )
             logger = logging.getLogger(__name__)
             logger.info("Sentry initialized successfully")
         except Exception as e:
