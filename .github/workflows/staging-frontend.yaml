@@ -40,8 +40,16 @@ jobs:
         run: |
           cd frontend
           npm run test -- --run
+      
+      - name: Debug Supabase secrets
+        run: |
+          echo "SUPABASE_URL set? ${{ secrets.SUPABASE_URL != '' }}"
+          echo "SUPABASE_ANON_KEY set? ${{ secrets.SUPABASE_ANON_KEY != '' }}"
 
       - name: Build project
+      - env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           cd frontend
           npm run build
@@ -60,5 +68,5 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./frontend
+          working-directory: ./
           prod: false  # preview deploy (not production)
