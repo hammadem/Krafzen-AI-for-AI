@@ -14,22 +14,25 @@ export default function NavHeader({ currentNav }: { currentNav: string; }) {
     return (
         <>
 
-            <div className="w-full h-30 z-9999" style={style}>
+            <div className="w-full h-[18vh] sm:h-[22vh] z-9999 flex items-center w-full" style={style}>
 
-                <div className="w-[50%] flex flex-col items-center justify-center">
-                    <h1 className="text-white text-[6vh] font-semibold mt-3">{currentNav}</h1>
+                <div className="flex flex-col mx-6 w-[80%] mx-auto">
 
-                    <span className="flex items-center justify-center">
-                        <Link className="text-white cursor-pointer font-semibold" href="/" aria-label="Home Link">Home</Link>
-                        <Image
-                            src="/navheader/Vector.png"
-                            height={5}
-                            width={5}
-                            alt="Vector Image Navheader"
-                            className="mx-3"
-                        />
-                        <p className="text-white font-semibold">{currentNav}</p>
-                    </span>
+                    <div className="flex flex-col items-start justify-center">
+                        <h1 className="text-white text-[6vh] font-semibold">{currentNav}</h1>
+
+                        <span className="flex items-center justify-start">
+                            <Link className="text-white cursor-pointer font-semibold" href="/" aria-label="Home Link">Home</Link>
+                            <Image
+                                src="/navheader/Vector.png"
+                                height={5}
+                                width={5}
+                                alt="Vector Image Navheader"
+                                className="mx-3 translate-y-[2px]"
+                            />
+                            <p className="text-white font-semibold">{currentNav}</p>
+                        </span>
+                    </div>
                 </div>
 
             </div>

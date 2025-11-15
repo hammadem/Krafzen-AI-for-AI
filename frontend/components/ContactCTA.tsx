@@ -19,7 +19,7 @@ export default function ContactCTA() {
 
                     <Button
                         variant="secondary"
-                        className="rounded-full z-999 cursor-pointer"
+                        className="rounded-full z-999 cursor-pointer hover:bg-green-400 bg-green-400"
                     >Book an appointment</Button>
                 </span>
 
@@ -28,7 +28,7 @@ export default function ContactCTA() {
                     width={600}
                     height={600}
                     alt="Tilted Image"
-                    className="absolute right-0 bottom-0 hidden sm:block"
+                    className="absolute right-0 bottom-0 hidden md:block"
                 />
         </div>
     );

@@ -1,5 +1,60 @@
 // This contain data for static pages those are all across the webpage
 
+// Static History Data Will be integrated with backend soon
+export const historyData: HistoryData[] = [
+    {
+        date: "31st Jan. 2025 07:21 PM",
+        searches: [
+            {
+                title: "Draw a 12x10 kitchen with a door on the right",
+                time: "07:21 PM"
+            },
+            {
+                title: "Draw a 12x10 kitchen with a door on the right",
+                time: "07:21 PM"
+            },
+            {
+                title: "Draw a 12x10 kitchen with a door on the right",
+                time: "07:21 PM"
+            }
+        ]
+    },
+    {
+        date: "1st Feb. 2025",
+        searches: [
+            {
+                title: "Draw a 12x10 kitchen with a door on the right",
+                time: "07:21 PM"
+            },
+            {
+                title: "Draw a 12x10 kitchen with a door on the right",
+                time: "07:21 PM"
+            },
+            {
+                title: "Draw a 12x10 kitchen with a door on the right",
+                time: "07:21 PM"
+            }
+        ]
+    },
+    {
+        date: "1st Feb. 2025",
+        searches: [
+            {
+                title: "Draw a 12x10 kitchen with a door on the right",
+                time: "07:21 PM"
+            },
+            {
+                title: "Draw a 12x10 kitchen with a door on the right",
+                time: "07:21 PM"
+            },
+            {
+                title: "Draw a 12x10 kitchen with a door on the right",
+                time: "07:21 PM"
+            }
+        ]
+    }
+]
+
 // FAQs Questions Data
 export const faqs: FAQs[] = [
     {
@@ -131,7 +186,7 @@ export const PricingPlans: PricingPlans = {
             price: "$249",
             features: [
                 "Includes 500 mins. per month",
-                "$.30/min for more usage",
+                "$0.30/min for more usage",
                 "Up to 3 team seats",
                 "Access to transcript view",
                 "Built-in JSON editor",
@@ -156,7 +211,7 @@ export const PricingPlans: PricingPlans = {
         },
         {
             type: "Enterprise",
-            price: "$1799",
+            price: "$1,799",
             features: [
                 "Includes 10,000 mins. per month",
                 "$0.12/min for more usage",
@@ -191,7 +246,7 @@ export const PricingPlans: PricingPlans = {
             price: "$2,490",
             features: [
                 "Includes 500 mins. per month",
-                "$.30/min for more usage",
+                "$0.30/min for more usage",
                 "Up to 3 team seats",
                 "Access to transcript view",
                 "Built-in JSON editor",

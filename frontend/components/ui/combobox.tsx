@@ -27,7 +27,7 @@ export function ComboboxDemo({ setValue,value }: { setValue: React.Dispatch<Reac
                     variant="secondary"
                     role="combobox"
                     aria-expanded={open}
-                    className="w-[80%] h-[12vh] justify-between bg-[#1d1c1cff] border-[1px] border-[white] opacity-60 cursor-pointer"
+                    className="w-[80%] h-[10vh] justify-between bg-[#1d1c1cff] border-[1px] border-[white] opacity-60 cursor-pointer"
                 >
                     <p className="text-white font-thin">
                         {

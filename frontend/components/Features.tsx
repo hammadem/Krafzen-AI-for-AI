@@ -42,13 +42,13 @@ export default function Features() {
                 </span>
             </div>
 
-            <div className="relative w-[100%] h-100vh sm:h-[80vh] bg-black flex flex-col items-center justify-evenly">
+            <div className="relative w-[100%] h-100vh sm:h-[70vh] bg-black flex flex-col items-center justify-evenly">
 
                 <span
-                    className="h-20 sm:h-0"
+                    className="h-20 sm:h-10"
                 ></span>
 
-                <div className="text-white text-[4vh] font-semibold">How it works</div>
+                <div className="text-white text-[6vh] font-semibold">How it works</div>
 
                 <span
                     className="h-20 sm:h-0"
@@ -87,7 +87,7 @@ export default function Features() {
                     />
 
                     <div className="relative flex flex-col h-[25vh] sm:h-[40vh] items-center justify-evenly">
-                        <p className="text-white font-semibold">Ai interprets</p>
+                        <p className="text-white font-semibold">AI interprets</p>
                         <Image
                             src="/hiw/design.png"
                             alt="Design"
@@ -99,7 +99,7 @@ export default function Features() {
                     </div>
 
                     <span
-                        className="h-20 sm:h-0"
+                        className="h-20 sm:h-10"
                     />
 
                     <div className="relative">
@@ -128,6 +128,10 @@ export default function Features() {
                         <p className="text-white">Export to DWG, DXF , Revit.</p>
                     </div>
                 </div>
+
+                <span
+                    className="h-10 sm:h-0"
+                ></span>
             </div>
         </>
     )

@@ -164,7 +164,7 @@ export default function SupportForm() {
             </CardContent>
             <CardFooter>
                 <Field orientation="horizontal">
-                    <Button type="submit" form="form-rhf-demo" variant="secondary" className="rounded-full w-full cursor-pointer">
+                    <Button type="submit" form="form-rhf-demo" variant="secondary" className="rounded-full w-full cursor-pointer hover:bg-green-400 bg-green-400">
                         Submit
                     </Button>
                 </Field>

@@ -22,15 +22,13 @@ export global {
             answer: string[]
         }[]
     }
-}
 
-{/**
-        type D1 = {
-        heading: string,
-        p: string[]
+    type HistoryData = {
+        date: string,
+        searches: {
+            title: string,
+            time: string | undefined
+        }[]
+
     }
-
-    type AboutData = {
-        d1: D1;
-        p: string[];
-    } */}
+}
