@@ -4,9 +4,17 @@ install:
 	pip install -r requirements.txt
 
 run:
-	uvicorn app.main:app --reload
+	@echo "Starting server..."
+	@if [ -d "venv" ]; then \
+		. venv/bin/activate && uvicorn app.main:app --reload; \
+	else \
+		python3 -m uvicorn app.main:app --reload; \
+	fi
 
 test:
+	pytest tests/ -v
+
+test-coverage:
 	pytest tests/ -v --cov=app/ --cov-report=html
 
 db-setup:
