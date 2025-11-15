@@ -7,7 +7,7 @@ run:
 	uvicorn app.main:app --reload
 
 test:
-	pytest app/tests/ -v --cov=app/ --cov-report=html
+	pytest tests/ -v --cov=app/ --cov-report=html
 
 db-setup:
 	./scripts/setup_supabase.sh

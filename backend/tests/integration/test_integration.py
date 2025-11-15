@@ -4,8 +4,8 @@ These tests make actual HTTP requests to a running server.
 
 To run these tests:
 1. Make sure the server is NOT already running on port 8000, OR
-2. Start the server manually: uvicorn main:app --reload
-3. Run: pytest app/tests/test_integration.py -v
+2. Start the server manually: uvicorn app.main:app --reload
+3. Run: pytest tests/integration/test_integration.py -v
 """
 
 import pytest

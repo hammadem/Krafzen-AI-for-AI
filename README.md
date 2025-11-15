@@ -233,10 +233,10 @@ The Projects Management API provides complete CRUD operations for managing user 
 ### Quick Test Script
 ```bash
 cd backend
-python3.12 test_endpoints.py
+python3.12 tests/integration/test_endpoints.py
 
 # With audio file:
-python3.12 test_endpoints.py --audio /path/to/audio.mp3
+python3.12 tests/integration/test_endpoints.py --audio /path/to/audio.mp3
 ```
 
 ### Microphone Testing (Whisper Transcription)
@@ -244,9 +244,9 @@ Test the complete workflow: Record from microphone → Transcribe → Parse
 ```bash
 cd backend
 source venv/bin/activate
-python test_full_workflow.py
+python tests/integration/test_full_workflow.py
 # Or test transcription only:
-python test_whisper_mic.py
+python tests/integration/test_whisper_mic.py
 ```
 
 ### Manual Testing
@@ -371,7 +371,7 @@ git push origin feature/your-feature
 **Backend:**
 ```bash
 cd backend
-pytest app/tests/ -v
+pytest tests/ -v
 ```
 
 **Frontend:**

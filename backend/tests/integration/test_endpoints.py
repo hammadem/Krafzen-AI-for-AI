@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Simple test script for KRAFZEN AI endpoints
-Usage: python test_endpoints.py
+Usage: python tests/integration/test_endpoints.py
+Or from backend directory: python -m tests.integration.test_endpoints
 """
 
 import requests
