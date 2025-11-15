@@ -98,7 +98,7 @@ jobs:
     - name: Run unit tests
       run: |
         cd backend
-        python -m pytest app/tests/test_jobs.py app/tests/test_files.py app/tests/test_health.py app/tests/test_projects.py -v --tb=short
+        python -m pytest tests/unit/ -v --tb=short
       continue-on-error: true
     
     - name: Run integration tests (HTTP requests)
@@ -126,7 +126,7 @@ jobs:
         
         # Run integration tests
         echo "Running integration tests..."
-        python -m pytest app/tests/test_integration.py -v --tb=short
+        python -m pytest tests/integration/test_integration.py -v --tb=short
         
         # Cleanup: Stop server
         echo "Stopping server..."

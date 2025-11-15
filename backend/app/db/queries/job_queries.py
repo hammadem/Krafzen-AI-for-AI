@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional
 from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
 from app.utils.logger import logger
+import uuid
 
 
 async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -20,6 +21,13 @@ async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = No
         if not project_id:
             logger.warning("[create_job] Missing project_id in payload")
             return {"error": "project_id is required"}
+        
+        # Validate UUID format
+        try:
+            uuid.UUID(project_id)
+        except (ValueError, TypeError):
+            logger.warning("[create_job] Invalid UUID format", project_id=project_id)
+            return {"error": f"Invalid project_id format: {project_id}. Must be a valid UUID."}
 
         project_check = await run_in_threadpool(
             lambda: db.table("projects")
@@ -29,7 +37,7 @@ async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = No
                         .execute()
         )
 
-        if not project_check.data:
+        if not project_check or not hasattr(project_check, 'data') or not project_check.data:
             logger.warning("[create_job] Project not found", project_id=project_id)
             return {"error": f"Project with id {project_id} does not exist"}
 
@@ -46,12 +54,16 @@ async def create_job(job_data: Dict[str, Any], authorization: Optional[str] = No
                         .execute()
         )
 
-        return response.data[0] if response.data else None
+        return response.data[0] if response and hasattr(response, 'data') and response.data else None
 
     except Exception as e:
         error_msg = str(e)
+        # Check for invalid UUID or Supabase client errors
+        if "missing response" in error_msg.lower() or "postgrest" in error_msg.lower() or "204" in error_msg:
+            logger.warning("[create_job] Invalid UUID or database error", project_id=job_data.get("project_id"), error=error_msg)
+            return {"error": "Invalid project_id format or database error"}
         if "foreign key constraint" in error_msg.lower():
-            logger.error("[create_job] Foreign key violation", project_id=job_data.get("project_id"), exc_info=True)
+            logger.warning("[create_job] Foreign key violation", project_id=job_data.get("project_id"))
             return {"error": "Invalid project_id. Project not found"}
         logger.error("[create_job] Unexpected error", error=str(e), exc_info=True)
         return {"error": "Unexpected server error"}
@@ -65,7 +77,7 @@ async def get_jobs(project_id: str, authorization: Optional[str] = None) -> List
                         .eq("project_id", project_id)
                         .execute()
         )
-        return response.data or []
+        return response.data if response and hasattr(response, 'data') and response.data else []
     except Exception as e:
         logger.error("[get_jobs] Error", project_id=project_id, error=str(e), exc_info=True)
         return []
@@ -80,6 +92,8 @@ async def get_job(job_id: str, authorization: Optional[str] = None) -> Optional[
                         .maybe_single()
                         .execute()
         )
+        if not response or not hasattr(response, 'data') or not response.data:
+            return None
         return response.data
     except Exception as e:
         logger.error("[get_job] Error", job_id=job_id, error=str(e), exc_info=True)
@@ -107,7 +121,7 @@ async def update_job(job_id: str, update_data: Dict[str, Any], authorization: Op
                         .execute()
         )
 
-        if response and response.data:
+        if response and hasattr(response, 'data') and response.data and len(response.data) > 0:
             return response.data[0]
 
         logger.warning("[update_job] Job not found", job_id=job_id)
@@ -126,7 +140,7 @@ async def delete_job(job_id: str, authorization: Optional[str] = None) -> bool:
                         .eq("id", job_id)
                         .execute()
         )
-        return bool(response.data)
+        return bool(response and hasattr(response, 'data') and response.data)
     except Exception as e:
         logger.error("[delete_job] Error", job_id=job_id, error=str(e), exc_info=True)
         return False

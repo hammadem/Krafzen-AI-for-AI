@@ -9,7 +9,11 @@ from app.models.project_model import ProjectCreate, ProjectUpdate
 # CREATE
 async def create_project(project_data: ProjectCreate, authorization: str) -> Optional[Dict[str, Any]]:
     try:
-        token = authorization.split(" ")[1]
+        token = None
+        if authorization:
+            parts = authorization.split(" ")
+            if len(parts) == 2:
+                token = parts[1]
 
         payload = {
             "user_id": project_data.user_id,
@@ -24,7 +28,7 @@ async def create_project(project_data: ProjectCreate, authorization: str) -> Opt
             .execute()
         )
 
-        return response.data[0] if response.data else None
+        return response.data[0] if response and hasattr(response, 'data') and response.data else None
 
     except Exception as e:
         print(f"Create project error: {e}")
@@ -44,7 +48,7 @@ async def get_projects(user_id: str, authorization: str) -> List[Dict[str, Any]]
         )
 
         print(f"DEBUG response.data={response.data}")
-        return response.data or []
+        return response.data if response and hasattr(response, 'data') and response.data else []
 
     except Exception as e:
         print(f"List projects error: {e}")
@@ -74,7 +78,7 @@ async def get_project(project_id: str, authorization: str) -> Optional[Dict[str,
             print("DEBUG: No project found with this ID.")
             return None
 
-        return response.data
+        return response.data if response and hasattr(response, 'data') and response.data else None
 
     except Exception as e:
         print(f"Get project error: {e}")
@@ -97,7 +101,7 @@ async def update_project(project_id: str, update_data: ProjectUpdate, authorizat
         )
         print(f"DEBUG: response.data={response.data}, len={len(response.data)}")
 
-        return response.data[0] if response.data else None
+        return response.data[0] if response and hasattr(response, 'data') and response.data else None
     except Exception as e:
         print(f"Update project error: {e}")
         return None
@@ -115,7 +119,7 @@ async def delete_project(project_id: str, authorization: str) -> bool:
             .execute()
         )
 
-        return bool(response.data)
+        return bool(response and hasattr(response, 'data') and response.data)
 
     except Exception as e:
         print(f"Delete project error: {e}")
