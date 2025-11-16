@@ -155,6 +155,10 @@ Example commands:
 # Global instance - only create if API key is configured
 try:
     gpt_parser_service = GPTParserService() if settings.OPENAI_API_KEY else None
-except ValueError:
+except (ValueError, AttributeError) as e:
+    logger.warning(f"Failed to initialize GPT parser service: {e}")
+    gpt_parser_service = None
+except Exception as e:
+    logger.error(f"Unexpected error initializing GPT parser service: {e}", exc_info=True)
     gpt_parser_service = None
 
