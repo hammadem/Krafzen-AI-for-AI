@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 try:
     from app.api import parser
     parser_available = True
+    print("✅ Parser module imported successfully")
 except Exception as e:
+    print(f"⚠️ Failed to import parser module: {e}")
+    import traceback
+    traceback.print_exc()
     logger.warning(f"Failed to import parser module: {e}. Parser endpoints will not be available.")
     parser_available = False
     parser = None
@@ -96,10 +100,15 @@ app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 if parser_available and parser:
     try:
         app.include_router(parser.router, prefix="/api/v1", tags=["Parser"])
+        print("✅ Parser router registered successfully")
         logger.info("Parser router registered successfully")
     except Exception as e:
+        print(f"❌ Failed to register parser router: {e}")
         logger.error(f"Failed to register parser router: {e}", exc_info=True)
 else:
+    print("⚠️ Parser router not available - endpoints will not be registered")
+    if not parser_available:
+        print("   Reason: Parser module import failed")
     logger.warning("Parser router not available - endpoints will not be registered")
 
 
