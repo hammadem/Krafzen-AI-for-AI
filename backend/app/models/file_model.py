@@ -6,11 +6,7 @@ from pydantic import BaseModel, Field
 class FileBase(BaseModel):
     job_id: str = Field(..., description="Foreign key reference to job")
     file_url: str = Field(..., description="Public or signed URL to the file")
-<<<<<<< HEAD
-    file_type: str = Field(..., description="Type of the file, e.g., 'dxf', 'json', 'pdf'")
-=======
     file_type: str = Field(default="dxf", description="Type of the file, e.g., 'dxf', 'json', 'pdf'")
->>>>>>> 2b0a26c080d36b93c0a5bb0cdf3a95ff591dfef9
 
 
 class FileCreate(FileBase):
@@ -30,11 +26,7 @@ class FileInDB(FileBase):
     created_at: Optional[datetime] = None
 
     class Config:
-<<<<<<< HEAD
-        orm_mode = True
-=======
         from_attributes = True
->>>>>>> 2b0a26c080d36b93c0a5bb0cdf3a95ff591dfef9
 
 
 class FileResponse(FileInDB):
