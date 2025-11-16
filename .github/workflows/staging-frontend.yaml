@@ -40,21 +40,17 @@ jobs:
         run: |
           cd frontend
           npm run test -- --run
-      
-      - name: Debug Supabase secrets
-        run: |
-          echo "SUPABASE_URL set? ${{ secrets.SUPABASE_URL != '' }}"
-          echo "SUPABASE_ANON_KEY set? ${{ secrets.SUPABASE_ANON_KEY != '' }}"
 
       - name: Build project
-      - env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
         run: |
           cd frontend
           npm run build
 
-      # This is to check if the secrets are availaible in the provided repo
+      # Optional debugging of Vercel secrets
       - name: Debug Vercel secrets
         run: |
           echo "VERCEL_TOKEN set? ${{ secrets.VERCEL_TOKEN != '' }}"
@@ -68,5 +64,5 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./
-          prod: false  # preview deploy (not production)
+          working-directory: ./frontend
+          prod: false
