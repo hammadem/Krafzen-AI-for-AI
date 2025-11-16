@@ -8,7 +8,6 @@ from app.services.gpt_parser_service import gpt_parser_service
 from app.schemas.parser import (
     ParsingRequest,
     ParsingResponse,
-    ParsingError,
     CADFileType
 )
 from datetime import datetime
