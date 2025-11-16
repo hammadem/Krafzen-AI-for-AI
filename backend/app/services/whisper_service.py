@@ -117,6 +117,14 @@ class WhisperService:
             Exception: If transcription fails
         """
         import httpx
+        import re
+        
+        # Convert Google Drive sharing URLs to direct download URLs
+        gdrive_match = re.search(r'drive\.google\.com/file/d/([a-zA-Z0-9_-]+)', audio_url)
+        if gdrive_match:
+            file_id = gdrive_match.group(1)
+            audio_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+            logger.info(f"Converted Google Drive URL to direct download: {audio_url}")
         
         # Download audio file - follow redirects (needed for Google Drive, etc.)
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
