@@ -4,17 +4,22 @@ GPT-4 Parser API endpoints for converting text to CAD instructions
 
 from fastapi import APIRouter, HTTPException, Body
 from typing import Optional
-from app.services.gpt_parser_service import gpt_parser_service
 from app.schemas.parser import (
     ParsingRequest,
     ParsingResponse,
-    ParsingError,
     CADFileType
 )
 from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Import gpt_parser_service with error handling to ensure router still registers
+try:
+    from app.services.gpt_parser_service import gpt_parser_service
+except Exception as e:
+    logger.warning(f"Failed to import gpt_parser_service: {e}. Parser endpoints will return 503.")
+    gpt_parser_service = None
 
 router = APIRouter()
 
