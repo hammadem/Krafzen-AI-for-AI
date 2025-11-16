@@ -16,15 +16,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Import parser with error handling to ensure app starts even if parser fails
+parser_available = False
+parser = None
 try:
+    import sys
+    sys.stdout.write("🔍 Attempting to import parser module...\n")
+    sys.stdout.flush()
     from app.api import parser
     parser_available = True
-    print("✅ Parser module imported successfully")
+    sys.stdout.write("✅ Parser module imported successfully\n")
+    sys.stdout.flush()
+    logger.info("Parser module imported successfully")
 except Exception as e:
-    print(f"⚠️ Failed to import parser module: {e}")
     import traceback
+    error_msg = f"⚠️ Failed to import parser module: {e}"
+    sys.stdout.write(error_msg + "\n")
+    sys.stdout.flush()
     traceback.print_exc()
-    logger.warning(f"Failed to import parser module: {e}. Parser endpoints will not be available.")
+    logger.error(f"Failed to import parser module: {e}", exc_info=True)
     parser_available = False
     parser = None
 
@@ -97,19 +106,29 @@ app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 
 # Include parser router if available
+import sys
+sys.stdout.write(f"🔍 Parser status: available={parser_available}, parser={parser is not None}\n")
+sys.stdout.flush()
 if parser_available and parser:
     try:
+        sys.stdout.write("🔍 Attempting to register parser router...\n")
+        sys.stdout.flush()
         app.include_router(parser.router, prefix="/api/v1", tags=["Parser"])
-        print("✅ Parser router registered successfully")
+        sys.stdout.write("✅ Parser router registered successfully\n")
+        sys.stdout.flush()
         logger.info("Parser router registered successfully")
     except Exception as e:
-        print(f"❌ Failed to register parser router: {e}")
+        import traceback
+        error_msg = f"❌ Failed to register parser router: {e}"
+        sys.stdout.write(error_msg + "\n")
+        sys.stdout.flush()
+        traceback.print_exc()
         logger.error(f"Failed to register parser router: {e}", exc_info=True)
 else:
-    print("⚠️ Parser router not available - endpoints will not be registered")
-    if not parser_available:
-        print("   Reason: Parser module import failed")
-    logger.warning("Parser router not available - endpoints will not be registered")
+    reason = "Parser module import failed" if not parser_available else "Parser is None"
+    sys.stdout.write(f"⚠️ Parser router not available - {reason}\n")
+    sys.stdout.flush()
+    logger.warning(f"Parser router not available - {reason}")
 
 
 # Root endpoint
