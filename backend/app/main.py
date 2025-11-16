@@ -11,6 +11,18 @@ from app.utils.error_handler import add_exception_handlers
 from app.routes import project_routes, job_routes, file_routes  
 from app.api import health, transcriber
 from app.db.supabase_client import db
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Import parser with error handling to ensure app starts even if parser fails
+try:
+    from app.api import parser
+    parser_available = True
+except Exception as e:
+    logger.warning(f"Failed to import parser module: {e}. Parser endpoints will not be available.")
+    parser_available = False
+    parser = None
 
 
 app = FastAPI(
@@ -79,6 +91,16 @@ app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
+
+# Include parser router if available
+if parser_available and parser:
+    try:
+        app.include_router(parser.router, prefix="/api/v1", tags=["Parser"])
+        logger.info("Parser router registered successfully")
+    except Exception as e:
+        logger.error(f"Failed to register parser router: {e}", exc_info=True)
+else:
+    logger.warning("Parser router not available - endpoints will not be registered")
 
 
 # Root endpoint
