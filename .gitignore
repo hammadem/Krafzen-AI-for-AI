@@ -67,3 +67,9 @@ render.yaml.lock  # If generated
 # Misc
 *.bak
 *.tmp
+
+# Test artifacts
+backend/test_audio.wav
+backend/tests/*.wav
+backend/tests/*.mp3
+backend/tests/*.m4a

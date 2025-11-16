@@ -8,7 +8,7 @@ from starlette.responses import Response
 from app.core.config import settings
 from app.core.logging_config import init_sentry
 from app.utils.error_handler import add_exception_handlers
-from app.routes import project_routes, job_routes, file_routes  
+from app.routes import project_routes, job_routes, file_routes
 from app.api import health, transcriber
 from app.db.supabase_client import db
 import logging

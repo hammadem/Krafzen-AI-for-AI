@@ -43,6 +43,22 @@ class Settings(BaseSettings):
     # OpenAI API
     OPENAI_API_KEY: str = ""
     
+    # GPT-4 Parser Configuration
+    GPT_MODEL: str = "gpt-4-turbo-preview"
+    GPT_MAX_TOKENS: int = 2000
+    GPT_TEMPERATURE: float = 0.3
+    
+    # File Upload Configuration
+    MAX_FILE_SIZE_MB: float = 25.0
+    ALLOWED_AUDIO_FORMATS: str = "mp3,wav,m4a,ogg,flac,webm"
+    
+    @property
+    def ALLOWED_AUDIO_FORMATS_LIST(self) -> List[str]:
+        """Get ALLOWED_AUDIO_FORMATS as a list"""
+        if not self.ALLOWED_AUDIO_FORMATS:
+            return ["mp3", "wav", "m4a", "ogg", "flac", "webm"]
+        return [fmt.strip().lower() for fmt in self.ALLOWED_AUDIO_FORMATS.split(',') if fmt.strip()]
+    
     # App/Security
     SECRET_KEY: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
@@ -58,6 +74,20 @@ class Settings(BaseSettings):
     # Render Configuration (optional)
     RENDER_SERVICE_ID_PRODUCTION: str = ""
     RENDER_SERVICE_ID_STAGING: str = ""
+    
+    # GPT-4 Parser Configuration
+    GPT_MODEL: str = "gpt-4-turbo-preview"
+    GPT_MAX_TOKENS: int = 2000
+    GPT_TEMPERATURE: float = 0.3
+    
+    # File Upload Configuration
+    MAX_FILE_SIZE_MB: int = 25
+    ALLOWED_AUDIO_FORMATS: str = "mp3,wav,m4a,ogg,flac,webm"
+    
+    @property
+    def ALLOWED_AUDIO_FORMATS_LIST(self) -> List[str]:
+        """Get allowed audio formats as a list"""
+        return [fmt.strip() for fmt in self.ALLOWED_AUDIO_FORMATS.split(',') if fmt.strip()]
     
     class Config:
         env_file = ".env"
