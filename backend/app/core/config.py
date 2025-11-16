@@ -36,10 +36,11 @@ class Settings(BaseSettings):
     
     # Supabase
     SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""  # Alias for SUPABASE_ANON_KEY (backward compatibility)
-    SUPABASE_ANON_KEY: str = ""  # Client-side
-    SUPABASE_SERVICE_ROLE_KEY: str = ""  # Server-side ops
-    
+    SUPABASE_PROJECT_ID: str = ""
+    SUPABASE_KEY: str = ""  
+    SUPABASE_ANON_KEY: str = ""  
+    SUPABASE_SERVICE_ROLE_KEY: str = ""  
+    SUPABASE_JWT_SECRET: str = ""
     # OpenAI API
     OPENAI_API_KEY: str = ""
     
@@ -92,6 +93,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
-        extra = "ignore"  # Ignore extra fields in .env file
+        extra = "ignore"  
 
 settings = Settings()

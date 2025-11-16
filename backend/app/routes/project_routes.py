@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from app.db.queries.project_queries import (
     create_project as create_project_query,
@@ -8,65 +8,60 @@ from app.db.queries.project_queries import (
     delete_project
 )
 from app.models.project_model import ProjectCreate, ProjectUpdate, ProjectOut
+from app.middlewares.auth import require_auth
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
 
-
-# CREATE PROJECT
 @router.post("/", response_model=ProjectOut, status_code=201)
 async def create_project_route(
     project: ProjectCreate,
-    authorization: str = Header(None)
+    user: dict = Depends(require_auth)
 ):
-    result = await create_project_query(project, authorization)
+    result = await create_project_query(project, user)
     if not result:
         raise HTTPException(status_code=400, detail="Project creation failed")
     return result
 
 
-# LIST PROJECTS FOR USER
 @router.get("/", response_model=List[ProjectOut])
 async def list_projects(
     user_id: str = Query(..., description="User ID (UUID)"),
-    authorization: str = Header(None)
+    user: dict = Depends(require_auth)
 ):
-    projects = await get_projects(user_id, authorization)
+    projects = await get_projects(user_id, user)
     return projects
 
 
-# GET SINGLE PROJECT
 @router.get("/{project_id}", response_model=ProjectOut)
 async def get_project_route(
     project_id: str,
-    authorization: str = Header(None)
+    user: dict = Depends(require_auth)
 ):
-    project = await get_project(project_id, authorization)
+    project = await get_project(project_id, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
 
 
-# UPDATE PROJECT
 @router.patch("/{project_id}", response_model=ProjectOut)
 async def update_project_route(
     project_id: str,
     update_data: ProjectUpdate,
-    authorization: str = Header(None)
+    user: dict = Depends(require_auth)
 ):
-    updated = await update_project(project_id, update_data, authorization)
+    updated = await update_project(project_id, update_data, user)
     if not updated:
-        raise HTTPException(status_code=404, detail="Project not found or no changes applied")  
+        raise HTTPException(status_code=404, detail="Project not found or no changes applied")
     return updated
 
 
-# DELETE PROJECT
 @router.delete("/{project_id}")
 async def delete_project_route(
     project_id: str,
-    authorization: str = Header(None)
+    user: dict = Depends(require_auth)
 ):
-    deleted = await delete_project(project_id, authorization)
+    deleted = await delete_project(project_id, user)
     if not deleted:
         raise HTTPException(status_code=400, detail="Delete failed")
     return {"message": "Project deleted successfully"}
