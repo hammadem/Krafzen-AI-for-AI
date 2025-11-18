@@ -3,14 +3,29 @@ import { Badge } from "@/components/ui/badge";
 import { BellRing, CircleQuestionMark } from "lucide-react";
 import Image from "next/image";
 import { History, NavLinks, Projects } from "./Examples";
-import { historyData } from "@/app/lib/data";
 import { useDashboard } from "@/context/DashboardContex";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { fetchProjects, fetchPromptHistory } from "@/hooks/fetchApiData";
+
 
 export default function Sidebar() {
-    const { sideBarOpen, setSideBarOpen, setCurrentRoute, route } = useDashboard();
+    const { setHistory, history, sideBarOpen, setSideBarOpen, setCurrentRoute, route } = useDashboard();
+    const { user, setCurrentProject, setProjects } = useAuth();
     function classNames(...classes: string[]) {
         return classes.filter(Boolean).join(' ')
     };
+    const [project, setProjectName] = useState<string>("Create a GYM");
+
+    useEffect(() => {
+        if (!user?.access_token) return;
+
+        fetchPromptHistory({ user, setHistory, setProjects });
+    }, [user, setHistory, setProjects]);
+
+    const createProject = async () => {
+        fetchProjects({ user, project });
+    }
 
     return (
         <div className={classNames(
@@ -72,15 +87,15 @@ export default function Sidebar() {
                 <NavLinks setCurrentRoute={setCurrentRoute} />
 
                 {
-
-                        route === "home" ? <History data={historyData} /> :
-                            route === "projects" ? <Projects /> :
-                                route === "templates" ? "" :
-                                    route === "exports" ?  "" :
-                                        route === "billing" ? "" :
-                                            route === "settings" ? "" :
-                                                ""
+                    route === "home" ? <History data={history} setCurrentProject={setCurrentProject} /> :
+                        route === "projects" ? <Projects createProject={createProject} setProjectName={setProjectName} /> :
+                            route === "templates" ? "" :
+                                route === "exports" ? "" :
+                                    route === "billing" ? "" :
+                                        route === "settings" ? "" :
+                                            ""
                 }
+
             </div>
 
             <div className="bg-black w-full flex flex-col items-center">

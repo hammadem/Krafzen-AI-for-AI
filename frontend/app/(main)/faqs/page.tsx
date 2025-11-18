@@ -2,7 +2,7 @@
 import NavHeader from "@/components/NavHeader";
 import { Button } from "@/components/ui/button";
 import { ComboboxDemo } from "@/components/ui/combobox";
-import { faqs } from "@/app/lib/data";
+import { faqs } from "@/lib/data";
 import { useState } from "react";
 
 function classNames(...classes: string[]) {
@@ -25,7 +25,7 @@ export default function Faqs() {
             <NavHeader currentNav="FAQs" />
 
             <div className="hidden sm:flex flex-cols w-full py-16 justify-evenly items-center md:h-[80vh] sm:h-[110vh]">
-                
+
                 <span className="flex flex-col items-center h-full gap-4 w-[50%] md:w-[50%]">
                     {faqs.map((faq, ind) => {
                         return (

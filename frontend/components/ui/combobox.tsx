@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/app/lib/utils";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
     Command,
@@ -15,9 +15,9 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import { faqs } from "@/app/lib/data";
+import { faqs } from "@/lib/data";
 
-export function ComboboxDemo({ setValue,value }: { setValue: React.Dispatch<React.SetStateAction<string>>,value:string }) {
+export function ComboboxDemo({ setValue, value }: { setValue: React.Dispatch<React.SetStateAction<string>>, value: string }) {
     const [open, setOpen] = React.useState(false)
 
     return (

@@ -1,7 +1,7 @@
 "use client";
 import CompanyLogo from "@/components/CompanyLogo";
 import { Button } from "@/components/ui/button";
-import { classNames } from "@/app/lib/utils";
+import { classNames } from "@/lib/utils";
 import { useDashboard } from "@/context/DashboardContex";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default function DashNav() {
     const { sideBarOpen } = useDashboard();
-    const { user ,logout} = useAuth();
+    const { user, logout } = useAuth();
 
     return (
         <div className="flex w-[95%] items-end justify-end">
@@ -20,7 +20,7 @@ export default function DashNav() {
                 </span>
 
                 {
-                    !user
+                    !user?.access_token
                         ? <span className="flex gap-4 mr-4">
                             <Link
                                 href="/login"
@@ -49,8 +49,8 @@ export default function DashNav() {
                         <span className="flex gap-4 items-center justify-center w-[15%]">
                             <Badge className="bg-green-300 text-black py-0 my-4 cursor-pointer">Pro</Badge>
 
-                            <Avatar className="cursor-pointer">
-                                <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" onClick={() => logout}/>
+                            <Avatar className="cursor-pointer" onClick={logout} >
+                                <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
                                 <AvatarFallback>CN</AvatarFallback>
                             </Avatar>
                         </span>

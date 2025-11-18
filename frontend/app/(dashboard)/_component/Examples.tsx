@@ -1,10 +1,14 @@
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { PricingPlans } from "@/app/lib/data";
-import { classNames } from "@/app/lib/utils";
-import { CreditCardIcon, Download, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, LucideLayoutTemplate, RotateCw, Settings } from "lucide-react";
+import { PricingPlans } from "@/lib/data";
+import { classNames } from "@/lib/utils";
+import { CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings } from "lucide-react";
 import Image from "next/image";
+import { ChangeEvent } from "react";
 
 export function Heading() {
     return (
@@ -52,7 +56,7 @@ export function NavLinks({ setCurrentRoute }: { setCurrentRoute: (value: string)
     );
 }
 
-export function History({ data }: { data: HistoryData[] }) {
+export function History({ data, setCurrentProject }: { data: HistoryData[], setCurrentProject: (value: Searches) => void }) {
     return (
         <div className="text-[#919191] text-[4vh] flex flex-col gap-6">
             <h1 className="font-semibold">History</h1>
@@ -65,7 +69,7 @@ export function History({ data }: { data: HistoryData[] }) {
                             {
                                 info.searches.map(detail => {
                                     return (
-                                        <span className="flex items-center justify-between" key={detail.time + detail.title}>
+                                        <span className="flex items-center justify-between cursor-pointer" key={detail.time + detail.title} onClick={() => setCurrentProject(detail)}>
                                             <p className="text-[2.5vh] font-normal text-white w-[70%] truncate">{detail.title}</p>
                                             <p className="text-[2vh] font-semibold text-[#616161]">{detail.time}</p>
                                         </span>
@@ -76,7 +80,7 @@ export function History({ data }: { data: HistoryData[] }) {
                     );
                 })
             }
-        </div>
+        </div >
     );
 }
 
@@ -195,34 +199,59 @@ export function ExportHistory({ ind, currentExp }: { ind: number, currentExp: nu
             </span>
 
             <span className="flex mr-4 gap-4">
-                <Button
-                    className="bg-black text-white hover:bg-black"
-                >
-                    <Download />
+                <Button className="group bg-black text-white hover:bg-black cursor-pointer flex items-center gap-2">
+                    {/* default icon */}
+                    <Download className="block group-hover:hidden" />
+                    {/* icon on hover */}
+                    <DownloadCloud className="hidden group-hover:block" />
                     Download
                 </Button>
-                <Button
-                    className="bg-transparent text-[#8F8F8F] hover:bg=transparent border-1 border-[#8F8F8F] flex items-center"
-                >
-                    <RotateCw />
+
+                <Button className="group bg-transparent text-[#8F8F8F] hover:bg-transparent border border-[#8F8F8F] flex items-center gap-2">
+                    {/* default icon */}
+                    <RotateCw className="block group-hover:hidden" />
+                    {/* icon on hover */}
+                    <RefreshCcw className="hidden group-hover:block" />
                     Re-export
                 </Button>
+
             </span>
         </span>
     )
 }
 
-export function Projects() {
+export function Projects({ createProject, setProjectName }: { createProject: () => void, setProjectName: (value: string) => void }) {
     return (
         <div className="w-full text-white flex flex-col gap-4">
             <h1 className="font-semibold flex gap-4 px-4"><FolderIcon /> Projects</h1>
             <span className="flex flex-col gap-4 items-center w-full justify-evenly">
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FolderPlus className="hover:scale-120 cursor-pointer"/> New Folder</p>
 
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer"/>file_name_1</p>
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer"/>file_name_2</p>
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer"/>file_name_3</p>
+                <Dialog>
+                    <DialogTrigger className="flex text-[2vh] text-white gap-2 items-center justify-around"><FolderPlus className="hover:scale-120 cursor-pointer" /> Create Project</DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px] bg-[#191919] text-white border-0">
+                        <DialogHeader>
+                            <DialogTitle>Project Name</DialogTitle>
+
+                        </DialogHeader>
+                        <div className="grid gap-4 text-white">
+                            <div className="grid gap-3">
+                                <Label htmlFor="name-1">Name</Label>
+                                <Input id="name-1" name="name" defaultValue="Create a GYM" onChange={(e: ChangeEvent<HTMLInputElement>) => setProjectName(e.target.value)} />
+                            </div>
+                        </div>
+                        <DialogDescription className="flex gap-4">
+                            <Lightbulb size={50} /> Projects keep chats, files, and custom instructions in one place. Use them for ongoing work, or just to keep things tidy.
+                        </DialogDescription>
+                        <DialogFooter>
+                            <Button onClick={createProject}>Create Project</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer" />file_name_1</p>
+                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer" />file_name_2</p>
+                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer" />file_name_3</p>
             </span>
-        </div>
+        </div >
     )
 }

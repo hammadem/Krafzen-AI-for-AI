@@ -1,5 +1,5 @@
 import NavHeader from "@/components/NavHeader";
-import { aboutData } from "@/app/lib/data";
+import { aboutData } from "@/lib/data";
 import Image from "next/image";
 
 export default function About() {

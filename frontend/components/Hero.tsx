@@ -8,7 +8,7 @@ import Partners from "./Partners";
 export default function Hero() {
     return (
         <>
-            <section className="h-130 sm:h-120 relative w-full flex items-center justify-center">
+            <section className="h-180 sm:h-120 relative w-full flex items-center justify-center">
                 <Image
                     src="/hero/hero.png"
                     alt="Hero Image"

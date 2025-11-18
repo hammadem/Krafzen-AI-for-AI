@@ -21,7 +21,7 @@ export default function Dashboard() {
         <>
             <div className="flex">
                 {
-                    user
+                    user?.access_token
                     &&
                     <Sidebar />
                 }
@@ -30,7 +30,7 @@ export default function Dashboard() {
                     {
                         route === "home" ? <DashComponent /> :
                             route === "projects" ? <Templates /> :
-                                route === "templates" ? <Templates />:
+                                route === "templates" ? <Templates /> :
                                     route === "exports" ? <Exports /> :
                                         route === "billing" ? <Billings /> :
                                             route === "settings" ? <Settings /> :
@@ -38,6 +38,7 @@ export default function Dashboard() {
                     }
 
                 </div>
+
             </div>
         </>
     )

@@ -14,11 +14,13 @@ import {
     FieldGroup,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { loginSchema } from "@/app/lib/validation";
+import { loginSchema } from "@/lib/validation";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 
 
 export default function SignUp() {
+    const { user } = useAuth();
     const form = useForm<z.infer<typeof loginSchema>>({
         resolver: zodResolver(loginSchema),
         defaultValues: {
@@ -31,9 +33,111 @@ export default function SignUp() {
     })
 
     function onSubmit(data: z.infer<typeof loginSchema>) {
-        alert("Form submitted succesfully and see logs for data.");
+        console.log("fetching project details")
         console.log(data);
+        console.log(user);
+        const fetchData = async () => {
+
+            // try {
+            //     const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`, {
+            //         method: "GET",
+            //         headers: {
+            //             "Content-Type": "application/json",
+            //             "Authorization": `Bearer ${user}`,  // if needed,
+            //             "apikey":process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            //         },
+            //         // body: JSON.stringify({
+            //         //     user_id: user,          // <-- IMPORTANT
+            //         //     input_text: "Draw a Rectangle 10x10"
+            //         // })
+            //     });
+
+            //     const response = await res.json();
+            //     console.log(response);
+
+            // } catch (err) {
+            //     console.log(err);
+            // }
+
+
+            //     try {
+            //         const res = await fetch(`https://krafzen-api-staging.onrender.com/api/v1/projects`, {
+            //             method: "POST",
+            //             headers: {
+            //                 "Content-Type": "application/json",
+            //                 "Authorization": `Bearer ${user}`,  // if needed,
+            //                 "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            //             },
+            //             body: JSON.stringify({
+            //                 user_id: "c631dfd9-4c96-481e-8d36-5a69f3dd8408",          // <-- IMPORTANT
+            //                 input_text: "Draw a Rectangle 10x10"
+            //             })
+            //         });
+
+            //         console.log(res);
+
+            //         const response = await res.json();
+            //         console.log(response);
+
+            //     } catch (err) {
+            //         console.log(err);
+            //     }
+            // };
+
+            // try {
+            //     const res = await fetch(`https://krafzen-api-staging.onrender.com/api/v1/projects/86c406d2-d54b-491e-9e25-c91f3207da6a`, {
+            //         method: "GET",
+            //         headers: {
+            //             "Content-Type": "application/json",
+            //             "Authorization": `Bearer ${user}`,  // if needed,
+            //             "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            //         },
+            //         // body: JSON.stringify({
+            //         //     user_id: "c631dfd9-4c96-481e-8d36-5a69f3dd8408",          // <-- IMPORTANT
+            //         //     input_text: "Draw a Rectangle 10x10"
+            //         // })
+            //     });
+
+            //     console.log(res);
+
+            //     const response = await res.json();
+            //     console.log(response);
+
+            // } catch (err) {
+            //     console.log(err);
+            // }
+
+            //     try {
+            //         const res = await fetch(`https://krafzen-api-staging.onrender.com/api/v1/jobs`, {
+            //             method: "POST",
+            //             headers: {
+            //                 "Content-Type": "application/json",
+            //                 "Authorization": `Bearer ${user}`,  // if needed,
+            //                 "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            //             },
+            //             body: JSON.stringify({
+            //                 "project_id": "86c406d2-d54b-491e-9e25-c91f3207da6a",
+            //                 "status": "pending",
+            //                 "transcript": "Draw a Rectangle 10x10",
+            //                 "error_message": null
+            //             })
+            //         });
+
+            //         console.log(res);
+
+            //         const response = await res.json();
+            //         console.log(response);
+
+            //     } catch (err) {
+            //         console.log(err);
+            //     }
+
+            // };
+        }
+
+        fetchData();
     }
+
 
     return (
         <div className="w-full flex flex-col items-center gap-8 w-full">
@@ -149,18 +253,18 @@ export default function SignUp() {
                         </Button>
                     </Field>
                 </CardFooter>
-                
-            <span className="flex items-center flex-col gap-2">
-                <p>Continue with your work mail - SSO login</p>
-                <p className="text-[#696969]">I already have an account? {" "}
-                    <Link 
-                    href="/login"
-                    aria-label="Link to Login Page"
-                >
-                    <b>Sign In</b>
-                </Link>
-                </p>
-            </span>
+
+                <span className="flex items-center flex-col gap-2">
+                    <p>Continue with your work mail - SSO login</p>
+                    <p className="text-[#696969]">I already have an account? {" "}
+                        <Link
+                            href="/login"
+                            aria-label="Link to Login Page"
+                        >
+                            <b>Sign In</b>
+                        </Link>
+                    </p>
+                </span>
             </Card>
         </div>
     )

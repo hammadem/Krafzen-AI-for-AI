@@ -1,10 +1,18 @@
 "use client";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/app/lib/supabase/supabaseClient";
+import { Input } from "@/components/ui/input";
+import { createClient } from "@/lib/supabase/supabaseClient";
+import { AlertDialogTrigger } from "@radix-ui/react-alert-dialog";
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
+import { toast } from "react-toastify";
 
 export default function Login() {
+    const [mail, setMail] = useState<string>("");
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
     // To implement it fully we need google and linkedIN client Id yet and enable oauth provider in supabase
     // leave it for now
 
@@ -12,15 +20,21 @@ export default function Login() {
         e.preventDefault();
         const supabase = createClient();
 
-        const { error } = await supabase.auth.signInWithOtp({
-            email:"jagdishdhukia770@gmail.com",
-            options: {
-                emailRedirectTo: `${window.location.origin}/auth/callback`
-            }
-        });
+        try {
+            const { error } = await supabase.auth.signInWithOtp({
+                email: mail,
+                options: {
+                    emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+                }
+            });
 
-        if (error) console.log(error.message);
-        else console.log("Magic link sent! Check your email 📩");
+            if (error) toast.error(error.message);
+            else toast.success("Magic link sent! Check your email 📩");
+            setIsDialogOpen(false);
+        } catch (err) {
+            console.log(err);
+            toast.error("Unable to fetch response.")
+        }
     };
 
 
@@ -32,13 +46,13 @@ export default function Login() {
                 <Button
                     variant="secondary"
                     className="rounded-full px-10 py-5"
-                    // onClick={() => handleLogin('google')}
+                // onClick={() => handleLogin('google')}
                 >
                     <Image
                         width={20}
                         height={20}
                         alt="Google Login Button Icon"
-                        src="/login/google.png"
+                        src="/auth/google.png"
                         className=""
                     /> Sign in with Google
                 </Button>
@@ -51,26 +65,47 @@ export default function Login() {
                         width={20}
                         height={20}
                         alt="Google Login Button Icon"
-                        src="/login/linkedIN.png"
+                        src="/auth/linkedIN.png"
                         className=""
                     />
                     Sign in with LinkedIn
                 </Button>
-                <Button
-                    variant="secondary"
-                    className="rounded-full bg-[#68D585] bg-green-400 px-10 py-5 hover:bg-green-400"
-                    onClick={(e) => handleMagicLinkLoginViaEmail(e)}
-                >
-                    <Image
-                        width={20}
-                        height={20}
-                        alt="Google Login Button Icon"
-                        src="/login/mail.png"
-                        className=""
-                    />
-                    Sign in with Email
-                </Button>
-            </div>
+
+                <AlertDialog open={isDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                        <Button
+                            variant="secondary"
+                            className="rounded-full bg-[#68D585] bg-green-400 px-10 py-5 hover:bg-green-400"
+                            onClick={() => setIsDialogOpen(true)}
+                        >
+                            <Image
+                                width={20}
+                                height={20}
+                                alt="Google Login Button Icon"
+                                src="/auth/mail.png"
+                                className=""
+                            />
+                            Sign in with Email
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="bg-[#191919] text-white">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Add your mail ID to get login link</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                <Input
+                                    onChange={(e) => setMail(e.target.value)}
+                                    value={mail}
+                                    placeholder="Add your email"
+                                />
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <Button className="font-white hover:bg-[#494949] hover:text-white bg-[#292929]! bg-black border-0" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                            <AlertDialogAction className="font-white hover:bg-[#494949] hover:text-white bg-[#292929]! bg-black border-0" onClick={(e) => handleMagicLinkLoginViaEmail(e)}>Send</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div >
 
             <span className="flex items-center flex-col gap-4">
                 <p>Continue with your work mail - SSO login</p>

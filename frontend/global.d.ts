@@ -23,12 +23,35 @@ export global {
         }[]
     }
 
-    type HistoryData = {
-        date: string,
-        searches: {
-            title: string,
-            time: string | undefined
-        }[]
+    type UserChat = string | null;
 
+    interface Searches {
+        title: string;
+        time: string;
+        isoTime: string;
+        chats: UserChat;
     }
+
+    interface HistoryData {
+        iso: string;
+        date: string;
+        searches: Searches[];
+    }
+
+    export interface ProjectDetails {
+        created_at: string;
+        dxf_url: string | null;
+        id: string;
+        input_text: string;
+        parsed_json: JSON | null; // add here type when server starts responding 
+        updated_at: string;
+        user_id: string;
+    }
+
+    interface User {
+        access_token: string | null | undefined;
+        userId: string | undefined;
+        email: string | undefined;
+    }
+
 }

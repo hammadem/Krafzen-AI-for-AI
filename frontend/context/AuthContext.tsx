@@ -1,65 +1,96 @@
-import { createClient } from "@/app/lib/supabase/supabaseClient";
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createClient } from "@/lib/supabase/supabaseClient";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import type { Session } from "@supabase/supabase-js";
 
 interface AuthContextType {
-  user: string | null | Session,
-  loading: boolean,
-  setLoading: (loading: boolean) => void,
-  logout: () => void
-}
-interface Session {
-  access_token: string;
-  // ...other fields
+  user: User | null; // ← from your global types
+  session: Session | null;
+  loading: boolean;
+  logout: () => void;
+  projects: ProjectDetails[];
+  setProjects: (value: ProjectDetails[]) => void;
+  currentProject: Searches | undefined;
+  setCurrentProject: (value: Searches | undefined) => void;
 }
 
-
-// ✅ Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ✅ Create the provider
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<string | null | Session>(null);
-  const [loading, setLoading] = useState<boolean>(true);
   const supabase = createClient();
 
-  // ✅ Check the current session
-  // const getSession = async () => {
-  //   const {
-  //     data: { session },
-  //   } = await supabase.auth.getSession();
-  //   setUser(session?.access_token || null);
-  //   setLoading(false);
-  // };
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<ProjectDetails[]>([]);
+  const [currentProject, setCurrentProject] = useState<Searches>();
 
-  // ✅ Listen for real-time auth changes
   useEffect(() => {
-    const fetchSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      console.log(session);
-      setUser(session?.access_token || null);
+    let mounted = true;
+
+    const loadSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      const sessionData = data.session || null;
+      setSession(sessionData);
+
+      if (sessionData?.user) {
+        // Build your custom User type
+        setUser({
+          userId: sessionData.user.id,
+          email: sessionData.user.email || undefined,
+          access_token: sessionData.access_token,
+        });
+      } else {
+        setUser(null);
+      }
+
       setLoading(false);
     };
 
-    fetchSession(); // called asynchronously, no sync setState
-  });
+    loadSession();
 
+    // Listen for changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
 
-  // ✅ Logout function
-  // Yet to be implemented
+        if (session?.user) {
+          setUser({
+            userId: session.user.id,
+            email: session.user.email || undefined,
+            access_token: session.access_token,
+          });
+          setCurrentProject(undefined);
+        } else {
+          setUser(null);
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
+
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
   };
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        session,
         loading,
-        setLoading,
-        logout
+        logout,
+        projects,
+        setProjects,
+        currentProject,
+        setCurrentProject,
       }}
     >
       {children}
@@ -67,11 +98,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// ✅ Custom hook for consuming the context
+// Hook
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within a AuthProvider");
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 };

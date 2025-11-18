@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
 interface DashRoutes {
-  settings:"settings",
-  billing:"billing",
-  exports:"exports",
-  templates:"templates",
-  projects:"projects",
-  home:"home"
+  settings: "settings",
+  billing: "billing",
+  exports: "exports",
+  templates: "templates",
+  projects: "projects",
+  home: "home"
 }
 
 interface DashboardContextType {
@@ -26,6 +26,8 @@ interface DashboardContextType {
   setIsPromptSend: (value: boolean) => void;
   route: string | Partial<DashRoutes>;
   setCurrentRoute: (value: string) => void;
+  history: HistoryData[];
+  setHistory: (value: HistoryData[]) => void;
 }
 
 // ✅ Create the context
@@ -40,7 +42,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [sideBarOpen, setSideBarOpen] = useState(false);
   const [file, setFile] = useState("");
   const [isPrompt, setIsPromptSend] = useState<boolean>(false);
-  const [route,setCurrentRoute] = useState("home");
+  const [route, setCurrentRoute] = useState("home");
+  const [history, setHistory] = useState<HistoryData[]>([]);
 
 
   return (
@@ -61,7 +64,9 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         isPrompt,
         setIsPromptSend,
         route,
-        setCurrentRoute
+        setCurrentRoute,
+        history,
+        setHistory
       }}
     >
       {children}

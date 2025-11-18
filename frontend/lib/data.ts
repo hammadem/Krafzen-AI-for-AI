@@ -1,59 +1,7 @@
 // This contain data for static pages those are all across the webpage
 
 // Static History Data Will be integrated with backend soon
-export const historyData: HistoryData[] = [
-    {
-        date: "31st Jan. 2025 07:21 PM",
-        searches: [
-            {
-                title: "Draw a 12x10 kitchen with a door on the right",
-                time: "07:21 PM"
-            },
-            {
-                title: "Draw a 12x10 kitchen with a door on the right",
-                time: "07:21 PM"
-            },
-            {
-                title: "Draw a 12x10 kitchen with a door on the right",
-                time: "07:21 PM"
-            }
-        ]
-    },
-    {
-        date: "1st Feb. 2025",
-        searches: [
-            {
-                title: "Draw a 12x10 kitchen with a door on the right",
-                time: "07:21 PM"
-            },
-            {
-                title: "Draw a 12x10 kitchen with a door on the right",
-                time: "07:21 PM"
-            },
-            {
-                title: "Draw a 12x10 kitchen with a door on the right",
-                time: "07:21 PM"
-            }
-        ]
-    },
-    {
-        date: "1st Feb. 2025",
-        searches: [
-            {
-                title: "Draw a 12x10 kitchen with a door on the right",
-                time: "07:21 PM"
-            },
-            {
-                title: "Draw a 12x10 kitchen with a door on the right",
-                time: "07:21 PM"
-            },
-            {
-                title: "Draw a 12x10 kitchen with a door on the right",
-                time: "07:21 PM"
-            }
-        ]
-    }
-]
+// Removed as API integrated export const historyData: HistoryData[] = []
 
 // FAQs Questions Data
 export const faqs: FAQs[] = [

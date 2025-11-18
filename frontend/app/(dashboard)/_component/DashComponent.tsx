@@ -2,12 +2,18 @@
 import Image from "next/image";
 import { Example, Heading, SideExample } from "./Examples";
 import Toolbar from "./Toolbar";
-import { classNames } from "@/app/lib/utils";
+import { classNames } from "@/lib/utils";
 import { useDashboard } from "@/context/DashboardContex";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
+import { Check, Copy, Mic } from "lucide-react";
+import { toast } from "react-toastify";
+import { useState } from "react";
 
 export default function DashComponent() {
-    const { isUserActing, isRecording, isPrompt } = useDashboard();
+    const { isUserActing, isRecording, isPrompt, setIsRecording } = useDashboard();
+    const { currentProject } = useAuth();
+    const [copied, setCopied] = useState(false);
 
     return (
         <>
@@ -40,20 +46,58 @@ export default function DashComponent() {
                 }
 
                 {
-                    isUserActing
+                    isUserActing || currentProject !== undefined
                         ?
-                        <div className="w-[85%] h-full bg-white self-start">
-                            {/** Here The Data from API Can Be Shown */}
+                        <div className="w-full h-full flex items-start justify-end">
+                            <div className="bg-black w-[90%] flex flex-col gap-4 pr-10">
+
+                                {/** Here The Data from API Can Be Shown */}
+                                <div className="w-[70%] flex self-end flex-col text-[2vh] mr-40">
+                                    <div className="bg-[#434343] p-6 w-[80%] rounded-[15px] flex flex-col self-end">
+                                        <h1 className="text-white">{currentProject?.title}</h1>
+                                    </div>
+                                    <span className="self-end flex gap-2 mt-3">
+                                        <Mic className="cursor-pointer"
+                                            onClick={() => {
+                                                setIsRecording(true)
+                                            }}
+                                        />
+                                        {copied ? (
+                                            <Check className="text-white cursor-pointer" />
+                                        ) : (
+                                            <Copy
+                                                className="cursor-pointer"
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(currentProject?.title || "");
+                                                    toast.dark("Copied Successfully");
+
+                                                    setCopied(true);
+                                                    setTimeout(() => setCopied(false), 1500); // revert after 1.5s
+                                                }}
+                                            />
+                                        )}
+
+                                        {currentProject?.time}
+                                    </span>
+                                </div>
+
+                                <div className="bg-black w-[70%] self-start justify-start flex flex-col gap-4">
+                                    <div className="bg-[#434343] p-6 w-[80%] rounded-[15px] flex flex-col self-end">
+                                        <h1 className="text-white">{currentProject?.chats != null ? currentProject?.chats.toString() : `Server responded with ${currentProject?.chats}`}</h1>
+                                    </div>
+                                </div>
+
+                            </div>
                         </div>
                         :
                         ""
                 }
 
-                <div className={classNames("flex flex-col gap-4 w-[55%] items-center transition-all duration-500", isUserActing ? "hidden" : "")}>
+                <div className={classNames("flex flex-col gap-4 w-[55%] items-center transition-all duration-500", isUserActing || currentProject ? "hidden" : "")}>
                     <Heading />
                 </div>
 
-                <div className={classNames("flex justify-center items-center w-[55%]", isUserActing ? "hidden" : "")}>
+                <div className={classNames("flex justify-center items-center w-[55%]", isUserActing || currentProject ? "hidden" : "")}>
                     <Example />
                 </div>
 
@@ -66,14 +110,15 @@ export default function DashComponent() {
             <div className={classNames("absolute top-25 w-[15%] flex flex-col gap-4", isUserActing ? "" : "hidden")}>
                 <Button
                     className="rounded-full border-1 border-white w-full bg-black p-2"
-                >Export Drawing</Button>
+                >Export Drawing
+                </Button>
                 <Button
                     className="rounded-full bg-green-400 w-full hover:bg-green-400 text-black"
                 >Redraw</Button>
                 <SideExample />
             </div>
 
-            <p className={classNames("text-white text-center font-normal text-[2vh] mx-auto w-[70%]", isUserActing ? "hidden" : "")}>Krafzen AI can make mistakes, so double-check it</p>
+            <p className={classNames("text-white text-center font-normal text-[2vh] mx-auto w-[70%]", isUserActing || currentProject ? "hidden" : "")}>Krafzen AI can make mistakes, so double-check it</p>
         </>
     )
 }
