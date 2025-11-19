@@ -3,6 +3,14 @@
 // Static History Data Will be integrated with backend soon
 // Removed as API integrated export const historyData: HistoryData[] = []
 
+// Example Searches
+export const examplePrompt: [string, string][] = [
+    ["Draw a 12x10 kitchen", "with a door on the right"],
+    ["Create a 15x12 bedroom", "with two windows and a door"],
+    ["Draw a 10x8 bathroom", "with a door on left"],
+    ["Draw a 12x10 garage", "with a large door in the middle"]
+]
+
 // FAQs Questions Data
 export const faqs: FAQs[] = [
     {

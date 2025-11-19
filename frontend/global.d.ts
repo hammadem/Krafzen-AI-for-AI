@@ -52,6 +52,8 @@ export global {
         access_token: string | null | undefined;
         userId: string | undefined;
         email: string | undefined;
+        firstname: string | undefined?;
+        lastname: string | undefined?;
     }
 
 }

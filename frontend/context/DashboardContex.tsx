@@ -28,6 +28,8 @@ interface DashboardContextType {
   setCurrentRoute: (value: string) => void;
   history: HistoryData[];
   setHistory: (value: HistoryData[]) => void;
+  loading: boolean;
+  setLoading: (value: boolean) => void;
 }
 
 // ✅ Create the context
@@ -44,6 +46,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [isPrompt, setIsPromptSend] = useState<boolean>(false);
   const [route, setCurrentRoute] = useState("home");
   const [history, setHistory] = useState<HistoryData[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
 
 
   return (
@@ -66,7 +69,9 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         route,
         setCurrentRoute,
         history,
-        setHistory
+        setHistory,
+        loading,
+        setLoading
       }}
     >
       {children}

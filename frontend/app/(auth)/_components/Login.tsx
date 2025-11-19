@@ -2,6 +2,8 @@
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/context/AuthContext";
+import { useDashboard } from "@/context/DashboardContex";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { AlertDialogTrigger } from "@radix-ui/react-alert-dialog";
 import Image from "next/image";
@@ -12,28 +14,36 @@ import { toast } from "react-toastify";
 export default function Login() {
     const [mail, setMail] = useState<string>("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const { loading, setLoading, setHistory } = useDashboard();
+    const { setCurrentProject, setProjects } = useAuth();
 
     // To implement it fully we need google and linkedIN client Id yet and enable oauth provider in supabase
     // leave it for now
 
     const handleMagicLinkLoginViaEmail = async (e: React.FormEvent) => {
         e.preventDefault();
-        const supabase = createClient();
-
         try {
+            setLoading(true);
+            const supabase = createClient();
+
             const { error } = await supabase.auth.signInWithOtp({
                 email: mail,
                 options: {
                     emailRedirectTo: `${window.location.origin}/auth/callback`
                 }
             });
+            setCurrentProject(undefined);
+            setProjects([]);
+            setHistory([]);
 
             if (error) toast.error(error.message);
             else toast.success("Magic link sent! Check your email 📩");
-            setIsDialogOpen(false);
         } catch (err) {
             console.log(err);
             toast.error("Unable to fetch response.")
+        } finally {
+            setIsDialogOpen(false);
+            setLoading(false);
         }
     };
 
@@ -100,8 +110,16 @@ export default function Login() {
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                            <Button className="font-white hover:bg-[#494949] hover:text-white bg-[#292929]! bg-black border-0" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                            <AlertDialogAction className="font-white hover:bg-[#494949] hover:text-white bg-[#292929]! bg-black border-0" onClick={(e) => handleMagicLinkLoginViaEmail(e)}>Send</AlertDialogAction>
+                            <Button disabled={loading} className="font-white hover:bg-[#494949] hover:text-white bg-[#292929]! bg-black border-0" onClick={() => setIsDialogOpen(false)}>
+                                <Link
+                                    href="/logincred"
+                                    aria-label="Login with Password"
+                                >
+                                    Login With Password
+                                </Link>
+                            </Button>
+                            <Button disabled={loading} className="font-white hover:bg-[#494949] hover:text-white bg-[#292929]! bg-black border-0" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                            <AlertDialogAction disabled={loading} className="font-white hover:bg-[#494949] hover:text-white bg-[#292929]! bg-black border-0" onClick={(e) => handleMagicLinkLoginViaEmail(e)}>{loading ? "Sending Mail" : "Send"}</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>

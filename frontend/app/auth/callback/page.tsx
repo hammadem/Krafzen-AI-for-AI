@@ -21,7 +21,9 @@ export default function AuthCallbackPage() {
     };
 
     handleCallback();
-  }, [router, supabase]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex items-center justify-center h-screen">

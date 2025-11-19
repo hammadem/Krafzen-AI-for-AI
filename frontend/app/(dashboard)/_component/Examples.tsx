@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PricingPlans } from "@/lib/data";
 import { classNames } from "@/lib/utils";
 import { CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings } from "lucide-react";
@@ -18,26 +19,12 @@ export function Heading() {
     )
 }
 
-export function Example() {
+export function Example({ ex }: { ex: [string, string] }) {
     return (
-        <div className="flex items-center gap-2">
-            <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer">
-                <h1 className="font-semibold text-[2vh]">Draw a 12x10 kitchen</h1>
-                <p className="text-[#7F7F7F] font-normal text-[2vh]">with a door on the right</p>
-            </span>
-            <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer">
-                <h1 className="font-semibold text-[2vh]">Create a 15x12 bedroom</h1>
-                <p className="text-[#7F7F7F] font-normal text-[2vh]">with two windows and a door</p>
-            </span>
-            <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer">
-                <h1 className="font-semibold text-[2vh]">Draw a 10x8 bathroom</h1>
-                <p className="text-[#7F7F7F] font-normal text-[2vh]">with a door on left</p>
-            </span>
-            <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer">
-                <h1 className="font-semibold text-[2vh]">Draw a 12x10 garage</h1>
-                <p className="text-[#7F7F7F] font-normal text-[2vh]">with a large door in the middle</p>
-            </span>
-        </div>
+        <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer">
+            <h1 className="font-semibold text-[2vh]">{ex[0]}</h1>
+            <p className="text-[#7F7F7F] font-normal text-[2vh]">{ex[1]}</p>
+        </span>
     )
 }
 
@@ -56,54 +43,69 @@ export function NavLinks({ setCurrentRoute }: { setCurrentRoute: (value: string)
     );
 }
 
-export function History({ data, setCurrentProject }: { data: HistoryData[], setCurrentProject: (value: Searches) => void }) {
+export function History({ data, setCurrentProject, loading }: { data: HistoryData[], setCurrentProject: (value: Searches) => void, loading: boolean }) {
     return (
         <div className="text-[#919191] text-[4vh] flex flex-col gap-6">
             <h1 className="font-semibold">History</h1>
 
-            {
-                data.map(info => {
-                    return (
-                        <div key={info.date + info.searches[0].title} className="flex flex-col gap-2">
-                            <p className="text-[2vh] font-semibold">{info.date}</p>
-                            {
-                                info.searches.map(detail => {
-                                    return (
-                                        <span className="flex items-center justify-between cursor-pointer" key={detail.time + detail.title} onClick={() => setCurrentProject(detail)}>
-                                            <p className="text-[2.5vh] font-normal text-white w-[70%] truncate">{detail.title}</p>
-                                            <p className="text-[2vh] font-semibold text-[#616161]">{detail.time}</p>
-                                        </span>
-                                    )
-                                })
-                            }
+            {loading ? (
+                <div className="flex flex-col gap-6">
+                    {/* Skeleton for 2–3 history sections */}
+                    {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex flex-col gap-3">
+                            {/* Date Skeleton */}
+                            <Skeleton className="w-32 h-4 rounded-md" />
+
+                            {/* Title/time pairs */}
+                            <div className="flex items-center justify-between gap-2">
+                                <Skeleton className="w-[70%] h-5 rounded-md" />
+                                <Skeleton className="w-12 h-4 rounded-md" />
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2">
+                                <Skeleton className="w-[60%] h-5 rounded-md" />
+                                <Skeleton className="w-10 h-4 rounded-md" />
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2">
+                                <Skeleton className="w-[80%] h-5 rounded-md" />
+                                <Skeleton className="w-16 h-4 rounded-md" />
+                            </div>
                         </div>
-                    );
-                })
-            }
-        </div >
+                    ))}
+                </div>
+            ) : (
+                data.map(info => (
+                    <div key={info.date + info.searches[0].title} className="flex flex-col gap-2">
+                        <p className="text-[2vh] font-semibold">{info.date}</p>
+                        {info.searches.map(detail => (
+                            <span
+                                key={detail.time + detail.title}
+                                className="flex items-center justify-between cursor-pointer"
+                                onClick={() => setCurrentProject(detail)}
+                            >
+                                <p className="text-[2.5vh] font-normal text-white w-[70%] truncate">
+                                    {detail.title}
+                                </p>
+                                <p className="text-[2vh] font-semibold text-[#616161]">
+                                    {detail.time}
+                                </p>
+                            </span>
+                        ))}
+                    </div>
+                ))
+            )}
+        </div>
+
     );
 }
 
-export function SideExample() {
+export function SideExample({ ex }: { ex: [string, string] }) {
     return (
-        <div className="flex flex-col items-center gap-2 text-white w-[100%]">
-            <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer w-full">
-                <h1 className="font-semibold text-[2vh]">Draw a 12x10 kitchen</h1>
-                <p className="text-[#9F9F9F] font-normal text-[2vh]">with a door on the right</p>
-            </span>
-            <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer w-full">
-                <h1 className="font-semibold text-[2vh]">Create a 15x12 bedroom</h1>
-                <p className="text-[#9F9F9F] font-normal text-[2vh]">with two windows and a door</p>
-            </span>
-            <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer w-full">
-                <h1 className="font-semibold text-[2vh]">Draw a 10x8 bathroom</h1>
-                <p className="text-[#9F9F9F] font-normal text-[2vh]">with a door on left</p>
-            </span>
-            <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer w-full">
-                <h1 className="font-semibold text-[2vh]">Draw a 12x10 garage</h1>
-                <p className="text-[#9F9F9F] font-normal text-[2vh]">with a large door in the middle</p>
-            </span>
-        </div>
+        <span className="bg-[#1F1F1F] flex items-start flex-col p-3 rounded-[6px] cursor-pointer w-full">
+            <h1 className="font-semibold text-[2vh]">{ex[0]}</h1>
+            <p className="text-[#9F9F9F] font-normal text-[2vh]">{ex[1]}</p>
+        </span>
     );
 }
 

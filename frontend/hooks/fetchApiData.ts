@@ -2,6 +2,8 @@ import { toast } from "react-toastify";
 import { formatTime, formatDate } from "@/lib/utils";
 
 export async function fetchProjects({ user, project }: { user: User | null, project: string }) {
+    if (!user?.access_token) return;
+
     const fetchPromptHistory = async () => {
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/projects`, {
@@ -30,8 +32,11 @@ export async function fetchProjects({ user, project }: { user: User | null, proj
     fetchPromptHistory();
 }
 
-export async function fetchPromptHistory({ user, setHistory, setProjects }: { user: User | null, setHistory: (value: HistoryData[]) => void, setProjects: (value: ProjectDetails[]) => void }) {
+export async function fetchPromptHistory({ setLoading, user, setHistory, setProjects }: { setLoading: (value: boolean) => void, user: User | null, setHistory: (value: HistoryData[]) => void, setProjects: (value: ProjectDetails[]) => void }) {
+    if (!user?.access_token) return;
+
     try {
+        setLoading(true);
         const res = await fetch(
             `${process.env.NEXT_PUBLIC_API_URL}/api/v1/projects?user_id=${user?.userId}`,
             {
@@ -84,24 +89,34 @@ export async function fetchPromptHistory({ user, setHistory, setProjects }: { us
             setHistory(grouped);
             setProjects(response);
             toast.success("Successfully fetched response");
+            setLoading(false);
         } else {
             toast.error(response?.message);
+            setLoading(false);
         }
     } catch (err) {
         console.log(err);
         toast.error("Server Error");
+    } finally {
+        setLoading(false);
     }
 };
 
-export const sendPromptRequest = async ({ setIsPromptSend, setUserAction, user, input, setInput, setAudioURL, setFile }: {
-    setIsPromptSend: (value: boolean) => void,
-    setUserAction: (value: boolean) => void;
-    user: User | null;
-    input: string;
-    setInput: (value: string) => void;
-    setAudioURL: (value: string) => void;
-    setFile: (value: string) => void;
-}) => {
+export const sendPromptRequest = async ({ setIsPromptSend, setUserAction, user, input, setInput, setAudioURL, setFile, history, setHistory, setCurrentProject }
+    : {
+        setIsPromptSend: (value: boolean) => void,
+        setUserAction: (value: boolean) => void;
+        user: User | null;
+        input: string;
+        setInput: (value: string) => void;
+        setAudioURL: (value: string) => void;
+        setFile: (value: string) => void;
+        history: HistoryData[];
+        setHistory: (value: HistoryData[]) => void;
+        setCurrentProject: (value: Searches) => void;
+    }) => {
+    if (!user?.access_token) return;
+
     setIsPromptSend(true);
     setUserAction(true);
 
@@ -128,6 +143,36 @@ export const sendPromptRequest = async ({ setIsPromptSend, setUserAction, user, 
             toast.error(response.message);
         }
 
+        const isoTime = new Date().toISOString();
+        const displayDate = formatDate(isoTime);
+        const displayTime = formatTime(isoTime);
+        // --- Optimistically update history locally without creating a new server request---
+        const isoDate = isoTime.split("T")[0];
+        const groupedHistory = [...history];
+        let group = groupedHistory.find(g => g.iso === isoDate);
+        if (!group) {
+            group = {
+                iso: isoDate,
+                date: displayDate,
+                searches: []
+            };
+            groupedHistory.unshift(group); // Add new group at start
+        }
+        group.searches.unshift({
+            title: input,
+            time: displayTime,
+            isoTime,
+            chats: null
+        });
+
+        setCurrentProject({
+            title: input,
+            time: displayTime,
+            isoTime: isoTime,
+            chats: response.parsed_json
+        });
+
+        setHistory(groupedHistory);
         setIsPromptSend(false);
         setInput("");
         setAudioURL("");

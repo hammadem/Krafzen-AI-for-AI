@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { Example, Heading, SideExample } from "./Examples";
+import { Example, Heading } from "./Examples";
 import Toolbar from "./Toolbar";
 import { classNames } from "@/lib/utils";
 import { useDashboard } from "@/context/DashboardContex";
@@ -9,10 +9,12 @@ import { useAuth } from "@/context/AuthContext";
 import { Check, Copy, Mic } from "lucide-react";
 import { toast } from "react-toastify";
 import { useState } from "react";
+import { examplePrompt } from "@/lib/data";
+import { sendPromptRequest } from "@/hooks/fetchApiData";
 
 export default function DashComponent() {
-    const { isUserActing, isRecording, isPrompt, setIsRecording } = useDashboard();
-    const { currentProject } = useAuth();
+    const { isUserActing, isRecording, isPrompt, setIsRecording, setIsPromptSend, setUserAction, setInput, setAudioURL, setFile, history, setHistory } = useDashboard();
+    const { currentProject, user, setCurrentProject } = useAuth();
     const [copied, setCopied] = useState(false);
 
     return (
@@ -83,7 +85,7 @@ export default function DashComponent() {
 
                                 <div className="bg-black w-[70%] self-start justify-start flex flex-col gap-4">
                                     <div className="bg-[#434343] p-6 w-[80%] rounded-[15px] flex flex-col self-end">
-                                        <h1 className="text-white">{currentProject?.chats != null ? currentProject?.chats.toString() : `Server responded with ${currentProject?.chats}`}</h1>
+                                        <h1 className="text-white text-[2vh]">{currentProject?.chats != null ? currentProject?.chats.toString() : `Server responded with ${currentProject?.chats}`}</h1>
                                     </div>
                                 </div>
 
@@ -98,14 +100,27 @@ export default function DashComponent() {
                 </div>
 
                 <div className={classNames("flex justify-center items-center w-[55%]", isUserActing || currentProject ? "hidden" : "")}>
-                    <Example />
+                    <div className="flex items-center gap-2">
+                        {
+                            examplePrompt.map((ex, ind) => {
+                                const input = (ex[0] + " " + ex[1]).toString();
+
+                                return (
+                                    <div key={ind} onClick={() => sendPromptRequest({ setIsPromptSend, setUserAction, user, input, setInput, setAudioURL, setFile, history, setHistory, setCurrentProject })
+                                    }>
+                                        <Example ex={ex} />
+                                    </div>
+                                )
+                            })
+                        }
+                    </div>
                 </div>
 
                 <div className={classNames("w-[55%] items-start  z-99999 transition-all duration-500", isUserActing ? "" : "")}>
                     <Toolbar />
                 </div>
 
-            </div>
+            </div >
 
             <div className={classNames("absolute top-25 w-[15%] flex flex-col gap-4", isUserActing ? "" : "hidden")}>
                 <Button
@@ -115,7 +130,20 @@ export default function DashComponent() {
                 <Button
                     className="rounded-full bg-green-400 w-full hover:bg-green-400 text-black"
                 >Redraw</Button>
-                <SideExample />
+                <div className="flex flex-col items-center gap-2 text-white w-full">
+                    {
+                        examplePrompt.map((ex, ind) => {
+                            const input = (ex[0] + " " + ex[1]).toString();
+
+                            return (
+                                <span className="w-full" key={ind} onClick={() => sendPromptRequest({ setIsPromptSend, setUserAction, user, input, setInput, setAudioURL, setFile, history, setHistory, setCurrentProject })}>
+                                    <Example ex={ex} />
+                                </span>
+                            )
+                        })
+                    }
+                </div>
+
             </div>
 
             <p className={classNames("text-white text-center font-normal text-[2vh] mx-auto w-[70%]", isUserActing || currentProject ? "hidden" : "")}>Krafzen AI can make mistakes, so double-check it</p>

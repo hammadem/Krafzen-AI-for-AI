@@ -1,8 +1,11 @@
+"use client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Settings() {
+    const { user } = useAuth();
     return (
         <div className="text-white flex flex-col items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
 
@@ -16,11 +19,12 @@ export default function Settings() {
                         <span className="flex flex-col gap-2">
                             <label htmlFor="name">Profile Name</label>
                             <Input
-                                value=""
+                                value={user?.firstname !== undefined || null ? user?.firstname?.toString() : ""}
                                 id="name"
                                 placeholder="First Name"
                                 autoComplete="off"
                                 className="border-1 border-[#3F3F3F] bg-[#1F1F1F] p-5"
+                                readOnly
                             />
 
                             <label htmlFor="name">Password</label>
@@ -30,17 +34,19 @@ export default function Settings() {
                                 placeholder="************"
                                 autoComplete="off"
                                 className="border-1 border-[#3F3F3F] bg-[#1F1F1F] p-5"
+                                readOnly
                             />
                         </span>
                         <span className="flex flex-col h-full justify-between gap-2">
                             <span className="flex flex-col gap-2">
                                 <label htmlFor="name">Email</label>
                                 <Input
-                                    value=""
+                                    value={user?.email !== undefined || null ? user?.email?.toString() : ""}
                                     id="name"
                                     placeholder="email address"
                                     autoComplete="off"
                                     className="border-1 border-[#3F3F3F] bg-[#1F1F1F] p-5"
+                                    readOnly
                                 />
                             </span>
                             <div>

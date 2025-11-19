@@ -10,7 +10,7 @@ import { fetchProjects, fetchPromptHistory } from "@/hooks/fetchApiData";
 
 
 export default function Sidebar() {
-    const { setHistory, history, sideBarOpen, setSideBarOpen, setCurrentRoute, route } = useDashboard();
+    const { setHistory, history, sideBarOpen, setSideBarOpen, setCurrentRoute, route, loading, setLoading } = useDashboard();
     const { user, setCurrentProject, setProjects } = useAuth();
     function classNames(...classes: string[]) {
         return classes.filter(Boolean).join(' ')
@@ -19,9 +19,9 @@ export default function Sidebar() {
 
     useEffect(() => {
         if (!user?.access_token) return;
-
-        fetchPromptHistory({ user, setHistory, setProjects });
-    }, [user, setHistory, setProjects]);
+        fetchPromptHistory({ user, setHistory, setProjects, setLoading });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const createProject = async () => {
         fetchProjects({ user, project });
@@ -87,8 +87,9 @@ export default function Sidebar() {
                 <NavLinks setCurrentRoute={setCurrentRoute} />
 
                 {
-                    route === "home" ? <History data={history} setCurrentProject={setCurrentProject} /> :
-                        route === "projects" ? <Projects createProject={createProject} setProjectName={setProjectName} /> :
+                    route === "home" ? <History data={history} setCurrentProject={setCurrentProject} loading={loading} />
+
+                        : route === "projects" ? <Projects createProject={createProject} setProjectName={setProjectName} /> :
                             route === "templates" ? "" :
                                 route === "exports" ? "" :
                                     route === "billing" ? "" :

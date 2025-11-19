@@ -7,7 +7,7 @@ import Login from "../_components/Login";
 export default function LoginPage() {
   return (
     <div>
-      <AuthSkeleton AuthType={Login}/>
+      <AuthSkeleton AuthType={Login} />
     </div>
   );
 }

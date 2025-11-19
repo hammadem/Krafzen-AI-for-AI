@@ -11,6 +11,7 @@ interface AuthContextType {
   setProjects: (value: ProjectDetails[]) => void;
   currentProject: Searches | undefined;
   setCurrentProject: (value: Searches | undefined) => void;
+  setUser: (value: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,21 +26,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentProject, setCurrentProject] = useState<Searches>();
 
   useEffect(() => {
-    let mounted = true;
-
+    // 1️⃣ Load session on mount
     const loadSession = async () => {
       const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
+      setSession(data.session || null);
 
-      const sessionData = data.session || null;
-      setSession(sessionData);
-
-      if (sessionData?.user) {
-        // Build your custom User type
+      if (data.session?.user) {
         setUser({
-          userId: sessionData.user.id,
-          email: sessionData.user.email || undefined,
-          access_token: sessionData.access_token,
+          userId: data.session.user.id,
+          email: data.session.user.email || undefined,
+          access_token: data.session.access_token,
+          firstname: data?.session?.user?.user_metadata?.firstname,
+          lastname: data?.session?.user?.user_metadata?.lastname
         });
       } else {
         setUser(null);
@@ -50,34 +48,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     loadSession();
 
-    // Listen for changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
+    // 2️⃣ Listen to auth changes (login, logout, refresh)
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session || null);
 
-        if (session?.user) {
-          setUser({
-            userId: session.user.id,
-            email: session.user.email || undefined,
-            access_token: session.access_token,
-          });
-          setCurrentProject(undefined);
-        } else {
-          setUser(null);
-        }
+      if (session?.user) {
+        setUser({
+          userId: session.user.id,
+          email: session.user.email || undefined,
+          access_token: session.access_token,
+          firstname: session?.user?.user_metadata?.firstname,
+          lastname: session?.user?.user_metadata?.lastname
+        });
+      } else {
+        setUser(null);
       }
-    );
 
-    return () => {
-      mounted = false;
-      authListener.subscription.unsubscribe();
-    };
-  }, [supabase.auth]);
+      setLoading(false);
+    });
+
+    return () => listener.subscription.unsubscribe();
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
+    setLoading(true);
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setSession(null);
+    } catch (err) {
+      console.log(err)
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -91,6 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProjects,
         currentProject,
         setCurrentProject,
+        setUser
       }}
     >
       {children}

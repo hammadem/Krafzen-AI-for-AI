@@ -7,6 +7,7 @@ import { forgotPassword } from "@/lib/validation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
+import { toast } from "react-toastify";
 import z from "zod";
 
 export default function ForgotPassword() {
@@ -18,9 +19,9 @@ export default function ForgotPassword() {
     })
 
     function onSubmit(data: z.infer<typeof forgotPassword>) {
-        alert("Form submitted succesfully and see logs for data.");
         console.log(data);
-    }
+        toast.error("Under construction try logging in with direct email link")
+    };
 
     return (
         <div className="flex text-white flex-col items-center w-full gap-4">

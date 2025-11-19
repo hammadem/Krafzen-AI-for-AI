@@ -9,6 +9,7 @@ import Link from "next/link";
 // import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import PassworStrengthBar from "react-password-strength-bar";
+import { toast } from "react-toastify";
 import z from "zod";
 
 export default function SetNewPassword() {
@@ -22,6 +23,10 @@ export default function SetNewPassword() {
     })
 
     function onSubmit(data: z.infer<typeof changePassword>) {
+        if (data?.password.toString() !== data?.confirmPassword.toString()) {
+            toast.error("Passwords must be same");
+            return;
+        }
         alert("Form submitted succesfully and see logs for data.");
         console.log(data);
     }

@@ -16,11 +16,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { loginSchema } from "@/lib/validation";
 import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
+import { createClient } from "@/lib/supabase/supabaseClient";
+import { toast } from "react-toastify";
+import { useDashboard } from "@/context/DashboardContex";
 
 
 export default function SignUp() {
-    const { user } = useAuth();
     const form = useForm<z.infer<typeof loginSchema>>({
         resolver: zodResolver(loginSchema),
         defaultValues: {
@@ -30,112 +31,50 @@ export default function SignUp() {
             password: "",
             confirmPassword: ""
         },
-    })
+    });
+    const { loading, setLoading } = useDashboard();
 
-    function onSubmit(data: z.infer<typeof loginSchema>) {
-        console.log("fetching project details")
-        console.log(data);
-        console.log(user);
-        const fetchData = async () => {
-
-            // try {
-            //     const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`, {
-            //         method: "GET",
-            //         headers: {
-            //             "Content-Type": "application/json",
-            //             "Authorization": `Bearer ${user}`,  // if needed,
-            //             "apikey":process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-            //         },
-            //         // body: JSON.stringify({
-            //         //     user_id: user,          // <-- IMPORTANT
-            //         //     input_text: "Draw a Rectangle 10x10"
-            //         // })
-            //     });
-
-            //     const response = await res.json();
-            //     console.log(response);
-
-            // } catch (err) {
-            //     console.log(err);
-            // }
-
-
-            //     try {
-            //         const res = await fetch(`https://krafzen-api-staging.onrender.com/api/v1/projects`, {
-            //             method: "POST",
-            //             headers: {
-            //                 "Content-Type": "application/json",
-            //                 "Authorization": `Bearer ${user}`,  // if needed,
-            //                 "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-            //             },
-            //             body: JSON.stringify({
-            //                 user_id: "c631dfd9-4c96-481e-8d36-5a69f3dd8408",          // <-- IMPORTANT
-            //                 input_text: "Draw a Rectangle 10x10"
-            //             })
-            //         });
-
-            //         console.log(res);
-
-            //         const response = await res.json();
-            //         console.log(response);
-
-            //     } catch (err) {
-            //         console.log(err);
-            //     }
-            // };
-
-            // try {
-            //     const res = await fetch(`https://krafzen-api-staging.onrender.com/api/v1/projects/86c406d2-d54b-491e-9e25-c91f3207da6a`, {
-            //         method: "GET",
-            //         headers: {
-            //             "Content-Type": "application/json",
-            //             "Authorization": `Bearer ${user}`,  // if needed,
-            //             "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-            //         },
-            //         // body: JSON.stringify({
-            //         //     user_id: "c631dfd9-4c96-481e-8d36-5a69f3dd8408",          // <-- IMPORTANT
-            //         //     input_text: "Draw a Rectangle 10x10"
-            //         // })
-            //     });
-
-            //     console.log(res);
-
-            //     const response = await res.json();
-            //     console.log(response);
-
-            // } catch (err) {
-            //     console.log(err);
-            // }
-
-            //     try {
-            //         const res = await fetch(`https://krafzen-api-staging.onrender.com/api/v1/jobs`, {
-            //             method: "POST",
-            //             headers: {
-            //                 "Content-Type": "application/json",
-            //                 "Authorization": `Bearer ${user}`,  // if needed,
-            //                 "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-            //             },
-            //             body: JSON.stringify({
-            //                 "project_id": "86c406d2-d54b-491e-9e25-c91f3207da6a",
-            //                 "status": "pending",
-            //                 "transcript": "Draw a Rectangle 10x10",
-            //                 "error_message": null
-            //             })
-            //         });
-
-            //         console.log(res);
-
-            //         const response = await res.json();
-            //         console.log(response);
-
-            //     } catch (err) {
-            //         console.log(err);
-            //     }
-
-            // };
+    async function onSubmit(data: z.infer<typeof loginSchema>) {
+        if (data?.password.toString() !== data?.confirmPassword.toString()) {
+            toast.error("Passwords must be same");
+            return;
         }
 
-        fetchData();
+        try {
+            setLoading(true);
+            const { firstname, lastname, email, password } = data;
+            const supabase = createClient();
+
+            const { data: signUpData, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        firstname,
+                        lastname,
+                    },
+                    emailRedirectTo: `${window.location.origin}/auth/callback`
+                }
+            });
+
+            if (Array.isArray(signUpData?.user?.identities) && signUpData?.user?.identities?.length <= 0) {
+                toast.error("Email Already In Use Please Login");
+                return;
+            }
+            if (error) {
+                toast.error(error.message);
+                return;
+            }
+
+            toast.error("Account created! Check your email to verify.");
+            setLoading(false);
+        } catch (err) {
+            console.log(err);
+            toast.error("Server Error");
+            setLoading(false);
+        } finally {
+            setLoading(false);
+        }
     }
 
 
@@ -248,8 +187,8 @@ export default function SignUp() {
                 </CardContent>
                 <CardFooter>
                     <Field orientation="horizontal">
-                        <Button type="submit" form="form-rhf-demo" variant="secondary" className="rounded-full w-full cursor-pointer bg-[#68D585] bg-green-400 hover:bg-green-400">
-                            Submit
+                        <Button type="submit" disabled={loading} form="form-rhf-demo" variant="secondary" className="rounded-full w-full cursor-pointer bg-[#68D585] bg-green-400 hover:bg-green-400">
+                            {loading ? "Submitting" : "Submit"}
                         </Button>
                     </Field>
                 </CardFooter>

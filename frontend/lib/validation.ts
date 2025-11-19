@@ -54,11 +54,22 @@ export const forgotPassword = z.object({
 });
 
 export const changePassword = z.object({
-        password: z
+    password: z
         .string()
         .min(8, "Phone number must be at least 8 characters.")
         .max(32, "Bug title must be at most 32 characters."),
     confirmPassword: z
+        .string()
+        .min(8, "Phone number must be at least 8 characters.")
+        .max(32, "Bug title must be at most 32 characters."),
+});
+
+export const loginCredSchema = z.object({
+    email: z
+        .email()
+        .min(3, "Last name must be at least 3 characters.")
+        .max(32, "Last name must be at most 32 characters."),
+    password: z
         .string()
         .min(8, "Phone number must be at least 8 characters.")
         .max(32, "Bug title must be at most 32 characters."),

@@ -11,7 +11,7 @@ import { useCreateWaves } from "@/hooks/createWaves";
 
 export default function Toolbar() {
     // Three hold 
-    const { input, setInput, isPrompt, audioUrl, setIsPromptSend, setAudioURL, setUserAction, file, isRecording, setIsRecording, setFile } = useDashboard();
+    const { input, history, setHistory, setInput, isPrompt, audioUrl, setIsPromptSend, setAudioURL, setUserAction, file, isRecording, setIsRecording, setFile } = useDashboard();
     const { user, setCurrentProject } = useAuth();
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -54,14 +54,15 @@ export default function Toolbar() {
     const cancelPromptReq = () => {
         setIsPromptSend(false);
     };
+
     const sendPromptRequestToServer = () => {
-        sendPromptRequest({ setIsPromptSend, setUserAction, user, input, setInput, setAudioURL, setFile });
+        sendPromptRequest({ setIsPromptSend, setUserAction, user, input, setInput, setAudioURL, setFile, history, setHistory, setCurrentProject });
         setCurrentProject({
             title: input,
             time: formatTime(new Date().toISOString()),
             isoTime: new Date().toISOString(),
             chats: null
-        })
+        });
     }
 
 
