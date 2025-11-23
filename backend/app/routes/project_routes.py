@@ -26,10 +26,9 @@ async def create_project_route(
 
 @router.get("/", response_model=List[ProjectOut])
 async def list_projects(
-    user_id: str = Query(..., description="User ID (UUID)"),
     user: dict = Depends(require_auth)
 ):
-    projects = await get_projects(user_id, user)
+    projects = await get_projects(user)
     return projects
 
 
