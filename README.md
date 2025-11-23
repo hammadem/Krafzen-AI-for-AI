@@ -473,11 +473,15 @@ We follow **[Conventional Commits](https://www.conventionalcommits.org/)**.
 ### 🚀 Development Workflow
 
 ```bash
+# Pre-checks tests and linting error
+npm run lint
+npm run test
+
 # Check for staging branch locally 
 git checkout staging
 
 # Fetch the fresh changes from staging branch
-git pull upstream staging
+git pull origin staging
 
 # Create branch feature/details to make a meaningful commit
 git checkout -b feature/setup

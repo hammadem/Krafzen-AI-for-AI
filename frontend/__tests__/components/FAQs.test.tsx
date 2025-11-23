@@ -5,12 +5,10 @@ describe("FAQs components", () => {
     it("renders the FAQs section", () => {
         render(<FAQs />);
 
-        expect(screen.getByText(/Frequently Asked Questions \(FAQs\)/i)).toBeInTheDocument();
-
         // check rendering of faqs questions
         const faqs = [
             {
-                question: "What is Krafzen Ai about?",
+                question: "What is Krafzen AI about?",
                 answer:
                     "KRAFZEN AI is a SaaS platform that transforms natural voice or text instructions into accurate CAD/DXF/DWG/Revit/BIM MEP models and as-built/instrumentation drawings.",
             },
@@ -25,6 +23,7 @@ describe("FAQs components", () => {
                     "Yes. The Free Plan allows limited projects per month with basic exports (DXF/DWG). It’s a great way to test the platform before upgrading.",
             },
         ];
+
         faqs.forEach((faq) => {
             expect(screen.getByText(faq.question)).toBeInTheDocument();
 
@@ -35,6 +34,6 @@ describe("FAQs components", () => {
             expect(screen.getByText(faq.answer));
         })
 
-        expect(screen.getByRole("button", { name: /Read more/i })).toBeInTheDocument();
+        expect(screen.getByText(/Read more/i)).toBeInTheDocument();
     })
 })

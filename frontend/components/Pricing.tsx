@@ -14,8 +14,8 @@ export default function Pricing() {
 
     return (
         <section>
-
             {/** Pricing text */}
+
             <div className="text-white bg-black flex flex-col items-center justify-evenly">
                 <h1 className="font-bold text-[5vh]">Pricing Plans</h1>
                 <p className="text-center px-1">Choose the plan that works best for you.</p>
@@ -33,7 +33,7 @@ export default function Pricing() {
                             , monthly ? "hover:bg-black bg-black" : "hover:bg-[#1d1c1cff]"
                         )}
                     >
-                        <p className="z-999 w-[100%] sm:px-12">Monthly</p>
+                        <p className="z-999 w-[100%] px-12">Monthly</p>
                     </Button>
                     <Button
                         onClick={() => setMonthly(false)}
@@ -42,7 +42,7 @@ export default function Pricing() {
                             !monthly ? "hover:bg-black bg-black" : "hover:bg-[#1d1c1cff]"
                         )}
                     >
-                        <p className="z-999 w-[100%] sm:px-12">Annual</p>
+                        <p className="z-999 w-[100%] px-12">Annual</p>
                     </Button>
                 </div>
 
@@ -62,7 +62,7 @@ export default function Pricing() {
                         ))
                 }
             </div>
-            
+
         </section>
     )
 }

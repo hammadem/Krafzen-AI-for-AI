@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import Faqs from "@/app/faqs/page";
+import Faqs from "@/app/(main)/faqs/page";
 import { faqs } from "@/lib/data";
 
 describe("FAQs Page", () => {
@@ -14,7 +14,7 @@ describe("FAQs Page", () => {
             );
         });
 
-        buttons.map((button,ind) => {
+        buttons.map((button, ind) => {
             fireEvent.click(button);
 
             expect(screen.getByTitle(faqs[ind].type)).toBeInTheDocument();

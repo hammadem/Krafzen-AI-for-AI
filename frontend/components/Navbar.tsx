@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from "next/navigation";
+import CompanyLogo from './CompanyLogo';
 
 const navigation = [
     { name: 'About', href: '/about' },
@@ -48,35 +49,15 @@ export default function Navbar() {
 
 
                     {/** Company Logo */}
-                    <div className="flex mx-2 lg:flex-1 md:flex-1 xlg:flex-1 items-center">
-                        <div className="flex mx-auto">
-                            <Image
-                                width={24}
-                                height={40.8}
-                                alt="Your Company"
-                                src="/navbar/Vector (6).png"
-                                className="h-8 p-0 m-0 translate-x-3"
-                            />
-                            <Image
-                                width={34}
-                                height={40.8}
-                                alt="Your Company"
-                                src="/navbar/Vector (7).png"
-                                className="h-8 w-auto p-0 m-0"
-                            />
-                            <p className='z-99999 text-white text-[22px] font-semibold hidden sm:block -translate-x-[1px]'>
-                                KRAFZEN AI
-                            </p>
-                            <p className='z-99999 text-white text-[22px] font-semibold block sm:hidden -translate-x-[1px]'>
-                                KRAFZEN
-                            </p>
-                        </div>
+                    <div className="flex mx-2 lg:flex-1 md:flex-1 xlg:flex-1 w-full items-between justify-between">
+                        <CompanyLogo />
+
 
                         { /** Desktop medium and large scale view of Navbar */}
                         <div className="hidden sm:ml-6 sm:block mx-auto"
                             // this is used in tests to target this div
                             data-testid="desktop-menu">
-                            <div className="space-x-2">
+                            <div className="flex gap-4">
                                 {navigation.map((item) => {
                                     const isActive = pathname === item.href;
 
@@ -97,11 +78,21 @@ export default function Navbar() {
                                     variant="secondary"
                                     className="cursor-pointer rounded-full bg-green-400 hover:bg-green-400"
                                 >
-                                    Start Free Trial
+
+                                    <Link
+                                        href="/dashboard"
+                                        className={classNames(
+                                            'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
+                                        )}
+                                    >
+                                        Start Free Trial
+                                    </Link>
                                 </Button>
                             </div>
                         </div>
+
                     </div>
+
                 </div>
 
                 {/** This is for mobile view */}

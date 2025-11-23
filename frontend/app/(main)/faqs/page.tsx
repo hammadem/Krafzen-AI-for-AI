@@ -24,8 +24,9 @@ export default function Faqs() {
         <>
             <NavHeader currentNav="FAQs" />
 
-            <div className="hidden sm:flex flex-cols w-full py-16 justify-evenly items-center md:h-[110vh] sm:h-[150vh]">
-                <span className="flex flex-col items-center h-full sm:py-30 md:py-12 justify-evenly w-[50%]">
+            <div className="hidden sm:flex flex-cols w-full py-16 justify-evenly items-center md:h-[80vh] sm:h-[110vh]">
+
+                <span className="flex flex-col items-center h-full gap-4 w-[50%] md:w-[50%]">
                     {faqs.map((faq, ind) => {
                         return (
                             <Button
@@ -40,9 +41,9 @@ export default function Faqs() {
                     })}
                 </span>
 
-                <span className="w-[1px] h-[60vh] bg-white" />
+                <span className="w-[1px] h-full bg-white" />
 
-                <span className="text-white pl-20 pr-4 md:pr-10 flex items-evenly justify-evenly flex-col h-full w-[90%]">
+                <span className="text-white pl-20 pr-4 md:pr-10 flex items-evenly gap-4 flex-col h-full w-[90%]">
                     <h1 title={faqs[currentQues].type} className="font-semibold">{faqs[currentQues].type}</h1>
                     {
                         faqs[currentQues].QandA.map((val, ind) => {
