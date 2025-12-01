@@ -274,6 +274,7 @@ curl http://localhost:8000/health/detailed
 **Frontend (Vercel)**
 - Auto-deploys on push to `staging` or `main`
 - Preview deployments for PRs
+- **Root Directory Configuration**: The project uses a monorepo structure with frontend in `frontend/` subdirectory. The root `vercel.json` is configured to handle this automatically. If you still see build errors, verify in Vercel Dashboard → Settings → General → Root Directory is set to `frontend/` (or leave empty if using root vercel.json)
 - **Sharing Preview Deployments**: Use Vercel's "Shareable Links" feature to share preview URLs with external collaborators (designers, stakeholders) who don't have Vercel accounts. Go to Vercel Dashboard → Deployments → Select deployment → Click "Share" → Select "Anyone with the link"
 
 **Backend (Render)**
