@@ -7,11 +7,13 @@ on:
       - feature/*
     paths:
       - 'frontend/**'
+      - 'vercel.json'
   pull_request:
     branches:
       - staging
     paths:
       - 'frontend/**'
+      - 'vercel.json'
 
 jobs:
   staging-preview:
