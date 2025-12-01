@@ -130,6 +130,48 @@ else:
     sys.stdout.flush()
     logger.warning(f"Parser router not available - {reason}")
 
+# Include DXF generator router
+dxf_generator_available = False
+dxf_generator = None
+try:
+    sys.stdout.write("🔍 Attempting to import DXF generator module...\n")
+    sys.stdout.flush()
+    from app.api import dxf_generator
+    dxf_generator_available = True
+    sys.stdout.write("✅ DXF generator module imported successfully\n")
+    sys.stdout.flush()
+    logger.info("DXF generator module imported successfully")
+except Exception as e:
+    import traceback
+    error_msg = f"⚠️ Failed to import DXF generator module: {e}"
+    sys.stdout.write(error_msg + "\n")
+    sys.stdout.flush()
+    traceback.print_exc()
+    logger.error(f"Failed to import DXF generator module: {e}", exc_info=True)
+    dxf_generator_available = False
+    dxf_generator = None
+
+if dxf_generator_available and dxf_generator:
+    try:
+        sys.stdout.write("🔍 Attempting to register DXF generator router...\n")
+        sys.stdout.flush()
+        app.include_router(dxf_generator.router, prefix="/api/v1/dxf", tags=["DXF Generator"])
+        sys.stdout.write("✅ DXF generator router registered successfully\n")
+        sys.stdout.flush()
+        logger.info("DXF generator router registered successfully")
+    except Exception as e:
+        import traceback
+        error_msg = f"❌ Failed to register DXF generator router: {e}"
+        sys.stdout.write(error_msg + "\n")
+        sys.stdout.flush()
+        traceback.print_exc()
+        logger.error(f"Failed to register DXF generator router: {e}", exc_info=True)
+else:
+    reason = "DXF generator module import failed" if not dxf_generator_available else "DXF generator is None"
+    sys.stdout.write(f"⚠️ DXF generator router not available - {reason}\n")
+    sys.stdout.flush()
+    logger.warning(f"DXF generator router not available - {reason}")
+
 
 # Root endpoint
 @app.get("/")
