@@ -69,6 +69,7 @@ render.yaml.lock  # If generated
 *.tmp
 
 # Test artifacts
+backend/test_output/
 backend/test_audio.wav
 backend/tests/*.wav
 backend/tests/*.mp3
