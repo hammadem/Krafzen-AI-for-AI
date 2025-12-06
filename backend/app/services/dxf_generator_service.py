@@ -49,7 +49,10 @@ class DXFGeneratorService:
         start = self._extract_point(params, 'start', (0.0, 0.0))
         end = self._extract_point(params, 'end', (100.0, 100.0))
         
-        msp.add_line(start, end)
+        line = msp.add_line(start, end)
+        # Set explicit color (7 = white/black, visible)
+        line.dxf.color = 7
+        line.dxf.layer = '0'
         logger.debug(f"Added line from {start} to {end}")
     
     def _add_circle(self, msp, params: dict):
@@ -61,7 +64,10 @@ class DXFGeneratorService:
             logger.warning(f"Invalid radius {radius}, using default 10.0")
             radius = 10.0
         
-        msp.add_circle(center, radius)
+        circle = msp.add_circle(center, radius)
+        # Set explicit color (7 = white/black, visible)
+        circle.dxf.color = 7
+        circle.dxf.layer = '0'
         logger.debug(f"Added circle at {center} with radius {radius}")
     
     def _add_rectangle(self, msp, params: dict):
@@ -78,7 +84,10 @@ class DXFGeneratorService:
             (corner[0], corner[1] + height),
         ]
         
-        msp.add_lwpolyline(points, close=True)
+        polyline = msp.add_lwpolyline(points, close=True)
+        # Set explicit color (7 = white/black, visible)
+        polyline.dxf.color = 7
+        polyline.dxf.layer = '0'
         logger.debug(f"Added rectangle at {corner} with size {width}x{height}")
     
     def _add_arc(self, msp, params: dict):
@@ -94,7 +103,10 @@ class DXFGeneratorService:
         
         # Convert angles from degrees to radians if needed
         # ezdxf uses degrees for angles
-        msp.add_arc(center, radius, start_angle, end_angle)
+        arc = msp.add_arc(center, radius, start_angle, end_angle)
+        # Set explicit color (7 = white/black, visible)
+        arc.dxf.color = 7
+        arc.dxf.layer = '0'
         logger.debug(f"Added arc at {center} with radius {radius}, angles {start_angle} to {end_angle}")
     
     def _add_polyline(self, msp, params: dict):
@@ -118,7 +130,10 @@ class DXFGeneratorService:
             return
         
         close = params.get('close', False)
-        msp.add_lwpolyline(points, close=close)
+        polyline = msp.add_lwpolyline(points, close=close)
+        # Set explicit color (7 = white/black, visible)
+        polyline.dxf.color = 7
+        polyline.dxf.layer = '0'
         logger.debug(f"Added polyline with {len(points)} points, closed={close}")
     
     def _add_dimension(self, msp, params: dict):
