@@ -4,7 +4,8 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchIcon } from "lucide-react";
-import { TemplateBox } from "./Examples";
+import { TemplateBox } from "../../_component/Examples";
+import { TemplateData } from "@/lib/data";
 
 export default function Templates() {
     return (
@@ -15,7 +16,7 @@ export default function Templates() {
 
                 <p className="text-[#8F8F8F]">Browse and start your project with a pre-designed template.</p>
 
-                <span className="flex gap-4 text-[#8F8F8F]">
+                <span className="flex sm:flex-row flex-col gap-4 text-[#8F8F8F]">
                     <span className="flex items-center gap-2 bg-[#0F0F0F] border-1 border-[#8F8F8F] rounded-[10px] w-full focus-within:none transition">
                         <SearchIcon className="w-5 h-5 text-[#9A9A9A] ml-3" />
                         <Input
@@ -101,16 +102,16 @@ export default function Templates() {
 
                 </span>
 
-                <div className="grid grid-cols-4 gap-4">
-                    <TemplateBox />
-                    <TemplateBox />
-                    <TemplateBox />
-                    <TemplateBox />
-                    <TemplateBox />
-                    <TemplateBox />
-                    <TemplateBox />
-                    <TemplateBox />
-                    <TemplateBox />
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <TemplateBox TemplateData={TemplateData} />
+                    <TemplateBox TemplateData={TemplateData} />
+                    <TemplateBox TemplateData={TemplateData} />
+                    <TemplateBox TemplateData={TemplateData} />
+                    <TemplateBox TemplateData={TemplateData} />
+                    <TemplateBox TemplateData={TemplateData} />
+                    <TemplateBox TemplateData={TemplateData} />
+                    <TemplateBox TemplateData={TemplateData} />
+                    <TemplateBox TemplateData={TemplateData} />
                 </div>
 
             </div>

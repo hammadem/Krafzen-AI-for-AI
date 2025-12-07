@@ -30,22 +30,13 @@ export global {
         time: string;
         isoTime: string;
         chats: UserChat;
+        id: string;
     }
 
     interface HistoryData {
         iso: string;
         date: string;
         searches: Searches[];
-    }
-
-    export interface ProjectDetails {
-        created_at: string;
-        dxf_url: string | null;
-        id: string;
-        input_text: string;
-        parsed_json: JSON | null; // add here type when server starts responding 
-        updated_at: string;
-        user_id: string;
     }
 
     interface User {
@@ -56,4 +47,23 @@ export global {
         lastname: string | undefined?;
     }
 
+    interface Settings {
+        profilename: string;
+        email: string;
+        password: string;
+        notification: boolean;
+        integrations: boolean;
+        advancedsettings: {
+            exportsettings: boolean;
+            developerapikeys: boolean;
+            importsettings: boolean;
+        }
+    }
+
+    interface TemplateData {
+        url: string,
+        title: string,
+        details: string
+    }
 }
+

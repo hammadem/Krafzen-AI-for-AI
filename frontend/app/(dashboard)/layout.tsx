@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   description: "This is the Dashboard component for krafzenai frontend",
 };
 
-export default function DashboardLayout({
+export default function Layout({
   children,
 }: {
   children: React.ReactNode

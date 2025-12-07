@@ -4,11 +4,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DashRoutes } from "@/context/DashboardContex";
 import { PricingPlans } from "@/lib/data";
 import { classNames } from "@/lib/utils";
 import { CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { ChangeEvent } from "react";
 
 export function Heading() {
@@ -28,75 +29,50 @@ export function Example({ ex }: { ex: [string, string] }) {
     )
 }
 
-export function NavLinks({ setCurrentRoute }: { setCurrentRoute: (value: string) => void }) {
+export function NavLinks({ setCurrentRoute }: { setCurrentRoute: (value: Partial<DashRoutes>) => void }) {
     return (
         <div className="flex text-white flex-col gap-4 w-[70%] text-[2vh]">
-            <p className="flex gap-4 items-center cursor-pointer" onClick={() => setCurrentRoute("home")}><HomeIcon /> Home</p>
-            <p className="flex gap-4 items-center cursor-pointer" onClick={() => setCurrentRoute("projects")}><Folder />Projects</p>
-            <p className="flex gap-4 items-center cursor-pointer" onClick={() => setCurrentRoute("templates")}><LucideLayoutTemplate />Templates</p>
-            <p className="flex gap-4 items-center cursor-pointer" onClick={() => setCurrentRoute("exports")}><ExpandIcon />Exports</p>
-            <p className="flex gap-4 items-center cursor-pointer" onClick={() => setCurrentRoute("billing")}><CreditCardIcon />Billing</p>
-            <p className="flex gap-4 items-center cursor-pointer" onClick={() => setCurrentRoute("settings")}><Settings />Settings</p>
+            <Link
+                onClick={() => setCurrentRoute({ home: "home" })}
+                aria-label="Link to Homepage"
+                href="/dashboard/id"
+                className="flex gap-4 items-center cursor-pointer" >
+                <HomeIcon /> Home
+            </Link>
+            <Link
+                onClick={() => setCurrentRoute({ projects: "projects" })}
+                aria-label="Link to Projects"
+                href="/dashboard/projects"
+                className="flex gap-4 items-center cursor-pointer" >
+                <Folder />Projects
+            </Link>
+            <Link
+                onClick={() => setCurrentRoute({ templates: "templates" })}
+                aria-label="Link to Templates"
+                href="/dashboard/templates"
+                className="flex gap-4 items-center cursor-pointer" >
+                <LucideLayoutTemplate />Templates
+            </Link>
+            <Link
+                onClick={() => setCurrentRoute({ exports: "exports" })}
+                aria-label="Link to Exports"
+                href="/dashboard/exports"
+                className="flex gap-4 items-center cursor-pointer" >
+                <ExpandIcon />Exports
+            </Link>
+            <Link
+                onClick={() => setCurrentRoute({ billing: "billing" })}
+                aria-label="Link to Billing"
+                href="/dashboard/billings"
+                className="flex gap-4 items-center cursor-pointer" ><CreditCardIcon />Billing</Link>
+            <Link
+                onClick={() => setCurrentRoute({ settings: "settings" })}
+                aria-label="Link to Settings"
+                href="/dashboard/settings"
+                className="flex gap-4 items-center cursor-pointer" ><Settings />Settings</Link>
 
             <Separator className="bg-[#919191] h-[1px] mt-2" />
         </div>
-    );
-}
-
-export function History({ data, setCurrentProject, loading }: { data: HistoryData[], setCurrentProject: (value: Searches) => void, loading: boolean }) {
-    return (
-        <div className="text-[#919191] text-[4vh] flex flex-col gap-6">
-            <h1 className="font-semibold">History</h1>
-
-            {loading ? (
-                <div className="flex flex-col gap-6">
-                    {/* Skeleton for 2–3 history sections */}
-                    {[1, 2, 3].map((i) => (
-                        <div key={i} className="flex flex-col gap-3">
-                            {/* Date Skeleton */}
-                            <Skeleton className="w-32 h-4 rounded-md" />
-
-                            {/* Title/time pairs */}
-                            <div className="flex items-center justify-between gap-2">
-                                <Skeleton className="w-[70%] h-5 rounded-md" />
-                                <Skeleton className="w-12 h-4 rounded-md" />
-                            </div>
-
-                            <div className="flex items-center justify-between gap-2">
-                                <Skeleton className="w-[60%] h-5 rounded-md" />
-                                <Skeleton className="w-10 h-4 rounded-md" />
-                            </div>
-
-                            <div className="flex items-center justify-between gap-2">
-                                <Skeleton className="w-[80%] h-5 rounded-md" />
-                                <Skeleton className="w-16 h-4 rounded-md" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                data.map(info => (
-                    <div key={info.date + info.searches[0].title} className="flex flex-col gap-2">
-                        <p className="text-[2vh] font-semibold">{info.date}</p>
-                        {info.searches.map(detail => (
-                            <span
-                                key={detail.time + detail.title}
-                                className="flex items-center justify-between cursor-pointer"
-                                onClick={() => setCurrentProject(detail)}
-                            >
-                                <p className="text-[2.5vh] font-normal text-white w-[70%] truncate">
-                                    {detail.title}
-                                </p>
-                                <p className="text-[2vh] font-semibold text-[#616161]">
-                                    {detail.time}
-                                </p>
-                            </span>
-                        ))}
-                    </div>
-                ))
-            )}
-        </div>
-
     );
 }
 
@@ -117,7 +93,7 @@ export function SeePlans({ ind, plan }: { ind: number, plan: PricingDetails }) {
                 <p>Basic features for individual use.</p>
             </span>
 
-            <p className="flex items-center"><p className="text-[6vh] mx-2">{plan.price}</p> / month</p>
+            <h1 className="flex items-center"><p className="text-[6vh] mx-2">{plan.price}</p> / month</h1>
 
             <div className="w-full border-1 border-white px-6 py-2 rounded-[5px] flex items-center justify-center">
                 Current Plan
@@ -169,21 +145,21 @@ export function SeePlans({ ind, plan }: { ind: number, plan: PricingDetails }) {
     );
 }
 
-export function TemplateBox() {
+export function TemplateBox({ TemplateData }: { TemplateData: TemplateData }) {
     return (
         <div className="bg-[#2F2F2F] flex flex-col items-center rounded-[10px]">
             <span>
                 <Image
-                    alt=""
+                    alt={TemplateData.title}
                     width={300}
                     height={300}
                     className=""
-                    src="/dashboard/tempexample.png"
+                    src={TemplateData.url}
                 />
             </span>
             <span className="flex flex-col gap-2 p-4">
-                <p>Modern House Plan</p>
-                <p className="text-[2.5vh]">A compact and efficient 2-bedroom modern house</p>
+                <p>{TemplateData.title}</p>
+                <p className="text-[2.5vh]">{TemplateData.details}</p>
             </span>
         </div>
     )
@@ -191,7 +167,7 @@ export function TemplateBox() {
 
 export function ExportHistory({ ind, currentExp }: { ind: number, currentExp: number }) {
     return (
-        <span className={classNames("bg-[#2F2F2F] rounded-[10px] flex w-full h-20 items-center justify-between", ind == currentExp ? "bg-black" : "bg-[#2F2F2F]")}>
+        <span className={classNames("bg-[#2F2F2F] rounded-[10px] flex md:flex-row gap-2 p-2 flex-col w-full md:h-20 items-center justify-between", ind == currentExp ? "bg-black" : "bg-[#2F2F2F]")}>
             <span className="flex items-center gap-6 ml-4">
                 <span className="rounded-full h-2 w-2 bg-green-400" />
                 <span>

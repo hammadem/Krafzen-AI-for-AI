@@ -24,7 +24,8 @@ import {
     InputGroupTextarea,
 } from "@/components/ui/input-group";
 import { formSchema } from "@/lib/validation";
-
+import { useState } from "react";
+import { classNames } from "@/lib/utils";
 
 export default function SupportForm() {
     const form = useForm<z.infer<typeof formSchema>>({
@@ -36,11 +37,33 @@ export default function SupportForm() {
             phonenumber: "",
             message: ""
         },
-    })
+    });
+    const [loading, setLoading] = useState(false);
 
-    function onSubmit(data: z.infer<typeof formSchema>) {
-        alert("Form submitted succesfully and see logs for data.");
-        console.log(data);
+    async function onSubmit(data: z.infer<typeof formSchema>) {
+        try {
+            setLoading(true);
+
+            const response = await fetch(
+                process.env.NEXT_PUBLIC_SUPABASE_RESEND_EMAIL_URL!,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                    },
+                    body: JSON.stringify(data),
+                }
+            );
+            const result = await response.json();
+            if (result.success) alert("Message sent successfully!");
+            else alert("Failed to send message.");
+
+        } catch (err) {
+            console.log(err);
+        } finally {
+            setLoading(false);
+        }
     }
 
     return (
@@ -164,8 +187,12 @@ export default function SupportForm() {
             </CardContent>
             <CardFooter>
                 <Field orientation="horizontal">
-                    <Button type="submit" form="form-rhf-demo" variant="secondary" className="rounded-full w-full cursor-pointer hover:bg-green-400 bg-green-400">
-                        Submit
+                    <Button
+                        disabled={loading}
+                        type="submit" form="form-rhf-demo" variant="secondary"
+                        className={classNames("rounded-full w-full cursor-pointer hover:bg-green-400", loading ? "bg-green-800" : "bg-green-400")}
+                    >
+                        {loading ? "Submitting" : "Submit"}
                     </Button>
                 </Field>
             </CardFooter>

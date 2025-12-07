@@ -18,7 +18,7 @@ import { loginSchema } from "@/lib/validation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { toast } from "react-toastify";
-import { useDashboard } from "@/context/DashboardContex";
+import { useState } from "react";
 
 
 export default function SignUp() {
@@ -32,7 +32,7 @@ export default function SignUp() {
             confirmPassword: ""
         },
     });
-    const { loading, setLoading } = useDashboard();
+    const [loading, setLoading] = useState(false);
 
     async function onSubmit(data: z.infer<typeof loginSchema>) {
         if (data?.password.toString() !== data?.confirmPassword.toString()) {
@@ -82,7 +82,7 @@ export default function SignUp() {
         <div className="w-full flex flex-col items-center gap-8 w-full">
             <h1 className="text-[4vh]">Sign up</h1>
 
-            <Card className="sm:max-w-md bg-black border-0 text-white w-[50%]">
+            <Card className="sm:max-w-md bg-black border-0 text-white md:w-[50%]">
                 <CardContent>
                     <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
                         <FieldGroup className="flex gap-2">
@@ -199,8 +199,9 @@ export default function SignUp() {
                         <Link
                             href="/login"
                             aria-label="Link to Login Page"
+                            className="font-bold"
                         >
-                            <b>Sign In</b>
+                            Sign In
                         </Link>
                     </p>
                 </span>

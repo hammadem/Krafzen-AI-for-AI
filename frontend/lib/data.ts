@@ -11,6 +11,13 @@ export const examplePrompt: [string, string][] = [
     ["Draw a 12x10 garage", "with a large door in the middle"]
 ]
 
+//Template details
+export const TemplateData = {
+    url: "/dashboard/tempexample.png",
+    title: "Modern House",
+    details: "A compact and efficient 2-bedroom modern house"
+}
+
 // FAQs Questions Data
 export const faqs: FAQs[] = [
     {

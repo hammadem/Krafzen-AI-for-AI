@@ -3,7 +3,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescript
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
-import { useDashboard } from "@/context/DashboardContex";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { AlertDialogTrigger } from "@radix-ui/react-alert-dialog";
 import Image from "next/image";
@@ -14,8 +13,8 @@ import { toast } from "react-toastify";
 export default function Login() {
     const [mail, setMail] = useState<string>("");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const { loading, setLoading, setHistory } = useDashboard();
-    const { setCurrentProject, setProjects } = useAuth();
+    const { setCurrentProject } = useAuth();
+    const [loading, setLoading] = useState(false);
 
     // To implement it fully we need google and linkedIN client Id yet and enable oauth provider in supabase
     // leave it for now
@@ -32,9 +31,7 @@ export default function Login() {
                     emailRedirectTo: `${window.location.origin}/auth/callback`
                 }
             });
-            setCurrentProject(undefined);
-            setProjects([]);
-            setHistory([]);
+            setCurrentProject(null);
 
             if (error) toast.error(error.message);
             else toast.success("Magic link sent! Check your email 📩");
@@ -132,8 +129,9 @@ export default function Login() {
                     <Link
                         href="/signup"
                         aria-label="Link to Sign Up"
+                        className="text-bold"
                     >
-                        <b>Sign Up</b>
+                        Sign Up
                     </Link>
                 </p>
             </span>

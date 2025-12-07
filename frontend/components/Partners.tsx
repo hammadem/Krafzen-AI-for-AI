@@ -39,7 +39,7 @@ export default function Partners() {
                     <CarouselContent>
                         <CarouselItem>
                             <Image
-                                src="/partners/1.png"
+                                src="/partners/3.png"
                                 alt="Partner 1"
                                 width={300}
                                 height={300}
@@ -60,7 +60,7 @@ export default function Partners() {
 
                         <CarouselItem>
                             <Image
-                                src="/partners/3.png"
+                                src="/partners/1.png"
                                 alt="Partner 3"
                                 width={300}
                                 height={300}

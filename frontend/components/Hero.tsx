@@ -5,11 +5,13 @@ import Pricing from "./Pricing";
 import FAQ from "./FAQs";
 import Partners from "./Partners";
 
+
 export default function Hero() {
     return (
         <>
-            <section className="h-180 sm:h-120 relative w-full flex items-center justify-center">
+            <section className="h-220 sm:h-150 relative w-full flex items-center justify-center">
                 <Image
+                    style={{ filter: "brightness(1.8)" }}
                     src="/hero/hero.png"
                     alt="Hero Image"
                     fill
@@ -19,10 +21,18 @@ export default function Hero() {
 
                 <div className="z-99 flex flex-col items-center">
                     <span
-                        className="sm:h-80 h-20"
+                        className="sm:h-50 h-20"
                     ></span>
-                    <h1 className="text-[7vh] font-bold text-white text-center">Reimagine Design with</h1>
-                    <h1 className="text-[7vh] font-bold text-white text-center">AI-Powered Precision</h1>
+
+                    <h1 className="hidden sm:block text-[7vh] font-bold text-white text-center">Reimagine Design with</h1>
+                    <h1 className="hidden sm:block text-[7vh] font-bold text-white text-center">AI-Powered Precision</h1>
+
+
+                    <h1 className="block sm:hidden text-[7vh] font-bold text-white text-center">Reimagine</h1>
+                    <h1 className="block sm:hidden text-[7vh] font-bold text-white text-center">Design</h1>
+                    <h1 className="block sm:hidden text-[7vh] font-bold text-white text-center">with</h1>
+                    <h1 className="block sm:hidden text-[7vh] font-bold text-white text-center">AI-</h1>
+                    <h1 className="block sm:hidden text-[7vh] font-bold text-white text-center">Powered Precision</h1>
 
                     <p className="text-white text-[2vh]">From Voice commands to</p>
                     <p className="text-white text-[2vh]"><b>DWG, DXF & MEP</b> as-builts in seconds.</p>

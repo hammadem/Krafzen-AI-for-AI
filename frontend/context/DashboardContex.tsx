@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
-interface DashRoutes {
+export interface DashRoutes {
   settings: "settings",
   billing: "billing",
   exports: "exports",
@@ -10,26 +10,17 @@ interface DashRoutes {
 }
 
 interface DashboardContextType {
-  input: string;
-  setInput: (value: string) => void;
-  audioUrl: string;
-  setAudioURL: (value: string) => void;
   isRecording: boolean;
   setIsRecording: (value: boolean) => void;
   isUserActing: boolean;
   setUserAction: (value: boolean) => void;
   sideBarOpen: boolean;
   setSideBarOpen: (value: boolean) => void;
-  file: string;
-  setFile: (value: string) => void;
-  isPrompt: boolean;
-  setIsPromptSend: (value: boolean) => void;
-  route: string | Partial<DashRoutes>;
-  setCurrentRoute: (value: string) => void;
-  history: HistoryData[];
-  setHistory: (value: HistoryData[]) => void;
-  loading: boolean;
-  setLoading: (value: boolean) => void;
+  isPrompting: boolean;
+  setisPromptingSend: (value: boolean) => void;
+  route: Partial<DashRoutes>;
+  setCurrentRoute: (value: Partial<DashRoutes>) => void;
+  resetDashboardState: () => void;
 }
 
 // ✅ Create the context
@@ -37,41 +28,34 @@ const DashboardContext = createContext<DashboardContextType | undefined>(undefin
 
 // ✅ Create the provider
 export const DashboardProvider = ({ children }: { children: ReactNode }) => {
-  const [input, setInput] = useState("");
-  const [audioUrl, setAudioURL] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isUserActing, setUserAction] = useState(false);
   const [sideBarOpen, setSideBarOpen] = useState(false);
-  const [file, setFile] = useState("");
-  const [isPrompt, setIsPromptSend] = useState<boolean>(false);
-  const [route, setCurrentRoute] = useState("home");
-  const [history, setHistory] = useState<HistoryData[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [isPrompting, setisPromptingSend] = useState<boolean>(false);
+  const [route, setCurrentRoute] = useState<Partial<DashRoutes>>({ home: "home" });
 
+  const resetDashboardState = () => {
+    setisPromptingSend(false);
+    setSideBarOpen(false);
+    setIsRecording(false);
+    setUserAction(false);
+    setCurrentRoute({ home: "home" });
+  }
 
   return (
     <DashboardContext.Provider
       value={{
-        input,
-        setInput,
-        audioUrl,
-        setAudioURL,
         isRecording,
         setIsRecording,
         isUserActing,
         setUserAction,
         sideBarOpen,
         setSideBarOpen,
-        file,
-        setFile,
-        isPrompt,
-        setIsPromptSend,
+        isPrompting,
+        setisPromptingSend,
         route,
         setCurrentRoute,
-        history,
-        setHistory,
-        loading,
-        setLoading
+        resetDashboardState
       }}
     >
       {children}

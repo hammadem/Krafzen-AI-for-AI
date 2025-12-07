@@ -20,8 +20,7 @@ import { createClient } from "@/lib/supabase/supabaseClient";
 import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useDashboard } from "@/context/DashboardContex";
-
+import { useState } from "react";
 
 export default function LoginWithCred() {
     const form = useForm<z.infer<typeof loginCredSchema>>({
@@ -33,7 +32,7 @@ export default function LoginWithCred() {
     });
     const { setUser } = useAuth();
     const router = useRouter();
-    const { loading, setLoading } = useDashboard();
+    const [loading, setLoading] = useState(false);
 
     async function onSubmit(data: z.infer<typeof loginCredSchema>) {
         try {
@@ -45,6 +44,8 @@ export default function LoginWithCred() {
                 email,
                 password,
             });
+
+            console.log(user);
 
             if (error) {
                 toast.error(error.message);
@@ -75,7 +76,7 @@ export default function LoginWithCred() {
         <div className="w-full flex flex-col items-center gap-8 w-full">
             <h1 className="text-[4vh]">Sign up</h1>
 
-            <Card className="sm:max-w-md bg-black border-0 text-white w-[50%]">
+            <Card className="sm:max-w-md bg-black border-0 text-white md:w-[50%]">
                 <CardContent>
                     <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
                         <FieldGroup className="flex gap-2">
@@ -135,8 +136,9 @@ export default function LoginWithCred() {
                         <Link
                             href="/signup"
                             aria-label="Link to Login Page"
+                            className="text-bold"
                         >
-                            <b>Sign Up</b>
+                            Sign Up
                         </Link>
                     </p>
 
@@ -144,8 +146,9 @@ export default function LoginWithCred() {
                         <Link
                             href="/forgot"
                             aria-label="Link to Login Page"
+                            className="text-bold"
                         >
-                            <b>Reset Password</b>
+                            Reset Password
                         </Link>
                     </p>
                 </span>

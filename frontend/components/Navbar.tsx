@@ -46,8 +46,6 @@ export default function Navbar() {
                             )}
                         />
                     </div>
-
-
                     {/** Company Logo */}
                     <div className="flex mx-2 lg:flex-1 md:flex-1 xlg:flex-1 w-full items-between justify-between">
                         <CompanyLogo />
@@ -80,7 +78,7 @@ export default function Navbar() {
                                 >
 
                                     <Link
-                                        href="/dashboard"
+                                        href="/dashboard/id"
                                         className={classNames(
                                             'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
                                         )}
@@ -125,8 +123,14 @@ export default function Navbar() {
                         variant="secondary"
                         className="z-9999 cursor-pointer rounded-full bg-green-400 hover:bg-green-400 my-2"
                     >
-                        Start Free Trial
-                    </Button>
+                        <Link
+                            href="/dashboard/id"
+                            className={classNames(
+                                'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
+                            )}
+                        >
+                            Start Free Trial
+                        </Link>                    </Button>
                 </div>
             </nav>
         </div>

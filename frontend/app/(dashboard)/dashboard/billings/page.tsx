@@ -1,16 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Download, LucideCreditCard, Plus } from "lucide-react";
-import { SeePlans } from "./Examples";
+import { SeePlans } from "@/app/(dashboard)/_component/Examples";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { PricingPlans } from "@/lib/data";
 
 export default function Billings() {
     return (
         <>
-            <div className="text-white w-[80%] flex flex-rows h-[86vh] gap-4 bg-[#191919]">
+            <div className="text-white w-[80%] flex flex-col md:flex-row md:h-[86vh] gap-4 bg-[#191919]">
 
-                <div className="w-[70%] p-4 gap-6 flex flex-col  overflow-y-auto custom-scrollbar2">
+                <div className="md:w-[70%] p-4 gap-6 flex flex-col  overflow-y-auto custom-scrollbar2">
 
                     <h1 className="text-white font-bold">Billing</h1>
                     <div className="bg-[#494949] p-4 rounded-[10px]">
@@ -46,7 +46,7 @@ export default function Billings() {
                             </span>
                         </span>
 
-                        <div className="w-full items-center flex flex-col gap-2">
+                        <div className="w-full items-center flex flex-col gap-2 overflow-scroll">
                             {/* Header */}
                             <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-4 py-2 font-semibold w-[95%]">
                                 <div className="text-left">Date</div>
@@ -130,7 +130,7 @@ export default function Billings() {
 
                 </div>
 
-                <div className="w-[30%] p-4 flex flex-col py-14  overflow-y-auto custom-scrollbar2">
+                <div className="md:w-[40%] p-4 flex flex-col py-14  overflow-y-auto custom-scrollbar2">
                     <h1 className="text-white font-semibold text-[4vh]">Compare Plans</h1>
                     <Accordion
                         type="single"

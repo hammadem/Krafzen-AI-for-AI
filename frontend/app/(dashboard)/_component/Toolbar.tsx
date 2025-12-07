@@ -1,205 +1,127 @@
 "use client";
-import { classNames, formatTime } from "@/lib/utils";
-import { Plus, Mic, ArrowUp } from "lucide-react";
-import { ChangeEvent, useRef } from "react";
+import { classNames } from "../../../lib/utils";
+import { ChangeEvent, useRef, useState } from "react";
 import { useDashboard } from "@/context/DashboardContex";
-import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
-import { sendPromptRequest } from "@/hooks/fetchApiData";
-import { useCreateWaves } from "@/hooks/createWaves";
+import { transcribeAudio } from "@/lib/api/api";
+import { useAudioWaves } from "@/hooks/useAudioWaves";
+import FilePreview from "./Toolbar/FilePreview";
+import { AudioRecorder, InputFile, SendPromptRequest, StoppedRecordingUI, StartedRecordingUI, SendingPromptUI } from "./Toolbar/ToolbarComponents";
+import { useCreateProject } from "@/hooks/useCreateProject";
+import { toast } from "react-toastify";
 
 
 export default function Toolbar() {
-    // Three hold 
-    const { input, history, setHistory, setInput, isPrompt, audioUrl, setIsPromptSend, setAudioURL, setUserAction, file, isRecording, setIsRecording, setFile } = useDashboard();
-    const { user, setCurrentProject } = useAuth();
-
+    const { setUserAction, isRecording, setIsRecording, setisPromptingSend } = useDashboard();
+    const { user } = useAuth();
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { startRecording: startWaves, stopRecording: stopWaves } = useCreateWaves({
-        mediaRecorderRef,
-        canvasRef,
-        setAudioURL,
-        setIsRecording
-    });
+    const audioChunksRef = useRef<Blob[]>([]);
 
-    console.log(input, audioUrl, file);
+    // Component state and requirements
+    const [input, setInput] = useState<string>("");
+    const [file, setFile] = useState<string>("");
+    const [loading, setLoading] = useState<boolean>(false);
 
-    const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files !== null ? e.target.files[0] : null;
-        if (file && file !== null && file !== undefined) {
-            const url = URL.createObjectURL(file);
-            setFile(url);
-        } else {
-            setFile("");
-        }
-    };
-    const inpuChange = (e: ChangeEvent<HTMLInputElement>) => {
-        const prompt = e.target.value !== "" ? e.target.value : ""
-        if (prompt && prompt !== "") {
-            setInput(prompt);
-        } else {
-            setInput("");
-        }
+    //Custom hooks
+    const { stopRecording, startRecording, canvasRef } = useAudioWaves({ mediaRecorderRef, audioChunksRef, setInput, setFile, setLoading });
+    const { createProject, isPrompting } = useCreateProject();
+
+    const start = () => {
+        setIsRecording(true);
+        startRecording();
+        setLoading(true);
     }
-    const stopRecording = () => {
-        stopWaves();
-        mediaRecorderRef.current?.stop();
+    const stop = () => {
         setIsRecording(false);
-    };
-    const startRecording = async () => {
-        startWaves();
-        setUserAction(true);
-    };
-    const cancelPromptReq = () => {
-        setIsPromptSend(false);
-    };
-
-    const sendPromptRequestToServer = () => {
-        sendPromptRequest({ setIsPromptSend, setUserAction, user, input, setInput, setAudioURL, setFile, history, setHistory, setCurrentProject });
-        setCurrentProject({
-            title: input,
-            time: formatTime(new Date().toISOString()),
-            isoTime: new Date().toISOString(),
-            chats: null
-        });
+        stopRecording();
     }
 
+
+    // automatically makes file view better
+    const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = e.target.files?.[0];
+        if (!selectedFile) return;
+
+        const fileSizeInMB = selectedFile.size / (1024 * 1024);
+        const isAudio = selectedFile.type.startsWith("audio/");
+
+        // ---- Validation ----
+        if (!isAudio) {
+            toast.error("Please upload a valid audio file.");
+            setInput("");
+            setFile("");
+            return;
+        }
+
+        if (fileSizeInMB > 20) {
+            toast.error("Audio file must be below 20MB.");
+            setInput("");
+            setFile("");   // <---- CLEAR previous preview
+            return;
+        }
+
+        setLoading(true);
+        setUserAction(true);
+
+        try {
+            const data = await transcribeAudio({ user, blob: selectedFile });
+            if (data?.text) setInput(data.text);
+        } catch (err) {
+            console.error("Audio transcription failed:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const inputChange = (e: ChangeEvent<HTMLInputElement>) => {
+        const prompt = e.target.value !== "" ? e.target.value : ""
+        if (prompt && prompt !== "") setInput(prompt);
+        else setInput("");
+    }
+
+    const cancelPromptReq = () => {
+        {
+            /*        
+            here we will create a custom hook for sending prompt request to server which
+            will return a abort signal which can be used to cancel the request to server in realtime 
+            rather than just ui changes.
+            */
+        }
+        setisPromptingSend(false);
+    }
 
     return (
-        <div className="flex flex-col gap-4 w-full items-center justify-center items-center">
+        <div className={classNames("flex flex-col w-full items-center justify-center items-start bg-white", file !== "" ? "rounded-[20px]" : "rounded-[40px]")}>
+            <FilePreview file={file} setFile={setFile} loading={loading} setInput={setInput} />
+
             {/* Toolbar */}
-            <div className={classNames("z-9999 flex items-center bg-white text-gray-700 w-[100%] rounded-full px-4 py-2 shadow-sm border border-gray-200", !isRecording === true && input === "" && audioUrl === "" ? "" : "")}>
-                <label className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100 transition cursor-pointer">
-                    {
-                        file !== ""
-                        &&
-                        <Image
-                            src={file}
-                            width={100}
-                            height={100}
-                            alt="User Input File"
-                            className="absolute"
-                        />}
-                    <Plus size={18} />
+            <div className={classNames("z-9999 flex items-center p-2 bg-white text-gray-700 w-[100%] rounded-full px-4 shadow-sm border border-gray-400")}>
+                <InputFile handleFileChange={handleFileChange} isRecording={isRecording} />
 
-                    <input type="file" className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>) => handleFileChange(e)} />
-                </label>
+                <AudioRecorder isRecording={isRecording} canvasRef={canvasRef} isPrompting={isPrompting} input={input} inputChange={inputChange} />
 
-                {
-                    isRecording
-                        ?
-                        // Canvas for live waveform 
-                        <div className="text-gray-400 flex items-center text-[2.5vh] justify-between w-full">
-                            <h1>Listening...</h1>
-                            <canvas ref={canvasRef} height={20} className="bg-white rounded-lg h-full w-[60%]" />
-                        </div>
-                        :
-                        <input
-                            type="text"
-                            placeholder={!isPrompt ? "𝐂𝐡𝐚𝐭 or 𝐒𝐩𝐞𝐚𝐤 to draw" : "Drawing..."}
-                            onChange={(e) => inpuChange(e)}
-                            className="w-[80%] text-sm md:text-base text-gray-700 bg-transparent outline-none placeholder:text-gray-400"
-                        />
-                }
+                <SendingPromptUI isPrompting={isPrompting} cancelPromptReq={cancelPromptReq} />
 
-                {
-                    isPrompt
-                        ?
-                        <>
-                            <span className="flex flex-row w-[30%] items-center justify-evenly">
-                                <Image
-                                    src="/dashboard/crossicon.png"
-                                    width={30}
-                                    height={30}
-                                    alt="Cancel Request To AI"
-                                    className="cursor-pointer"
-                                    onClick={cancelPromptReq}
-                                />
-                                <h1 className="text-[3vh] text-black">Cancel Drawing</h1>
-
-                            </span>
-                        </>
-                        :
-                        ""
-                }
-
+                {/** this is the ui for started stoped and prompt submit button  */}
                 <span className="flex items-center gap-4 bg-white text-black rounded-full">
                     {
-                        !isPrompt
-                            ?
-                            <>
-                                {
-                                    !isRecording
-                                        ?
-                                        (
-                                            <span
-                                                className="p-2 bg-black rounded-full cursor-pointer"
-                                                onClick={startRecording}
-                                            >
-                                                <Mic size={16} className="text-white" />
-                                            </span>
-                                        )
-                                        :
-                                        (
-                                            <span className="p-2 bg-white rounded-full">
-                                                <Mic size={8} className="text-black" />
-                                            </span>
-                                        )
-                                }
-                            </>
-                            :
-                            <>
-                            </>
+                        // this is if the request is not sent to the user I mean if no request is made to server yet
+                        !isPrompting
+                        &&
+                        <StoppedRecordingUI isRecording={isRecording} start={start} />
                     }
-
                     <span>
                         {
                             isRecording
                                 ?
-                                (
-                                    <span className="cursor-pointer" onClick={stopRecording}>
-                                        <svg
-                                            width="24"
-                                            height="24"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            xmlns="http://www.w3.org/2000/svg"
-                                        >
-                                            <circle cx="12" cy="12" r="10" stroke="black" strokeWidth="4" />
-                                            <rect x="9" y="9" width="6" height="6" fill="black" />
-                                        </svg>
-                                    </span>
-                                ) : (
-                                    <span>
-                                        {
-                                            !isPrompt
-                                                ?
-                                                <span>
-                                                    {
-                                                        file !== "" || audioUrl !== "" || input !== ""
-                                                            ?
-                                                            <div
-                                                                onClick={() => sendPromptRequestToServer()}
-                                                                className="border-rounded mx-[2px] rounded-full p-1 text-white bg-black cursor-pointer">
-                                                                <ArrowUp className="bg-black rounded-full" />
-                                                            </div>
-                                                            :
-                                                            <span className="text-sm font-medium">Speak</span>
-                                                    }
-                                                </span>
-                                                :
-                                                ""
-                                        }
-                                    </span>
-                                )
+                                <StartedRecordingUI stop={stop} />
+                                :
+                                <SendPromptRequest isPrompting={isPrompting} input={input} loading={loading} createProject={createProject} setInput={setInput} />
                         }
                     </span>
                 </span>
             </div>
 
-            {/* Playback */}
-            {/* {audioUrl && <audio controls src={audioUrl} className="w-full mt-2" />} */}
-        </div >
+        </div>
     );
 }
