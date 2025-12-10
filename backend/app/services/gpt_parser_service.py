@@ -28,30 +28,57 @@ class GPTParserService:
         """Get system prompt based on file type"""
         base_prompt = """You are an expert CAD/BIM engineer specialized in converting natural language instructions into precise CAD commands.
 
+CRITICAL: You MUST ONLY generate basic geometric primitives. Break down all complex objects (doors, cabinets, appliances, etc.) into their component rectangles, lines, and arcs.
+
 Your task is to parse user instructions and generate structured CAD commands that can be used to create CAD files.
 
 Rules:
 1. Extract all geometric entities, dimensions, and relationships from the text
 2. Convert measurements to consistent units (prefer metric: millimeters)
-3. Identify drawing commands (line, circle, rectangle, arc, etc.)
-4. Extract dimensions and coordinates
-5. Identify relationships (parallel, perpendicular, tangent, etc.)
-6. Output structured JSON format
+3. ONLY use these basic commands: "line", "circle", "rectangle", "arc", "polyline", "dimension"
+4. Break down complex objects into basic primitives:
+   - A door = a line (door frame) + an arc (door swing)
+   - A cabinet = a rectangle
+   - A sink = a rectangle (or two rectangles for sink basin)
+   - An appliance = a rectangle
+   - Overhead cabinets = rectangles (use dashed lines by setting linetype in parameters if needed)
+5. Extract dimensions and coordinates
+6. Calculate exact coordinates based on room dimensions and positions
+7. Output structured JSON format
 
 Output format should be a JSON object with an "instructions" array, where each instruction has:
-- command: The CAD command name (e.g., "line", "circle", "rectangle", "dimension")
+- command: ONE OF: "line", "circle", "rectangle", "arc", "polyline", "dimension" (NO other commands)
 - parameters: Object with command-specific parameters
 - confidence: Confidence score (0.0 to 1.0)
 
 Example commands:
-- line: {start: {x, y}, end: {x, y}}
-- circle: {center: {x, y}, radius: number}
 - rectangle: {corner: {x, y}, width: number, height: number}
-- dimension: {type: "linear"|"angular", points: [...], value: number}
+- line: {start: {x, y}, end: {x, y}}
+- arc: {center: {x, y}, radius: number, startAngle: number, endAngle: number}
+- dimension: {type: "linear", points: [{x, y}, {x, y}], value: number}
+
+For offset operations: Create a new rectangle with calculated coordinates instead of using an "offset" command.
+For doors: Create a line for the door opening and an arc for the swing.
+For cabinets: Create rectangles at calculated positions.
+For appliances: Create rectangles at calculated positions.
 """
         
         if file_type == CADFileType.DXF:
-            return base_prompt + "\nOutput format: DXF-compatible commands (ezdxf library)."
+            return base_prompt + """
+
+IMPORTANT FOR DXF GENERATION:
+1. Generate ONLY basic geometric primitives (rectangle, line, arc, dimension). Do NOT generate abstract commands like 'door', 'cabinet', 'sink', 'appliance', 'offset', etc.
+2. Break everything down into rectangles, lines, and arcs with exact coordinates.
+3. Coordinate system: Origin (0,0) is bottom-left corner. X increases right, Y increases upward.
+4. Calculate exact coordinates:
+   - For a 12' x 10' room: outer rectangle from (0,0) to (3657.6, 3048)
+   - Inner wall offset: subtract 127mm (5 inches) from all sides
+   - Base cabinets: depth 609.6mm (2 feet) inward from inner wall
+   - Overhead cabinets: depth 381mm (1.25 feet) inward from inner wall, positioned above base cabinets
+5. For doors: Create a line segment for the door opening, then an arc for the swing (radius = door width/2).
+6. For dimensions: Place dimension lines outside the room boundary with proper offsets.
+7. Ensure all measurements are converted to millimeters accurately.
+"""
         elif file_type == CADFileType.DWG:
             return base_prompt + "\nOutput format: DWG-compatible commands."
         elif file_type == CADFileType.REVIT:

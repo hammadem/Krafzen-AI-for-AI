@@ -14,15 +14,30 @@ logger = logging.getLogger(__name__)
 class DXFGeneratorService:
     """Service for generating DXF files from parsed CAD instructions"""
     
+    # Layer definitions with line weights (in mm)
+    # Line weights: 0.13mm (thin), 0.25mm (medium), 0.50mm (thick)
+    LAYERS = {
+        'Walls': {'color': 7, 'lineweight': 50},  # Thick line (0.50mm)
+        'Cabinets': {'color': 7, 'lineweight': 25},  # Medium line (0.25mm)
+        'Appliances': {'color': 7, 'lineweight': 25},  # Medium line (0.25mm)
+        'Doors': {'color': 7, 'lineweight': 13},  # Thin line (0.13mm)
+        'Dimensions': {'color': 7, 'lineweight': 13},  # Thin line (0.13mm)
+        'Annotations': {'color': 7, 'lineweight': 13},  # Thin line (0.13mm)
+    }
+    
     def __init__(self):
         """Initialize DXF generator service"""
         self.dxf_version = 'R2010'  # DXF version (R2010 is widely compatible)
         self.units = units.MM  # Use millimeters as default unit
         
-    def _extract_point(self, params: dict, key: str, default: Tuple[float, float] = (0.0, 0.0)) -> Tuple[float, float]:
+    def _extract_point(self, params: dict, key: str, default: Tuple[float, float] = (0.0, 0.0), index: Optional[int] = None) -> Tuple[float, float]:
         """Extract point coordinates from parameters"""
         if key in params:
             point = params[key]
+            if isinstance(point, list) and index is not None and 0 <= index < len(point):
+                # Extract from list at specific index
+                point = point[index]
+            
             if isinstance(point, dict):
                 x = float(point.get('x', default[0]))
                 y = float(point.get('y', default[1]))
@@ -44,18 +59,108 @@ class DXFGeneratorService:
                     logger.warning(f"Could not convert {value} to float for key {key}")
         return default
     
-    def _add_line(self, msp, params: dict):
+    def _setup_layers(self, doc):
+        """Create layers with appropriate line weights"""
+        for layer_name, layer_props in self.LAYERS.items():
+            layer = doc.layers.add(layer_name)
+            layer.color = layer_props['color']
+            layer.lineweight = layer_props['lineweight']
+            logger.debug(f"Created layer '{layer_name}' with lineweight {layer_props['lineweight']}")
+    
+    def _infer_layer(self, command: str, params: dict, instruction_index: int, all_instructions: List) -> str:
+        """
+        Infer which layer an entity should be on based on context
+        
+        Args:
+            command: The CAD command
+            params: Command parameters
+            instruction_index: Index of current instruction
+            all_instructions: All instructions for context
+        
+        Returns:
+            Layer name
+        """
+        # Check if layer is explicitly specified in parameters
+        if 'layer' in params:
+            layer_name = params['layer']
+            if layer_name in self.LAYERS:
+                return layer_name
+        
+        # Dimension commands go to Dimensions layer
+        if command == 'dimension':
+            return 'Dimensions'
+        
+        # Arc commands are typically door swings
+        if command == 'arc':
+            return 'Doors'
+        
+        # For rectangles, infer based on size and context
+        if command == 'rectangle':
+            width = abs(self._extract_number(params, 'width', 0))
+            height = abs(self._extract_number(params, 'height', 0))
+            
+            # Large rectangles (room boundaries) are walls
+            # Room is 12' x 10' = 3657.6mm x 3048mm
+            if width > 3000 or height > 3000:
+                return 'Walls'
+            
+            # Medium rectangles could be cabinets or appliances
+            # Check if it's near the edges (cabinets) or in corners (appliances)
+            corner = self._extract_point(params, 'corner', (0, 0))
+            x, y = corner
+            
+            # Refrigerator is typically 3' x 2.5' = 914.4mm x 762mm, near bottom-right
+            if 700 <= width <= 1000 and 600 <= height <= 800:
+                if x > 2000 and y < 1000:  # Bottom-right area
+                    return 'Appliances'
+            
+            # Cooktop is typically 2.5' = 762mm wide
+            if 700 <= width <= 800:
+                return 'Appliances'
+            
+            # Base cabinets are typically 2' = 609.6mm deep, but we use 381mm (1.25') for overheads
+            # Overhead cabinets are 1.25' = 381mm deep
+            if height == -381 or width == -381:  # Negative height indicates overhead
+                return 'Cabinets'
+            
+            # Default to cabinets for medium-sized rectangles
+            if 200 <= width <= 2000 or 200 <= height <= 2000:
+                return 'Cabinets'
+            
+            return 'Walls'  # Default for large rectangles
+        
+        # Lines could be walls or door frames
+        if command == 'line':
+            # Check if it's part of a door (short vertical line near right wall)
+            start = self._extract_point(params, 'start', (0, 0))
+            end = self._extract_point(params, 'end', (0, 0))
+            
+            # Door is on right wall (x around 1828.8 for center, or 3657.6 for right edge)
+            if 1500 <= start[0] <= 2000 or 1500 <= end[0] <= 2000:
+                line_length = ((end[0] - start[0])**2 + (end[1] - start[1])**2)**0.5
+                if line_length < 1000:  # Short line, likely door frame
+                    return 'Doors'
+            
+            return 'Walls'  # Default for lines
+        
+        # Default layer
+        return 'Walls'
+    
+    def _add_line(self, msp, params: dict, layer: str = 'Walls'):
         """Add a line entity to the modelspace"""
         start = self._extract_point(params, 'start', (0.0, 0.0))
         end = self._extract_point(params, 'end', (100.0, 100.0))
         
         line = msp.add_line(start, end)
-        # Set explicit color (7 = white/black, visible)
-        line.dxf.color = 7
-        line.dxf.layer = '0'
-        logger.debug(f"Added line from {start} to {end}")
+        # Set layer and properties
+        line.dxf.layer = layer
+        if layer in self.LAYERS:
+            line.dxf.color = self.LAYERS[layer]['color']
+        else:
+            line.dxf.color = 7
+        logger.debug(f"Added line from {start} to {end} on layer '{layer}'")
     
-    def _add_circle(self, msp, params: dict):
+    def _add_circle(self, msp, params: dict, layer: str = 'Walls'):
         """Add a circle entity to the modelspace"""
         center = self._extract_point(params, 'center', (0.0, 0.0))
         radius = self._extract_number(params, 'radius', 10.0)
@@ -65,12 +170,15 @@ class DXFGeneratorService:
             radius = 10.0
         
         circle = msp.add_circle(center, radius)
-        # Set explicit color (7 = white/black, visible)
-        circle.dxf.color = 7
-        circle.dxf.layer = '0'
-        logger.debug(f"Added circle at {center} with radius {radius}")
+        # Set layer and properties
+        circle.dxf.layer = layer
+        if layer in self.LAYERS:
+            circle.dxf.color = self.LAYERS[layer]['color']
+        else:
+            circle.dxf.color = 7
+        logger.debug(f"Added circle at {center} with radius {radius} on layer '{layer}'")
     
-    def _add_rectangle(self, msp, params: dict):
+    def _add_rectangle(self, msp, params: dict, layer: str = 'Walls'):
         """Add a rectangle entity to the modelspace"""
         corner = self._extract_point(params, 'corner', (0.0, 0.0))
         width = self._extract_number(params, 'width', 100.0)
@@ -85,12 +193,15 @@ class DXFGeneratorService:
         ]
         
         polyline = msp.add_lwpolyline(points, close=True)
-        # Set explicit color (7 = white/black, visible)
-        polyline.dxf.color = 7
-        polyline.dxf.layer = '0'
-        logger.debug(f"Added rectangle at {corner} with size {width}x{height}")
+        # Set layer and properties
+        polyline.dxf.layer = layer
+        if layer in self.LAYERS:
+            polyline.dxf.color = self.LAYERS[layer]['color']
+        else:
+            polyline.dxf.color = 7
+        logger.debug(f"Added rectangle at {corner} with size {width}x{height} on layer '{layer}'")
     
-    def _add_arc(self, msp, params: dict):
+    def _add_arc(self, msp, params: dict, layer: str = 'Doors'):
         """Add an arc entity to the modelspace"""
         center = self._extract_point(params, 'center', (0.0, 0.0))
         radius = self._extract_number(params, 'radius', 10.0)
@@ -104,12 +215,15 @@ class DXFGeneratorService:
         # Convert angles from degrees to radians if needed
         # ezdxf uses degrees for angles
         arc = msp.add_arc(center, radius, start_angle, end_angle)
-        # Set explicit color (7 = white/black, visible)
-        arc.dxf.color = 7
-        arc.dxf.layer = '0'
-        logger.debug(f"Added arc at {center} with radius {radius}, angles {start_angle} to {end_angle}")
+        # Set layer and properties
+        arc.dxf.layer = layer
+        if layer in self.LAYERS:
+            arc.dxf.color = self.LAYERS[layer]['color']
+        else:
+            arc.dxf.color = 7
+        logger.debug(f"Added arc at {center} with radius {radius}, angles {start_angle} to {end_angle} on layer '{layer}'")
     
-    def _add_polyline(self, msp, params: dict):
+    def _add_polyline(self, msp, params: dict, layer: str = 'Walls'):
         """Add a polyline entity to the modelspace"""
         points_data = params.get('points', [])
         if not points_data:
@@ -131,33 +245,90 @@ class DXFGeneratorService:
         
         close = params.get('close', False)
         polyline = msp.add_lwpolyline(points, close=close)
-        # Set explicit color (7 = white/black, visible)
-        polyline.dxf.color = 7
-        polyline.dxf.layer = '0'
-        logger.debug(f"Added polyline with {len(points)} points, closed={close}")
+        # Set layer and properties
+        polyline.dxf.layer = layer
+        if layer in self.LAYERS:
+            polyline.dxf.color = self.LAYERS[layer]['color']
+        else:
+            polyline.dxf.color = 7
+        logger.debug(f"Added polyline with {len(points)} points, closed={close} on layer '{layer}'")
     
-    def _add_dimension(self, msp, params: dict):
+    def _add_dimension(self, msp, params: dict, layer: str = 'Dimensions'):
         """Add a dimension entity to the modelspace"""
         dim_type = params.get('type', 'linear').lower()
         
         if dim_type == 'linear':
             # Linear dimension
-            start = self._extract_point(params, 'start', (0.0, 0.0))
-            end = self._extract_point(params, 'end', (100.0, 0.0))
-            dim_line = self._extract_point(params, 'dim_line', (50.0, -10.0))
+            # Try to get points from 'points' array or individual 'start'/'end'
+            points = params.get('points', [])
+            if points and len(points) >= 2:
+                start = self._extract_point(params, 'points', (0.0, 0.0), index=0)
+                end = self._extract_point(params, 'points', (100.0, 0.0), index=1)
+            else:
+                start = self._extract_point(params, 'start', (0.0, 0.0))
+                end = self._extract_point(params, 'end', (100.0, 0.0))
+            
+            # Calculate dimension line position (offset from the dimension)
+            dim_line = self._extract_point(params, 'dim_line', None)
+            if dim_line is None:
+                # Default: offset perpendicular to dimension
+                mid_x = (start[0] + end[0]) / 2
+                mid_y = (start[1] + end[1]) / 2
+                # Offset by 50mm perpendicular
+                dx = end[0] - start[0]
+                dy = end[1] - start[1]
+                length = (dx**2 + dy**2)**0.5
+                if length > 0:
+                    perp_x = -dy / length * 50
+                    perp_y = dx / length * 50
+                    dim_line = (mid_x + perp_x, mid_y + perp_y)
+                else:
+                    dim_line = (mid_x, mid_y - 50)
+            
             value = self._extract_number(params, 'value', 0.0)
             
             try:
-                msp.add_linear_dim(
+                # Create dimension
+                dim = msp.add_linear_dim(
                     base=dim_line,
                     p1=start,
                     p2=end,
-                    dimstyle='STANDARD',
-                    text=value if value > 0 else None
+                    dimstyle='STANDARD'
                 )
-                logger.debug(f"Added linear dimension from {start} to {end}")
+                
+                # Set layer and properties on the dimension entity
+                # Dimensions are complex entities - set layer directly
+                try:
+                    dim.dxf.layer = layer
+                    if layer in self.LAYERS:
+                        dim.dxf.color = self.LAYERS[layer]['color']
+                    else:
+                        dim.dxf.color = 7
+                except AttributeError:
+                    # If dimension doesn't have direct dxf access, try alternative
+                    try:
+                        dim.set_dxf_attrib('layer', layer)
+                    except:
+                        pass
+                
+                # Set dimension text if provided using dimstyle overrides
+                if value > 0:
+                    try:
+                        # Use dimstyle overrides to set text
+                        overrides = dim.dimstyle.overrides
+                        overrides['dimtext'] = str(value)
+                    except:
+                        # If overrides don't work, try setting text directly
+                        try:
+                            dim.dxf.text = str(value)
+                        except:
+                            pass
+                
+                logger.debug(f"Added linear dimension from {start} to {end} on layer '{layer}'")
             except Exception as e:
                 logger.warning(f"Failed to add linear dimension: {e}")
+                import traceback
+                traceback.print_exc()
         elif dim_type == 'angular':
             # Angular dimension
             center = self._extract_point(params, 'center', (0.0, 0.0))
@@ -166,13 +337,19 @@ class DXFGeneratorService:
             radius = self._extract_number(params, 'radius', 10.0)
             
             try:
-                msp.add_angular_dim(
+                dim = msp.add_angular_dim(
                     base=center,
                     line1=(start_angle, radius),
                     line2=(end_angle, radius),
                     dimstyle='STANDARD'
                 )
-                logger.debug(f"Added angular dimension at {center}")
+                # Set layer and properties
+                dim.dxf.layer = layer
+                if layer in self.LAYERS:
+                    dim.dxf.color = self.LAYERS[layer]['color']
+                else:
+                    dim.dxf.color = 7
+                logger.debug(f"Added angular dimension at {center} on layer '{layer}'")
             except Exception as e:
                 logger.warning(f"Failed to add angular dimension: {e}")
     
@@ -202,33 +379,39 @@ class DXFGeneratorService:
         doc = new(self.dxf_version, setup=True)
         doc.units = self.units
         
+        # Set up layers with line weights
+        self._setup_layers(doc)
+        
         # Get modelspace
         msp = doc.modelspace()
         
         # Process each instruction
         processed_count = 0
-        for instruction in instructions:
+        for idx, instruction in enumerate(instructions):
             try:
                 command = instruction.command.lower()
                 params = instruction.parameters
                 
+                # Infer layer for this entity
+                layer = self._infer_layer(command, params, idx, instructions)
+                
                 if command == 'line':
-                    self._add_line(msp, params)
+                    self._add_line(msp, params, layer)
                     processed_count += 1
                 elif command == 'circle':
-                    self._add_circle(msp, params)
+                    self._add_circle(msp, params, layer)
                     processed_count += 1
                 elif command == 'rectangle':
-                    self._add_rectangle(msp, params)
+                    self._add_rectangle(msp, params, layer)
                     processed_count += 1
                 elif command == 'arc':
-                    self._add_arc(msp, params)
+                    self._add_arc(msp, params, layer)
                     processed_count += 1
                 elif command in ['polyline', 'poly']:
-                    self._add_polyline(msp, params)
+                    self._add_polyline(msp, params, layer)
                     processed_count += 1
                 elif command == 'dimension':
-                    self._add_dimension(msp, params)
+                    self._add_dimension(msp, params, layer)
                     processed_count += 1
                 else:
                     logger.warning(f"Unsupported command: {command}")

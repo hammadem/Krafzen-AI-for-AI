@@ -118,7 +118,11 @@ async def test_audio_to_dxf(audio_file_path: str):
     try:
         output_dir = Path(__file__).parent.parent.parent / "test_output"
         output_dir.mkdir(exist_ok=True)
-        output_file = output_dir / "audio_generated.dxf"
+        
+        # Generate output filename based on input audio file
+        audio_name = Path(audio_file_path).stem
+        safe_name = audio_name.replace(" ", "_").replace("/", "_")
+        output_file = output_dir / f"{safe_name}.dxf"
         
         with open(output_file, 'wb') as f:
             f.write(dxf_bytes)
