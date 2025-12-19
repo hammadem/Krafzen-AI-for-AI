@@ -34,7 +34,7 @@ export default function FAQ() {
             <div className="flex flex-col items-center gap-4 justify-center h-full">
 
                 <div className="flex w-[80%] sm:flex-row flex-col sm:gap-0 gap-6">
-                    
+
                     <div className="w-[40%] sm:flex flex-col items-start justify-start hidden">
                         <h1 className="text-[4vh]">Frequently</h1>
                         <h1 className="text-[4vh]">Asked</h1>
@@ -57,7 +57,7 @@ export default function FAQ() {
                                 >
                                     <p className="font-normal">{faq.question}</p>
                                     <Image
-                                        src="/faqs/chevron-down.png"
+                                        src="/faqs/chevron-down.svg"
                                         width={30}
                                         height={30}
                                         alt="toggle"
@@ -75,26 +75,26 @@ export default function FAQ() {
 
 
                             </div>
-                                
+
                         ))}
 
+                    </div>
                 </div>
-            </div>
-            <div className="w-[80%] flex items-center justify-center">
-                <Button
-                    variant="secondary"
-                    className="rounded-full cursor-pointer mx-8 my-4 bg-green-400 hover:bg-green-400"
-                >
-                    <Link
-                    href="/faqs"
-                    aria-label="Navigate to FAQs"
+                <div className="w-[80%] flex items-center justify-center">
+                    <Button
+                        variant="secondary"
+                        className="rounded-full cursor-pointer mx-8 my-4 bg-green-400 hover:bg-green-400"
                     >
-                        Read more
-                    </Link>
-                </Button>
-            </div>
+                        <Link
+                            href="/faqs"
+                            aria-label="Navigate to FAQs"
+                        >
+                            Read more
+                        </Link>
+                    </Button>
+                </div>
 
-        </div>
+            </div>
         </div >
     );
 }

@@ -4,6 +4,14 @@ import Hero from "@/components/Hero";
 // Buttons testing needs to be done yet to check if button does the correct thing
 // logging actions form submits and other actions
 
+vitest.mock('../../context/AuthContext', () => ({
+    useAuth: () => ({})
+}));
+
+vitest.mock('../../context/DashboardContex', () => ({
+    useDashboard: () => ({})
+}));
+
 vi.mock("@/components/FAQs", () => ({
     default: () => <div data-testid="FAQs">Mock FAQs</div>,
 }));

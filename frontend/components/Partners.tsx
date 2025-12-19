@@ -14,17 +14,18 @@ export default function Partners() {
             <span
                 className="sm:h-0 h-10"
             ></span>
-            <div className="relative w-[80%] md:w-[70%] lg:[80%] h-20 sm:h-15 hidden sm:block">
+
+            <div className="relative w-[80%] md:w-[80%] lg:[80%] h-[20vh] hidden sm:block">
                 <Image
-                    src="/partners/partner.png"
+                    src="/partners/partners.svg"
                     alt="Proof Partners Image"
                     fill
-                    className="sm:object-fit object-fit"
+                    className="object-fit"
                     loading="eager"
                 />
             </div>
 
-            <div className="sm:hidden block">
+            <div className="sm:hidden block w-full">
                 <Carousel
                     opts={{ loop: true }}
                     plugins={[
@@ -38,46 +39,50 @@ export default function Partners() {
                 >
                     <CarouselContent>
                         <CarouselItem>
-                            <Image
-                                src="/partners/3.png"
-                                alt="Partner 1"
-                                width={300}
-                                height={300}
-                                className="mx-auto"
-                            />
+                            <div className="h-[10vh] relative w-[80%] mx-auto">
+                                <Image
+                                    src="/partners/1.svg"
+                                    alt="Partner 1"
+                                    fill
+                                    className="mx-auto object-fit"
+                                />
+                            </div>
+
                         </CarouselItem>
 
                         <CarouselItem>
-                            <Image
-                                src="/partners/2.png"
-                                alt="Partner 2"
-                                width={300}
-                                height={300}
-                                className="mx-auto"
-
-                            />
+                            <div className="h-[10vh] relative w-[80%] mx-auto">
+                                <Image
+                                    src="/partners/2.svg"
+                                    alt="Partner 2"
+                                    fill
+                                    className="mx-auto object-fit"
+                                />
+                            </div>
                         </CarouselItem>
 
                         <CarouselItem>
-                            <Image
-                                src="/partners/1.png"
-                                alt="Partner 3"
-                                width={300}
-                                height={300}
-                                className="mx-auto"
+                            <div className="h-[10vh] relative w-[80%] mx-auto">
+                                <Image
+                                    src="/partners/3.svg"
+                                    alt="Partner 3"
+                                    fill
+                                    className="mx-auto object-fit"
 
-                            />
+                                />
+                            </div>
                         </CarouselItem>
 
                         <CarouselItem>
-                            <Image
-                                src="/partners/4.png"
-                                alt="Partner 4"
-                                width={300}
-                                height={300}
-                                className="mx-auto"
+                            <div className="h-[10vh] relative w-[80%] mx-auto">
+                                <Image
+                                    src="/partners/4.svg"
+                                    alt="Partner 4"
+                                    fill
+                                    className="mx-auto object-fit"
+                                />
+                            </div>
 
-                            />
                         </CarouselItem>
 
                     </CarouselContent>

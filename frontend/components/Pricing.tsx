@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
 import { Button } from "./ui/button";
 import PricingDiv from "./ui/PricingDiv";
 import { PricingPlans } from "@/lib/data";
+import { useDashboard } from "@/context/DashboardContex";
 
 function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ')
@@ -10,7 +10,7 @@ function classNames(...classes: string[]) {
 
 
 export default function Pricing() {
-    const [monthly, setMonthly] = useState(true);
+    const { monthly, setMonthly } = useDashboard();
 
     return (
         <section>

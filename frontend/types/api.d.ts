@@ -1,6 +1,15 @@
 // All API response types
 
+// idle refers to inital page visit stable state
+type ReqState = "idle" | "prompting" | "recording" | "parsingaudio" | "success" | "error" | "aborted" | "inprogress";
+
 type REQTYPE = "GET" | "POST" | "PATCH" | "DELETE";
+
+type AppError = {
+    type: "AUTH" | "NETWORK" | "ABORTED" | "UNKNOWN" | "INVALID" | "APIERROR";
+    message: string;
+};
+
 
 interface InputData {
     input_text: string,
@@ -51,10 +60,19 @@ interface JobReqType {
     error_message: string | null;
 }
 
+interface ParsedAudio {
+    duration: string | number;
+    filename: string;
+    language: string;
+    status: string;
+    text: string;
+    timestamp: string;
+}
+
 interface ApiRes {
     ok: boolean,
-    data: ProjectDetails | JobReqType | FileDetails | null | ProjectDetails[] | FileDetails[] | JobDetails | JobDetails[]
-    error: null | string
+    data: ParsedAudio | ProjectDetails | JobReqType | FileDetails | null | ProjectDetails[] | FileDetails[] | JobDetails | JobDetails[] | GPT_PARSED_INSRUCTION_SUCCESS
+    error: AppError
 }
 
 interface CreateFileReq {
@@ -62,3 +80,4 @@ interface CreateFileReq {
     file_url: string,
     file_type: string
 }
+

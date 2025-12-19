@@ -5,21 +5,26 @@ export async function apiClient(
     method: REQTYPE,
     url: string,
     user: User | null,
-    body?: JobReqType | string | FileDetails | CreateFileReq | InputData,
-    contentType: string = "application/json"
+    body?: JobReqType | string | FileDetails | CreateFileReq | InputData | GPT_PARSE_REQ | FormData,
+    contentType: string = "application/json",
+    controller?: AbortController
 ): Promise<ApiRes> {
-    if (!user?.access_token) return { ok: false, data: null, error: "No access token" };
+    if (!user?.access_token) return {
+        ok: false, data: null, error: {
+            type: "AUTH",
+            message: "No access token"
+        }
+    };
 
     const cacheKey = `${method}:${url}`;
     const cached = getCache(cacheKey);
     if (cached !== undefined) return cached; // TypeScript now knows cached is ApiRes
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+    // const timeout = setTimeout(() => controller.abort(), 20000);
 
     const headers: Record<string, string> = {
-        "Content-Type": contentType,
-        "Authorization": `Bearer ${user?.access_token}`,
+        ...(!(body instanceof FormData) && { "Content-Type": contentType }),
+        "Authorization": `Bearer ${user.access_token}`,
         "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     };
 
@@ -28,21 +33,44 @@ export async function apiClient(
             method,
             headers,
             ...(body && method !== "GET" && method !== "DELETE"
-                ? { body: JSON.stringify(body) }
+                ?
+                {
+                    body: body instanceof FormData ? body : JSON.stringify(body)
+                }
                 : {}),
-            signal: controller.signal
+            ...(controller ? { signal: controller.signal } : {}),
         });
 
+
         const data = await response.json();
-        const result: ApiRes = { ok: response.ok, data, error: data?.message }
-        if (response.ok && method === "GET") apiCache.set(cacheKey, result);
+
+        let result: ApiRes;
+        if (response.ok) {
+            result = { ok: response.ok, data, error: data?.message }
+            if (method === "GET") apiCache.set(cacheKey, result);
+        } else {
+            result = {
+                ok: response.ok, data: null, error: {
+                    type: "APIERROR",
+                    message: data?.message
+                }
+            }
+        }
 
         return result;
-    } catch (err) {
-        console.log(err);
-        return { ok: false, data: null, error: "Unexpected error" };
-    } finally {
-        clearTimeout(timeout);
+    } catch (err: unknown) {
+        if (err instanceof Error) return {
+            ok: false, data: null, error: {
+                type: "UNKNOWN",
+                message: err?.message
+            }
+        };
+        else return {
+            ok: false, data: null, error: {
+                type: "UNKNOWN",
+                message: "UNEXPECTED ERROR"
+            }
+        };
     }
 }
 

@@ -1,54 +1,64 @@
-import { useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { createAProject } from '@/lib/api/api';
 import { useDashboard } from '@/context/DashboardContex';
 import { useFetchProjects } from './useFetchProjects';
+import { useApiStateProvider } from '@/context/ApiStateContext';
 
 export function useCreateProject() {
     const { forceRefetch } = useFetchProjects();
     const { user, setCurrentProject } = useAuth();
-    const { isPrompting, setisPromptingSend, setUserAction } = useDashboard();
+    const { setUserAction } = useDashboard();
+    const { setStatus, setApiError } = useApiStateProvider();
     const router = useRouter();
-    const [error, setError] = useState<string | null>(null);
+    const controllerRef = useRef<AbortController | null>(null);
 
-    const createProject = async (input: string, setInput: (input: string) => void) => {
-        setUserAction(true);
-        setisPromptingSend(true);
-        setInput("");
+    const cancel = useCallback(() => {
+        if (!controllerRef?.current) return;
 
-        if (!user) setError("Not Authorized User");
-        if (!input.trim()) setError("Input cannot be empty");
+        controllerRef.current?.abort();
+        controllerRef.current = null;
+        setStatus("aborted");
+    }, [setStatus]);
 
-        if (error !== null) {
-            setisPromptingSend(false);
-            return {
-                error,
-                isPrompting,
-                project: null
+    const createProject = useCallback(
+        async (input: string) => {
+            setUserAction(true);
+
+            // avoid deduplication to delete ongoing requests
+            controllerRef.current?.abort();
+
+            const controller = new AbortController();
+            controllerRef.current = controller;
+
+            if (!input.trim()) setApiError({
+                type: "INVALID",
+                message: "Input field cannot be empty"
+            });
+
+            setStatus("prompting");
+            // the above means prompt being sent we could use recording if recording is happening
+            // using it at center removes multiboolean dependency
+
+            const { error, ok, data } = await createAProject(user, input, controller);
+
+            if (ok) {
+                const project = data as ProjectDetails;
+                setCurrentProject(project);
+                forceRefetch();
+                setStatus("success");
+                router.push(`/dashboard/id/${project.id} `);
+            } else {
+                setStatus("error");
+                setApiError(error);
             }
-        }
-        const res = await createAProject(user, input);
-        if (!res.ok) setError(res.error || "Unexpected Error Occured");
 
-        const project = res.data as ProjectDetails;
-        setCurrentProject(project);
-
-        forceRefetch();
-
-        router.push(`/dashboard/id/${project.id}`);
-        setisPromptingSend(false);
-
-        return {
-            error,
-            isPrompting,
-            project,
-        };
-    };
+            controllerRef.current = null;
+        }, [setCurrentProject, setUserAction, forceRefetch, router, user, setStatus, setApiError]);
 
     return {
-        createProject,
-        isPrompting,
-        error,
+        cancel,
+        createProject
     };
 }

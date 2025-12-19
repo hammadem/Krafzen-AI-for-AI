@@ -5,6 +5,7 @@ import type { Session } from "@supabase/supabase-js";
 interface AuthContextType {
   user: User | null; // ← from your global types
   session: Session | null;
+  // this is for session managment you cannot manipulate this directly
   loading: boolean;
   logout: () => void;
   currentProject: ProjectDetails | false | null;

@@ -1,23 +1,34 @@
+import { useApiStateProvider } from "@/context/ApiStateContext";
 import { useAuth } from "@/context/AuthContext";
 import { transcribeAudio } from "@/lib/api/api";
 import { RefObject, useRef } from "react";
 
-export function useAudioWaves({ mediaRecorderRef, audioChunksRef, setInput, setFile, setLoading }
-    : {
-        mediaRecorderRef: RefObject<MediaRecorder | null>, audioChunksRef: RefObject<Blob[]>,
-        setInput: (value: string) => void;
-        setFile: (value: string) => void;
-        setLoading: (value: boolean) => void;
-    }) {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+export function useAudioWaves({
+    mediaRecorderRef,
+    audioChunksRef,
+    setInput,
+    setFile,
+}: {
+    mediaRecorderRef: RefObject<MediaRecorder | null>;
+    audioChunksRef: RefObject<Blob[]>;
+    setInput: (value: string) => void;
+    setFile: (value: string) => void;
+}) {
+    const barsRef = useRef<SVGRectElement[]>([]);
     const audioCtxRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
     const animationRef = useRef<number>(0);
+
     const { user } = useAuth();
+    const { setStatus, setApiError } = useApiStateProvider();
 
     const startRecording = async () => {
         try {
+            setStatus("recording");
+            setInput("");
+            setFile("");
+
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const mediaRecorder = new MediaRecorder(stream);
             mediaRecorderRef.current = mediaRecorder;
@@ -25,70 +36,78 @@ export function useAudioWaves({ mediaRecorderRef, audioChunksRef, setInput, setF
 
             const audioCtx = new AudioContext();
             audioCtxRef.current = audioCtx;
+
             const source = audioCtx.createMediaStreamSource(stream);
             const analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 1024;
+            analyser.fftSize = 512;
+
             source.connect(analyser);
 
             analyserRef.current = analyser;
             sourceRef.current = source;
 
-            const canvas = canvasRef.current!;
-            const ctx = canvas.getContext("2d")!;
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-            const drawBars = () => {
-                animationRef.current = requestAnimationFrame(drawBars);
+            const animate = () => {
+                animationRef.current = requestAnimationFrame(animate);
                 analyser.getByteFrequencyData(dataArray);
 
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                const barWidth = 3;
-                const barGap = 2;
-                const centerY = canvas.height / 2;  //centers the waves
-                const numBars = Math.floor(canvas.width / (barWidth + barGap));  // calculates numbers of bar those can be adjusted in canvas
-
-                for (let i = 0; i < numBars; i++) {
-                    const index = Math.floor((i / numBars) * bufferLength);
-                    const value = dataArray[index];
-                    const barHeight = (value / 255) * canvas.height * 1;
-
-                    const x = i * (barWidth + barGap);
-                    ctx.fillStyle = "#818181"; // gray tone like in your image
-                    ctx.fillRect(x, centerY - barHeight / 2, barWidth, barHeight);
-                    ctx.beginPath();
-                    ctx.roundRect(x, centerY - barHeight / 2, barWidth, barHeight, 1.5);
-                    ctx.fill();
-                }
+                barsRef.current.forEach((bar, i) => {
+                    const value = dataArray[i * 2] || 0;
+                    const height = Math.max(4, (value / 255) * 30);
+                    bar.setAttribute("height", height.toString());
+                    bar.setAttribute("y", (35 - height).toString());
+                });
             };
 
-            drawBars();
+            animate();
 
-            mediaRecorder.ondataavailable = (event: BlobEvent) => {
-                audioChunksRef.current.push(event.data);
+            mediaRecorder.ondataavailable = (e) => {
+                audioChunksRef.current.push(e.data);
             };
 
             mediaRecorder.onstop = async () => {
-                const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-                setFile(URL.createObjectURL(blob));
+                cancelAnimationFrame(animationRef.current);
 
-                const data = await transcribeAudio({ user, blob });
-                setInput(data.text);
-                setLoading(false);
-                cancelAnimationFrame(animationRef.current!);
                 analyser.disconnect();
                 source.disconnect();
                 audioCtx.close();
+
+                const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+                setFile(URL.createObjectURL(blob));
+
+                setStatus("parsingaudio");
+                const { ok, data, error } = await transcribeAudio({ user, blob });
+
+                if (ok) {
+                    setInput((data as ParsedAudio).text);
+                    setStatus("success");
+                } else {
+                    setStatus("error");
+                    setApiError(error);
+                }
             };
 
             mediaRecorder.start();
-        } catch (err) {
-            console.error("Microphone access error:", err);
+        } catch (err: unknown) {
+            if (err instanceof Error) return {
+                ok: false, data: null, error: {
+                    type: "UNKNOWN",
+                    message: err?.message
+                }
+            };
+            else return {
+                ok: false, data: null, error: {
+                    type: "UNKNOWN",
+                    message: "UNABLE TO ACCESS MICROPHONE"
+                }
+            };
         }
     };
+
     const stopRecording = () => {
         mediaRecorderRef.current?.stop();
     };
 
-    return { stopRecording, startRecording, canvasRef };
+    return { startRecording, stopRecording, barsRef };
 }

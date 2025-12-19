@@ -8,10 +8,11 @@ import { toast } from "react-toastify";
 
 export default function ProjectUI({ slug }: { slug: string }) {
     const { currentProject, user, setCurrentProject } = useAuth();
-    const { setIsRecording, setUserAction } = useDashboard();
+    const { setUserAction } = useDashboard();
     const [copied, setCopied] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(false);
 
+    // here keeping this with its own state managment is better same should be done with project history
     useEffect(() => {
         async function loadProject() {
             setLoading(true);
@@ -34,43 +35,48 @@ export default function ProjectUI({ slug }: { slug: string }) {
             {
                 currentProject !== null
                 &&
-                <div className="w-full h-full flex items-start justify-end overflow-y-auto custom-scrollbar2">
-                    <div className="bg-black w-[90%] flex flex-col gap-4 pr-10">
+                <div className="w-full h-full flex items-start justify-end overflow-y-auto custom-scrollbar2 bg-black">
+                    <div className="w-[95%] sm:w-[80%] items-end sm:items-center flex flex-col gap-4 h-1000 bg-black">
 
                         {/** Here The Data from API Can Be Shown */}
-                        <div className="w-[70%] flex self-end flex-col text-[2vh] mr-40">
-                            <div className="bg-[#434343] p-6 w-[80%] rounded-[15px] flex flex-col self-end">
-                                <h1 className="text-white">{currentProject?.input_text}</h1>
-                            </div>
-                            <span className="self-end flex gap-2 mt-3">
-                                <Mic className="cursor-pointer"
-                                    onClick={() => {
-                                        setIsRecording(true)
-                                    }}
-                                />
-                                {copied ? (
-                                    <Check className="text-white cursor-pointer" />
-                                ) : (
-                                    <Copy
-                                        className="cursor-pointer"
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(currentProject?.input_text || "");
-                                            toast.dark("Copied Successfully");
+                        <div className="w-[90%] bg-black mr-4 sm:mr-0">
 
-                                            setCopied(true);
-                                            setTimeout(() => setCopied(false), 1500); // revert after 1.5s
+                            <div className="flex self-end flex-col text-[2vh] bg-black mb-1">
+                                <div className="bg-[#434343] p-6 w-[80%] rounded-[15px] flex flex-col self-center sm:self-end">
+                                    <h1 className="text-white">{currentProject?.input_text}</h1>
+                                </div>
+                                <span className="self-end flex gap-2 mt-3">
+                                    <Mic className="cursor-pointer"
+                                        onClick={() => {
+
                                         }}
                                     />
-                                )}
+                                    {copied ? (
+                                        <Check className="text-white cursor-pointer" />
+                                    ) : (
+                                        <Copy
+                                            className="cursor-pointer"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(currentProject?.input_text || "");
+                                                toast.dark("Copied Successfully");
 
-                                {currentProject?.time}
-                            </span>
-                        </div>
+                                                setCopied(true);
+                                                setTimeout(() => setCopied(false), 1500); // revert after 1.5s
+                                            }}
+                                        />
+                                    )}
 
-                        <div className="bg-black w-[70%] self-start justify-start flex flex-col gap-4">
-                            <div className="bg-[#434343] p-6 w-[80%] rounded-[15px] flex flex-col self-end">
-                                <h1 className="text-white text-[2vh]">{currentProject?.parsed_json != null ? currentProject?.parsed_json.toString() : `Server responded with ${currentProject?.parsed_json}`}</h1>
+                                    {currentProject?.time}
+                                </span>
                             </div>
+
+
+                            <div className="flex self-start flex-col justify-start gap-4 bg-black mb-1">
+                                <div className="bg-[#434343] p-6 w-[80%] rounded-[15px] flex flex-col self-center sm:self-start">
+                                    <h1 className="text-white text-[2vh]">{currentProject?.parsed_json != null ? currentProject?.parsed_json.toString() : `Server responded with ${currentProject?.parsed_json}`}</h1>
+                                </div>
+                            </div>
+
                         </div>
 
                     </div>

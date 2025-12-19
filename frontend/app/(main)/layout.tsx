@@ -14,11 +14,10 @@ export default function MainLayout({
   children: React.ReactNode
 }) {
   return <>
-    
-      <Navbar />
-      <main>{children}</main>
-      <ContactCTA />
-      <Footer />
-      </>
+    <Navbar isRoot={false} />
+    <main>{children}</main>
+    <ContactCTA />
+    <Footer />
+  </>
 }
 

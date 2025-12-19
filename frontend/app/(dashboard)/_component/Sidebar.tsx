@@ -10,28 +10,25 @@ import { History } from "./History";
 import { createAProject } from "@/lib/api/api";
 import { classNames, organizeProjectsAsHistory } from "@/lib/utils";
 import { useFetchProjects } from "@/hooks/useFetchProjects";
+import { useApiStateProvider } from "@/context/ApiStateContext";
 
 export default function Sidebar() {
     const { sideBarOpen, setSideBarOpen, route, setCurrentRoute } = useDashboard();
     const { user } = useAuth();
+    const { status } = useApiStateProvider();
     const [projectName, setProjectName] = useState<string>("Create a GYM");
-    const { projects, error } = useFetchProjects();
+    const { projects } = useFetchProjects();
     const [history, setHistory] = useState<HistoryData[]>([]);
-    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (!user?.access_token) return;
-        if (error !== null) return;
-
         const fetchHistoryData = async () => setHistory(organizeProjectsAsHistory({ projects }));
         fetchHistoryData();
-    }, [projects, error, user]);
+    }, [projects, user]);
+
 
     const createProject = async () => {
-        setLoading(true);
         const res = await createAProject(user, projectName);
         console.log(res);
-        setLoading(false);
     }
 
     return (
@@ -53,14 +50,14 @@ export default function Sidebar() {
                         width={24}
                         height={40.8}
                         alt="Your Company"
-                        src="/navbar/Vector (6).png"
+                        src="/navbar/Vector.svg"
                         className="h-8 p-0 m-0"
                     />
                     <Image
                         width={34}
                         height={40.8}
                         alt="Your Company"
-                        src="/navbar/Vector (7).png"
+                        src="/navbar/Vector1.svg"
                         className="h-8 w-auto p-0 m-0 -translate-x-3"
                     />
                 </div>
@@ -94,7 +91,7 @@ export default function Sidebar() {
                 <NavLinks setCurrentRoute={setCurrentRoute} />
 
                 {
-                    route.home ? <History data={history} loading={loading} />
+                    route.home ? <History data={history} status={status} />
                         : route.projects ? <Projects createProject={createProject} setProjectName={setProjectName} /> :
                             route.templates ? "" :
                                 route.exports ? "" :

@@ -1,13 +1,22 @@
 import { classNames } from "@/lib/utils";
 import { Loader, X } from "lucide-react";
 import Image from "next/image";
+import { RefObject } from "react";
 
-export default function FilePreview({ file, setFile, loading, setInput }: { file: string, setFile: (file: string) => void, loading: boolean, setInput: (value: string) => void }) {
+export default function FilePreview({ file, setFile, status, setInput, fileInputRef }:
+    {
+        file: string, setFile: (file: string) => void,
+        status: ReqState,
+        setInput: (value: string) => void,
+        fileInputRef: RefObject<HTMLInputElement | null>
+    }) {
+
     if (!file || file === "") return;
 
     const deleteFile = () => {
         setFile("");
         setInput("");
+        if (fileInputRef.current) fileInputRef.current.value = "";
     }
 
     return (
@@ -15,7 +24,7 @@ export default function FilePreview({ file, setFile, loading, setInput }: { file
             <div className={classNames("w-full bg-white flex h-full rounded-[20px] flex gap-2 p-2 relative")}>
                 <div className="relative">
                     {
-                        loading
+                        status === "parsingaudio"
                             ?
                             <Loader
                                 width={30}

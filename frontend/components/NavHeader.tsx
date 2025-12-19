@@ -1,41 +1,53 @@
 import Image from "next/image";
 import Link from "next/link";
 
-const style: React.CSSProperties = {
-    backgroundImage: "url('/navheader/nav-image2.png')",
-    backgroundRepeat: "no-repeat",
-    backgroundSize: "cover",
-    backgroundPosition: "center",
-    borderTop: "1px solid white",
-    borderBottom: "1px solid white",
-};
-
-export default function NavHeader({ currentNav }: { currentNav: string; }) {
+export default function NavHeader({ currentNav }: { currentNav: string }) {
     return (
-        <>
+        <div className="relative w-full h-[18vh] sm:h-[22vh] border-y border-[#090909] overflow-hidden">
 
-            <div className="w-full h-[18vh] sm:h-[22vh] z-9999 flex items-center w-full" style={style}>
+            {/* Background Image */}
+            <Image
+                src="/navheader/nav-image2.svg"
+                alt="Header background"
+                fill
+                className="object-cover z-0"
+                priority
+            />
 
-                <div className="flex flex-col mx-6 w-[80%] mx-auto">
+            {/* Optional dark overlay for contrast */}
+            <div className="absolute inset-0 bg-black/30 z-0" />
 
-                    <div className="flex flex-col items-start justify-center">
-                        <h1 className="text-white text-[6vh] font-semibold">{currentNav}</h1>
+            {/* Content */}
+            <div className="relative z-10 h-full flex items-center">
+                <div className="mx-auto w-[80%]">
+                    <div className="flex flex-col items-start justify-center text-white">
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold">
+                            {currentNav}
+                        </h1>
 
-                        <span className="flex items-center justify-start">
-                            <Link className="text-white cursor-pointer font-semibold" href="/" aria-label="Home Link">Home</Link>
+                        <div className="flex items-center mt-2 gap-2">
+                            <Link
+                                href="/"
+                                aria-label="Home Link"
+                                className="font-"
+                            >
+                                Home
+                            </Link>
+
                             <Image
-                                src="/navheader/Vector.png"
-                                height={5}
-                                width={5}
-                                alt="Vector Image Navheader"
-                                className="mx-3 translate-y-[2px]"
+                                src="/navheader/Vector.svg"
+                                height={15}
+                                width={15}
+                                alt="Breadcrumb separator"
+                                className="translate-y-[1.5px]"
                             />
-                            <p className="text-white font-semibold">{currentNav}</p>
-                        </span>
+
+                            <p className="font-">{currentNav}</p>
+                        </div>
                     </div>
                 </div>
-
             </div>
-        </>
-    )
+
+        </div >
+    );
 }

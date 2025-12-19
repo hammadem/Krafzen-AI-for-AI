@@ -10,7 +10,7 @@ export default function Billings() {
         <>
             <div className="text-white w-[80%] flex flex-col md:flex-row md:h-[86vh] gap-4 bg-[#191919]">
 
-                <div className="md:w-[70%] p-4 gap-6 flex flex-col  overflow-y-auto custom-scrollbar2">
+                <div className="md:w-[70%] p-4 gap-6 flex flex-col overflow-y-auto custom-scrollbar2">
 
                     <h1 className="text-white font-bold">Billing</h1>
                     <div className="bg-[#494949] p-4 rounded-[10px]">
@@ -46,7 +46,7 @@ export default function Billings() {
                             </span>
                         </span>
 
-                        <div className="w-full items-center flex flex-col gap-2 overflow-scroll">
+                        <div className="w-full items-center flex flex-col gap-2 overflow-y-auto custom-scrollbar2">
                             {/* Header */}
                             <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-4 py-2 font-semibold w-[95%]">
                                 <div className="text-left">Date</div>

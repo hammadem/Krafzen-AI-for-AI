@@ -7,7 +7,7 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
 
             <div className="relative w-[50%] my-5 mx-5 md:block hidden">
                 <Image
-                    src="/auth/sideImage.png"
+                    src="/auth/sideImage.svg"
                     alt="Auth Hero Image"
                     fill
                     className="h-[100vh] w-[50%]"

@@ -1,31 +1,28 @@
+// this needs to be optimized yet
 import { useState, useEffect, useCallback } from "react";
 import { getAllProjects } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
 import { apiCache } from "@/lib/api/cache";
+import { useApiStateProvider } from "@/context/ApiStateContext";
 
 export function useFetchProjects() {
     const { user } = useAuth();
-    const [error, setError] = useState<string | null>(null);
+    const { setStatus, setApiError } = useApiStateProvider();
     const [projects, setProjects] = useState<ProjectDetails[]>([]);
 
     const fetchProjects = useCallback(async () => {
-        if (!user) {
-            setError("Not Authorized User");
-            return;
-        }
-        setError(null);
-        setProjects([]);
+        setStatus("inprogress");
+        const { ok, data, error } = await getAllProjects(user, user!.userId!);
 
-        const cacheKey = `GET:/api/v1/projects?user_id=${user?.userId}`;
-        if (apiCache.has(cacheKey)) {
-            setProjects(apiCache.get(cacheKey)?.data as ProjectDetails[]);
-            return;
+        if (ok) {
+            setProjects(data as ProjectDetails[]);
+            setStatus("success");
+        } else {
+            setStatus("error");
+            setApiError(error);
         }
 
-        const res = await getAllProjects(user, user.userId!);
-        if (res.ok) setProjects(res.data as ProjectDetails[]);
-        else setError(res.error);
-    }, [user]);
+    }, [user, setStatus, setApiError]);
 
     useEffect(() => {
         const load = async () => await fetchProjects();
@@ -38,5 +35,5 @@ export function useFetchProjects() {
         fetchProjects();
     }, [user, fetchProjects]);
 
-    return { projects, error, forceRefetch };
+    return { projects, forceRefetch };
 }

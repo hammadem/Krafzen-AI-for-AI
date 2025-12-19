@@ -29,6 +29,7 @@ export default function DashNav() {
         }
     }
 
+    if (loading) return;
 
     return (
         <div className="flex w-[95%] items-end justify-end">

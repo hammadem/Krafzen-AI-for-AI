@@ -81,3 +81,4 @@ export const organizeProjectsAsHistory = ({ projects }: { projects: ProjectDetai
 
   return grouped;
 }
+

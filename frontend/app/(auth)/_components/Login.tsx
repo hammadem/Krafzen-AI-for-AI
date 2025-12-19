@@ -59,7 +59,7 @@ export default function Login() {
                         width={20}
                         height={20}
                         alt="Google Login Button Icon"
-                        src="/auth/google.png"
+                        src="/auth/google.svg"
                         className=""
                     /> Sign in with Google
                 </Button>
@@ -72,7 +72,7 @@ export default function Login() {
                         width={20}
                         height={20}
                         alt="Google Login Button Icon"
-                        src="/auth/linkedIN.png"
+                        src="/auth/linkedIN.svg"
                         className=""
                     />
                     Sign in with LinkedIn
@@ -89,7 +89,7 @@ export default function Login() {
                                 width={20}
                                 height={20}
                                 alt="Google Login Button Icon"
-                                src="/auth/mail.png"
+                                src="/auth/mail.svg"
                                 className=""
                             />
                             Sign in with Email

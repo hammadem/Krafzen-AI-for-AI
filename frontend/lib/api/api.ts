@@ -26,6 +26,35 @@ const PROJECT_URLS = {
     DELETE: (projectId: string) => `/api/v1/projects/${projectId}`,
 } as const;
 
+const GPT_PARSERS = {
+    PARSE: () => `/api/v1/parse`,
+    PARSE_TRANSCRIPTION: () => `api/v1/parse-transcription`
+} as const;
+
+const DXF_GENERATER = {
+    GENERATE: () => `/api/v1/dxf/generate`,
+    GENERATE_FROM_TEXT: () => `api/v1/generate-from-text`,
+    VALIDATE: () => `api/v1/validate`
+} as const;
+
+const AUDIO_PARSER = {
+    PARSE: () => `/api/v1/transcribe`,
+}
+
+export async function generateADXF(
+    user: User | null,
+    body: { text: string }
+) {
+    return apiClient("POST", DXF_GENERATER.GENERATE(), user, body);
+}
+
+export async function parseAnInput(
+    user: User | null,
+    body: GPT_PARSE_REQ
+) {
+    return apiClient("POST", GPT_PARSERS.PARSE(), user, body);
+}
+
 export async function createAFile(
     user: User | null,
     body: CreateFileReq
@@ -61,9 +90,10 @@ export async function updateAFile(
 // Can create a prompt from here also
 export async function createAProject(
     user: User | null,
-    body: string
+    body: string,
+    controller?: AbortController
 ) {
-    return apiClient("POST", PROJECT_URLS.POST(), user, { user_id: user?.userId, input_text: body });
+    return apiClient("POST", PROJECT_URLS.POST(), user, { user_id: user?.userId, input_text: body }, "application/json", controller);
 };
 export async function getAProject(
     user: User | null,
@@ -124,33 +154,11 @@ export async function updateAJob(
     return apiClient("PATCH", JOB_URLS.UPDATE(jobId), user, data);
 }
 
-// to convert audio to text
-export async function transcribeAudio({ user, blob }: { user: User | null, blob: Blob }) {
-    if (!user?.access_token) return;
+export async function transcribeAudio(
+    { user, blob }: { user: User | null, blob: Blob }
+) {
+    const formData = new FormData();
+    formData.append("file", blob, "audio.webm");
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
-
-    try {
-        const formData = new FormData();
-        formData.append("file", blob, "audio.webm");
-
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/transcribe`, {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${user?.access_token}`,
-                "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            },
-            body: formData,
-            signal: controller.signal
-        });
-
-        return await res.json();
-    }
-    catch (err) {
-        console.log(err);
-        return { ok: false, data: null, error: "Unexpected Error." }
-    } finally {
-        clearTimeout(timeout);
-    }
+    return apiClient("POST", AUDIO_PARSER.PARSE(), user, formData);
 }

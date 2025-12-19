@@ -1,35 +1,35 @@
 "use client";
 import { classNames } from "@/lib/utils";
 import { Example, Heading } from "../../_component/Examples";
-// import { sendPromptRequest } from "@/hooks/fetchApiData";
 import { examplePrompt } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import Toolbar from "../../_component/Toolbar";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboard } from "@/context/DashboardContex";
-import { createAProject } from "@/lib/api/api";
-import { useRouter } from "next/navigation";
+import { useCreateProject } from "@/hooks/useCreateProject";
+import { useApiStateProvider } from "@/context/ApiStateContext";
 
 export default function DashboardLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
-    const { user, currentProject, setCurrentProject } = useAuth();
-    const { isUserActing, isPrompting, isRecording, setisPromptingSend, setUserAction } = useDashboard();
-    const router = useRouter();
+    const { currentProject } = useAuth();
+    const { isUserActing } = useDashboard();
+    const { createProject } = useCreateProject();
+    const { status } = useApiStateProvider();
 
     return (
         <>
             <div className={classNames("text-white flex flex-col items-center justify-center gap-6 w-full h-[85vh] sm:h-[80vh] ", isUserActing ? "items-center justify-center" : "")}>
                 {
                     // This is ui being shown while recording sound
-                    isRecording
+                    status === "recording"
                     &&
                     <div className="w-full z-999999 w-100 absolute top-0 left-0 bg-black flex items-center h-[100vh] justify-center">
                         <Image
-                            src="/dashboard/sound.png"
+                            src="/dashboard/sound.svg"
                             width={100}
                             height={100}
                             alt="Recording Image"
@@ -38,11 +38,11 @@ export default function DashboardLayout({
                 }
                 {
                     // This is ui being shown while sending prompt request to user
-                    isPrompting
+                    status === "prompting"
                     &&
                     <div className="w-full z-999999 w-100 absolute top-0 left-0 bg-black flex items-center h-[100vh] justify-center flex flex-col">
                         <Image
-                            src="/dashboard/drawing.png"
+                            src="/dashboard/drawing.svg"
                             width={100}
                             height={100}
                             alt="AI Prompt Sent Image"
@@ -57,7 +57,7 @@ export default function DashboardLayout({
                     Also Project and other projects will be shown here as protected
                 */}
                 {
-                    isRecording || isUserActing || isPrompting
+                    status === "prompting" || status === "recording" || isUserActing
                         ?
                         <div className="w-full h-[70vh]">
                             {children}
@@ -84,13 +84,7 @@ export default function DashboardLayout({
 
                                     return (
                                         <div key={ind} onClick={async () => {
-                                            const { data, error, ok } = await createAProject(user, input);
-                                            if (error || !ok) return console.log(error);
-                                            const project = data as ProjectDetails;
-                                            if (project?.id) router.push(`/dashboard/id/${project?.id}`);
-                                            setCurrentProject(project);
-                                            setisPromptingSend(true);
-                                            setUserAction(true);
+                                            await createProject(input);
                                         }}
                                         >
                                             <Example ex={ex} />
@@ -103,7 +97,7 @@ export default function DashboardLayout({
 
 
                 {/** This is the prompt input bar */}
-                <div className={classNames("w-[80%] mr-4 sm:m-0 self-end sm:self-center sm:w-[55%] items-start z-99999 transition-all duration-500", isPrompting || isRecording ? "z-999999 w-[90%]" : "")}>
+                <div className={classNames("w-[80%] mr-4 sm:m-0 self-end sm:self-center sm:w-[55%] items-start z-99999 transition-all duration-500", status === "recording" || status === "prompting" ? "z-999999 w-[90%]" : "")}>
                     <Toolbar />
                 </div>
 
@@ -132,13 +126,7 @@ export default function DashboardLayout({
 
                                 return (
                                     <span className="w-full" key={ind} onClick={async () => {
-                                        const { data, error, ok } = await createAProject(user, input);
-                                        if (error || !ok) return console.log(error);
-                                        const project = data as ProjectDetails;
-                                        if (project?.id) router.push(`/dashboard/id/${project?.id}`);
-                                        setCurrentProject(project);
-                                        setisPromptingSend(true);
-                                        setUserAction(true);
+                                        await createProject(input);
                                     }}>
                                         <Example ex={ex} />
                                     </span>
@@ -150,7 +138,7 @@ export default function DashboardLayout({
             }
 
             {
-                !isRecording && !isUserActing && !isPrompting
+                status !== "recording" && !isUserActing && status !== "prompting"
                 &&
                 <p className={classNames("sm:block hidden text-white text-center font-normal text-[2vh] mx-auto w-[70%]", isUserActing || currentProject ? "hidden" : "")}>Krafzen AI can make mistakes, so double-check it</p>
             }

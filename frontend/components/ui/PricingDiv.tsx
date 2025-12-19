@@ -29,7 +29,7 @@ export default function PricingDiv({ price, index }: { price: PricingDetails; in
                     {price.features.map((feature, i) => (
                         <span className="flex items-start" key={i + price.price}>
                             <Image
-                                src="/pricing/tick.png"
+                                src="/pricing/tick.svg"
                                 width={25}
                                 height={25}
                                 alt="Tick Image"
@@ -39,7 +39,7 @@ export default function PricingDiv({ price, index }: { price: PricingDetails; in
                         </span>
                     ))}
                 </span>
-                
+
             </span>
 
             <Button
