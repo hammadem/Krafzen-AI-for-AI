@@ -15,7 +15,7 @@ export default function DashboardLayout({
 }: {
     children: React.ReactNode
 }) {
-    const { currentProject } = useAuth();
+    const { currentProject, user } = useAuth();
     const { isUserActing } = useDashboard();
     const { createProject } = useCreateProject();
     const { status } = useApiStateProvider();
@@ -97,7 +97,7 @@ export default function DashboardLayout({
 
 
                 {/** This is the prompt input bar */}
-                <div className={classNames("w-[80%] mr-4 sm:m-0 self-end sm:self-center sm:w-[55%] items-start z-99999 transition-all duration-500", status === "recording" || status === "prompting" ? "z-999999 w-[90%]" : "")}>
+                <div className={classNames(user?.access_token ? "w-[80%]" : "w-[90%]", "mr-4 sm:m-0 self-end sm:self-center sm:w-[55%] items-start z-99999 transition-all duration-500", status === "recording" || status === "prompting" ? "z-999999 w-[90%]" : "")}>
                     <Toolbar />
                 </div>
 

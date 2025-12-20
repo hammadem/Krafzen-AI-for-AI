@@ -8,6 +8,7 @@ function classNames(...classes: string[]) {
     return classes.filter(Boolean).join(' ')
 };
 
+// some tests has beeen commentedd due to conflicts with reccent changes test file can be re-written
 
 export default function Pricing() {
     const { monthly, setMonthly } = useDashboard();

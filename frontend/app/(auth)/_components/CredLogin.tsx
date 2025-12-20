@@ -22,6 +22,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+// Input Feild Fixing needs to be done yet
+
 export default function LoginWithCred() {
     const form = useForm<z.infer<typeof loginCredSchema>>({
         resolver: zodResolver(loginCredSchema),
@@ -44,8 +46,6 @@ export default function LoginWithCred() {
                 email,
                 password,
             });
-
-            console.log(user);
 
             if (error) {
                 toast.error(error.message);
@@ -73,13 +73,13 @@ export default function LoginWithCred() {
 
 
     return (
-        <div className="w-full flex flex-col items-center gap-8 w-full">
+        <div className="w-full flex flex-col items-center gap-8">
             <h1 className="text-[4vh]">Sign up</h1>
 
-            <Card className="sm:max-w-md bg-black border-0 text-white md:w-[50%]">
-                <CardContent>
-                    <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
-                        <FieldGroup className="flex gap-2">
+            <Card className="sm:max-w-md bg-black border-0 text-white md:w-[50%] w-full">
+                <CardContent className="w-full">
+                    <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)} className="w-full">
+                        <FieldGroup className="flex gap-2 w-full">
                             <Controller
                                 name="email"
                                 control={form.control}
@@ -91,7 +91,7 @@ export default function LoginWithCred() {
                                             aria-invalid={fieldState.invalid}
                                             placeholder="Email"
                                             autoComplete="off"
-                                            className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4"
+                                            className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4 w-full"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />

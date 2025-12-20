@@ -113,7 +113,9 @@ export default function Toolbar() {
                                     input={input}
                                     setInput={setInput}
                                     createProject={createProject}
-                                    status={status} />
+                                    status={status}
+                                    user={user}
+                                />
                     }
                 </div >
             </div>

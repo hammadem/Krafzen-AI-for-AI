@@ -133,7 +133,7 @@ export function DrawingToolbar({ cancel }: { cancel: () => void; }) {
 }
 
 // Simple Toolbar
-export function InputToolbar({ startRecording, inputChange, input, status, setInput, createProject, fileInputRef, handleFileChange }: {
+export function InputToolbar({ startRecording, inputChange, input, status, setInput, createProject, fileInputRef, handleFileChange, user }: {
     startRecording: () => void,
     inputChange: (e: ChangeEvent<HTMLInputElement>) => void,
     input: string,
@@ -141,18 +141,20 @@ export function InputToolbar({ startRecording, inputChange, input, status, setIn
     createProject: (input: string, setInput: (input: string) => void) => Promise<void>,
     setInput: (input: string) => void,
     fileInputRef: RefObject<HTMLInputElement | null>,
-    handleFileChange: (e: ChangeEvent<HTMLInputElement>) => void
+    handleFileChange: (e: ChangeEvent<HTMLInputElement>) => void,
+    user: User | null
 }) {
     return (
         <div className="flex justify-between w-full">
             <span className="flex items-center w-full">
                 <label className={classNames("flex items-center justify-center w-10 h-10 rounded-full transition", status === "recording" ? "" : "cursor-pointer hover:bg-gray-400")}>
                     <Plus size={18} />
-                    <input type="file" ref={fileInputRef} className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>) => handleFileChange(e)} />
+                    <input type="file" disabled={user === null} ref={fileInputRef} className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>) => handleFileChange(e)} />
                 </label>
                 <input
                     type="text"
                     value={input}
+                    disabled={user === null}
                     placeholder={"𝐂𝐡𝐚𝐭 or 𝐒𝐩𝐞𝐚𝐤 to draw"}
                     onChange={(e) => inputChange(e)}
                     className="w-full text-sm md:text-base text-gray-700 bg-transparent outline-none placeholder:text-gray-400"
@@ -167,7 +169,9 @@ export function InputToolbar({ startRecording, inputChange, input, status, setIn
                             <>
                                 <span
                                     className="cursor-pointer"
-                                    onClick={startRecording}
+                                    onClick={() => {
+                                        if (user !== null) startRecording();
+                                    }}
                                 >
                                     <Image
                                         src="/dashboard/dashmicrecord.svg"

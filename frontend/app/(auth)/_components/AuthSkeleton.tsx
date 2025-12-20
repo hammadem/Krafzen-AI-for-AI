@@ -14,7 +14,7 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
                 />
             </div>
 
-            <div className="flex flex-col text-white items-center justify-evenly w-[50%] py-12 gap-4">
+            <div className="flex flex-col text-white items-center justify-evenly sm:w-[50%] py-12 gap-4">
                 <div className="flex w-full items-center justify-center -translate-x-4">
                     <CompanyLogo />
                 </div>
