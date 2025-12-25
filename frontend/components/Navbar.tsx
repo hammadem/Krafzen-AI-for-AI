@@ -40,7 +40,7 @@ export default function Navbar({ isRoot }: {
                         width={25.76}
                         height={40.8}
                         alt="Toggle Button"
-                        src="/navbar/Icon.svg"
+                        src="/navbar/icon.svg"
                         className={classNames(
                             "sm:hidden p-0 m-2 cursor-pointer transition-transform duration-500",
                             open ? "rotate-90" : "rotate-0"

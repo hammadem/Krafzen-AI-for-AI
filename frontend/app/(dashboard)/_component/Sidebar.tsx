@@ -77,7 +77,7 @@ export default function Sidebar() {
                         width={25.76}
                         height={40.8}
                         alt="Toggle Button"
-                        src="/navbar/Icon.png"
+                        src="/navbar/icon.svg"
                         className={classNames(
                             "h-4 p-0 m-2 cursor-ew-resize transition-transform duration-500",
                             !sideBarOpen ? "rotate-90 hidden" : "rotate-0"

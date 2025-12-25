@@ -81,13 +81,13 @@ export default function Faqs() {
 
             <div className="w-full max-w-sm mx-auto sm:hidden flex flex-col items-center justify-evenly py-10">
                 <ComboboxDemo setValue={setValue} value={value} />
-                <span className="w-[80%] mt-2">
-                    <p className="text-white text-[3vh]">Select a topic to see FAQs.</p>
+                <span className="w-[90%] mt-2">
+                    <p className="text-white text-2xl">Select a topic to see FAQs.</p>
                 </span>
 
                 {
                     faqs.filter(faq => faq.type === value).length > 0 &&
-                    <span className="text-white px-4 py-12 flex items-evenly justify-evenly flex-col h-full w-[90%]">
+                    <span className="text-white py-12 flex items-evenly justify-evenly flex-col h-full w-[90%]">
                         <h1 className="font-semibold">{faqs.filter(faq => faq.type === value)[0].type}</h1>
 
                         {
