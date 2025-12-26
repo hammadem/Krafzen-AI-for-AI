@@ -194,6 +194,27 @@ def validate_config():
         raise ValueError("REPO_ID could not be constructed. Check HF_USERNAME and HF_FINE_TUNED_MODEL_NAME in .env file")
     if not ADAPTER_PATH.exists():
         raise ValueError(f"Adapter path not found: {ADAPTER_PATH}")
+    
+    # Check if adapter path contains adapter_config.json (LoRA adapter) or is a merged model
+    adapter_config = ADAPTER_PATH / "adapter_config.json"
+    config_json = ADAPTER_PATH / "config.json"
+    
+    if not adapter_config.exists() and not config_json.exists():
+        raise ValueError(
+            f"Adapter path '{ADAPTER_PATH}' does not contain a valid model.\n"
+            f"Expected either:\n"
+            f"  - LoRA adapter with 'adapter_config.json'\n"
+            f"  - Merged model with 'config.json'\n"
+            f"\nFiles found in directory:\n"
+            f"  {list(ADAPTER_PATH.iterdir())[:10] if ADAPTER_PATH.is_dir() else 'Not a directory'}"
+        )
+    
+    # If it's a merged model (has config.json but no adapter_config.json), warn user
+    if config_json.exists() and not adapter_config.exists():
+        print(f"⚠️  WARNING: Path '{ADAPTER_PATH}' appears to be a merged model, not a LoRA adapter.")
+        print(f"   This script is designed to merge LoRA adapters. If you want to upload an already-merged model,")
+        print(f"   you may need to use a different approach or ensure the path points to a LoRA adapter directory.")
+        print(f"   Continuing anyway...")
 
 def merge_model():
     """Merge LoRA adapter with base model."""
