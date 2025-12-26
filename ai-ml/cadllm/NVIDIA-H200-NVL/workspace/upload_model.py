@@ -199,22 +199,38 @@ def validate_config():
     adapter_config = ADAPTER_PATH / "adapter_config.json"
     config_json = ADAPTER_PATH / "config.json"
     
+    # If not found at root, search recursively
     if not adapter_config.exists() and not config_json.exists():
-        raise ValueError(
-            f"Adapter path '{ADAPTER_PATH}' does not contain a valid model.\n"
-            f"Expected either:\n"
-            f"  - LoRA adapter with 'adapter_config.json'\n"
-            f"  - Merged model with 'config.json'\n"
-            f"\nFiles found in directory:\n"
-            f"  {list(ADAPTER_PATH.iterdir())[:10] if ADAPTER_PATH.is_dir() else 'Not a directory'}"
-        )
-    
-    # If it's a merged model (has config.json but no adapter_config.json), warn user
-    if config_json.exists() and not adapter_config.exists():
-        print(f"⚠️  WARNING: Path '{ADAPTER_PATH}' appears to be a merged model, not a LoRA adapter.")
-        print(f"   This script is designed to merge LoRA adapters. If you want to upload an already-merged model,")
-        print(f"   you may need to use a different approach or ensure the path points to a LoRA adapter directory.")
-        print(f"   Continuing anyway...")
+        print(f"   🔍 'adapter_config.json' or 'config.json' not found at root, searching subdirectories...")
+        found_adapters = list(ADAPTER_PATH.rglob("adapter_config.json"))
+        found_configs = list(ADAPTER_PATH.rglob("config.json"))
+        
+        if found_adapters:
+            print(f"   ✅ Found {len(found_adapters)} LoRA adapter(s) in subdirectories")
+            # Validation passed - adapter exists in subdirectory
+        elif found_configs:
+            print(f"   ⚠️  Found {len(found_configs)} merged model(s) in subdirectories")
+            print(f"   WARNING: Path '{ADAPTER_PATH}' appears to contain merged models, not LoRA adapters.")
+            print(f"   This script is designed to merge LoRA adapters. If you want to upload an already-merged model,")
+            print(f"   you may need to use a different approach or ensure the path points to a LoRA adapter directory.")
+            print(f"   Continuing anyway...")
+        else:
+            raise ValueError(
+                f"Adapter path '{ADAPTER_PATH}' does not contain a valid model.\n"
+                f"Expected either:\n"
+                f"  - LoRA adapter with 'adapter_config.json'\n"
+                f"  - Merged model with 'config.json'\n"
+                f"\nSearched recursively but found neither.\n"
+                f"Files found in directory:\n"
+                f"  {list(ADAPTER_PATH.iterdir())[:10] if ADAPTER_PATH.is_dir() else 'Not a directory'}"
+            )
+    else:
+        # Found at root level
+        if config_json.exists() and not adapter_config.exists():
+            print(f"⚠️  WARNING: Path '{ADAPTER_PATH}' appears to be a merged model, not a LoRA adapter.")
+            print(f"   This script is designed to merge LoRA adapters. If you want to upload an already-merged model,")
+            print(f"   you may need to use a different approach or ensure the path points to a LoRA adapter directory.")
+            print(f"   Continuing anyway...")
 
 def merge_model():
     """Merge LoRA adapter with base model."""
