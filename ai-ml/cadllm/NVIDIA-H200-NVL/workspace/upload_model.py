@@ -61,21 +61,31 @@ def generate_model_card(adapter_path: Path, base_model: str, repo_id: str) -> st
     Returns:
         Model card content as string
     """
-    # Try to read existing README from adapter path
+    # Check if existing README is a template (contains "[More Information Needed]")
     adapter_readme = adapter_path / "README.md"
+    is_template = False
     if adapter_readme.exists():
-        print(f"   📄 Found existing README.md in adapter path, using it as base...")
         existing_content = adapter_readme.read_text(encoding="utf-8")
-        # Enhance it with model information
-        if "model_name" not in existing_content.lower() or repo_id not in existing_content:
-            # Add model identifier if missing
-            enhanced = f"# {repo_id}\n\n"
-            enhanced += f"**Base Model:** {base_model}\n"
-            enhanced += f"**Adapter Path:** `{adapter_path}`\n\n"
-            enhanced += "---\n\n"
-            enhanced += existing_content
-            return enhanced
-        return existing_content
+        # Check if it's a PEFT template
+        if "[More Information Needed]" in existing_content or "Model Card for Model ID" in existing_content:
+            is_template = True
+            print(f"   📄 Found template README.md in adapter path, generating new model card...")
+        elif repo_id in existing_content and "base_model" in existing_content.lower():
+            # It's a proper model card, use it
+            print(f"   📄 Found existing model card in adapter path, using it...")
+            return existing_content
+        else:
+            # It's a custom README but not a template, enhance it
+            print(f"   📄 Found custom README.md in adapter path, enhancing it...")
+            if repo_id not in existing_content:
+                enhanced = f"# {repo_id}\n\n"
+                enhanced += f"**Base Model:** {base_model}\n\n"
+                enhanced += "---\n\n"
+                enhanced += existing_content
+                return enhanced
+            return existing_content
+    
+    # Generate new model card (either no README or template detected)
     
     # Generate new model card
     adapter_name = adapter_path.name
