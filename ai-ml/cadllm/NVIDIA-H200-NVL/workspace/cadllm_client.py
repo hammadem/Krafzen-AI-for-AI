@@ -82,7 +82,15 @@ class CADLLMClient:
             self._endpoint_url = None
         self.system_prompt = """You are a CAD code assistant. Given a CAD description, 
 generate precise 2D CAD coordinates. Always center shapes at origin (0, 0). 
-Use exact dimensions specified in the request. Generate single, closed shapes unless multiple objects are explicitly requested."""
+Use exact dimensions specified in the request. 
+
+For architectural layouts (apartments, houses, rooms, floor plans):
+- Generate all rooms, walls, doors, and windows as separate shapes
+- Use lines for walls, rectangles for rooms, arcs for doors
+- Include all requested features (bedrooms, windows, doors, etc.)
+
+For simple shapes:
+- Generate single, closed shapes unless multiple objects are explicitly requested."""
     
     def format_prompt(self, instruction: str, input_text: str = "(none)") -> str:
         """
@@ -97,8 +105,17 @@ Use exact dimensions specified in the request. Generate single, closed shapes un
         # Enhance instruction with explicit requirements
         enhanced_instruction = instruction
         
+        # Detect architectural/floor plan requests
+        architectural_keywords = ["apartment", "bedroom", "room", "house", "floor plan", "layout", "wall", "door", "window"]
+        is_architectural = any(keyword in instruction.lower() for keyword in architectural_keywords)
+        
+        if is_architectural:
+            # For architectural requests, emphasize multiple objects
+            if "all" not in instruction.lower() and "include" not in instruction.lower():
+                enhanced_instruction = f"{instruction} (include all rooms, walls, doors, and windows)"
+        
         # Add dimension hints if not present
-        if "mm" not in instruction.lower() and "cm" not in instruction.lower():
+        if "mm" not in instruction.lower() and "cm" not in instruction.lower() and "meter" not in instruction.lower():
             enhanced_instruction = f"{instruction} (use millimeters for dimensions)"
         
         # Emphasize centering if not mentioned
