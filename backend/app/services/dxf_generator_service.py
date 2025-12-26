@@ -1,5 +1,9 @@
 """
-DXF Generator Service for converting CAD instructions to DXF files using ezdxf
+DXF Generator Service for converting CAD instructions to DXF files using ezdxf.
+
+This service provides functionality to generate DXF (Drawing Exchange Format) files
+from parsed CAD instructions. It supports multiple entity types, layer management,
+and line weight assignment for professional CAD drawings.
 """
 
 import io
@@ -12,17 +16,22 @@ logger = logging.getLogger(__name__)
 
 
 class DXFGeneratorService:
-    """Service for generating DXF files from parsed CAD instructions"""
+    """
+    Service for generating DXF files from parsed CAD instructions.
     
-    # Layer definitions with line weights (in mm)
-    # Line weights: 0.13mm (thin), 0.25mm (medium), 0.50mm (thick)
+    Supports multiple entity types (rectangles, lines, arcs, circles, polylines, dimensions)
+    with automatic layer assignment and line weight management.
+    """
+    
+    # Layer definitions with line weights (in hundredths of mm)
+    # Standard line weights: 13 (thin), 25 (medium), 50 (thick)
     LAYERS = {
-        'Walls': {'color': 7, 'lineweight': 50},  # Thick line (0.50mm)
-        'Cabinets': {'color': 7, 'lineweight': 25},  # Medium line (0.25mm)
-        'Appliances': {'color': 7, 'lineweight': 25},  # Medium line (0.25mm)
-        'Doors': {'color': 7, 'lineweight': 13},  # Thin line (0.13mm)
-        'Dimensions': {'color': 7, 'lineweight': 13},  # Thin line (0.13mm)
-        'Annotations': {'color': 7, 'lineweight': 13},  # Thin line (0.13mm)
+        'Walls': {'color': 7, 'lineweight': 50},  # Thick line for structural elements
+        'Cabinets': {'color': 7, 'lineweight': 25},  # Medium line for fixtures/furniture
+        'Appliances': {'color': 7, 'lineweight': 25},  # Medium line for equipment
+        'Doors': {'color': 7, 'lineweight': 13},  # Thin line for openings
+        'Dimensions': {'color': 7, 'lineweight': 13},  # Thin line for dimensions
+        'Annotations': {'color': 7, 'lineweight': 13},  # Thin line for annotations
     }
     
     def __init__(self):
@@ -90,7 +99,7 @@ class DXFGeneratorService:
         if command == 'dimension':
             return 'Dimensions'
         
-        # Arc commands are typically door swings
+        # Arc commands are typically opening swing paths or curved elements
         if command == 'arc':
             return 'Doors'
         
@@ -99,49 +108,43 @@ class DXFGeneratorService:
             width = abs(self._extract_number(params, 'width', 0))
             height = abs(self._extract_number(params, 'height', 0))
             
-            # Large rectangles (room boundaries) are walls
-            # Room is 12' x 10' = 3657.6mm x 3048mm
+            # Large rectangles (typically room/space boundaries) are walls
             if width > 3000 or height > 3000:
                 return 'Walls'
             
-            # Medium rectangles could be cabinets or appliances
-            # Check if it's near the edges (cabinets) or in corners (appliances)
+            # Medium-sized rectangles: infer based on size and position
             corner = self._extract_point(params, 'corner', (0, 0))
             x, y = corner
             
-            # Refrigerator is typically 3' x 2.5' = 914.4mm x 762mm, near bottom-right
-            if 700 <= width <= 1000 and 600 <= height <= 800:
-                if x > 2000 and y < 1000:  # Bottom-right area
+            # Medium rectangles (equipment/appliance size range)
+            if 600 <= width <= 1200 and 600 <= height <= 1200:
+                # Check if positioned in corners or specific areas (common for equipment)
+                if (x > 2000 and y < 1000) or (x < 500 and y < 500):
                     return 'Appliances'
             
-            # Cooktop is typically 2.5' = 762mm wide
-            if 700 <= width <= 800:
-                return 'Appliances'
-            
-            # Base cabinets are typically 2' = 609.6mm deep, but we use 381mm (1.25') for overheads
-            # Overhead cabinets are 1.25' = 381mm deep
-            if height == -381 or width == -381:  # Negative height indicates overhead
-                return 'Cabinets'
-            
-            # Default to cabinets for medium-sized rectangles
+            # Small to medium rectangles (fixture/furniture size range)
             if 200 <= width <= 2000 or 200 <= height <= 2000:
+                # Check if negative dimensions (might indicate overhead/elevated elements)
+                if height < 0 or width < 0:
+                    return 'Cabinets'
+                # Default to cabinets for medium-sized rectangles
                 return 'Cabinets'
             
             return 'Walls'  # Default for large rectangles
         
-        # Lines could be walls or door frames
+        # Lines could be walls or opening frames
         if command == 'line':
-            # Check if it's part of a door (short vertical line near right wall)
             start = self._extract_point(params, 'start', (0, 0))
             end = self._extract_point(params, 'end', (0, 0))
             
-            # Door is on right wall (x around 1828.8 for center, or 3657.6 for right edge)
-            if 1500 <= start[0] <= 2000 or 1500 <= end[0] <= 2000:
-                line_length = ((end[0] - start[0])**2 + (end[1] - start[1])**2)**0.5
-                if line_length < 1000:  # Short line, likely door frame
-                    return 'Doors'
+            # Calculate line length
+            line_length = ((end[0] - start[0])**2 + (end[1] - start[1])**2)**0.5
             
-            return 'Walls'  # Default for lines
+            # Short lines are typically opening frames (doors, windows)
+            if line_length < 1500:  # Short line, likely opening frame
+                return 'Doors'
+            
+            return 'Walls'  # Default for longer lines (wall segments)
         
         # Default layer
         return 'Walls'
@@ -288,28 +291,59 @@ class DXFGeneratorService:
             value = self._extract_number(params, 'value', 0.0)
             
             try:
-                # Create dimension
-                dim = msp.add_linear_dim(
+                # Create dimension (returns DimStyleOverride, not Dimension entity directly)
+                dim_override = msp.add_linear_dim(
                     base=dim_line,
                     p1=start,
                     p2=end,
                     dimstyle='STANDARD'
                 )
                 
-                # Set layer and properties on the dimension entity
-                # Dimensions are complex entities - set layer directly
+                # Get the actual Dimension entity from the override
+                # The override wraps the dimension entity
+                dimension_entity = dim_override.dimension
+                
+                # Set layer on the DIMENSION entity itself
+                # Dimensions in ezdxf have an associated anonymous block for visual representation
+                # We need to set the layer on BOTH the dimension entity AND its geometry block
                 try:
-                    dim.dxf.layer = layer
-                    if layer in self.LAYERS:
-                        dim.dxf.color = self.LAYERS[layer]['color']
-                    else:
-                        dim.dxf.color = 7
-                except AttributeError:
-                    # If dimension doesn't have direct dxf access, try alternative
+                    # Step 1: Set layer on the DIMENSION entity
+                    dimension_entity.dxf.layer = layer
+                    
+                    # Step 2: Get the anonymous block containing the dimension's visual geometry
+                    # and set the layer on all entities within that block
                     try:
-                        dim.set_dxf_attrib('layer', layer)
-                    except:
-                        pass
+                        # Access the block via the dimension entity
+                        block_name = dimension_entity.dxf.geometry
+                        if block_name and block_name in doc.blocks:
+                            block = doc.blocks[block_name]
+                            for entity in block:
+                                try:
+                                    entity.dxf.layer = layer
+                                except (AttributeError, TypeError):
+                                    # Some entities in the block might not support layer assignment
+                                    pass
+                    except (AttributeError, TypeError, KeyError):
+                        # Alternative: try to get block via dimension's block reference
+                        try:
+                            # Dimensions store their geometry in an anonymous block
+                            # The block name is typically stored in the dimension's geometry attribute
+                            if hasattr(dimension_entity.dxf, 'geometry'):
+                                block_ref = dimension_entity.dxf.geometry
+                                # This might be a block name or handle - try to access it
+                                pass
+                        except:
+                            pass
+                    
+                    # Set color based on layer
+                    if layer in self.LAYERS:
+                        dimension_entity.dxf.color = self.LAYERS[layer]['color']
+                    else:
+                        dimension_entity.dxf.color = 7
+                        
+                    logger.debug(f"Set dimension layer to '{layer}' including geometry block entities")
+                except (AttributeError, TypeError) as e:
+                    logger.warning(f"Error setting layer on dimension: {e}")
                 
                 # Set dimension text if provided using dimstyle overrides
                 if value > 0:
@@ -407,7 +441,7 @@ class DXFGeneratorService:
                 elif command == 'arc':
                     self._add_arc(msp, params, layer)
                     processed_count += 1
-                elif command in ['polyline', 'poly']:
+                elif command in ['polyline', 'poly', 'lwpolyline']:
                     self._add_polyline(msp, params, layer)
                     processed_count += 1
                 elif command == 'dimension':

@@ -2,7 +2,7 @@
 DXF Generator API endpoints for converting CAD instructions to DXF files
 """
 
-from fastapi import APIRouter, HTTPException, Body, Response, Depends, Query
+from fastapi import APIRouter, HTTPException, Body, Response, Depends, Query, UploadFile, File
 from typing import Optional, List
 from app.schemas.parser import (
     ParsingRequest,
@@ -10,6 +10,7 @@ from app.schemas.parser import (
     ParsedInstruction,
     CADFileType
 )
+from typing import Dict, Any
 from datetime import datetime
 import logging
 from app.middlewares.auth import require_auth
@@ -31,6 +32,18 @@ try:
 except Exception as e:
     logger.warning(f"Failed to import gpt_parser_service: {e}.")
     gpt_parser_service = None
+
+try:
+    from app.services.whisper_service import whisper_service
+except Exception as e:
+    logger.warning(f"Failed to import whisper_service: {e}.")
+    whisper_service = None
+
+try:
+    from app.services.cadllm_service import cadllm_service
+except Exception as e:
+    logger.warning(f"Failed to import cadllm_service: {e}. CADLLM endpoints will return 503.")
+    cadllm_service = None
 
 router = APIRouter()
 
@@ -89,12 +102,91 @@ async def generate_dxf_from_instructions(
         )
 
 
-@router.post("/generate-from-text")
-async def generate_dxf_from_text(
+@router.post("/generate-from-json")
+async def generate_dxf_from_json(
+    json_data: Dict[str, Any] = Body(..., description="Structured JSON with entities and coordinates")
+):
+    """
+    Generate DXF file from structured JSON format.
+    
+    This endpoint accepts machine-readable JSON with exact coordinates,
+    providing precise control over the generated drawing.
+    
+    Args:
+        json_data: JSON object with entities, units, and format
+    
+    Returns:
+        DXF file as binary response
+    """
+    """
+    Generate DXF file from structured JSON format
+    
+    Args:
+        json_data: JSON object with entities, units, and format
+    
+    Returns:
+        DXF file as binary response
+    """
+    if not dxf_generator_service:
+        raise HTTPException(
+            status_code=503,
+            detail="DXF generator service is not available. Please check ezdxf installation."
+        )
+    
+    try:
+        from app.services.json_instruction_parser import json_instruction_parser
+        
+        # Parse JSON to instructions
+        instructions = json_instruction_parser.parse_json(json_data)
+        
+        if not instructions:
+            raise HTTPException(
+                status_code=400,
+                detail="No valid instructions parsed from JSON"
+            )
+        
+        # Generate DXF file
+        dxf_bytes = dxf_generator_service.generate_dxf(
+            instructions=instructions,
+            filename=None
+        )
+        
+        # Validate the generated DXF
+        is_valid, error_msg = dxf_generator_service.validate_dxf(dxf_bytes)
+        if not is_valid:
+            logger.warning(f"Generated DXF validation warning: {error_msg}")
+        
+        # Return DXF file as binary response
+        return Response(
+            content=dxf_bytes,
+            media_type="application/dxf",
+            headers={
+                "Content-Disposition": 'attachment; filename="generated_from_json.dxf"'
+            }
+        )
+        
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"DXF generation from JSON error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"DXF generation failed: {str(e)}"
+        )
+
+
+@router.post("/generate-from-text-via-json")
+async def generate_dxf_from_text_via_json(
     request: ParsingRequest = Body(...)
 ):
     """
-    Parse text and generate DXF file in one step
+    Generate DXF file from text by first converting to JSON format (RECOMMENDED).
+    
+    This two-stage approach (Text → JSON → DXF) provides better accuracy
+    than direct text parsing by ensuring all elements are captured in structured format.
     
     Args:
         request: ParsingRequest with text and file type
@@ -102,10 +194,95 @@ async def generate_dxf_from_text(
     Returns:
         DXF file as binary response
     """
-    if not gpt_parser_service:
+    if not dxf_generator_service:
         raise HTTPException(
             status_code=503,
-            detail="GPT-4 parser service is not configured. Please check OPENAI_API_KEY."
+            detail="DXF generator service is not available. Please check ezdxf installation."
+        )
+    
+    try:
+        from app.services.text_to_json_converter import text_to_json_converter
+        from app.services.json_instruction_parser import json_instruction_parser
+        
+        if not text_to_json_converter:
+            raise HTTPException(
+                status_code=503,
+                detail="Text to JSON converter is not configured. Please check OPENAI_API_KEY."
+            )
+        
+        # Step 1: Convert text to JSON
+        logger.info("Converting text to structured JSON format...")
+        json_data = await text_to_json_converter.convert_text_to_json(
+            text=request.text,
+            units="inches"  # Default, can be made configurable
+        )
+        
+        # Step 2: Parse JSON to instructions
+        instructions = json_instruction_parser.parse_json(json_data)
+        
+        if not instructions:
+            raise HTTPException(
+                status_code=400,
+                detail="No valid instructions parsed from JSON"
+            )
+        
+        # Step 3: Generate DXF file
+        dxf_bytes = dxf_generator_service.generate_dxf(
+            instructions=instructions,
+            filename=None
+        )
+        
+        # Validate the generated DXF
+        is_valid, error_msg = dxf_generator_service.validate_dxf(dxf_bytes)
+        if not is_valid:
+            logger.warning(f"Generated DXF validation warning: {error_msg}")
+        
+        # Return DXF file as binary response
+        return Response(
+            content=dxf_bytes,
+            media_type="application/dxf",
+            headers={
+                "Content-Disposition": 'attachment; filename="generated_from_text_via_json.dxf"'
+            }
+        )
+        
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"DXF generation from text via JSON error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"DXF generation failed: {str(e)}"
+        )
+
+
+@router.post("/generate-from-audio")
+async def generate_dxf_from_audio(
+    file: UploadFile = File(...),
+    language: Optional[str] = Query("en", description="Language code (ISO 639-1)"),
+    units: Optional[str] = Query("inches", description="Units for measurements (inches, feet, mm)")
+):
+    """
+    Generate DXF file directly from audio using JSON pipeline (RECOMMENDED).
+    
+    This endpoint uses Option 2 pipeline: Audio → Transcription → JSON → DXF
+    for better accuracy and precision.
+    
+    Args:
+        file: Audio file (mp3, wav, m4a, ogg, flac, webm)
+        language: Language code (default: en, use "auto" for auto-detection)
+        units: Units for measurements (default: inches)
+    
+    Returns:
+        DXF file as binary response
+    """
+    if not whisper_service:
+        raise HTTPException(
+            status_code=503,
+            detail="Whisper service is not configured. Please check OPENAI_API_KEY."
         )
     
     if not dxf_generator_service:
@@ -115,18 +292,159 @@ async def generate_dxf_from_text(
         )
     
     try:
-        # Parse text using GPT-4 service
-        instructions, raw_response = await gpt_parser_service.parse_text(
-            text=request.text,
-            file_type=CADFileType.DXF,  # Force DXF for generation
-            additional_context=request.additional_context
+        from app.services.text_to_json_converter import text_to_json_converter
+        from app.services.json_instruction_parser import json_instruction_parser
+        
+        if not text_to_json_converter:
+            raise HTTPException(
+                status_code=503,
+                detail="Text to JSON converter is not configured. Please check OPENAI_API_KEY."
+            )
+        
+        # Step 1: Transcribe audio
+        logger.info("Transcribing audio file...")
+        file_content = await file.read()
+        
+        if not file_content:
+            raise HTTPException(status_code=400, detail="Empty file provided")
+        
+        transcribed_text, detected_language, duration = await whisper_service.transcribe_file(
+            file_content=file_content,
+            filename=file.filename or "audio",
+            language=language
         )
+        
+        if not transcribed_text:
+            raise HTTPException(status_code=400, detail="Transcription returned empty text")
+        
+        logger.info(f"Transcription successful: {len(transcribed_text)} characters")
+        
+        # Step 2: Convert text to JSON
+        logger.info("Converting text to structured JSON format...")
+        json_data = await text_to_json_converter.convert_text_to_json(
+            text=transcribed_text,
+            units=units
+        )
+        
+        # Step 3: Parse JSON to instructions
+        instructions = json_instruction_parser.parse_json(json_data)
         
         if not instructions:
             raise HTTPException(
                 status_code=400,
-                detail="No valid instructions parsed from text"
+                detail="No valid instructions parsed from JSON"
             )
+        
+        logger.info(f"Parsed {len(instructions)} instructions from JSON")
+        
+        # Step 4: Generate DXF file
+        dxf_bytes = dxf_generator_service.generate_dxf(
+            instructions=instructions,
+            filename=None
+        )
+        
+        # Validate the generated DXF
+        is_valid, error_msg = dxf_generator_service.validate_dxf(dxf_bytes)
+        if not is_valid:
+            logger.warning(f"Generated DXF validation warning: {error_msg}")
+        
+        # Generate filename from audio file
+        audio_name = (file.filename or "audio").rsplit('.', 1)[0]
+        safe_name = audio_name.replace(" ", "_").replace("/", "_")
+        
+        # Return DXF file as binary response
+        return Response(
+            content=dxf_bytes,
+            media_type="application/dxf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_name}.dxf"'
+            }
+        )
+        
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"DXF generation from audio error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"DXF generation failed: {str(e)}"
+        )
+
+
+@router.post("/generate-from-text")
+async def generate_dxf_from_text(
+    request: ParsingRequest = Body(...),
+    use_json_pipeline: Optional[bool] = Query(True, description="Use JSON pipeline (Option 2) for better accuracy. Set to False for direct parsing (Option 1).")
+):
+    """
+    Parse text and generate DXF file.
+    
+    By default, uses JSON pipeline (Option 2) for better accuracy.
+    Set use_json_pipeline=False to use direct parsing (Option 1).
+    
+    Args:
+        request: ParsingRequest with text and file type
+        use_json_pipeline: Use JSON pipeline (default: True, recommended)
+    
+    Returns:
+        DXF file as binary response
+    """
+    if not dxf_generator_service:
+        raise HTTPException(
+            status_code=503,
+            detail="DXF generator service is not available. Please check ezdxf installation."
+        )
+    
+    try:
+        if use_json_pipeline:
+            # Use JSON pipeline (Option 2) - RECOMMENDED
+            from app.services.text_to_json_converter import text_to_json_converter
+            from app.services.json_instruction_parser import json_instruction_parser
+            
+            if not text_to_json_converter:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Text to JSON converter is not configured. Please check OPENAI_API_KEY."
+                )
+            
+            # Step 1: Convert text to JSON
+            logger.info("Converting text to structured JSON format (Option 2)...")
+            json_data = await text_to_json_converter.convert_text_to_json(
+                text=request.text,
+                units="inches"  # Default, can be made configurable
+            )
+            
+            # Step 2: Parse JSON to instructions
+            instructions = json_instruction_parser.parse_json(json_data)
+            
+            if not instructions:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No valid instructions parsed from JSON"
+                )
+        else:
+            # Use direct parsing (Option 1)
+            if not gpt_parser_service:
+                raise HTTPException(
+                    status_code=503,
+                    detail="GPT-4 parser service is not configured. Please check OPENAI_API_KEY."
+                )
+            
+            logger.info("Parsing text directly (Option 1)...")
+            instructions, raw_response = await gpt_parser_service.parse_text(
+                text=request.text,
+                file_type=CADFileType.DXF,  # Force DXF for generation
+                additional_context=request.additional_context
+            )
+            
+            if not instructions:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No valid instructions parsed from text"
+                )
         
         # Generate DXF file
         dxf_bytes = dxf_generator_service.generate_dxf(
@@ -339,5 +657,170 @@ async def download_project_dxf(
         raise HTTPException(
             status_code=500,
             detail=f"DXF download failed: {str(e)}"
+        )
+
+
+@router.post("/generate-from-text-cadllm")
+async def generate_dxf_from_text_cadllm(
+    request: ParsingRequest = Body(...)
+):
+    """
+    Generate DXF file from text using the fine-tuned CAD-LLM model (RECOMMENDED for 2D CAD).
+    
+    This endpoint uses the fine-tuned CAD-LLM model that outputs coordinates directly,
+    which are then converted to DXF files. This is faster and more cost-effective than
+    using GPT-4 for 2D CAD generation.
+    
+    Args:
+        request: ParsingRequest with text and file type
+    
+    Returns:
+        DXF file as binary response
+    """
+    if not cadllm_service:
+        raise HTTPException(
+            status_code=503,
+            detail="CADLLM service is not configured. Please set HF_TOKEN and HF_MODEL_NAME or HF_ENDPOINT_URL."
+        )
+    
+    if not cadllm_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="CADLLM service is not properly configured. Please check HF_TOKEN and model settings."
+        )
+    
+    try:
+        # Generate DXF using CADLLM
+        logger.info(f"Generating DXF using CAD-LLM model for text: {request.text[:100]}...")
+        dxf_bytes, error_msg = await cadllm_service.generate_dxf_from_text(
+            text=request.text,
+            filename=None
+        )
+        
+        if error_msg:
+            raise HTTPException(
+                status_code=500,
+                detail=f"CADLLM generation failed: {error_msg}"
+            )
+        
+        if not dxf_bytes:
+            raise HTTPException(
+                status_code=500,
+                detail="CADLLM generation returned empty result"
+            )
+        
+        # Return DXF file as binary response
+        return Response(
+            content=dxf_bytes,
+            media_type="application/dxf",
+            headers={
+                "Content-Disposition": 'attachment; filename="generated_cadllm.dxf"'
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"CADLLM DXF generation error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"DXF generation failed: {str(e)}"
+        )
+
+
+@router.post("/generate-from-audio-cadllm")
+async def generate_dxf_from_audio_cadllm(
+    file: UploadFile = File(...),
+    language: Optional[str] = Query("en", description="Language code (ISO 639-1)"),
+):
+    """
+    Generate DXF file from audio using CAD-LLM model (RECOMMENDED for 2D CAD).
+    
+    This endpoint uses: Audio → Transcription → CAD-LLM → DXF
+    for faster and more cost-effective 2D CAD generation.
+    
+    Args:
+        file: Audio file (mp3, wav, m4a, ogg, flac, webm)
+        language: Language code (default: en, use "auto" for auto-detection)
+    
+    Returns:
+        DXF file as binary response
+    """
+    if not whisper_service:
+        raise HTTPException(
+            status_code=503,
+            detail="Whisper service is not configured. Please check OPENAI_API_KEY."
+        )
+    
+    if not cadllm_service:
+        raise HTTPException(
+            status_code=503,
+            detail="CADLLM service is not configured. Please set HF_TOKEN and HF_MODEL_NAME or HF_ENDPOINT_URL."
+        )
+    
+    if not cadllm_service.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="CADLLM service is not properly configured. Please check HF_TOKEN and model settings."
+        )
+    
+    try:
+        # Step 1: Transcribe audio
+        logger.info("Transcribing audio file...")
+        file_content = await file.read()
+        
+        if not file_content:
+            raise HTTPException(status_code=400, detail="Empty file provided")
+        
+        transcribed_text, detected_language, duration = await whisper_service.transcribe_file(
+            file_content=file_content,
+            filename=file.filename or "audio",
+            language=language
+        )
+        
+        if not transcribed_text:
+            raise HTTPException(status_code=400, detail="Transcription returned empty text")
+        
+        logger.info(f"Transcription successful: {len(transcribed_text)} characters")
+        
+        # Step 2: Generate DXF using CADLLM
+        logger.info("Generating DXF using CAD-LLM model...")
+        dxf_bytes, error_msg = await cadllm_service.generate_dxf_from_text(
+            text=transcribed_text,
+            filename=None
+        )
+        
+        if error_msg:
+            raise HTTPException(
+                status_code=500,
+                detail=f"CADLLM generation failed: {error_msg}"
+            )
+        
+        if not dxf_bytes:
+            raise HTTPException(
+                status_code=500,
+                detail="CADLLM generation returned empty result"
+            )
+        
+        # Generate filename from audio file
+        audio_name = (file.filename or "audio").rsplit('.', 1)[0]
+        safe_name = audio_name.replace(" ", "_").replace("/", "_")
+        
+        # Return DXF file as binary response
+        return Response(
+            content=dxf_bytes,
+            media_type="application/dxf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_name}_cadllm.dxf"'
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"CADLLM DXF generation from audio error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"DXF generation failed: {str(e)}"
         )
 

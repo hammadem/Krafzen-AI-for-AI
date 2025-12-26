@@ -74,3 +74,13 @@ backend/test_audio.wav
 backend/tests/*.wav
 backend/tests/*.mp3
 backend/tests/*.m4a
+
+# AI/ML datasets (too large for git)
+ai-ml/**/dataset/cadllm_raw/
+ai-ml/**/dataset/jsonl/
+ai-ml/**/cadllm_raw/
+ai-ml/**/*.jsonl
+ai-ml/**/cad-agent-qwen-*/
+ai-ml/**/logs/
+ai-ml/**/*.tar.gz
+ai-ml/**/cadllm-workspace.tar.gz

@@ -1,5 +1,8 @@
 """
-GPT-4 parsing service for converting transcribed text into CAD instructions
+GPT-4 parsing service for converting natural language text into structured CAD instructions.
+
+This service uses GPT-4 to parse user instructions and convert them into a structured
+format that can be used by CAD generators to create DXF, DWG, or other CAD file formats.
 """
 
 import json
@@ -12,7 +15,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 class GPTParserService:
-    """Service for parsing transcribed text into CAD instructions using GPT-4"""
+    """
+    Service for parsing natural language text into structured CAD instructions using GPT-4.
+    
+    Converts user descriptions into geometric primitives (rectangles, lines, arcs, etc.)
+    with calculated coordinates and parameters suitable for CAD file generation.
+    """
     
     def __init__(self):
         """Initialize GPT-4 parser service"""
@@ -28,7 +36,7 @@ class GPTParserService:
         """Get system prompt based on file type"""
         base_prompt = """You are an expert CAD/BIM engineer specialized in converting natural language instructions into precise CAD commands.
 
-CRITICAL: You MUST ONLY generate basic geometric primitives. Break down all complex objects (doors, cabinets, appliances, etc.) into their component rectangles, lines, and arcs.
+CRITICAL: You MUST ONLY generate basic geometric primitives. Break down all complex objects into their component rectangles, lines, and arcs.
 
 Your task is to parse user instructions and generate structured CAD commands that can be used to create CAD files.
 
@@ -37,11 +45,10 @@ Rules:
 2. Convert measurements to consistent units (prefer metric: millimeters)
 3. ONLY use these basic commands: "line", "circle", "rectangle", "arc", "polyline", "dimension"
 4. Break down complex objects into basic primitives:
-   - A door = a line (door frame) + an arc (door swing)
-   - A cabinet = a rectangle
-   - A sink = a rectangle (or two rectangles for sink basin)
-   - An appliance = a rectangle
-   - Overhead cabinets = rectangles (use dashed lines by setting linetype in parameters if needed)
+   - Doors/Openings = a line (frame) + an arc (swing path if applicable)
+   - Furniture/Fixtures = rectangles
+   - Equipment/Machinery = rectangles
+   - Structural elements = rectangles or polylines
 5. Extract dimensions and coordinates
 6. Calculate exact coordinates based on room dimensions and positions
 7. Output structured JSON format
@@ -57,27 +64,67 @@ Example commands:
 - arc: {center: {x, y}, radius: number, startAngle: number, endAngle: number}
 - dimension: {type: "linear", points: [{x, y}, {x, y}], value: number}
 
+EXAMPLE BREAKDOWN:
+If instructions say "cabinets along top wall except for sink area, sink centered":
+- Generate rectangle for left cabinet section
+- Generate rectangle for right cabinet section  
+- Generate rectangle for sink (centered)
+- All three as SEPARATE rectangle commands
+
+If instructions say "base cabinets full length except for cooktop area":
+- Generate rectangle for bottom cabinet section
+- Generate rectangle for top cabinet section
+- Generate rectangle for cooktop
+- All three as SEPARATE rectangle commands
+
 For offset operations: Create a new rectangle with calculated coordinates instead of using an "offset" command.
-For doors: Create a line for the door opening and an arc for the swing.
-For cabinets: Create rectangles at calculated positions.
-For appliances: Create rectangles at calculated positions.
+For openings: Create a line for the opening frame and an arc for swing paths if applicable.
+For fixtures and equipment: Create rectangles at calculated positions.
 """
         
         if file_type == CADFileType.DXF:
             return base_prompt + """
 
-IMPORTANT FOR DXF GENERATION:
-1. Generate ONLY basic geometric primitives (rectangle, line, arc, dimension). Do NOT generate abstract commands like 'door', 'cabinet', 'sink', 'appliance', 'offset', etc.
-2. Break everything down into rectangles, lines, and arcs with exact coordinates.
-3. Coordinate system: Origin (0,0) is bottom-left corner. X increases right, Y increases upward.
-4. Calculate exact coordinates:
-   - For a 12' x 10' room: outer rectangle from (0,0) to (3657.6, 3048)
-   - Inner wall offset: subtract 127mm (5 inches) from all sides
-   - Base cabinets: depth 609.6mm (2 feet) inward from inner wall
-   - Overhead cabinets: depth 381mm (1.25 feet) inward from inner wall, positioned above base cabinets
-5. For doors: Create a line segment for the door opening, then an arc for the swing (radius = door width/2).
-6. For dimensions: Place dimension lines outside the room boundary with proper offsets.
-7. Ensure all measurements are converted to millimeters accurately.
+CRITICAL INSTRUCTIONS FOR DXF GENERATION:
+1. Generate ONLY basic geometric primitives: rectangle, line, arc, dimension. NO abstract commands.
+2. Coordinate system: Origin (0,0) is bottom-left. X increases rightward, Y increases upward.
+3. BREAK DOWN ALL ELEMENTS into separate entities - CRITICAL:
+   - Each cabinet section = separate rectangle (e.g., "left cabinet" and "right cabinet" = 2 rectangles)
+   - Each appliance = separate rectangle (sink, cooktop, refrigerator = 3 separate rectangles)
+   - Each fixture = separate rectangle
+   - Wall sections = separate rectangles (outer wall, inner wall = 2 rectangles)
+   - Do NOT combine multiple elements into one rectangle
+   - If instructions say "cabinets along wall except for X area", generate:
+     * Rectangle for left section
+     * Rectangle for right section  
+     * Rectangle for the excluded element (X)
+     * All as separate entities
+4. Calculate exact coordinates based on the provided measurements:
+   - Convert all measurements to millimeters (1 foot = 304.8mm, 1 inch = 25.4mm)
+   - Calculate positions based on room dimensions, offsets, and specified placements
+   - For walls with thickness: create outer and inner rectangles with proper offsets
+   - For openings: calculate frame positions and swing arcs based on specified dimensions
+   - For fixtures/equipment: position based on specified locations and dimensions
+5. For dimensions: Place dimension lines outside the drawing boundary with appropriate offsets.
+6. Calculate ALL coordinates precisely. Do not approximate or use placeholder values.
+7. If layer is specified in instructions, include it in the parameters: {"layer": "LayerName"}
+8. IMPORTANT: Generate ALL entities mentioned in the instructions. Do not skip any elements.
+9. COUNT CHECK: If instructions mention multiple sections (e.g., "left cabinet" and "right cabinet"), 
+   generate separate rectangles for EACH section. Do not combine them.
+10. COMPLETENESS CHECKLIST - Before finalizing, verify you have generated:
+    - All wall rectangles (outer + inner if offset mentioned)
+    - All door elements (line + arc if swing mentioned)
+    - ALL cabinet sections separately (left, right, top, bottom sections as separate rectangles)
+    - ALL appliances separately (sink, cooktop, refrigerator as separate rectangles)
+    - All overhead/elevated elements (as separate rectangles)
+    - All dimensions mentioned
+11. If instructions say "cabinets along wall except for X area", you MUST generate:
+    - Rectangle for left section (before X)
+    - Rectangle for right section (after X)  
+    - Rectangle for X itself
+    - All three as SEPARATE rectangle commands with calculated coordinates
+12. Generate a MINIMUM number of entities: For a typical room layout, expect 15-25+ entities.
+    If you generate fewer than 10 entities, you are likely missing elements.
 """
         elif file_type == CADFileType.DWG:
             return base_prompt + "\nOutput format: DWG-compatible commands."
@@ -163,7 +210,21 @@ IMPORTANT FOR DXF GENERATION:
                 if not instructions:
                     raise ValueError("No valid instructions parsed from GPT-4 response")
                 
-                logger.info(f"Successfully parsed {len(instructions)} instructions")
+                original_count = len(instructions)
+                logger.info(f"Successfully parsed {original_count} instructions")
+                
+                # Validate and enrich instructions
+                try:
+                    from app.services.instruction_validator import instruction_validator
+                    instructions = instruction_validator.validate_and_enrich(
+                        instructions=instructions,
+                        original_text=text
+                    )
+                    if len(instructions) > original_count:
+                        logger.info(f"Enriched instructions: {len(instructions)} total (added {len(instructions) - original_count} elements)")
+                except Exception as e:
+                    logger.warning(f"Instruction validation failed: {e}. Continuing with original instructions.")
+                
                 return instructions, raw_response
                 
             except json.JSONDecodeError as e:
