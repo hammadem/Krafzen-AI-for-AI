@@ -309,9 +309,9 @@ def merge_model():
     merged_model = model.merge_and_unload()
     
     print("✅ Model merged successfully!")
-    return merged_model, tokenizer
+    return merged_model, tokenizer, actual_adapter_path
 
-def upload_merged_model(merged_model, tokenizer):
+def upload_merged_model(merged_model, tokenizer, adapter_path: Path):
     """Upload merged model to Hugging Face Hub."""
     print("\n" + "=" * 60)
     print("Uploading Merged Model to Hugging Face Hub")
@@ -350,7 +350,7 @@ def upload_merged_model(merged_model, tokenizer):
     tokenizer.save_pretrained(str(temp_dir))
     
     # Add README.md for proper model recognition
-    readme_content = generate_model_card(ADAPTER_PATH, BASE_MODEL, REPO_ID)
+    readme_content = generate_model_card(adapter_path, BASE_MODEL, REPO_ID)
     readme_path = temp_dir / "README.md"
     readme_path.write_text(readme_content, encoding="utf-8")
     print("   ✅ Generated README.md (model card) for model recognition")
@@ -455,10 +455,10 @@ def main():
         validate_config()
         
         # Merge model
-        merged_model, tokenizer = merge_model()
+        merged_model, tokenizer, actual_adapter_path = merge_model()
         
         # Upload
-        merged_repo_id = upload_merged_model(merged_model, tokenizer)
+        merged_repo_id = upload_merged_model(merged_model, tokenizer, actual_adapter_path)
         
         print("\n" + "=" * 60)
         print("✅ UPLOAD SUCCESS!")
