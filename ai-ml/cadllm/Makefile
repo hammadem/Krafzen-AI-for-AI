@@ -1,4 +1,4 @@
-.PHONY: help setup download-dataset recreate-dataset clean-dataset train test-api test-api-custom upload-model package package-with-dataset clean clean-all info
+.PHONY: help setup download-dataset recreate-dataset clean-dataset train test-api test-api-custom upload-model deploy-space update-space package package-with-dataset clean clean-all info
 
 # Configuration
 # When running locally (from cadllm root)
@@ -13,6 +13,9 @@ PACKAGE_NAME = cadllm-workspace.tar.gz
 # These paths are used by the 'train' target
 SERVER_DATA_PATH = /workspace/dataset/jsonl/cadllm.jsonl
 SERVER_OUTPUT_DIR = /workspace/cadllm
+
+# Space deployment
+SPACE_DIR = $(WORKSPACE_DIR)/space/cad-llm-api
 
 help: ## Show this help message
 	@echo "CADLLM Makefile - Available commands:"
@@ -139,6 +142,53 @@ upload-model: ## Merge LoRA adapter and upload to Hugging Face (requires .env fi
 	@echo "📤 Uploading model to Hugging Face..."
 	cd $(WORKSPACE_DIR) && python upload_model.py
 	@echo "✅ Model upload complete"
+
+update-space: ## Update Space app with latest model name from .env (does not deploy)
+	@echo "🔄 Updating Space app configuration..."
+	@if [ ! -f "$(WORKSPACE_DIR)/.env" ]; then \
+		echo "❌ Error: .env file not found. Please create it first."; \
+		exit 1; \
+	fi
+	@echo "   Loading model name from .env..."
+	@cd $(WORKSPACE_DIR) && \
+		if [ -f .env ]; then \
+			. .env && \
+			if [ -n "$$HF_MODEL_NAME" ]; then \
+				echo "   ✅ Found HF_MODEL_NAME=$$HF_MODEL_NAME"; \
+				echo "   📝 Updating app.py default model name..."; \
+				sed -i.bak "s|MODEL_NAME = os.getenv(\"HF_MODEL_NAME\", \".*\")|MODEL_NAME = os.getenv(\"HF_MODEL_NAME\", \"$$HF_MODEL_NAME\")|g" $(SPACE_DIR)/app.py && \
+				rm -f $(SPACE_DIR)/app.py.bak && \
+				echo "   ✅ Updated app.py"; \
+			else \
+				echo "   ⚠️  HF_MODEL_NAME not found in .env, using default"; \
+			fi; \
+		fi
+	@echo "✅ Space app updated (run 'make deploy-space' to push changes)"
+
+deploy-space: ## Deploy Space app to Hugging Face (commits and pushes changes)
+	@echo "🚀 Deploying Space app to Hugging Face..."
+	@if [ ! -d "$(SPACE_DIR)" ]; then \
+		echo "❌ Error: Space directory not found at $(SPACE_DIR)"; \
+		exit 1; \
+	fi
+	@echo "   Checking git status..."
+	@cd $(SPACE_DIR) && \
+		if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$$(git status --porcelain)" ]; then \
+			echo "   📝 Staging changes..."; \
+			git add -A && \
+			echo "   💾 Committing changes..."; \
+			git commit -m "Update Space app configuration" || true && \
+			echo "   📤 Pushing to Hugging Face Space..."; \
+			git push origin main || git push origin master || true && \
+			echo "   ✅ Space app deployed!"; \
+			echo ""; \
+			echo "   🌐 Your Space will rebuild automatically at:"; \
+			echo "   https://huggingface.co/spaces/mkmad7/cad-llm-api"; \
+		else \
+			echo "   ✅ No changes to commit"; \
+			echo "   💡 To force rebuild, make a small change or use Hugging Face UI"; \
+		fi
+	@echo "✅ Deployment complete"
 
 clean: ## Remove generated files (package, __pycache__, etc.)
 	@echo "🧹 Cleaning generated files..."
