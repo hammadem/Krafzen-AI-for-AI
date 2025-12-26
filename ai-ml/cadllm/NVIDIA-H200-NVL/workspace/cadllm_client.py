@@ -169,24 +169,43 @@ For simple shapes:
                 
                 # Try Space API format first (FastAPI), then Inference Endpoint format
                 # Space API format
-                # Increased timeout to 180 seconds (3 minutes) for slow Space instances
-                response = requests.post(
-                    f"{self._endpoint_url}/generate",
-                    headers=headers,
-                    json={
-                        "instruction": prompt,
-                        "max_new_tokens": max_new_tokens,
-                        "temperature": temperature,
-                        "top_p": top_p,
-                        **kwargs
-                    },
-                    timeout=self.timeout
-                )
+                # Space API can take 2-5 minutes on first request (cold start)
+                # Complex prompts may also take longer
+                space_timeout = max(self.timeout, 300)  # At least 5 minutes for Space
                 
-                if response.status_code == 404:
-                    # Try Inference Endpoint format
+                print(f"   ⏱️  Using timeout: {space_timeout}s (Space API may take time on first request)")
+                
+                try:
                     response = requests.post(
                         f"{self._endpoint_url}/generate",
+                        headers=headers,
+                        json={
+                            "instruction": prompt,
+                            "max_new_tokens": max_new_tokens,
+                            "temperature": temperature,
+                            "top_p": top_p,
+                            **kwargs
+                        },
+                        timeout=space_timeout
+                    )
+                except requests.exceptions.ReadTimeout as e:
+                    raise RuntimeError(
+                        f"Space API request timed out after {space_timeout}s. "
+                        f"This may happen if:\n"
+                        f"  1. The Space is loading the model (first request takes 2-5 minutes)\n"
+                        f"  2. The Space is sleeping (check https://huggingface.co/spaces/mkmad7/cad-llm-api)\n"
+                        f"  3. The generation is taking too long (try a simpler prompt first)\n"
+                        f"\nTry:\n"
+                        f"  - Wait a moment and try again\n"
+                        f"  - Check if the Space is running: https://huggingface.co/spaces/mkmad7/cad-llm-api\n"
+                        f"  - Use a simpler prompt to test if the Space is working"
+                    ) from e
+                
+                if response.status_code == 404:
+                    # Try Inference Endpoint format (with same timeout)
+                    try:
+                        response = requests.post(
+                            f"{self._endpoint_url}/generate",
                         headers=headers,
                         json={
                             "inputs": prompt,
@@ -197,8 +216,13 @@ For simple shapes:
                                 **kwargs
                             }
                         },
-                        timeout=self.timeout
-                    )
+                            timeout=space_timeout
+                        )
+                    except requests.exceptions.ReadTimeout as e:
+                        raise RuntimeError(
+                            f"Inference Endpoint request timed out after {space_timeout}s. "
+                            f"Try a simpler prompt or check if the endpoint is responsive."
+                        ) from e
                 
                 response.raise_for_status()
                 result = response.json()
