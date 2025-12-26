@@ -29,6 +29,10 @@ HF_FINE_TUNED_MODEL_NAME = os.getenv("HF_FINE_TUNED_MODEL_NAME")
 # Adapter path - can be set via ADAPTER_PATH env var or defaults to cad-agent-qwen-2d
 ADAPTER_PATH_STR = os.getenv("ADAPTER_PATH")
 if ADAPTER_PATH_STR:
+    # Expand user home directory (~ or $HOME)
+    ADAPTER_PATH_STR = os.path.expanduser(ADAPTER_PATH_STR)
+    # Expand environment variables (e.g., $HOME)
+    ADAPTER_PATH_STR = os.path.expandvars(ADAPTER_PATH_STR)
     ADAPTER_PATH = Path(ADAPTER_PATH_STR)
     if not ADAPTER_PATH.is_absolute():
         # If relative path, make it relative to script directory
