@@ -259,7 +259,51 @@ def merge_model():
         print(f"   ✅ Model embeddings resized to {tokenizer_vocab_size}")
     
     print("📥 Loading LoRA adapter...")
-    model = PeftModel.from_pretrained(base_model, str(ADAPTER_PATH))
+    # Check if adapter_config.json exists
+    adapter_config = ADAPTER_PATH / "adapter_config.json"
+    
+    # If not found, try to find it in subdirectories
+    actual_adapter_path = ADAPTER_PATH
+    if not adapter_config.exists():
+        print(f"   ⚠️  'adapter_config.json' not found at '{ADAPTER_PATH}'")
+        print(f"   🔍 Searching for adapter in subdirectories...")
+        
+        # Search for adapter_config.json in subdirectories
+        found_adapters = list(ADAPTER_PATH.rglob("adapter_config.json"))
+        
+        if found_adapters:
+            print(f"   ✅ Found {len(found_adapters)} adapter(s):")
+            for i, adapter in enumerate(found_adapters, 1):
+                print(f"      {i}. {adapter.parent}")
+            
+            # Use the one in a 'cadllm' subdirectory if exists, otherwise first one
+            preferred = None
+            for adapter in found_adapters:
+                if "cadllm" in str(adapter.parent).lower():
+                    preferred = adapter.parent
+                    break
+            
+            if preferred:
+                actual_adapter_path = preferred
+                print(f"   📌 Using adapter at: {actual_adapter_path}")
+            else:
+                actual_adapter_path = found_adapters[0].parent
+                print(f"   📌 Using first adapter found at: {actual_adapter_path}")
+        else:
+            raise ValueError(
+                f"LoRA adapter not found at '{ADAPTER_PATH}'.\n"
+                f"Expected 'adapter_config.json' file in the adapter directory.\n"
+                f"\nThis path may contain a merged model instead of a LoRA adapter.\n"
+                f"\nTo fix:\n"
+                f"  1. Point ADAPTER_PATH to a directory containing 'adapter_config.json'\n"
+                f"  2. Or if this is a merged model, you may need to upload it directly without merging\n"
+                f"\nFiles found in directory:\n"
+                f"  {list(ADAPTER_PATH.iterdir())[:10] if ADAPTER_PATH.is_dir() else 'Not a directory'}"
+            )
+    else:
+        print(f"   ✅ Found adapter_config.json at: {ADAPTER_PATH}")
+    
+    model = PeftModel.from_pretrained(base_model, str(actual_adapter_path))
     
     print("🔧 Merging adapter with base model...")
     merged_model = model.merge_and_unload()
