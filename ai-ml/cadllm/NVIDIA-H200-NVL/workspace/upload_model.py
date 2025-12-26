@@ -26,7 +26,16 @@ load_dotenv(env_path)
 HF_TOKEN = os.getenv("HF_TOKEN")
 HF_USERNAME = os.getenv("HF_USERNAME")
 HF_FINE_TUNED_MODEL_NAME = os.getenv("HF_FINE_TUNED_MODEL_NAME")
-ADAPTER_PATH = Path(__file__).parent / "cad-agent-qwen-2d"
+# Adapter path - can be set via ADAPTER_PATH env var or defaults to cad-agent-qwen-2d
+ADAPTER_PATH_STR = os.getenv("ADAPTER_PATH")
+if ADAPTER_PATH_STR:
+    ADAPTER_PATH = Path(ADAPTER_PATH_STR)
+    if not ADAPTER_PATH.is_absolute():
+        # If relative path, make it relative to script directory
+        ADAPTER_PATH = Path(__file__).parent / ADAPTER_PATH
+else:
+    # Default to cad-agent-qwen-2d in script directory
+    ADAPTER_PATH = Path(__file__).parent / "cad-agent-qwen-2d"
 BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen2.5-Coder-3B-Instruct")
 PRIVATE = True
 
