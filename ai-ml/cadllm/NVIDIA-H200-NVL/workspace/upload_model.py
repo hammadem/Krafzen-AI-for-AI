@@ -49,6 +49,139 @@ if HF_USERNAME and HF_FINE_TUNED_MODEL_NAME:
 else:
     REPO_ID = None
 
+def generate_model_card(adapter_path: Path, base_model: str, repo_id: str) -> str:
+    """
+    Generate a model card (README.md) based on the adapter path and model information.
+    
+    Args:
+        adapter_path: Path to the LoRA adapter
+        base_model: Base model identifier
+        repo_id: Hugging Face repository ID
+    
+    Returns:
+        Model card content as string
+    """
+    # Try to read existing README from adapter path
+    adapter_readme = adapter_path / "README.md"
+    if adapter_readme.exists():
+        print(f"   📄 Found existing README.md in adapter path, using it as base...")
+        existing_content = adapter_readme.read_text(encoding="utf-8")
+        # Enhance it with model information
+        if "model_name" not in existing_content.lower() or repo_id not in existing_content:
+            # Add model identifier if missing
+            enhanced = f"# {repo_id}\n\n"
+            enhanced += f"**Base Model:** {base_model}\n"
+            enhanced += f"**Adapter Path:** `{adapter_path}`\n\n"
+            enhanced += "---\n\n"
+            enhanced += existing_content
+            return enhanced
+        return existing_content
+    
+    # Generate new model card
+    adapter_name = adapter_path.name
+    current_date = __import__("datetime").datetime.now().strftime("%Y-%m-%d")
+    
+    model_card = f"""---
+license: apache-2.0
+base_model: {base_model}
+tags:
+- cad
+- 2d-cad
+- qwen
+- fine-tuned
+- lora
+- cad-llm
+pipeline_tag: text-generation
+---
+
+# {repo_id}
+
+Fine-tuned CAD-LLM model for generating 2D CAD coordinates from natural language descriptions.
+
+## Model Details
+
+- **Base Model:** [{base_model}](https://huggingface.co/{base_model})
+- **Fine-tuning Method:** LoRA (Low-Rank Adaptation)
+- **Adapter Path:** `{adapter_path}`
+- **Model Type:** Causal Language Model
+- **Language:** English
+- **Task:** Text-to-CAD Coordinates Generation
+
+## Model Description
+
+This model is a fine-tuned version of {base_model} specifically trained for 2D CAD coordinate generation. The model takes natural language CAD descriptions as input and outputs precise 2D CAD coordinates in a structured format.
+
+### Output Format
+
+The model generates coordinates in the following format:
+- `<SOL>` - Start of object
+- `<Circle>: x=0.0, y=0.0, r=48.0` - Circle with center and radius
+- `<Line>: x=47.5, y=-32.0` - Line coordinates (multiple lines form a polyline)
+- `<Arc>: x=-8.5, y=-58.0, α=64.0, f=1.0` - Arc with center, angle, and flag
+- `<EOS>` - End of sequence
+
+These coordinates are automatically converted to DXF files using coordinate parsers.
+
+## Usage
+
+### Using Hugging Face Inference API
+
+```python
+from huggingface_hub import InferenceClient
+
+client = InferenceClient(
+    model="{repo_id}",
+    token="your_token_here"
+)
+
+prompt = "Create a circle with radius 10mm centered at origin"
+response = client.text_generation(prompt, max_new_tokens=400)
+print(response)
+```
+
+### Using the CADLLM Client
+
+```python
+from cadllm_client import CADLLMClient
+
+client = CADLLMClient("{repo_id}")
+dxf_path = client.generate("Create a rectangle 100mm x 50mm")
+print(f"DXF file saved to: {{dxf_path}}")
+```
+
+## Training Details
+
+- **Training Data:** CADLLM 2D dataset
+- **Training Method:** LoRA fine-tuning
+- **Adapter Location:** `{adapter_path}`
+- **Training Date:** {current_date}
+
+## Limitations
+
+- Primarily designed for 2D CAD coordinate generation
+- May require post-processing to convert coordinates to DXF format
+- Best results with clear, specific CAD descriptions
+
+## Citation
+
+If you use this model, please cite:
+
+```bibtex
+@misc{{{repo_id.replace("/", "_")}}},
+  title={{CAD-LLM: Fine-tuned Model for 2D CAD Coordinate Generation}},
+  author={{KRAFZEN AI}},
+  year={{2024}},
+  publisher={{Hugging Face}},
+  howpublished={{\\url{{https://huggingface.co/{repo_id}}}}}
+}}
+```
+
+## License
+
+This model is licensed under Apache 2.0, same as the base model.
+"""
+    return model_card
+
 def validate_config():
     """Validate required configuration."""
     if not HF_TOKEN:
@@ -152,11 +285,10 @@ def upload_merged_model(merged_model, tokenizer):
     tokenizer.save_pretrained(str(temp_dir))
     
     # Add README.md for proper model recognition
-    readme_path = Path(__file__).parent / "model_readme.md"
-    if readme_path.exists():
-        import shutil
-        shutil.copy(readme_path, temp_dir / "README.md")
-        print("   ✅ Added README.md for model recognition")
+    readme_content = generate_model_card(ADAPTER_PATH, BASE_MODEL, REPO_ID)
+    readme_path = temp_dir / "README.md"
+    readme_path.write_text(readme_content, encoding="utf-8")
+    print("   ✅ Generated README.md (model card) for model recognition")
     
     # Upload
     print(f"\n📤 Uploading to {REPO_ID}...")
