@@ -86,22 +86,23 @@ def generate_model_card(adapter_path: Path, base_model: str, repo_id: str) -> st
             return existing_content
     
     # Generate new model card (either no README or template detected)
-    
-    # Generate new model card
     adapter_name = adapter_path.name
     current_date = __import__("datetime").datetime.now().strftime("%Y-%m-%d")
+    current_year = __import__("datetime").datetime.now().strftime("%Y")
     
     model_card = f"""---
 license: apache-2.0
 base_model: {base_model}
 tags:
-- cad
-- 2d-cad
-- qwen
-- fine-tuned
-- lora
-- cad-llm
+  - cad
+  - 2d-cad
+  - qwen
+  - fine-tuned
+  - lora
+  - cad-llm
+  - text-generation
 pipeline_tag: text-generation
+library_name: transformers
 ---
 
 # {repo_id}
@@ -112,10 +113,12 @@ Fine-tuned CAD-LLM model for generating 2D CAD coordinates from natural language
 
 - **Base Model:** [{base_model}](https://huggingface.co/{base_model})
 - **Fine-tuning Method:** LoRA (Low-Rank Adaptation)
-- **Adapter Path:** `{adapter_path}`
 - **Model Type:** Causal Language Model
 - **Language:** English
 - **Task:** Text-to-CAD Coordinates Generation
+- **Developed by:** KRAFZEN AI
+- **Model type:** Text Generation
+- **License:** apache-2.0
 
 ## Model Description
 
@@ -132,7 +135,26 @@ The model generates coordinates in the following format:
 
 These coordinates are automatically converted to DXF files using coordinate parsers.
 
-## Usage
+## Uses
+
+### Direct Use
+
+This model is designed for generating 2D CAD coordinates from natural language descriptions. It can be used to:
+- Convert text descriptions to CAD coordinates
+- Generate DXF files from natural language input
+- Assist in CAD design workflows
+
+### Downstream Use
+
+The model can be fine-tuned further for specific CAD domains or integrated into CAD software applications.
+
+### Out-of-Scope Use
+
+- 3D CAD generation (model is trained for 2D only)
+- Complex multi-object assemblies without explicit instructions
+- Non-CAD related text generation
+
+## How to Get Started with the Model
 
 ### Using Hugging Face Inference API
 
@@ -161,26 +183,43 @@ print(f"DXF file saved to: {{dxf_path}}")
 
 ## Training Details
 
-- **Training Data:** CADLLM 2D dataset
-- **Training Method:** LoRA fine-tuning
-- **Adapter Location:** `{adapter_path}`
+### Training Data
+
+The model was trained on the CADLLM 2D dataset, which contains natural language CAD descriptions paired with coordinate outputs.
+
+### Training Procedure
+
+- **Training Method:** LoRA (Low-Rank Adaptation) fine-tuning
+- **Base Model:** {base_model}
 - **Training Date:** {current_date}
+
+### Training Hyperparameters
+
+- **Training regime:** Mixed precision (fp16)
+- **LoRA rank:** 8
+- **LoRA alpha:** 16
+- **Target modules:** q_proj, v_proj
 
 ## Limitations
 
 - Primarily designed for 2D CAD coordinate generation
 - May require post-processing to convert coordinates to DXF format
 - Best results with clear, specific CAD descriptions
+- Accuracy depends on the quality and specificity of input descriptions
+
+## Bias, Risks, and Limitations
+
+The model may generate incorrect coordinates if the input description is ambiguous or unclear. Users should verify generated CAD files before use in production.
 
 ## Citation
 
 If you use this model, please cite:
 
 ```bibtex
-@misc{{{repo_id.replace("/", "_")}}},
+@misc{{{repo_id.replace("/", "_").replace("-", "_")}}},
   title={{CAD-LLM: Fine-tuned Model for 2D CAD Coordinate Generation}},
   author={{KRAFZEN AI}},
-  year={{2024}},
+  year={{{current_year}}},
   publisher={{Hugging Face}},
   howpublished={{\\url{{https://huggingface.co/{repo_id}}}}}
 }}
