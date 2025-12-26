@@ -154,7 +154,7 @@ def main():
         print("\n" + "=" * 60)
         print("✅ GENERATED OUTPUT")
         print("=" * 60)
-print(result)
+        print(result)
         print("=" * 60)
         print("\n✅ Test completed successfully!")
         
