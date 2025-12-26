@@ -224,6 +224,29 @@ For simple shapes:
                             f"Try a simpler prompt or check if the endpoint is responsive."
                         ) from e
                 
+                # Check for errors and provide better error messages
+                if response.status_code != 200:
+                    error_detail = "Unknown error"
+                    try:
+                        error_json = response.json()
+                        error_detail = error_json.get("detail", str(error_json))
+                    except:
+                        # If not JSON, try to extract error from HTML or text
+                        error_text = response.text[:500]  # First 500 chars
+                        if "error" in error_text.lower() or "exception" in error_text.lower():
+                            error_detail = error_text
+                        else:
+                            error_detail = f"HTTP {response.status_code}: {response.reason}"
+                    
+                    raise RuntimeError(
+                        f"Space API returned error {response.status_code}:\n{error_detail}\n\n"
+                        f"This may happen if:\n"
+                        f"  1. The Space is still rebuilding (check https://huggingface.co/spaces/mkmad7/cad-llm-api)\n"
+                        f"  2. There's an error in the Space app code\n"
+                        f"  3. The model failed to load\n"
+                        f"\nCheck the Space logs at: https://huggingface.co/spaces/mkmad7/cad-llm-api/logs"
+                    )
+                
                 response.raise_for_status()
                 result = response.json()
                 
