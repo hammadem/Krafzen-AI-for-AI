@@ -172,9 +172,9 @@ unarchive: ## Extract workspace package on training machine (RunPod) - use after
 	@echo "📦 Verifying extraction..."
 	@if [ ! -f "Makefile" ]; then \
 		echo "❌ Error: Makefile not found. Please extract the archive first:"; \
-		echo "   tar --no-same-owner -xzf cadllm-workspace.tar.gz"; \
+		echo "   tar --no-same-owner --warning=no-unknown-keyword -xzf cadllm-workspace.tar.gz"; \
 		echo ""; \
-		echo "   This suppresses ownership warnings (harmless but noisy)."; \
+		echo "   This suppresses ownership and extended attribute warnings (harmless but noisy)."; \
 		exit 1; \
 	fi
 	@echo "✅ Package already extracted (Makefile found)"
