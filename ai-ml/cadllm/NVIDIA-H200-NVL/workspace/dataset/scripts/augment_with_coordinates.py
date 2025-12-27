@@ -314,11 +314,19 @@ def augment_record(rec: Dict) -> Optional[Dict]:
                 # Skip if somehow out of bounds (shouldn't happen with proper calculation)
                 continue
             
-            # Check for overlaps with existing placements (shouldn't happen for same wall, but check anyway)
+            # Check for overlaps with existing placements
+            # This catches corner collisions between perpendicular walls
             has_overlap = False
             for existing_o, ex_x, ex_y in placements:
                 ex_w = existing_o.get("w", existing_o.get("r", 0) * 2)
                 ex_h = existing_o.get("h", existing_o.get("r", 0) * 2)
+                ex_wall = existing_o.get("wall", "none")
+                
+                # Skip overlap check if both are subfeatures of the same parent
+                # (e.g., burners on the same cooktop)
+                if o.get("subfeature_of") and ex_wall == o.get("subfeature_of"):
+                    continue
+                
                 if check_overlap(x, y, obj_w, obj_h, ex_x, ex_y, ex_w, ex_h):
                     has_overlap = True
                     break
