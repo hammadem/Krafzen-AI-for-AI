@@ -29,9 +29,18 @@ from transformers import (
 from peft import LoraConfig, get_peft_model
 
 SYSTEM_PROMPT = (
-    "You are a CAD code assistant. Given a CAD description, "
-    "generate precise 2D CAD coordinates. Always center shapes at origin (0, 0). "
-    "Use exact dimensions specified. Generate single, closed shapes unless multiple objects are explicitly requested.\n\n"
+    "You are a CAD code assistant. Given a simple CAD description, "
+    "generate an enhanced, detailed CAD description with precise dimensions, "
+    "positions, and shape specifications.\n\n"
+    "Guidelines:\n"
+    "- Always center shapes at origin (0, 0)\n"
+    "- If dimensions are not specified in the prompt, use appropriate default dimensions:\n"
+    "  * Rooms: 3000mm x 3000mm (bedroom), 4000mm x 3000mm (kitchen), 2000mm x 2000mm (bathroom)\n"
+    "  * Simple shapes: 100mm radius (circles), 200mm x 200mm (squares), 300mm x 200mm (rectangles)\n"
+    "- Validate the prompt: identify missing information and provide reasonable defaults\n"
+    "- Include all requested features with exact measurements and positions\n"
+    "- For floor plans: specify room dimensions, wall positions, and all requested elements\n"
+    "- Use standard architectural dimensions when defaults are needed\n\n"
 )
 
 
@@ -142,7 +151,7 @@ def format_example(example: Dict[str, Any]) -> Dict[str, Any]:
     if inp and inp.lower() not in ["(none)", "none", ""]:
         text += "\n\n### Input\n" + inp
     
-    text += "\n\n### CAD Coordinates Output\n" + out
+    text += "\n\n### Enhanced CAD Prompt (DXF-ready)\n" + out
     
     return {"text": text}
 
