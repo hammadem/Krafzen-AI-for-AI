@@ -169,14 +169,15 @@ def format_example(example: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def load_model_and_tokenizer(model_name: str):
+def load_model_and_tokenizer(model_name: str, tokenizer=None):
     if is_main_process():
         print(f"📥 Loading base model: {model_name}", flush=True)
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
-
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+    if tokenizer is None:
+        tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+    
     tokenizer.padding_side = "right"
 
     bf16_supported = (
@@ -186,7 +187,7 @@ def load_model_and_tokenizer(model_name: str):
     )
     dtype = torch.bfloat16 if bf16_supported else torch.float16
 
-    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=dtype)
+    model = AutoModelForCausalLM.from_pretrained(model_name, dtype=dtype)
 
     # Ensure vocab sizes match in case tokenizer is resized
     model.resize_token_embeddings(len(tokenizer))
@@ -318,21 +319,43 @@ def main():
         print(f"   Total examples: {len(full_train)}", flush=True)
         print(f"   Train examples: {len(train_raw)}", flush=True)
         print(f"   Eval examples:  {len(eval_raw)}", flush=True)
-        print("__ Formatting examples...", flush=True)
+        print("__ Loading tokenizer for length computation...", flush=True)
+    
+    # Load tokenizer early for length computation (needed for group_by_length)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    if is_main_process():
+        print("__ Formatting examples and computing lengths...", flush=True)
+
+    def format_and_compute_length(example):
+        """Format example and compute tokenized length for group_by_length."""
+        formatted = format_example(example)
+        messages = formatted["messages"]
+        # Compute length of full conversation
+        full = tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=False,
+            return_tensors=None
+        )
+        formatted["length"] = len(full)
+        return formatted
 
     train_dataset = train_raw.map(
-        format_example,
+        format_and_compute_length,
         remove_columns=train_raw.column_names,
     )
     eval_dataset = eval_raw.map(
-        format_example,
+        format_and_compute_length,
         remove_columns=eval_raw.column_names,
     )
 
     if is_main_process():
-        print("__ Loading model/tokenizer...", flush=True)
+        print("__ Loading model...", flush=True)
 
-    model, tokenizer = load_model_and_tokenizer(args.model_name)
+    model, _ = load_model_and_tokenizer(args.model_name, tokenizer=tokenizer)
     data_collator = CADDataCollator(tokenizer, max_length=args.max_seq_length)
 
     training_args = TrainingArguments(
@@ -348,7 +371,7 @@ def main():
         save_steps=args.save_steps,
         save_total_limit=3,
         # Explicit evaluation strategy
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         eval_steps=args.logging_steps,  # Evaluate at same frequency as logging
         save_strategy="steps",
         # Performance optimizations for NVIDIA GPUs
