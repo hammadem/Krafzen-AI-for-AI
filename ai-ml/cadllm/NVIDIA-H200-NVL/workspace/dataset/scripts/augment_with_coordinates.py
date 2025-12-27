@@ -54,22 +54,45 @@ def pick_room_dims(text: str, instruction: str) -> Tuple[int, int]:
 
 
 def wall_center_xy(wall: str, room_w: int, room_h: int, obj_w: int, obj_h: int, along: float) -> Tuple[float, float]:
-    """Calculate center coordinates for an object placed on a wall."""
+    """
+    Calculate center coordinates for an object placed on a wall.
+    Ensures the object stays within room bounds.
+    """
+    room_half_w = room_w / 2
+    room_half_h = room_h / 2
+    
     if wall == "north":
+        # Constrain along to keep object within bounds
+        max_along = room_half_w - obj_w / 2
+        along = max(-max_along, min(along, max_along))
         x = along
-        y = +room_h / 2 - (WALL_THICKNESS + DEFAULT_SETBACK + obj_h / 2)
+        y = +room_half_h - (WALL_THICKNESS + DEFAULT_SETBACK + obj_h / 2)
+        # Ensure y keeps object within bounds
+        y = min(y, room_half_h - obj_h / 2)
     elif wall == "south":
+        max_along = room_half_w - obj_w / 2
+        along = max(-max_along, min(along, max_along))
         x = along
-        y = -room_h / 2 + (WALL_THICKNESS + DEFAULT_SETBACK + obj_h / 2)
+        y = -room_half_h + (WALL_THICKNESS + DEFAULT_SETBACK + obj_h / 2)
+        y = max(y, -room_half_h + obj_h / 2)
     elif wall == "east":
-        x = +room_w / 2 - (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
+        max_along = room_half_h - obj_h / 2
+        along = max(-max_along, min(along, max_along))
+        x = +room_half_w - (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
+        x = min(x, room_half_w - obj_w / 2)
         y = along
     elif wall == "west":
-        x = -room_w / 2 + (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
+        max_along = room_half_h - obj_h / 2
+        along = max(-max_along, min(along, max_along))
+        x = -room_half_w + (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
+        x = max(x, -room_half_w + obj_w / 2)
         y = along
     else:  # "none" or "center" - free placement
-        x = along if abs(along) < room_w/2 else 0.0
-        y = 0.0
+        # Constrain to room bounds
+        max_x = room_half_w - obj_w / 2
+        max_y = room_half_h - obj_h / 2
+        x = max(-max_x, min(along if abs(along) < max_x else 0.0, max_x))
+        y = max(-max_y, min(0.0, max_y))
     return x, y
 
 
@@ -87,32 +110,59 @@ def validate_bounds(x: float, y: float, obj_w: float, obj_h: float, room_w: int,
             y + half_h <= room_half_h)
 
 
+def check_overlap(x1: float, y1: float, w1: float, h1: float,
+                  x2: float, y2: float, w2: float, h2: float,
+                  min_gap: float = 10.0) -> bool:
+    """Check if two rectangles overlap (with optional minimum gap)."""
+    # Expand bounding boxes by min_gap
+    w1_exp = w1 + min_gap
+    h1_exp = h1 + min_gap
+    w2_exp = w2 + min_gap
+    h2_exp = h2 + min_gap
+    
+    # Check axis-aligned bounding box overlap
+    return not (x1 + w1_exp/2 < x2 - w2_exp/2 or
+                x1 - w1_exp/2 > x2 + w2_exp/2 or
+                y1 + h1_exp/2 < y2 - h2_exp/2 or
+                y1 - h1_exp/2 > y2 + h2_exp/2)
+
+
 def non_overlapping_slots(room_w: int, room_h: int, wall: str, widths_or_heights: List[int]) -> List[float]:
     """
-    Assign positions along a wall without overlap, centered-ish.
+    Assign positions along a wall without overlap, ensuring all slots are within bounds.
     For N/S we slot along X using object widths.
     For E/W we slot along Y using object heights.
     """
-    # Available span along wall (inner face)
+    # Available span along wall (inner face) - account for object sizes
     if wall in ("north", "south"):
-        span = room_w - 2 * (WALL_THICKNESS + DEFAULT_SETBACK)
+        # For N/S walls, we need to ensure objects don't extend beyond room_w/2
+        # Available span is room width minus object half-widths on each side
+        max_obj_half = max(sizes) / 2 if (sizes := widths_or_heights) else 0
+        span = room_w - 2 * max_obj_half  # Ensure largest object fits
         sizes = widths_or_heights  # widths
     else:
-        span = room_h - 2 * (WALL_THICKNESS + DEFAULT_SETBACK)
+        max_obj_half = max(sizes) / 2 if (sizes := widths_or_heights) else 0
+        span = room_h - 2 * max_obj_half
         sizes = widths_or_heights  # heights
 
+    # Calculate total space needed
     total = sum(sizes) + MIN_GAP * (len(sizes) - 1)
+    
+    # If objects don't fit, reduce gaps (but ensure they fit)
     if total > span:
-        # Squeeze by reducing gaps (or you can scale objects)
-        gap = max(0, (span - sum(sizes)) / max(1, (len(sizes) - 1)))
+        gap = max(10, (span - sum(sizes)) / max(1, (len(sizes) - 1)))  # Min 10mm gap
     else:
         gap = MIN_GAP
 
+    # Center the group
     start = -total / 2
     cur = start
     slots = []
     for s in sizes:
         center = cur + s / 2
+        # Ensure slot keeps object within bounds
+        max_center = span / 2 - s / 2
+        center = max(-max_center, min(center, max_center))
         slots.append(center)
         cur += s + gap
     return slots
@@ -210,25 +260,72 @@ def augment_record(rec: Dict) -> Optional[Dict]:
         for o, along in zip(objs, along_positions):
             if o["shape"] == "circle":
                 x, y = wall_center_xy(wall, room_w, room_h, o["r"] * 2, o["r"] * 2, along)
+                obj_w = obj_h = o["r"] * 2
             else:
                 x, y = wall_center_xy(wall, room_w, room_h, o["w"], o["h"], along)
+                obj_w = o["w"]
+                obj_h = o["h"]
             
-            # Validate bounds
-            obj_w = o.get("w", o.get("r", 0) * 2)
-            obj_h = o.get("h", o.get("r", 0) * 2)
+            # Validate bounds (should always pass now, but double-check)
             if not validate_bounds(x, y, obj_w, obj_h, room_w, room_h):
-                # Skip invalid placements
                 continue
             
-            placements.append((o, x, y))
+            # Check for overlaps with existing placements
+            has_overlap = False
+            for existing_o, ex_x, ex_y in placements:
+                ex_w = existing_o.get("w", existing_o.get("r", 0) * 2)
+                ex_h = existing_o.get("h", existing_o.get("r", 0) * 2)
+                if check_overlap(x, y, obj_w, obj_h, ex_x, ex_y, ex_w, ex_h):
+                    has_overlap = True
+                    break
+            
+            if not has_overlap:
+                placements.append((o, x, y))
     
-    # Handle free placement objects (center/none)
+    # Handle free placement objects (center/none) - place them avoiding overlaps
     for o in center_objs:
-        x, y = 0.0, 0.0
         obj_w = o.get("w", o.get("r", 0) * 2)
         obj_h = o.get("h", o.get("r", 0) * 2)
+        
+        # Try center first
+        x, y = 0.0, 0.0
         if validate_bounds(x, y, obj_w, obj_h, room_w, room_h):
-            placements.append((o, x, y))
+            # Check overlap
+            has_overlap = False
+            for existing_o, ex_x, ex_y in placements:
+                ex_w = existing_o.get("w", existing_o.get("r", 0) * 2)
+                ex_h = existing_o.get("h", existing_o.get("r", 0) * 2)
+                if check_overlap(x, y, obj_w, obj_h, ex_x, ex_y, ex_w, ex_h):
+                    has_overlap = True
+                    break
+            
+            if not has_overlap:
+                placements.append((o, x, y))
+                continue
+        
+        # If center doesn't work, try offset positions
+        placed = False
+        for offset_x in [0, obj_w, -obj_w, obj_w*1.5, -obj_w*1.5]:
+            for offset_y in [0, obj_h, -obj_h, obj_h*1.5, -obj_h*1.5]:
+                x, y = offset_x, offset_y
+                if not validate_bounds(x, y, obj_w, obj_h, room_w, room_h):
+                    continue
+                
+                has_overlap = False
+                for existing_o, ex_x, ex_y in placements:
+                    ex_w = existing_o.get("w", existing_o.get("r", 0) * 2)
+                    ex_h = existing_o.get("h", existing_o.get("r", 0) * 2)
+                    if check_overlap(x, y, obj_w, obj_h, ex_x, ex_y, ex_w, ex_h):
+                        has_overlap = True
+                        break
+                
+                if not has_overlap:
+                    placements.append((o, x, y))
+                    placed = True
+                    break
+            
+            if placed:
+                break
 
     # Build new coordinate-enriched output (DSL-like)
     enriched = []

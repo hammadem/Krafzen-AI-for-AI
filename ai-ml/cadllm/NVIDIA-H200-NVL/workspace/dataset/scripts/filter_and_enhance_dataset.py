@@ -102,13 +102,16 @@ def detect_room_type(instruction: str, output: str) -> str:
     return "unknown"
 
 
-def add_burners_to_stove(output: str, stove_x: float, stove_y: float, stove_w: float, stove_h: float) -> List[str]:
-    """Add burner circles to a stove object."""
+def add_burners_to_stove(output: str, stove_x: float, stove_y: float, stove_w: float, stove_h: float, room_w: int, room_h: int) -> List[str]:
+    """Add burner circles to a stove object, ensuring they stay within room bounds."""
     burners = []
     # Standard 4-burner layout
-    burner_radius = min(stove_w, stove_h) * 0.15  # 15% of smaller dimension
+    burner_radius = min(stove_w, stove_h) * 0.12  # 12% of smaller dimension (smaller to avoid overlap)
     spacing_x = stove_w / 3
     spacing_y = stove_h / 3
+    
+    room_half_w = room_w / 2
+    room_half_h = room_h / 2
     
     burner_positions = [
         (stove_x - spacing_x/2, stove_y - spacing_y/2),  # Top-left
@@ -118,6 +121,10 @@ def add_burners_to_stove(output: str, stove_x: float, stove_y: float, stove_w: f
     ]
     
     for i, (bx, by) in enumerate(burner_positions, 1):
+        # Ensure burner stays within room bounds
+        bx = max(-room_half_w + burner_radius, min(bx, room_half_w - burner_radius))
+        by = max(-room_half_h + burner_radius, min(by, room_half_h - burner_radius))
+        
         burners.append(
             f"BURNER_{i}: circle r={burner_radius:.0f} center=({bx:.0f},{by:.0f}) "
             f"layer=APPLIANCES closed=true anchor_wall=none"
@@ -135,6 +142,16 @@ def enhance_record(rec: Dict) -> Optional[Dict]:
     enhanced_lines = []
     stove_found = False
     stove_info = None
+    room_w = room_h = 4000  # Default
+    
+    # Extract room dimensions
+    for line in lines:
+        if line.startswith("ROOM:"):
+            match = re.search(r'w=(\d+)\s+h=(\d+)', line)
+            if match:
+                room_w = int(match.group(1))
+                room_h = int(match.group(2))
+            break
     
     for line in lines:
         enhanced_lines.append(line)
@@ -153,7 +170,7 @@ def enhance_record(rec: Dict) -> Optional[Dict]:
     
     # Add burners if stove found and instruction mentions burners
     if stove_found and stove_info and ("burner" in instruction.lower() or "stove" in instruction.lower()):
-        burners = add_burners_to_stove(output, *stove_info)
+        burners = add_burners_to_stove(output, *stove_info, room_w, room_h)
         # Insert burners after stove
         stove_idx = next(i for i, line in enumerate(enhanced_lines) if line.startswith("STOVE:"))
         enhanced_lines[stove_idx+1:stove_idx+1] = burners
