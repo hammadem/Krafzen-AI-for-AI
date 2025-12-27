@@ -1,7 +1,6 @@
-import { useApiStateProvider } from "@/context/ApiStateContext";
 import { useAuth } from "@/context/AuthContext";
 import { transcribeAudio } from "@/lib/api/api";
-import { RefObject, useRef } from "react";
+import { RefObject, useRef, useState } from "react";
 
 export function useAudioWaves({
     mediaRecorderRef,
@@ -21,7 +20,9 @@ export function useAudioWaves({
     const animationRef = useRef<number>(0);
 
     const { user } = useAuth();
-    const { setStatus, setApiError } = useApiStateProvider();
+    const [status, setStatus] = useState<ReqState>("idle");
+    const [apiError, setApiError] = useState<AppError | null>(null);
+
 
     const startRecording = async () => {
         try {
@@ -109,5 +110,5 @@ export function useAudioWaves({
         mediaRecorderRef.current?.stop();
     };
 
-    return { startRecording, stopRecording, barsRef };
+    return { startRecording, stopRecording, barsRef, status, apiError };
 }

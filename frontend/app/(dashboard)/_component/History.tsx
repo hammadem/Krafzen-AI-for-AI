@@ -41,7 +41,7 @@ export function History({ data, status }: { data: HistoryData[], status: ReqStat
                         </div>
                     ) : (
                         data.map(info => (
-                            <div key={info?.searches[0].id.toString() + "Date"} className="flex flex-col">
+                            <div key={info?.searches[0].id.toString() + "Date"} className="flex flex-col my-2">
                                 <p className="text-[2vh] font-semibold">{info.date}</p>
                                 {info.searches.map(detail => {
                                     const isActive = pathname === `/dashboard/id/${detail.id}`;
@@ -51,12 +51,12 @@ export function History({ data, status }: { data: HistoryData[], status: ReqStat
                                             aria-label="Link to project details"
                                             href={`/dashboard/id/${detail.id}`}
                                             key={detail?.id}
-                                            className={isActive ? "flex items-center justify-between cursor-pointer rounded py-1 px-1 bg-[#292929]" : "rounded py-1 flex items-center justify-between cursor-pointer"}
+                                            className={isActive ? "flex items-center justify-between cursor-pointer rounded py-2 px-4 bg-[#292929]" : "rounded w-[90%] mx-auto py-1 flex items-center justify-between cursor-pointer"}
                                         >
-                                            <p className="text-[2.5vh] font-normal text-white w-[70%] truncate">
+                                            <p className="text-sm font-normal text-white w-[70%] truncate">
                                                 {detail.title}
                                             </p>
-                                            <p className="text-[2vh] font-semibold text-[#616161]">
+                                            <p className="text-sm font-semibold text-[#616161]">
                                                 {detail.time}
                                             </p>
                                         </Link>

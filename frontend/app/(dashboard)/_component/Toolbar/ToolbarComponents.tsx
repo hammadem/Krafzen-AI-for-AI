@@ -1,204 +1,137 @@
+"use client";
 import { Button } from "@/components/ui/button";
 import { classNames } from "@/lib/utils";
 import { ArrowUp, Plus } from "lucide-react";
 import Image from "next/image";
-import { ChangeEvent, RefObject } from "react";
+import { ChangeEvent, useRef, useState } from "react";
+import { InputGroupCustom } from "./ChatInput";
+import FilePreview from "./FilePreview";
+import { toast } from "react-toastify";
+import { transcribeAudio } from "@/lib/api/api";
+import { useDashboard } from "@/context/DashboardContex";
+import { useAuth } from "@/context/AuthContext";
 
-// mic fixes need to be done yet a lot pending
+// Simple Toolbar
+export function InputToolbar({
+    startRecording, inputChange,
+    createProject,
+    input, setInput, file, setFile
+}: {
+    input: string,
+    file: string,
+    setFile: (val: string) => void,
+    setInput: (val: string) => void,
+    startRecording: () => void,
+    inputChange: (e: ChangeEvent<HTMLTextAreaElement>) => void,
+    createProject: (input: string, setInput: (input: string) => void) => Promise<void>,
+}) {
+    const [isTwoLines, setIsTwoLines] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const { setUserAction, isUserActing } = useDashboard();
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const { user } = useAuth();
 
-// Toolbar View While Recording
-const StartedRecordingUI = ({ stopRecording }: { stopRecording: () => void }) => {
-    return (
-        <div className="flex items-center gap-2 pr-2">
-            <Image
-                src="/dashboard/recording.svg"
-                width={30}
-                height={30}
-                alt="Mic While Recording"
-            />
+    // automatically makes file view better
+    const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = e.target.files?.[0];
+        if (!selectedFile) return;
 
-            <Image
-                src="/dashboard/dashmicrecording.svg"
-                width={30}
-                height={30}
-                alt="Mic While Recording"
-                className="cursor-pointer"
-                onClick={stopRecording}
-            />
-        </div >
-    )
-}
+        const fileSizeInMB = selectedFile.size / (1024 * 1024);
+        const isAudio = selectedFile.type.startsWith("audio/");
 
-export function RecordingToolbar({ canvasRef, stopRecording }:
-    {
-        canvasRef: RefObject<SVGRectElement[]>,
-        stopRecording: () => void
-    }) {
-    const BAR_COUNT = 60;
-    const VIEWBOX_WIDTH = 480;
-    const VIEWBOX_HEIGHT = 50;
+        // ---- Validation ----
+        if (!isAudio) {
+            toast.error("Please upload a valid audio file.");
+            setInput("");
+            setFile("");
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+        }
+
+        if (fileSizeInMB > 20) {
+            toast.error("Audio file must be below 20MB.");
+            setInput("");
+            setFile("");   // <---- CLEAR previous preview
+            if (fileInputRef.current) fileInputRef.current.value = "";
+            return;
+        }
+
+        setFile(URL.createObjectURL(selectedFile));
+
+        setUserAction(true);
+        setLoading(true);
+
+        const { ok, error, data } = await transcribeAudio({ user, blob: selectedFile });
+
+        const parsedAudioDetails = data as ParsedAudio;
+        if (ok) {
+            setInput(parsedAudioDetails?.text);
+            setLoading(false);
+        } else {
+            toast.error(error.message);
+        }
+
+        setLoading(false);
+    };
 
     return (
         <>
-            <div className="flex w-full justify-between">
+            <div className={classNames(user?.access_token ? "w-[80%]" : "w-[90%]", "mr-4 sm:m-0 self-end sm:self-center sm:w-[55%] items-start w-[80%] flex flex-col rounded-[10px] bg-white pl-4 shadow-sm text-gray-700", isTwoLines || file !== "" ? "" : "rounded-full", isUserActing ? "fixed bottom-4" : "")}>
 
-                <div className="flex items-center">
-                    <label className={classNames("flex items-center justify-center w-10 h-10 rounded-full transition")}>
-                        <Plus size={18} />
-                        <input type="file" disabled={true} className="hidden" />
-                    </label>
-                    <h1>Listening...</h1>
+                <div className="w-full z-999999999">
+                    <FilePreview
+                        file={file}
+                        status={loading}
+                        setFile={setFile}
+                        setInput={setInput}
+                        fileInputRef={fileInputRef}
+                    />
                 </div>
 
+                <div className="flex justify-between w-full">
 
-                {/** this is the ui for started stoped and prompt submit button  */}
-                <span className="flex items-center bg-white text-black rounded-full mr-4">
-
-                    <span className="text-gray-400 flex items-center justify-end">
-
-                        {/** for now its working fine improovements those can be done later
-                        * first animation should be better this logic can be extracted
-                        * second waveforms only being shoun on +y axis can also be sown growing on -y axis
-                        */}
-                        <svg
-                            viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
-                            className="w-[80%] sm:w-full h-6"
-                            preserveAspectRatio="none"
-                        >
-                            {Array.from({ length: BAR_COUNT }).map((_, i) => {
-                                const gap = VIEWBOX_WIDTH / BAR_COUNT;
-                                const barWidth = gap * 0.5;
-
-                                return (
-                                    <rect
-                                        key={i}
-                                        ref={(el) => {
-                                            if (el) canvasRef.current[i] = el;
-                                        }}
-                                        x={i * gap + (gap - barWidth) / 2}
-                                        y={VIEWBOX_HEIGHT / 2}
-                                        width={barWidth}
-                                        height={6}
-                                        rx={barWidth / 2}
-                                        fill="#818181"
-                                    />
-                                );
-                            })}
-                        </svg>
+                    <span className={classNames("flex w-full", isTwoLines || file !== "" ? "items-end" : "items-center")}>
+                        <label className="flex items-center justify-center w-10 h-10 rounded-full transition cursor-pointer hover:bg-gray-400">
+                            <Plus size={18} />
+                            <input type="file" disabled={user === null} ref={fileInputRef} className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>) => handleFileChange(e)} />
+                        </label>
+                        <InputGroupCustom user={user} inputChange={inputChange} setIsTwoLines={setIsTwoLines} input={input} />
                     </span>
 
-                    <StartedRecordingUI stopRecording={stopRecording} />
-                </span>
-
-            </div>
-
-        </>
-    )
-};
-
-// Toolbar View While Drawing
-export function DrawingToolbar({ cancel }: { cancel: () => void; }) {
-    return (
-        <div className="flex w-full justify-between">
-
-            <span className="flex">
-                <label className={classNames("flex items-center justify-center w-10 h-10 rounded-full transition")}>
-                    <Plus size={18} />
-                    <input type="file" disabled={true} className="hidden" />
-                </label>
-                <input
-                    type="text"
-                    disabled
-                    placeholder="Drawing..."
-                    size={6}
-                    className="w-auto text-sm md:text-base text-gray-700 bg-transparent outline-none placeholder:text-gray-400"
-                />
-            </span>
-
-            <span className="flex flex-row items-center z-[99999] whitespace-nowrap gap-2 pr-2">
-                <Image
-                    src="/dashboard/crossicon.svg"
-                    width={30}
-                    height={30}
-                    alt="Cancel Request To AI"
-                    className="cursor-pointer"
-                    onClick={cancel}
-                />
-                <h1 className="text-[15px] text-black">
-                    Cancel Drawing
-                </h1>
-            </span>
-        </div>
-    );
-}
-
-// Simple Toolbar
-export function InputToolbar({ startRecording, inputChange, input, status, setInput, createProject, fileInputRef, handleFileChange, user }: {
-    startRecording: () => void,
-    inputChange: (e: ChangeEvent<HTMLInputElement>) => void,
-    input: string,
-    status: ReqState,
-    createProject: (input: string, setInput: (input: string) => void) => Promise<void>,
-    setInput: (input: string) => void,
-    fileInputRef: RefObject<HTMLInputElement | null>,
-    handleFileChange: (e: ChangeEvent<HTMLInputElement>) => void,
-    user: User | null
-}) {
-    return (
-        <div className="flex justify-between w-full">
-            <span className="flex items-center w-full">
-                <label className={classNames("flex items-center justify-center w-10 h-10 rounded-full transition", status === "recording" ? "" : "cursor-pointer hover:bg-gray-400")}>
-                    <Plus size={18} />
-                    <input type="file" disabled={user === null} ref={fileInputRef} className="hidden" onChange={(e: ChangeEvent<HTMLInputElement>) => handleFileChange(e)} />
-                </label>
-                <input
-                    type="text"
-                    value={input}
-                    disabled={user === null}
-                    placeholder={"𝐂𝐡𝐚𝐭 or 𝐒𝐩𝐞𝐚𝐤 to draw"}
-                    onChange={(e) => inputChange(e)}
-                    className="w-full text-sm md:text-base text-gray-700 bg-transparent outline-none placeholder:text-gray-400"
-                />
-            </span>
-
-            {
-                <div className="flex items-center gap-2 pr-2">
                     {
-                        input === ""
-                            ?
-                            <>
-                                <span
-                                    className="cursor-pointer"
-                                    onClick={() => {
-                                        if (user !== null) startRecording();
-                                    }}
-                                >
-                                    <Image
-                                        src="/dashboard/dashmicrecord.svg"
-                                        width={45}
-                                        height={45}
-                                        alt="Mic To Record"
-                                    />
-                                </span>
-                                <span className="text-sm font-medium bg-white">Speak</span>
-                            </>
-                            :
-                            <Button
-                                disabled={status === "inprogress" || status === "parsingaudio"}
-                                onClick={
-                                    async () => {
-                                        console.log("Sending prompt UI.")
-                                        const res = createProject(input, setInput);
-                                        const data = res;
-                                        console.log(data);
-                                    }
-                                }
-                                className="border-rounded mx-[2px] rounded-full p-1 text-white bg-black hover:bg-black cursor-pointer">
-                                <ArrowUp className="bg-black rounded-full" />
-                            </Button>
+                        <div className={classNames("flex gap-2 pr-2", isTwoLines || file !== "" ? "items-end mb-2" : "items-center")}>
+                            {
+                                input === ""
+                                    ?
+                                    <>
+                                        <span
+                                            className="cursor-pointer"
+                                            onClick={() => {
+                                                if (user !== null) startRecording();
+                                            }}
+                                        >
+                                            <Image
+                                                src="/dashboard/dashmicrecord.svg"
+                                                width={45}
+                                                height={45}
+                                                alt="Mic To Record"
+                                            />
+                                        </span>
+                                        <span className="text-sm font-medium bg-white">Speak</span>
+                                    </>
+                                    :
+                                    <Button
+                                        disabled={loading}
+                                        onClick={() => createProject(input, setInput)}
+                                        className="border-rounded mx-[2px] rounded-full p-1 text-white bg-black hover:bg-black cursor-pointer">
+                                        <ArrowUp className="bg-black rounded-full" />
+                                    </Button>
+                            }
+                        </div>
                     }
                 </div>
-            }
-        </div>
+
+            </div >
+        </>
     );
 }

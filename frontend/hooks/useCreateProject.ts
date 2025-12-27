@@ -1,18 +1,18 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { createAProject } from '@/lib/api/api';
 import { useDashboard } from '@/context/DashboardContex';
 import { useFetchProjects } from './useFetchProjects';
-import { useApiStateProvider } from '@/context/ApiStateContext';
 
 export function useCreateProject() {
     const { forceRefetch } = useFetchProjects();
     const { user, setCurrentProject } = useAuth();
     const { setUserAction } = useDashboard();
-    const { setStatus, setApiError } = useApiStateProvider();
     const router = useRouter();
     const controllerRef = useRef<AbortController | null>(null);
+    const [status, setStatus] = useState<ReqState>("idle");
+    const [apiError, setApiError] = useState<AppError | null>(null);
 
     const cancel = useCallback(() => {
         if (!controllerRef?.current) return;
@@ -59,6 +59,8 @@ export function useCreateProject() {
 
     return {
         cancel,
-        createProject
+        createProject,
+        status,
+        apiError
     };
 }

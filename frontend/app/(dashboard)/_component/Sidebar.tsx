@@ -10,14 +10,12 @@ import { History } from "./History";
 import { createAProject } from "@/lib/api/api";
 import { classNames, organizeProjectsAsHistory } from "@/lib/utils";
 import { useFetchProjects } from "@/hooks/useFetchProjects";
-import { useApiStateProvider } from "@/context/ApiStateContext";
 
 export default function Sidebar() {
     const { sideBarOpen, setSideBarOpen, route, setCurrentRoute } = useDashboard();
     const { user } = useAuth();
-    const { status } = useApiStateProvider();
     const [projectName, setProjectName] = useState<string>("Create a GYM");
-    const { projects } = useFetchProjects();
+    const { projects, status } = useFetchProjects();
     const [history, setHistory] = useState<HistoryData[]>([]);
 
     useEffect(() => {
@@ -73,13 +71,13 @@ export default function Sidebar() {
                                 :
                                 true
                         )}
-                        preload
+                        priority
                         width={25.76}
                         height={40.8}
                         alt="Toggle Button"
                         src="/navbar/icon.svg"
                         className={classNames(
-                            "h-4 p-0 m-2 cursor-ew-resize transition-transform duration-500",
+                            "p-0 m-2 cursor-ew-resize transition-transform duration-500",
                             !sideBarOpen ? "rotate-90 hidden" : "rotate-0"
                         )}
                     />

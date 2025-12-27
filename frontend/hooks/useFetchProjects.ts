@@ -3,12 +3,13 @@ import { useState, useEffect, useCallback } from "react";
 import { getAllProjects } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
 import { apiCache } from "@/lib/api/cache";
-import { useApiStateProvider } from "@/context/ApiStateContext";
 
 export function useFetchProjects() {
     const { user } = useAuth();
-    const { setStatus, setApiError } = useApiStateProvider();
+    // const { setStatus, setApiError } = useApiStateProvider();
     const [projects, setProjects] = useState<ProjectDetails[]>([]);
+    const [status, setStatus] = useState<ReqState>("idle");
+    const [apiError, setApiError] = useState<AppError | null>(null);
 
     const fetchProjects = useCallback(async () => {
         setStatus("inprogress");
@@ -35,5 +36,5 @@ export function useFetchProjects() {
         fetchProjects();
     }, [user, fetchProjects]);
 
-    return { projects, forceRefetch };
+    return { projects, forceRefetch, status, apiError };
 }

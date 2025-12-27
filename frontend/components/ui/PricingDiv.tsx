@@ -33,7 +33,7 @@ export default function PricingDiv({ price, index }: { price: PricingDetails; in
                                 width={25}
                                 height={25}
                                 alt="Tick Image"
-                                className="my-2 h-auto w-auto"
+                                className="h-auto w-auto"
                             />
                             <p className="mx-2">{feature}</p>
                         </span>

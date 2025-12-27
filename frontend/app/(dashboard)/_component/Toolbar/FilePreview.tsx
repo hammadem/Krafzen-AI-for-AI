@@ -6,7 +6,7 @@ import { RefObject } from "react";
 export default function FilePreview({ file, setFile, status, setInput, fileInputRef }:
     {
         file: string, setFile: (file: string) => void,
-        status: ReqState,
+        status: boolean,
         setInput: (value: string) => void,
         fileInputRef: RefObject<HTMLInputElement | null>
     }) {
@@ -24,7 +24,7 @@ export default function FilePreview({ file, setFile, status, setInput, fileInput
             <div className={classNames("w-full bg-white flex h-full rounded-[20px] flex gap-2 p-2 relative")}>
                 <div className="relative">
                     {
-                        status === "parsingaudio"
+                        status
                             ?
                             <Loader
                                 width={30}

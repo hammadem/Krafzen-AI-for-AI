@@ -36,7 +36,7 @@ export default function Navbar({ isRoot }: {
                     onClick={() => setOpen(!open)}
                     className="absolute p-1 right-0 inline-flex cursor-pointer items-center justify-center rounded-md text-gray-400 hover:bg-white/5 hover:text-white focus:outline-2 focus:-outline-offset-1 focus:outline-indigo-500">
                     <Image
-                        preload
+                        priority
                         width={25.76}
                         height={40.8}
                         alt="Toggle Button"

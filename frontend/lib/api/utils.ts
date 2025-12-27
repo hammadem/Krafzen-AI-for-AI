@@ -43,7 +43,6 @@ export async function apiClient(
 
 
         const data = await response.json();
-        console.log(data);
 
         let result: ApiRes;
         if (response.ok) {

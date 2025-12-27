@@ -4,52 +4,22 @@ import { Example, Heading } from "../../_component/Examples";
 import { examplePrompt } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import Toolbar from "../../_component/Toolbar";
-import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboard } from "@/context/DashboardContex";
 import { useCreateProject } from "@/hooks/useCreateProject";
-import { useApiStateProvider } from "@/context/ApiStateContext";
 
 export default function DashboardLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
-    const { currentProject, user } = useAuth();
+    const { currentProject } = useAuth();
     const { isUserActing } = useDashboard();
     const { createProject } = useCreateProject();
-    const { status } = useApiStateProvider();
 
     return (
         <>
-            <div className={classNames("text-white flex flex-col items-center justify-center gap-6 w-full h-[85vh] sm:h-[80vh] ", isUserActing ? "items-center justify-center" : "")}>
-                {
-                    // This is ui being shown while recording sound
-                    status === "recording"
-                    &&
-                    <div className="w-full z-999999 w-100 absolute top-0 left-0 bg-black flex items-center h-[100vh] justify-center">
-                        <Image
-                            src="/dashboard/sound.svg"
-                            width={100}
-                            height={100}
-                            alt="Recording Image"
-                        />
-                    </div>
-                }
-                {
-                    // This is ui being shown while sending prompt request to user
-                    status === "prompting"
-                    &&
-                    <div className="w-full z-999999 w-100 absolute top-0 left-0 bg-black flex items-center h-[100vh] justify-center flex flex-col">
-                        <Image
-                            src="/dashboard/drawing.svg"
-                            width={100}
-                            height={100}
-                            alt="AI Prompt Sent Image"
-                        />
-                        <p className="text-[2vh] mt-4 text-[#696969]">Generating Drawing...</p>
-                    </div>
-                }
+            <div className={classNames("text-white flex flex-col items-center justify-center gap-6 w-full h-[85vh] sm:h-[80vh] ", isUserActing ? "items-center justify-start" : "")}>
 
                 { /*    
                     This is to the slug route when user starts creating a project submitting a  
@@ -57,9 +27,9 @@ export default function DashboardLayout({
                     Also Project and other projects will be shown here as protected
                 */}
                 {
-                    status === "prompting" || status === "recording" || isUserActing
+                    isUserActing
                         ?
-                        <div className="w-full h-[70vh]">
+                        <div className="w-full sm:h-[75vh] h-[80vh]">
                             {children}
                         </div>
                         :
@@ -97,9 +67,12 @@ export default function DashboardLayout({
 
 
                 {/** This is the prompt input bar */}
-                <div className={classNames(user?.access_token ? "w-[80%]" : "w-[90%]", "mr-4 sm:m-0 self-end sm:self-center sm:w-[55%] items-start z-99999 transition-all duration-500", status === "recording" || status === "prompting" ? "z-999999 w-[90%]" : "")}>
-                    <Toolbar />
-                </div>
+                {/** what else can be done the divs above components can be moved to components like for this one in particular
+                 * the eaccch state of toolbar can have its own component
+                 */}
+                {/* <div className={classNames("bg-black mr-4 sm:m-0 self-end sm:self-center sm:w-[55%] items-start transition-all duration-500")}> */}
+                <Toolbar />
+                {/* </div> */}
 
             </div >
 
@@ -138,7 +111,7 @@ export default function DashboardLayout({
             }
 
             {
-                status !== "recording" && !isUserActing && status !== "prompting"
+                !isUserActing
                 &&
                 <p className={classNames("sm:block hidden text-white text-center font-normal text-[2vh] mx-auto w-[70%]", isUserActing || currentProject ? "hidden" : "")}>Krafzen AI can make mistakes, so double-check it</p>
             }
