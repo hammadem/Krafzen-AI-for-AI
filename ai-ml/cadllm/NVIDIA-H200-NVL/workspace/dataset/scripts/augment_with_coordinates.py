@@ -133,17 +133,17 @@ def non_overlapping_slots(room_w: int, room_h: int, wall: str, widths_or_heights
     For N/S we slot along X using object widths.
     For E/W we slot along Y using object heights.
     """
+    sizes = widths_or_heights
+    
     # Available span along wall (inner face) - account for object sizes
     if wall in ("north", "south"):
         # For N/S walls, we need to ensure objects don't extend beyond room_w/2
         # Available span is room width minus object half-widths on each side
-        max_obj_half = max(sizes) / 2 if (sizes := widths_or_heights) else 0
+        max_obj_half = max(sizes) / 2 if sizes else 0
         span = room_w - 2 * max_obj_half  # Ensure largest object fits
-        sizes = widths_or_heights  # widths
     else:
-        max_obj_half = max(sizes) / 2 if (sizes := widths_or_heights) else 0
+        max_obj_half = max(sizes) / 2 if sizes else 0
         span = room_h - 2 * max_obj_half
-        sizes = widths_or_heights  # heights
 
     # Calculate total space needed
     total = sum(sizes) + MIN_GAP * (len(sizes) - 1)
