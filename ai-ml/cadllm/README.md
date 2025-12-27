@@ -159,9 +159,9 @@ scp cadllm-workspace.tar.gz root@<pod-ip>:/workspace/
 # SSH into the pod
 ssh root@<pod-ip>
 
-# Extract the files
+# Extract the files (--no-same-owner suppresses harmless ownership warnings)
 cd /workspace
-make unarchive
+tar --no-same-owner -xzf cadllm-workspace.tar.gz
 ```
 
 #### Option A2: Manual SCP (Alternative)
@@ -177,9 +177,9 @@ scp workspace.tar.gz root@<pod-ip>:/workspace/
 # SSH into the pod
 ssh root@<pod-ip>
 
-# Extract the files
+# Extract the files (--no-same-owner suppresses harmless ownership warnings)
 cd /workspace
-make unarchive  # or: tar -xzf workspace.tar.gz
+tar --no-same-owner -xzf workspace.tar.gz
 ```
 
 #### Option B: Using RunPod's File Manager
@@ -190,8 +190,9 @@ make unarchive  # or: tar -xzf workspace.tar.gz
 4. Extract it using the terminal:
    ```bash
    cd /workspace
-   make unarchive  # or: tar -xzf cadllm-workspace.tar.gz
+   tar --no-same-owner -xzf cadllm-workspace.tar.gz
    ```
+   Note: `--no-same-owner` suppresses harmless ownership warnings from macOS metadata files.
 
 #### Option C: Using Git (If Repository is Available)
 
@@ -738,7 +739,7 @@ make info                 # Check what was created
 
 # On RunPod after upload
 cd /workspace
-make unarchive            # Extract the package
+tar --no-same-owner -xzf cadllm-workspace.tar.gz  # Extract (--no-same-owner suppresses warnings)
 make train                # Start training (chmods scripts, sets paths, auto-installs deps)
 ```
 

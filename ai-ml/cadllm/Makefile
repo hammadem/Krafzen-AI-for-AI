@@ -97,6 +97,7 @@ package: ## Create tarball of workspace for upload to RunPod (excludes large fil
 		--exclude='*.pyc' \
 		--exclude='.env' \
 		--exclude='.DS_Store' \
+		--exclude='._*' \
 		--exclude='*.tar.gz' \
 		.
 	# Remove the copied Makefile from workspace (keep original in root)
@@ -107,7 +108,7 @@ package: ## Create tarball of workspace for upload to RunPod (excludes large fil
 	@echo "📤 Upload to RunPod:"
 	@echo "   scp $(PACKAGE_NAME) root@<pod-ip>:/workspace/"
 	@echo "   ssh root@<pod-ip>"
-	@echo "   cd /workspace && make unarchive"
+	@echo "   cd /workspace && tar --no-same-owner -xzf $(PACKAGE_NAME)"
 	@echo "   make train  # Start training with correct paths"
 
 package-with-dataset: ## Create tarball including cleaned dataset (larger file)
@@ -126,6 +127,7 @@ package-with-dataset: ## Create tarball including cleaned dataset (larger file)
 		--exclude='*.pyc' \
 		--exclude='.env' \
 		--exclude='.DS_Store' \
+		--exclude='._*' \
 		--exclude='*.tar.gz' \
 		.
 	# Remove the copied Makefile from workspace (keep original in root)
@@ -149,6 +151,7 @@ package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for
 		--exclude='*.pyc' \
 		--exclude='.env' \
 		--exclude='.DS_Store' \
+		--exclude='._*' \
 		--exclude='*.tar.gz' \
 		.
 	# Remove the copied Makefile from workspace (keep original in root)
@@ -159,26 +162,25 @@ package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for
 	@echo "📤 Upload to RunPod:"
 	@echo "   scp $(PACKAGE_NAME) root@<pod-ip>:/workspace/"
 	@echo "   ssh root@<pod-ip>"
-	@echo "   cd /workspace && make unarchive"
+	@echo "   cd /workspace && tar --no-same-owner -xzf $(PACKAGE_NAME)"
 	@echo "   make train DATA_PATH=/workspace/dataset/jsonl/cadllm_enhanced.jsonl"
 
 extract: unarchive ## Alias for unarchive target
 	@echo "✅ Use 'make unarchive' to extract the package"
 
-unarchive: ## Extract workspace package on training machine (RunPod)
-	@echo "📦 Extracting workspace package..."
-	@if [ ! -f "cadllm-workspace.tar.gz" ]; then \
-		echo "❌ Error: cadllm-workspace.tar.gz not found in current directory."; \
-		echo "   Make sure you're in /workspace and the package has been uploaded."; \
+unarchive: ## Extract workspace package on training machine (RunPod) - use after manual extraction
+	@echo "📦 Verifying extraction..."
+	@if [ ! -f "Makefile" ]; then \
+		echo "❌ Error: Makefile not found. Please extract the archive first:"; \
+		echo "   tar --no-same-owner -xzf cadllm-workspace.tar.gz"; \
+		echo ""; \
+		echo "   This suppresses ownership warnings (harmless but noisy)."; \
 		exit 1; \
 	fi
-	@echo "   Extracting archive..."
-	tar -xzf cadllm-workspace.tar.gz
-	@echo "✅ Package extracted successfully!"
+	@echo "✅ Package already extracted (Makefile found)"
 	@echo ""
 	@echo "📋 Next steps:"
-	@echo "   1. cd /workspace"
-	@echo "   2. make train DATA_PATH=/workspace/dataset/jsonl/cadllm_enhanced.jsonl"
+	@echo "   make train DATA_PATH=/workspace/dataset/jsonl/cadllm_enhanced.jsonl"
 	@echo ""
 	@echo "   Or to use the cleaned dataset:"
 	@echo "   make train DATA_PATH=/workspace/dataset/jsonl/cadllm_2d_cleaned.jsonl"
