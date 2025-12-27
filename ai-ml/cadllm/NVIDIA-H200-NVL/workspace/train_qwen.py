@@ -239,11 +239,11 @@ class CADDataCollator:
                 return_tensors=None
             )
             
-            # Prefix up to assistant (no answer content) - this is what we mask
+            # Prefix up to assistant - use add_generation_prompt=True for cleaner masking
             prefix = self.tokenizer.apply_chat_template(
-                messages[:-1] + [{"role": "assistant", "content": ""}],
+                messages[:-1],
                 tokenize=True,
-                add_generation_prompt=False,
+                add_generation_prompt=True,
                 return_tensors=None
             )
             
@@ -338,6 +338,13 @@ def main():
         logging_steps=args.logging_steps,
         save_steps=args.save_steps,
         save_total_limit=3,
+        # Explicit evaluation strategy
+        evaluation_strategy="steps",
+        eval_steps=args.logging_steps,  # Evaluate at same frequency as logging
+        save_strategy="steps",
+        # Performance optimizations for NVIDIA GPUs
+        optim="adamw_torch_fused",  # Faster on NVIDIA GPUs
+        tf32=True,  # Enable TensorFloat-32 for faster training on Ampere+
         bf16=(
             torch.cuda.is_available()
             and hasattr(torch.cuda, "is_bf16_supported")
