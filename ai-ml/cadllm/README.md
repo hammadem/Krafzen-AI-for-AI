@@ -708,7 +708,7 @@ The project includes a comprehensive Makefile for automating common tasks:
 - `make package` - Create tarball for upload to RunPod (excludes large files)
 - `make package-with-dataset` - Create tarball including cleaned dataset
 - `make package-with-enhanced-dataset` - Create tarball including enhanced dataset (for simple prompts)
-- `make unarchive` - Extract workspace package on training machine (RunPod)
+- `make unarchive` - Verify extraction (use after manual `tar --no-same-owner -xzf cadllm-workspace.tar.gz`)
 - `make extract` - Alias for `make unarchive`
 - `make setup` - Install Python dependencies from requirements.txt
 
