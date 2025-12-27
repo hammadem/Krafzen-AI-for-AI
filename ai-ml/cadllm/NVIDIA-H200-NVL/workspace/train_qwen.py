@@ -30,24 +30,26 @@ from peft import LoraConfig, get_peft_model
 
 SYSTEM_PROMPT = (
     "You are a CAD code assistant. Given a simple CAD description, "
-    "generate an enhanced, detailed CAD description with precise dimensions, "
-    "positions, and shape specifications.\n\n"
-    "Output Format Requirements (STRICT - for parser compatibility):\n"
-    "- Always use bullet points starting with '-'\n"
-    "- Format: '- Name: WIDTHmm x HEIGHTmm SHAPE on POSITION'\n"
-    "- Always include room dimensions: 'ROOM_TYPE floor plan (WIDTHmm x HEIGHTmm) with:'\n"
-    "- Always specify wall positions: 'on north wall', 'on south wall', 'on east wall', 'on west wall', or 'on center'\n"
-    "- Always include units (mm) for all dimensions\n"
-    "- Always end with: '- Draw all as separate closed shapes, include walls, centered at origin'\n\n"
-    "Guidelines:\n"
-    "- Always center shapes at origin (0, 0)\n"
-    "- If dimensions are not specified in the prompt, use appropriate default dimensions:\n"
-    "  * Rooms: 3000mm x 3000mm (bedroom), 4000mm x 3000mm (kitchen), 2000mm x 2000mm (bathroom)\n"
-    "  * Simple shapes: 100mm radius (circles), 200mm x 200mm (squares), 300mm x 200mm (rectangles)\n"
-    "- Validate the prompt: identify missing information and provide reasonable defaults\n"
-    "- Include all requested features with exact measurements and positions\n"
-    "- For floor plans: specify room dimensions, wall positions, and all requested elements\n"
-    "- Use standard architectural dimensions when defaults are needed\n\n"
+    "output ONLY the strict DSL format shown below. Do not use natural language.\n\n"
+    "Required DSL Format (STRICT - must match exactly):\n"
+    "UNITS: mm\n"
+    "ORIGIN_POLICY: room_center_at_(0,0)\n"
+    "ROOM: rect w=WIDTH h=HEIGHT center=(0,0)\n"
+    "WALLS: rect_perimeter closed=true layer=WALLS\n"
+    "OBJECT_NAME: rect w=WIDTH h=HEIGHT center=(X,Y) layer=OBJECTS closed=true anchor_wall=WALL\n"
+    "OBJECT_NAME: circle r=RADIUS center=(X,Y) layer=OBJECTS closed=true anchor_wall=WALL\n\n"
+    "Rules:\n"
+    "- Always start with UNITS, ORIGIN_POLICY, ROOM, WALLS (in that order)\n"
+    "- Use rect or circle primitives only\n"
+    "- Entity names must use underscores (e.g., COFFEE_TABLE not COFFEE TABLE)\n"
+    "- anchor_wall must be: north, south, east, west, or none (for free placement)\n"
+    "- All coordinates in mm, room centered at (0,0)\n"
+    "- All objects must be within room bounds\n"
+    "- Use circle for round objects (burners, round tables, columns)\n"
+    "- Use rect for rectangular objects (tables, desks, appliances)\n\n"
+    "Default dimensions if not specified:\n"
+    "- Rooms: 3000x3000 (bedroom), 4000x3000 (kitchen), 2000x2000 (bathroom)\n"
+    "- Simple shapes: r=100 (circles), 200x200 (squares), 300x200 (rectangles)\n"
 )
 
 
@@ -352,6 +354,7 @@ def main():
         # Performance optimizations for NVIDIA GPUs
         optim="adamw_torch_fused",  # Faster on NVIDIA GPUs
         tf32=True,  # Enable TensorFloat-32 for faster training on Ampere+
+        group_by_length=True,  # Group similar-length sequences to reduce padding
         bf16=(
             torch.cuda.is_available()
             and hasattr(torch.cuda, "is_bf16_supported")

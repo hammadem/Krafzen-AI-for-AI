@@ -64,10 +64,27 @@ def wall_center_xy(wall: str, room_w: int, room_h: int, obj_w: int, obj_h: int, 
     elif wall == "east":
         x = +room_w / 2 - (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
         y = along
-    else:  # west
+    elif wall == "west":
         x = -room_w / 2 + (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
         y = along
+    else:  # "none" or "center" - free placement
+        x = along if abs(along) < room_w/2 else 0.0
+        y = 0.0
     return x, y
+
+
+def validate_bounds(x: float, y: float, obj_w: float, obj_h: float, room_w: int, room_h: int) -> bool:
+    """Check if object bounding box is within room bounds."""
+    half_w = obj_w / 2
+    half_h = obj_h / 2
+    room_half_w = room_w / 2
+    room_half_h = room_h / 2
+    
+    # Check if object extends beyond room bounds
+    return (x - half_w >= -room_half_w and 
+            x + half_w <= room_half_w and
+            y - half_h >= -room_half_h and
+            y + half_h <= room_half_h)
 
 
 def non_overlapping_slots(room_w: int, room_h: int, wall: str, widths_or_heights: List[int]) -> List[float]:
@@ -104,7 +121,7 @@ def non_overlapping_slots(room_w: int, room_h: int, wall: str, widths_or_heights
 def extract_wall_objects(lines: List[str]) -> List[Dict]:
     """
     Extract objects from bullet-point lines.
-    Return list of dicts: name, shape, w, h, wall
+    Return list of dicts: name, shape, w, h, r (for circles), wall
     """
     objs = []
     for ln in lines:
@@ -113,11 +130,30 @@ def extract_wall_objects(lines: List[str]) -> List[Dict]:
         wall_m = WALL_RE.search(ln)
         center_m = CENTER_RE.search(ln)
         size_m = SIZE_RE.search(ln)
+        radius_m = RADIUS_RE.search(ln)
         
+        # Standardize entity name (replace spaces with underscores)
+        name = ln.strip()[1:].split(":")[0].strip().upper().replace(" ", "_")
+        
+        # Check for circle
+        if radius_m or "circle" in ln.lower():
+            r = int(radius_m.group(1)) if radius_m and radius_m.group(1) else int(radius_m.group(2)) if radius_m else 100
+            shape = "circle"
+            wall = None
+            if wall_m:
+                wall = wall_m.group(1).lower()
+            elif center_m:
+                wall = "none"  # Free placement
+            else:
+                wall = "none"  # Default for circles
+            
+            objs.append({"name": name, "shape": shape, "r": r, "wall": wall})
+            continue
+        
+        # Rectangle/square
         if not size_m:
             continue
 
-        name = ln.strip()[1:].split(":")[0].strip()
         w = int(size_m.group(1))
         h = int(size_m.group(2))
         shape = "rect"
@@ -129,10 +165,12 @@ def extract_wall_objects(lines: List[str]) -> List[Dict]:
         if wall_m:
             wall = wall_m.group(1).lower()
         elif center_m:
-            wall = "center"
+            wall = "none"  # Free placement (center)
+        else:
+            # If no wall specified, assume free placement
+            wall = "none"
         
-        if wall:
-            objs.append({"name": name, "shape": shape, "w": w, "h": h, "wall": wall})
+        objs.append({"name": name, "shape": shape, "w": w, "h": h, "wall": wall})
     
     return objs
 
@@ -167,15 +205,30 @@ def augment_record(rec: Dict) -> Optional[Dict]:
     # Handle wall-anchored objects
     for wall, objs in by_wall.items():
         # Sizes along wall axis
-        sizes = [(o["w"] if wall in ("north", "south") else o["h"]) for o in objs]
+        sizes = [(o.get("w", o.get("r", 0) * 2) if wall in ("north", "south") else o.get("h", o.get("r", 0) * 2)) for o in objs]
         along_positions = non_overlapping_slots(room_w, room_h, wall, sizes)
         for o, along in zip(objs, along_positions):
-            x, y = wall_center_xy(wall, room_w, room_h, o["w"], o["h"], along)
+            if o["shape"] == "circle":
+                x, y = wall_center_xy(wall, room_w, room_h, o["r"] * 2, o["r"] * 2, along)
+            else:
+                x, y = wall_center_xy(wall, room_w, room_h, o["w"], o["h"], along)
+            
+            # Validate bounds
+            obj_w = o.get("w", o.get("r", 0) * 2)
+            obj_h = o.get("h", o.get("r", 0) * 2)
+            if not validate_bounds(x, y, obj_w, obj_h, room_w, room_h):
+                # Skip invalid placements
+                continue
+            
             placements.append((o, x, y))
     
-    # Handle center objects (place at origin or near center)
+    # Handle free placement objects (center/none)
     for o in center_objs:
-        placements.append((o, 0.0, 0.0))
+        x, y = 0.0, 0.0
+        obj_w = o.get("w", o.get("r", 0) * 2)
+        obj_h = o.get("h", o.get("r", 0) * 2)
+        if validate_bounds(x, y, obj_w, obj_h, room_w, room_h):
+            placements.append((o, x, y))
 
     # Build new coordinate-enriched output (DSL-like)
     enriched = []
@@ -185,12 +238,16 @@ def augment_record(rec: Dict) -> Optional[Dict]:
     enriched.append("WALLS: rect_perimeter closed=true layer=WALLS")
 
     for o, x, y in placements:
-        enriched.append(
-            f"{o['name'].upper()}: rect w={o['w']} h={o['h']} center=({x:.0f},{y:.0f}) "
-            f"layer=OBJECTS closed=true"
-        )
-        if o.get("wall") != "center":
-            enriched[-1] += f" anchor_wall={o['wall']}"
+        if o["shape"] == "circle":
+            enriched.append(
+                f"{o['name']}: circle r={o['r']} center=({x:.0f},{y:.0f}) "
+                f"layer=OBJECTS closed=true anchor_wall={o.get('wall', 'none')}"
+            )
+        else:
+            enriched.append(
+                f"{o['name']}: rect w={o['w']} h={o['h']} center=({x:.0f},{y:.0f}) "
+                f"layer=OBJECTS closed=true anchor_wall={o.get('wall', 'none')}"
+            )
 
     return {"instruction": instr, "output": "\n".join(enriched)}
 
