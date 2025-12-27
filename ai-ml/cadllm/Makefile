@@ -1,4 +1,4 @@
-.PHONY: help setup download-dataset recreate-dataset clean-dataset train test-api test-api-custom upload-model deploy-space update-space package package-with-dataset clean clean-all info
+.PHONY: help setup download-dataset recreate-dataset clean-dataset generate-enhanced-dataset train test-api test-api-custom upload-model deploy-space update-space package package-with-dataset package-with-enhanced-dataset clean clean-all info
 
 # Configuration
 # When running locally (from cadllm root)
@@ -132,6 +132,35 @@ package-with-dataset: ## Create tarball including cleaned dataset (larger file)
 	rm -f $(WORKSPACE_DIR)/Makefile
 	@echo "✅ Package created: $(PACKAGE_NAME)"
 	@echo "   Size: $$(du -h $(PACKAGE_NAME) | cut -f1)"
+
+package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for training with simple prompts)
+	@echo "📦 Creating workspace package with enhanced dataset..."
+	@if [ ! -f "$(JSONL_DIR)/cadllm_enhanced.jsonl" ]; then \
+		echo "❌ Error: Enhanced dataset not found. Run 'make generate-enhanced-dataset' first."; \
+		exit 1; \
+	fi
+	# Copy Makefile to workspace directory for packaging
+	cp Makefile $(WORKSPACE_DIR)/Makefile
+	cd $(WORKSPACE_DIR) && tar -czf ../../$(PACKAGE_NAME) \
+		--exclude='cad-agent-qwen-*' \
+		--exclude='dataset/cadllm_raw' \
+		--exclude='logs' \
+		--exclude='__pycache__' \
+		--exclude='*.pyc' \
+		--exclude='.env' \
+		--exclude='.DS_Store' \
+		--exclude='*.tar.gz' \
+		.
+	# Remove the copied Makefile from workspace (keep original in root)
+	rm -f $(WORKSPACE_DIR)/Makefile
+	@echo "✅ Package created: $(PACKAGE_NAME)"
+	@echo "   Size: $$(du -h $(PACKAGE_NAME) | cut -f1)"
+	@echo ""
+	@echo "📤 Upload to RunPod:"
+	@echo "   scp $(PACKAGE_NAME) root@<pod-ip>:/workspace/"
+	@echo "   ssh root@<pod-ip>"
+	@echo "   cd /workspace && tar -xzf $(PACKAGE_NAME)"
+	@echo "   make train DATA_PATH=/workspace/dataset/jsonl/cadllm_enhanced.jsonl"
 
 test-api: ## Test Hugging Face API (requires .env file with HF_TOKEN)
 	@echo "🧪 Testing Hugging Face API..."
