@@ -141,19 +141,23 @@ def parse_args():
 
 
 def format_example(example: Dict[str, Any]) -> Dict[str, Any]:
+    """Format example as Qwen chat messages for better instruction following."""
     instruction = (example.get("instruction") or "").strip()
     inp = (example.get("input") or "").strip()
     out = (example.get("output") or "").strip()
 
-    # Build prompt - only include Input section if it's not empty or "(none)"
-    text = SYSTEM_PROMPT + "### Instruction\n" + instruction
-    
+    # Build user message
+    user_text = instruction
     if inp and inp.lower() not in ["(none)", "none", ""]:
-        text += "\n\n### Input\n" + inp
-    
-    text += "\n\n### Enhanced CAD Prompt (DXF-ready)\n" + out
-    
-    return {"text": text}
+        user_text += "\n\nInput:\n" + inp
+
+    return {
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_text},
+            {"role": "assistant", "content": out},
+        ]
+    }
 
 
 def load_model_and_tokenizer(model_name: str):
@@ -215,21 +219,62 @@ def load_model_and_tokenizer(model_name: str):
 
 
 class CADDataCollator:
+    """Collator that uses Qwen chat template and masks prompt tokens in loss."""
     def __init__(self, tokenizer, max_length: int):
         self.tokenizer = tokenizer
         self.max_length = max_length
 
     def __call__(self, batch: List[Dict[str, Any]]):
-        texts = [ex["text"] for ex in batch]
-        enc = self.tokenizer(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=self.max_length,
-            return_tensors="pt",
+        input_ids_list = []
+        labels_list = []
+        
+        for ex in batch:
+            messages = ex["messages"]
+            
+            # Full conversation (includes assistant answer)
+            full = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=True,
+                add_generation_prompt=False,
+                return_tensors=None
+            )
+            
+            # Prefix up to assistant (no answer content) - this is what we mask
+            prefix = self.tokenizer.apply_chat_template(
+                messages[:-1] + [{"role": "assistant", "content": ""}],
+                tokenize=True,
+                add_generation_prompt=False,
+                return_tensors=None
+            )
+            
+            # Truncate to max_length
+            full = full[:self.max_length]
+            prefix_len = min(len(prefix), len(full))
+            
+            # Create labels: mask prompt portion, keep assistant response
+            labels = full.copy()
+            labels[:prefix_len] = [-100] * prefix_len  # Mask prompt tokens
+            
+            input_ids_list.append(torch.tensor(full, dtype=torch.long))
+            labels_list.append(torch.tensor(labels, dtype=torch.long))
+        
+        # Pad sequences
+        input_ids = torch.nn.utils.rnn.pad_sequence(
+            input_ids_list, batch_first=True, padding_value=self.tokenizer.pad_token_id
         )
-        enc["labels"] = enc["input_ids"].clone()
-        return enc
+        labels = torch.nn.utils.rnn.pad_sequence(
+            labels_list, batch_first=True, padding_value=-100
+        )
+        attention_mask = (input_ids != self.tokenizer.pad_token_id).long()
+        
+        # Mask padding tokens in labels
+        labels[attention_mask == 0] = -100
+        
+        return {
+            "input_ids": input_ids,
+            "labels": labels,
+            "attention_mask": attention_mask
+        }
 
 
 def main():
@@ -252,6 +297,9 @@ def main():
     raw_dset = load_dataset("json", data_files=args.data_path)
     full_train = raw_dset["train"]
 
+    # Shuffle before splitting to ensure representative eval set
+    full_train = full_train.shuffle(seed=args.seed)
+    
     # First 2k for eval, rest for train
     eval_size = min(2000, len(full_train))
     eval_raw = full_train.select(range(eval_size))
