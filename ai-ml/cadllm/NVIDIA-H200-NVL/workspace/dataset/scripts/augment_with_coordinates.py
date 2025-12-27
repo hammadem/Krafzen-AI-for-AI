@@ -56,37 +56,53 @@ def pick_room_dims(text: str, instruction: str) -> Tuple[int, int]:
 def wall_center_xy(wall: str, room_w: int, room_h: int, obj_w: int, obj_h: int, along: float) -> Tuple[float, float]:
     """
     Calculate center coordinates for an object placed on a wall.
-    Ensures the object stays within room bounds.
+    Properly accounts for object size to ensure it stays within room bounds.
+    
+    Formula:
+    - south wall: y = -H/2 + (wall_thickness + setback + h/2)
+    - north wall: y = +H/2 - (wall_thickness + setback + h/2)
+    - west wall:  x = -W/2 + (wall_thickness + setback + w/2)
+    - east wall:  x = +W/2 - (wall_thickness + setback + w/2)
     """
     room_half_w = room_w / 2
     room_half_h = room_h / 2
     
     if wall == "north":
-        # Constrain along to keep object within bounds
+        # Constrain along (x coordinate) to keep object within bounds
         max_along = room_half_w - obj_w / 2
         along = max(-max_along, min(along, max_along))
         x = along
+        # Calculate y based on object's actual height
         y = +room_half_h - (WALL_THICKNESS + DEFAULT_SETBACK + obj_h / 2)
-        # Ensure y keeps object within bounds
-        y = min(y, room_half_h - obj_h / 2)
+        # Double-check: ensure object doesn't extend beyond room
+        assert y + obj_h / 2 <= room_half_h, f"North wall object extends beyond room: y={y}, obj_h={obj_h}, room_half={room_half_h}"
     elif wall == "south":
+        # Constrain along (x coordinate)
         max_along = room_half_w - obj_w / 2
         along = max(-max_along, min(along, max_along))
         x = along
+        # Calculate y based on object's actual height
         y = -room_half_h + (WALL_THICKNESS + DEFAULT_SETBACK + obj_h / 2)
-        y = max(y, -room_half_h + obj_h / 2)
+        # Double-check: ensure object doesn't extend beyond room
+        assert y - obj_h / 2 >= -room_half_h, f"South wall object extends beyond room: y={y}, obj_h={obj_h}, room_half={room_half_h}"
     elif wall == "east":
+        # Constrain along (y coordinate)
         max_along = room_half_h - obj_h / 2
         along = max(-max_along, min(along, max_along))
+        y = along
+        # Calculate x based on object's actual width
         x = +room_half_w - (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
-        x = min(x, room_half_w - obj_w / 2)
-        y = along
+        # Double-check: ensure object doesn't extend beyond room
+        assert x + obj_w / 2 <= room_half_w, f"East wall object extends beyond room: x={x}, obj_w={obj_w}, room_half={room_half_w}"
     elif wall == "west":
+        # Constrain along (y coordinate)
         max_along = room_half_h - obj_h / 2
         along = max(-max_along, min(along, max_along))
-        x = -room_half_w + (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
-        x = max(x, -room_half_w + obj_w / 2)
         y = along
+        # Calculate x based on object's actual width
+        x = -room_half_w + (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
+        # Double-check: ensure object doesn't extend beyond room
+        assert x - obj_w / 2 >= -room_half_w, f"West wall object extends beyond room: x={x}, obj_w={obj_w}, room_half={room_half_w}"
     else:  # "none" or "center" - free placement
         # Constrain to room bounds
         max_x = room_half_w - obj_w / 2
@@ -132,20 +148,31 @@ def non_overlapping_slots(room_w: int, room_h: int, wall: str, widths_or_heights
     Assign positions along a wall without overlap, ensuring all slots are within bounds.
     For N/S we slot along X using object widths.
     For E/W we slot along Y using object heights.
+    
+    Returns list of 'along' coordinates (x for N/S, y for E/W) that keep all objects within bounds.
     """
+    if not widths_or_heights:
+        return []
+    
     sizes = widths_or_heights
     
-    # Available span along wall (inner face) - account for object sizes
+    # Available span along wall axis - must account for largest object's half-size on each side
     if wall in ("north", "south"):
-        # For N/S walls, we need to ensure objects don't extend beyond room_w/2
-        # Available span is room width minus object half-widths on each side
-        max_obj_half = max(sizes) / 2 if sizes else 0
+        # For N/S walls, objects are placed along X axis
+        # Available span: room width minus space needed for largest object on each side
+        max_obj_half = max(sizes) / 2
         span = room_w - 2 * max_obj_half  # Ensure largest object fits
+        if span <= 0:
+            # Objects too large - return centered positions (will be constrained later)
+            return [0.0] * len(sizes)
     else:
-        max_obj_half = max(sizes) / 2 if sizes else 0
+        # For E/W walls, objects are placed along Y axis
+        max_obj_half = max(sizes) / 2
         span = room_h - 2 * max_obj_half
+        if span <= 0:
+            return [0.0] * len(sizes)
 
-    # Calculate total space needed
+    # Calculate total space needed (including gaps)
     total = sum(sizes) + MIN_GAP * (len(sizes) - 1)
     
     # If objects don't fit, reduce gaps (but ensure they fit)
@@ -154,17 +181,20 @@ def non_overlapping_slots(room_w: int, room_h: int, wall: str, widths_or_heights
     else:
         gap = MIN_GAP
 
-    # Center the group
+    # Center the group within available span
     start = -total / 2
     cur = start
     slots = []
     for s in sizes:
         center = cur + s / 2
-        # Ensure slot keeps object within bounds
+        # Constrain to keep object within bounds
+        # For each object, max center = span/2 - object_half_size
         max_center = span / 2 - s / 2
-        center = max(-max_center, min(center, max_center))
+        min_center = -span / 2 + s / 2
+        center = max(min_center, min(center, max_center))
         slots.append(center)
         cur += s + gap
+    
     return slots
 
 
@@ -252,25 +282,39 @@ def augment_record(rec: Dict) -> Optional[Dict]:
 
     placements = []
     
-    # Handle wall-anchored objects
+    # Handle wall-anchored objects - process each wall separately
     for wall, objs in by_wall.items():
-        # Sizes along wall axis
-        sizes = [(o.get("w", o.get("r", 0) * 2) if wall in ("north", "south") else o.get("h", o.get("r", 0) * 2)) for o in objs]
+        if not objs:
+            continue
+            
+        # Calculate sizes along wall axis (width for N/S, height for E/W)
+        sizes = []
+        for o in objs:
+            if o["shape"] == "circle":
+                size = o["r"] * 2  # Diameter
+            else:
+                size = o.get("w") if wall in ("north", "south") else o.get("h")
+            sizes.append(size)
+        
+        # Get non-overlapping slot positions along the wall
         along_positions = non_overlapping_slots(room_w, room_h, wall, sizes)
+        
+        # Place each object at its slot position
         for o, along in zip(objs, along_positions):
             if o["shape"] == "circle":
-                x, y = wall_center_xy(wall, room_w, room_h, o["r"] * 2, o["r"] * 2, along)
                 obj_w = obj_h = o["r"] * 2
+                x, y = wall_center_xy(wall, room_w, room_h, obj_w, obj_h, along)
             else:
-                x, y = wall_center_xy(wall, room_w, room_h, o["w"], o["h"], along)
                 obj_w = o["w"]
                 obj_h = o["h"]
+                x, y = wall_center_xy(wall, room_w, room_h, obj_w, obj_h, along)
             
-            # Validate bounds (should always pass now, but double-check)
+            # Validate bounds (should always pass, but verify)
             if not validate_bounds(x, y, obj_w, obj_h, room_w, room_h):
+                # Skip if somehow out of bounds (shouldn't happen with proper calculation)
                 continue
             
-            # Check for overlaps with existing placements
+            # Check for overlaps with existing placements (shouldn't happen for same wall, but check anyway)
             has_overlap = False
             for existing_o, ex_x, ex_y in placements:
                 ex_w = existing_o.get("w", existing_o.get("r", 0) * 2)
