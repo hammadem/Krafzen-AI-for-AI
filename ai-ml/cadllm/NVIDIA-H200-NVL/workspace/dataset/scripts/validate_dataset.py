@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Filter dataset to remove invalid geometry (OOB and overlaps).
+Validate dataset and filter out invalid geometry (OOB and overlaps).
 
 Usage:
-    python filter_clean_dataset.py \
-        --input ../jsonl/cadllm_synth_with_coords_200k.jsonl \
-        --output ../jsonl/cadllm_synth_with_coords_200k_clean.jsonl \
+    python validate_dataset.py \
+        --input ../jsonl/dataset.jsonl \
+        --output ../jsonl/dataset_validated.jsonl \
         --filter_oob \
         --filter_overlaps \
         --exclude_subfeatures
@@ -44,6 +44,10 @@ def parse_objects(output: str) -> List[Dict]:
             continue
         
         name = match.group(1)
+        # Skip ROOM and WALLS - they're not objects to check for overlaps
+        if name in ("ROOM", "WALLS"):
+            continue
+        
         shape = match.group(2)
         
         if shape == "rect":
