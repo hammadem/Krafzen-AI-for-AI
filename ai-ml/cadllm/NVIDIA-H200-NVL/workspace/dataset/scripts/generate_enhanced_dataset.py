@@ -315,7 +315,6 @@ def generate_simple_shape_examples(num_examples: int) -> List[Dict]:
         
         examples.append({
             "instruction": prompt,
-            "input": "(none)",
             "output": description
         })
     
@@ -360,7 +359,6 @@ def generate_combined_examples(num_examples: int) -> List[Dict]:
         
         examples.append({
             "instruction": prompt,
-            "input": "(none)",
             "output": description
         })
     
