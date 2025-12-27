@@ -290,7 +290,6 @@ def generate_room_examples(num_examples: int) -> List[Dict]:
         
         examples.append({
             "instruction": simple_prompt,
-            "input": "(none)",
             "output": enhanced_description
         })
     

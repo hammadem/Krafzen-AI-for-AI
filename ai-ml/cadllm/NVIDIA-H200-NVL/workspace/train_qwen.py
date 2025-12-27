@@ -136,15 +136,14 @@ def format_example(example: Dict[str, Any]) -> Dict[str, Any]:
     inp = (example.get("input") or "").strip()
     out = (example.get("output") or "").strip()
 
-    text = (
-        SYSTEM_PROMPT
-        + "### Instruction\n"
-        + instruction
-        + "\n\n### Input\n"
-        + inp
-        + "\n\n### CAD Coordinates Output\n"
-        + out
-    )
+    # Build prompt - only include Input section if it's not empty or "(none)"
+    text = SYSTEM_PROMPT + "### Instruction\n" + instruction
+    
+    if inp and inp.lower() not in ["(none)", "none", ""]:
+        text += "\n\n### Input\n" + inp
+    
+    text += "\n\n### CAD Coordinates Output\n" + out
+    
     return {"text": text}
 
 
