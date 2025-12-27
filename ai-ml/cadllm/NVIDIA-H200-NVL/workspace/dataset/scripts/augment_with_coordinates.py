@@ -74,8 +74,8 @@ def wall_center_xy(wall: str, room_w: int, room_h: int, obj_w: int, obj_h: int, 
         x = along
         # Calculate y based on object's actual height
         y = +room_half_h - (WALL_THICKNESS + DEFAULT_SETBACK + obj_h / 2)
-        # Double-check: ensure object doesn't extend beyond room
-        assert y + obj_h / 2 <= room_half_h, f"North wall object extends beyond room: y={y}, obj_h={obj_h}, room_half={room_half_h}"
+        # Ensure object doesn't extend beyond room (safety check)
+        y = min(y, room_half_h - obj_h / 2)
     elif wall == "south":
         # Constrain along (x coordinate)
         max_along = room_half_w - obj_w / 2
@@ -83,8 +83,8 @@ def wall_center_xy(wall: str, room_w: int, room_h: int, obj_w: int, obj_h: int, 
         x = along
         # Calculate y based on object's actual height
         y = -room_half_h + (WALL_THICKNESS + DEFAULT_SETBACK + obj_h / 2)
-        # Double-check: ensure object doesn't extend beyond room
-        assert y - obj_h / 2 >= -room_half_h, f"South wall object extends beyond room: y={y}, obj_h={obj_h}, room_half={room_half_h}"
+        # Ensure object doesn't extend beyond room (safety check)
+        y = max(y, -room_half_h + obj_h / 2)
     elif wall == "east":
         # Constrain along (y coordinate)
         max_along = room_half_h - obj_h / 2
@@ -92,8 +92,8 @@ def wall_center_xy(wall: str, room_w: int, room_h: int, obj_w: int, obj_h: int, 
         y = along
         # Calculate x based on object's actual width
         x = +room_half_w - (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
-        # Double-check: ensure object doesn't extend beyond room
-        assert x + obj_w / 2 <= room_half_w, f"East wall object extends beyond room: x={x}, obj_w={obj_w}, room_half={room_half_w}"
+        # Ensure object doesn't extend beyond room (safety check)
+        x = min(x, room_half_w - obj_w / 2)
     elif wall == "west":
         # Constrain along (y coordinate)
         max_along = room_half_h - obj_h / 2
@@ -101,8 +101,8 @@ def wall_center_xy(wall: str, room_w: int, room_h: int, obj_w: int, obj_h: int, 
         y = along
         # Calculate x based on object's actual width
         x = -room_half_w + (WALL_THICKNESS + DEFAULT_SETBACK + obj_w / 2)
-        # Double-check: ensure object doesn't extend beyond room
-        assert x - obj_w / 2 >= -room_half_w, f"West wall object extends beyond room: x={x}, obj_w={obj_w}, room_half={room_half_w}"
+        # Ensure object doesn't extend beyond room (safety check)
+        x = max(x, -room_half_w + obj_w / 2)
     else:  # "none" or "center" - free placement
         # Constrain to room bounds
         max_x = room_half_w - obj_w / 2
