@@ -137,7 +137,7 @@ package-with-dataset: ## Create tarball including cleaned dataset (larger file)
 
 package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for training with simple prompts)
 	@echo "📦 Creating workspace package with enhanced dataset..."
-	@if [ ! -f "$(JSONL_DIR)/cadllm_enhanced.jsonl" ]; then \
+	@if [ ! -f "$(JSONL_DIR)/cadllm_final.jsonl" ]; then \
 		echo "❌ Error: Enhanced dataset not found. Run 'make generate-enhanced-dataset' first."; \
 		exit 1; \
 	fi
@@ -145,7 +145,6 @@ package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for
 	cp Makefile $(WORKSPACE_DIR)/Makefile
 	cd $(WORKSPACE_DIR) && tar -czf ../../$(PACKAGE_NAME) \
 		--exclude='cad-agent-qwen-*' \
-		--exclude='dataset/cadllm_raw' \
 		--exclude='logs' \
 		--exclude='__pycache__' \
 		--exclude='*.pyc' \
@@ -163,7 +162,7 @@ package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for
 	@echo "   scp $(PACKAGE_NAME) root@<pod-ip>:/workspace/"
 	@echo "   ssh root@<pod-ip>"
 	@echo "   cd /workspace && tar --no-same-owner --warning=no-unknown-keyword -xzf $(PACKAGE_NAME)"
-	@echo "   make train DATA_PATH=/workspace/dataset/jsonl/cadllm_enhanced.jsonl"
+	@echo "   make train DATA_PATH=/workspace/dataset/jsonl/cadllm_final.jsonl"
 
 extract: unarchive ## Alias for unarchive target
 	@echo "✅ Use 'make unarchive' to extract the package"
