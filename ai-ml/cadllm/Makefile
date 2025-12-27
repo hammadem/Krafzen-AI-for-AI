@@ -108,7 +108,7 @@ package: ## Create tarball of workspace for upload to RunPod (excludes large fil
 	@echo "📤 Upload to RunPod:"
 	@echo "   scp $(PACKAGE_NAME) root@<pod-ip>:/workspace/"
 	@echo "   ssh root@<pod-ip>"
-	@echo "   cd /workspace && tar --no-same-owner -xzf $(PACKAGE_NAME)"
+	@echo "   cd /workspace && tar --no-same-owner --warning=no-unknown-keyword -xzf $(PACKAGE_NAME)"
 	@echo "   make train  # Start training with correct paths"
 
 package-with-dataset: ## Create tarball including cleaned dataset (larger file)
@@ -162,7 +162,7 @@ package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for
 	@echo "📤 Upload to RunPod:"
 	@echo "   scp $(PACKAGE_NAME) root@<pod-ip>:/workspace/"
 	@echo "   ssh root@<pod-ip>"
-	@echo "   cd /workspace && tar --no-same-owner -xzf $(PACKAGE_NAME)"
+	@echo "   cd /workspace && tar --no-same-owner --warning=no-unknown-keyword -xzf $(PACKAGE_NAME)"
 	@echo "   make train DATA_PATH=/workspace/dataset/jsonl/cadllm_enhanced.jsonl"
 
 extract: unarchive ## Alias for unarchive target

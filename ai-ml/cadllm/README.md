@@ -161,7 +161,7 @@ ssh root@<pod-ip>
 
 # Extract the files (--no-same-owner suppresses harmless ownership warnings)
 cd /workspace
-tar --no-same-owner -xzf cadllm-workspace.tar.gz
+tar --no-same-owner --warning=no-unknown-keyword -xzf cadllm-workspace.tar.gz
 ```
 
 #### Option A2: Manual SCP (Alternative)
@@ -179,7 +179,7 @@ ssh root@<pod-ip>
 
 # Extract the files (--no-same-owner suppresses harmless ownership warnings)
 cd /workspace
-tar --no-same-owner -xzf workspace.tar.gz
+tar --no-same-owner --warning=no-unknown-keyword -xzf workspace.tar.gz
 ```
 
 #### Option B: Using RunPod's File Manager
@@ -190,7 +190,7 @@ tar --no-same-owner -xzf workspace.tar.gz
 4. Extract it using the terminal:
    ```bash
    cd /workspace
-   tar --no-same-owner -xzf cadllm-workspace.tar.gz
+   tar --no-same-owner --warning=no-unknown-keyword -xzf cadllm-workspace.tar.gz
    ```
    Note: `--no-same-owner` suppresses harmless ownership warnings from macOS metadata files.
 
@@ -708,7 +708,7 @@ The project includes a comprehensive Makefile for automating common tasks:
 - `make package` - Create tarball for upload to RunPod (excludes large files)
 - `make package-with-dataset` - Create tarball including cleaned dataset
 - `make package-with-enhanced-dataset` - Create tarball including enhanced dataset (for simple prompts)
-- `make unarchive` - Verify extraction (use after manual `tar --no-same-owner -xzf cadllm-workspace.tar.gz`)
+- `make unarchive` - Verify extraction (use after manual `tar --no-same-owner --warning=no-unknown-keyword -xzf cadllm-workspace.tar.gz`)
 - `make extract` - Alias for `make unarchive`
 - `make setup` - Install Python dependencies from requirements.txt
 
@@ -739,7 +739,7 @@ make info                 # Check what was created
 
 # On RunPod after upload
 cd /workspace
-tar --no-same-owner -xzf cadllm-workspace.tar.gz  # Extract (--no-same-owner suppresses warnings)
+tar --no-same-owner --warning=no-unknown-keyword -xzf cadllm-workspace.tar.gz  # Extract (--no-same-owner suppresses warnings)
 make train                # Start training (chmods scripts, sets paths, auto-installs deps)
 ```
 
