@@ -56,6 +56,15 @@ clean-dataset: ## Clean dataset (normalize coordinates, close shapes, apply dime
 		--output ../jsonl/cadllm_2d_cleaned.jsonl
 	@echo "✅ Dataset cleaned and ready for training"
 
+generate-enhanced-dataset: ## Generate enhanced dataset (200k+ examples with simple prompts -> enhanced descriptions)
+	@echo "🔄 Generating enhanced CAD dataset..."
+	@echo "   This creates examples where:"
+	@echo "   - Instruction: Simple user prompts (e.g., 'a kitchen floor plan that has sink, gas burners')"
+	@echo "   - Output: Enhanced detailed descriptions (e.g., 'Kitchen floor plan (4000mm x 3000mm) with:...')"
+	cd $(SCRIPTS_DIR) && python generate_enhanced_dataset.py
+	@echo "✅ Enhanced dataset generated!"
+	@echo "   File: $(JSONL_DIR)/cadllm_enhanced.jsonl"
+
 prepare-dataset: download-dataset recreate-dataset clean-dataset ## Complete dataset preparation pipeline
 	@echo "✅ Dataset preparation complete!"
 	@echo "   Ready for training: $(JSONL_DIR)/cadllm_2d_cleaned.jsonl"
