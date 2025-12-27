@@ -1,4 +1,4 @@
-.PHONY: help setup download-dataset recreate-dataset clean-dataset generate-enhanced-dataset train test-api test-api-custom upload-model deploy-space update-space package package-with-dataset package-with-enhanced-dataset clean clean-all info
+.PHONY: help setup download-dataset recreate-dataset clean-dataset generate-enhanced-dataset train test-api test-api-custom upload-model deploy-space update-space package package-with-dataset package-with-enhanced-dataset extract unarchive clean clean-all info
 
 # Configuration
 # When running locally (from cadllm root)
@@ -107,7 +107,7 @@ package: ## Create tarball of workspace for upload to RunPod (excludes large fil
 	@echo "📤 Upload to RunPod:"
 	@echo "   scp $(PACKAGE_NAME) root@<pod-ip>:/workspace/"
 	@echo "   ssh root@<pod-ip>"
-	@echo "   cd /workspace && tar -xzf $(PACKAGE_NAME)"
+	@echo "   cd /workspace && make unarchive"
 	@echo "   make train  # Start training with correct paths"
 
 package-with-dataset: ## Create tarball including cleaned dataset (larger file)
@@ -159,8 +159,29 @@ package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for
 	@echo "📤 Upload to RunPod:"
 	@echo "   scp $(PACKAGE_NAME) root@<pod-ip>:/workspace/"
 	@echo "   ssh root@<pod-ip>"
-	@echo "   cd /workspace && tar -xzf $(PACKAGE_NAME)"
+	@echo "   cd /workspace && make unarchive"
 	@echo "   make train DATA_PATH=/workspace/dataset/jsonl/cadllm_enhanced.jsonl"
+
+extract: unarchive ## Alias for unarchive target
+	@echo "✅ Use 'make unarchive' to extract the package"
+
+unarchive: ## Extract workspace package on training machine (RunPod)
+	@echo "📦 Extracting workspace package..."
+	@if [ ! -f "cadllm-workspace.tar.gz" ]; then \
+		echo "❌ Error: cadllm-workspace.tar.gz not found in current directory."; \
+		echo "   Make sure you're in /workspace and the package has been uploaded."; \
+		exit 1; \
+	fi
+	@echo "   Extracting archive..."
+	tar -xzf cadllm-workspace.tar.gz
+	@echo "✅ Package extracted successfully!"
+	@echo ""
+	@echo "📋 Next steps:"
+	@echo "   1. cd /workspace"
+	@echo "   2. make train DATA_PATH=/workspace/dataset/jsonl/cadllm_enhanced.jsonl"
+	@echo ""
+	@echo "   Or to use the cleaned dataset:"
+	@echo "   make train DATA_PATH=/workspace/dataset/jsonl/cadllm_2d_cleaned.jsonl"
 
 test-api: ## Test Hugging Face API (requires .env file with HF_TOKEN)
 	@echo "🧪 Testing Hugging Face API..."

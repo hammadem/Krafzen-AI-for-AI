@@ -40,12 +40,18 @@ See [Setting Up a New RunPod Machine](#setting-up-a-new-runpod-machine) section 
 
 The models were trained on a **RunPod** cloud instance with the following specifications:
 
-- **GPU**: NVIDIA H200 NVL 1x
-- **vCPU**: 16 cores
-- **Memory**: 283 GB RAM
+- **GPU**: NVIDIA H200 NVL 1x (or equivalent: H100 NVL, H100 SXM, RTX PRO 6000)
+- **vCPU**: 16+ cores
+- **Memory**: 94+ GB RAM (recommended: 125+ GB)
 - **Container Disk**: 20 GB
 - **Pod Volume**: 20 GB (mounted at `/workspace`)
 - **Location**: US-MD-1 (Secure Cloud)
+
+**Recommended GPU Alternatives (if H200 NVL unavailable):**
+- **RTX PRO 6000** (96GB VRAM, $1.84/hr) - Best value, high availability
+- **H100 SXM** (80GB VRAM, $2.69/hr) - Best availability, excellent performance
+- **H100 NVL** (94GB VRAM, $3.07/hr) - Closest to H200, low availability
+- **L40S** (48GB VRAM, $0.86/hr) - Budget option, sufficient for 3B model with LoRA
 
 ### Software Environment
 
@@ -155,7 +161,7 @@ ssh root@<pod-ip>
 
 # Extract the files
 cd /workspace
-tar -xzf cadllm-workspace.tar.gz
+make unarchive
 ```
 
 #### Option A2: Manual SCP (Alternative)
@@ -173,7 +179,7 @@ ssh root@<pod-ip>
 
 # Extract the files
 cd /workspace
-tar -xzf workspace.tar.gz
+make unarchive  # or: tar -xzf workspace.tar.gz
 ```
 
 #### Option B: Using RunPod's File Manager
@@ -184,7 +190,7 @@ tar -xzf workspace.tar.gz
 4. Extract it using the terminal:
    ```bash
    cd /workspace
-   tar -xzf workspace.tar.gz
+   make unarchive  # or: tar -xzf cadllm-workspace.tar.gz
    ```
 
 #### Option C: Using Git (If Repository is Available)
@@ -700,6 +706,9 @@ The project includes a comprehensive Makefile for automating common tasks:
 
 - `make package` - Create tarball for upload to RunPod (excludes large files)
 - `make package-with-dataset` - Create tarball including cleaned dataset
+- `make package-with-enhanced-dataset` - Create tarball including enhanced dataset (for simple prompts)
+- `make unarchive` - Extract workspace package on training machine (RunPod)
+- `make extract` - Alias for `make unarchive`
 - `make setup` - Install Python dependencies from requirements.txt
 
 ### Training
@@ -729,7 +738,7 @@ make info                 # Check what was created
 
 # On RunPod after upload
 cd /workspace
-tar -xzf cadllm-workspace.tar.gz
+make unarchive            # Extract the package
 make train                # Start training (chmods scripts, sets paths, auto-installs deps)
 ```
 
