@@ -29,12 +29,12 @@ except ImportError:
     # python-dotenv not installed, skip loading .env
     pass
 
-# Import coordinate parser
+# Import DSL parser
 try:
-    from dxf_parser import parse_coordinates_to_dxf
+    from dsl_parser import parse_dsl_to_dxf
 except ImportError:
     # If parser not available, we'll return raw output
-    parse_coordinates_to_dxf = None
+    parse_dsl_to_dxf = None
 
 
 class CADLLMClient:
@@ -57,7 +57,7 @@ class CADLLMClient:
             model_name: Hugging Face model identifier (e.g., "username/model-name")
             token: HF API token (or set HF_TOKEN env var)
             endpoint_url: Optional custom endpoint URL (if provided, model_name is ignored)
-            convert_to_ezdxf: If True, automatically convert coordinate output to ezdxf code
+            convert_to_ezdxf: If True, automatically convert DSL output to DXF file
             timeout: Request timeout in seconds (default: 180 for slow Space instances)
         """
         self.model_name = model_name
@@ -80,58 +80,81 @@ class CADLLMClient:
                 model=model_name
             )
             self._endpoint_url = None
-        self.system_prompt = """You are a CAD code assistant. Given a CAD description, 
-generate precise 2D CAD coordinates. Always center shapes at origin (0, 0). 
-Use exact dimensions specified in the request. 
-
-For architectural layouts (apartments, houses, rooms, floor plans):
-- Generate all rooms, walls, doors, and windows as separate shapes
-- Use lines for walls, rectangles for rooms, arcs for doors
-- Include all requested features (bedrooms, windows, doors, etc.)
-
-For simple shapes:
-- Generate single, closed shapes unless multiple objects are explicitly requested."""
+        # System prompt matches training format (from train_qwen.py)
+        self.system_prompt = (
+            "You are a CAD code assistant. Given a simple CAD description, "
+            "output ONLY the strict DSL format shown below. Do not use natural language.\n\n"
+            "Required DSL Format (STRICT - must match exactly):\n"
+            "UNITS: mm\n"
+            "ORIGIN_POLICY: room_center_at_(0,0)\n"
+            "ROOM: rect w=WIDTH h=HEIGHT center=(0,0)\n"
+            "WALLS: rect_perimeter closed=true layer=WALLS\n"
+            "OBJECT_NAME: rect w=WIDTH h=HEIGHT center=(X,Y) layer=OBJECTS closed=true anchor_wall=WALL\n"
+            "OBJECT_NAME: circle r=RADIUS center=(X,Y) layer=OBJECTS closed=true anchor_wall=WALL\n\n"
+            "Rules:\n"
+            "- Always start with UNITS, ORIGIN_POLICY, ROOM, WALLS (in that order)\n"
+            "- Use rect or circle primitives only\n"
+            "- Entity names must use underscores (e.g., COFFEE_TABLE not COFFEE TABLE)\n"
+            "- anchor_wall must be: north, south, east, west, or none (for free placement)\n"
+            "- All coordinates in mm, room centered at (0,0)\n"
+            "- All objects must be within room bounds\n"
+            "- Use circle for round objects (burners, round tables, columns)\n"
+            "- Use rect for rectangular objects (tables, desks, appliances)\n\n"
+            "Default dimensions if not specified:\n"
+            "- Rooms: 3000x3000 (bedroom), 4000x3000 (kitchen), 2000x2000 (bathroom)\n"
+            "- Simple shapes: r=100 (circles), 200x200 (squares), 300x200 (rectangles)\n"
+        )
+        
+        # Load tokenizer for chat template formatting (only if not using endpoint)
+        self.tokenizer = None
+        if not endpoint_url:
+            try:
+                from transformers import AutoTokenizer
+                try:
+                    # Try to load tokenizer from the model (if it's a local path)
+                    # For HF models, we'll use the base model tokenizer
+                    self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+                except:
+                    # Fallback to base model tokenizer
+                    base_model_name = "Qwen/Qwen2.5-Coder-3B-Instruct"
+                    self.tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
+            except ImportError:
+                # transformers not available, will use plain text format
+                pass
     
     def format_prompt(self, instruction: str, input_text: str = "(none)") -> str:
         """
-        Format user instruction into model prompt with improved engineering.
+        Format user instruction using Qwen chat template (matches training format).
         
-        The prompt emphasizes:
-        - Centering at origin (0, 0)
-        - Using exact dimensions
-        - Generating closed shapes
-        - Single objects unless multiple are requested
+        Args:
+            instruction: User instruction (e.g., "Create a bedroom with a bed and desk")
+            input_text: Optional input context (usually "(none)")
+        
+        Returns:
+            Formatted prompt string ready for tokenization
         """
-        # Enhance instruction with explicit requirements
-        enhanced_instruction = instruction
+        # Build user message (matches training format_example function)
+        user_text = instruction
+        if input_text and input_text.lower() not in ["(none)", "none", ""]:
+            user_text += "\n\nInput:\n" + input_text
         
-        # Detect architectural/floor plan requests
-        architectural_keywords = ["apartment", "bedroom", "room", "house", "floor plan", "layout", "wall", "door", "window"]
-        is_architectural = any(keyword in instruction.lower() for keyword in architectural_keywords)
+        # Format as Qwen chat messages (matches training format)
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": user_text},
+        ]
         
-        if is_architectural:
-            # For architectural requests, emphasize multiple objects
-            if "all" not in instruction.lower() and "include" not in instruction.lower():
-                enhanced_instruction = f"{instruction} (include all rooms, walls, doors, and windows)"
-        
-        # Add dimension hints if not present
-        if "mm" not in instruction.lower() and "cm" not in instruction.lower() and "meter" not in instruction.lower():
-            enhanced_instruction = f"{instruction} (use millimeters for dimensions)"
-        
-        # Emphasize centering if not mentioned
-        if "origin" not in instruction.lower() and "center" not in instruction.lower():
-            enhanced_instruction = f"{enhanced_instruction} (centered at origin)"
-        
-        return f"""{self.system_prompt}
-
-### Instruction
-{enhanced_instruction}
-
-### Input
-{input_text}
-
-### Enhanced CAD Prompt (DXF-ready)
-"""
+        # Apply Qwen chat template if tokenizer is available
+        if self.tokenizer:
+            formatted_prompt = self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,  # Return string, not tokens
+                add_generation_prompt=True,  # Add assistant prompt token
+            )
+            return formatted_prompt
+        else:
+            # Fallback to plain text format (shouldn't happen in normal usage)
+            return f"{self.system_prompt}\n\nUser: {user_text}\n\nAssistant:"
     
     def generate(
         self, 
@@ -265,10 +288,10 @@ For simple shapes:
                     output = str(result)
                 
                 # Convert to DXF file if requested and parser is available
-                if self.convert_to_ezdxf and parse_coordinates_to_dxf:
-                    # Check if output looks like coordinate format
-                    if "<SOL>" in output or "<Line>" in output or "<Circle>" in output:
-                        dxf_path = parse_coordinates_to_dxf(output)
+                if self.convert_to_ezdxf and parse_dsl_to_dxf:
+                    # Check if output looks like DSL format
+                    if "UNITS:" in output or "ROOM:" in output or "WALLS:" in output:
+                        dxf_path = parse_dsl_to_dxf(output)
                         return dxf_path
                 
                 return output
@@ -293,10 +316,10 @@ For simple shapes:
                         result = str(result)
                 
                 # Convert to DXF file if requested and parser is available
-                if self.convert_to_ezdxf and parse_coordinates_to_dxf:
-                    # Check if output looks like coordinate format
-                    if "<SOL>" in result or "<Line>" in result or "<Circle>" in result:
-                        dxf_path = parse_coordinates_to_dxf(result)
+                if self.convert_to_ezdxf and parse_dsl_to_dxf:
+                    # Check if output looks like DSL format
+                    if "UNITS:" in result or "ROOM:" in result or "WALLS:" in result:
+                        dxf_path = parse_dsl_to_dxf(result)
                         return dxf_path
                 
                 return result

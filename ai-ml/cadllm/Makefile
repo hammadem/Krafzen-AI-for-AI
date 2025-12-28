@@ -1,4 +1,4 @@
-.PHONY: help setup download-dataset recreate-dataset clean-dataset generate-enhanced-dataset train test-api test-api-custom upload-model deploy-space update-space package package-with-dataset package-with-enhanced-dataset extract unarchive clean clean-all info
+.PHONY: help setup download-dataset recreate-dataset clean-dataset generate-enhanced-dataset train train-resume merge-model upload-model deploy-ollama deploy-space update-space package package-with-dataset package-with-enhanced-dataset extract unarchive clean clean-all info test-api test-api-custom infer-local open-webui-start open-webui-stop open-webui-logs open-webui-status
 
 # Configuration
 # When running locally (from cadllm root)
@@ -82,6 +82,36 @@ train: ## Start training (use on RunPod server - sets up scripts and runs traini
 	DATA_PATH=$${DATA_PATH:-$(SERVER_DATA_PATH)} \
 	OUTPUT_DIR=$${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)} \
 	./run.sh
+
+train-resume: ## Resume training from latest checkpoint (auto-detects) or specify CHECKPOINT=path/to/checkpoint
+	@echo "🔄 Resuming training from checkpoint..."
+	@echo "   Making scripts executable..."
+	chmod +x train.sh
+	@echo "   Using configuration:"
+	@echo "     DATA_PATH: $${DATA_PATH:-$(SERVER_DATA_PATH)}"
+	@echo "     OUTPUT_DIR: $${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)}"
+	@if [ -n "$$CHECKPOINT" ]; then \
+		echo "     CHECKPOINT: $$CHECKPOINT (specified)"; \
+	else \
+		echo "     CHECKPOINT: (auto-detect latest)"; \
+	fi
+	@echo ""
+	@echo "   The script will automatically find the latest checkpoint if not specified."
+	@echo ""
+	@if [ -n "$$CHECKPOINT" ]; then \
+		DATA_PATH=$${DATA_PATH:-$(SERVER_DATA_PATH)} \
+		OUTPUT_DIR=$${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)} \
+		./train.sh \
+			--data_path $${DATA_PATH:-$(SERVER_DATA_PATH)} \
+			--output_dir $${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)} \
+			--resume_from_checkpoint "$$CHECKPOINT"; \
+	else \
+		DATA_PATH=$${DATA_PATH:-$(SERVER_DATA_PATH)} \
+		OUTPUT_DIR=$${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)} \
+		./train.sh \
+			--data_path $${DATA_PATH:-$(SERVER_DATA_PATH)} \
+			--output_dir $${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)}; \
+	fi
 
 package: ## Create tarball of workspace for upload to RunPod (excludes large files)
 	@echo "📦 Creating workspace package..."
@@ -198,10 +228,90 @@ test-api-custom: ## Test Hugging Face API with custom prompt (usage: make test-a
 	cd $(WORKSPACE_DIR) && python test_hf_api.py "$(PROMPT)"
 	@echo "✅ API test complete"
 
-upload-model: ## Merge LoRA adapter and upload to Hugging Face (requires .env file)
-	@echo "📤 Uploading model to Hugging Face..."
-	cd $(WORKSPACE_DIR) && python upload_model.py
+infer-local: ## Run model locally on Mac (requires .env with MODEL_PATH or ADAPTER_PATH, optional PROMPT="your prompt")
+	@echo "💻 Running model locally on Mac..."
+	@echo "   Loading configuration from .env file..."
+	@if [ -n "$$PROMPT" ]; then \
+		cd $(WORKSPACE_DIR) && python infer_local_mac.py "$$PROMPT"; \
+	else \
+		cd $(WORKSPACE_DIR) && python infer_local_mac.py; \
+	fi
+	@echo "✅ Local inference complete"
+
+merge-model: ## Merge LoRA adapter with base model (requires .env file with ADAPTER_PATH, OUTPUT_DIR, BASE_MODEL)
+	@echo "🔧 Merging LoRA adapter with base model..."
+	@echo "   Loading configuration from .env file..."
+	@cd $(WORKSPACE_DIR) && python merge_model.py
+	@echo "✅ Model merge complete"
+
+upload-model: ## Upload merged model to Hugging Face (requires .env file with MODEL_PATH, BASE_MODEL, HF_TOKEN, HF_USERNAME, HF_FINE_TUNED_MODEL_NAME)
+	@echo "📤 Uploading merged model to Hugging Face..."
+	@echo "   Loading configuration from .env file..."
+	@cd $(WORKSPACE_DIR) && python upload_model.py
 	@echo "✅ Model upload complete"
+
+deploy-ollama: ## Deploy merged model to Ollama (requires .env file with MODEL_OUTPUT_DIR, optional: OLLAMA_MODEL_NAME, GGUF_OUTPUT_DIR, LLAMA_CPP_PATH)
+	@echo "🦙 Deploying model to Ollama..."
+	@echo "   Loading configuration from .env file..."
+	@echo "   Note: This requires llama.cpp to be installed"
+	@echo "   Install from: https://github.com/ggerganov/llama.cpp"
+	@cd $(WORKSPACE_DIR) && python deploy_ollama.py
+	@echo "✅ Ollama deployment complete"
+
+open-webui-start: ## Start Open WebUI container for Ollama (accessible at http://localhost:3000)
+	@echo "🌐 Starting Open WebUI for Ollama..."
+	@if docker ps -a --format '{{.Names}}' | grep -q '^open-webui$$'; then \
+		echo "   Container 'open-webui' already exists"; \
+		if docker ps --format '{{.Names}}' | grep -q '^open-webui$$'; then \
+			echo "   ✅ Open WebUI is already running"; \
+			echo "   Access at: http://localhost:3000"; \
+		else \
+			echo "   🔄 Starting existing container..."; \
+			docker start open-webui && \
+			echo "   ✅ Open WebUI started"; \
+			echo "   Access at: http://localhost:3000"; \
+		fi; \
+	else \
+		echo "   🐳 Creating and starting Open WebUI container..."; \
+		docker run -d -p 3000:8080 \
+			--add-host=host.docker.internal:host-gateway \
+			-v open-webui:/app/backend/data \
+			--name open-webui \
+			--restart always \
+			ghcr.io/open-webui/open-webui:main && \
+		echo "   ✅ Open WebUI started"; \
+		echo "   Access at: http://localhost:3000"; \
+		echo "   Note: Open WebUI will automatically connect to your local Ollama instance"; \
+	fi
+
+open-webui-stop: ## Stop Open WebUI container
+	@echo "🛑 Stopping Open WebUI..."
+	@if docker ps --format '{{.Names}}' | grep -q '^open-webui$$'; then \
+		docker stop open-webui && \
+		echo "   ✅ Open WebUI stopped"; \
+	else \
+		echo "   ⚠️  Open WebUI is not running"; \
+	fi
+
+open-webui-logs: ## Show Open WebUI container logs
+	@echo "📋 Open WebUI logs (Ctrl+C to exit):"
+	@docker logs -f open-webui 2>/dev/null || echo "   ❌ Container 'open-webui' not found. Run 'make open-webui-start' first."
+
+open-webui-status: ## Check Open WebUI container status
+	@echo "📊 Open WebUI Status:"
+	@if docker ps -a --format '{{.Names}}' | grep -q '^open-webui$$'; then \
+		if docker ps --format '{{.Names}}' | grep -q '^open-webui$$'; then \
+			echo "   ✅ Running"; \
+			echo "   Access at: http://localhost:3000"; \
+			docker ps --filter name=open-webui --format "   Container ID: {{.ID}}\n   Status: {{.Status}}"; \
+		else \
+			echo "   ⏸️  Stopped"; \
+			echo "   Run 'make open-webui-start' to start it"; \
+		fi; \
+	else \
+		echo "   ❌ Container not found"; \
+		echo "   Run 'make open-webui-start' to create and start it"; \
+	fi
 
 update-space: ## Update Space app with latest model name from .env (does not deploy)
 	@echo "🔄 Updating Space app configuration..."

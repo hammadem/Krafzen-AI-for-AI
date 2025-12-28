@@ -1,4 +1,8 @@
 # Core Hugging Face stack
+# Note: torch >= 2.6.0 required for checkpoint resuming (security fix for CVE-2025-32434)
+# torchvision must be compatible with torch version
+torch>=2.6.0
+torchvision>=0.21.0
 transformers>=4.45.0,<5.0.0
 datasets>=2.16.0
 peft>=0.12.0,<0.13.0
@@ -15,3 +19,6 @@ python-dotenv>=1.0.0
 
 # Hugging Face Inference API
 huggingface-hub==0.36.0
+
+# Note: For Ollama deployment, the gguf module comes with llama.cpp source
+# Do not install the PyPI 'gguf' package - it's incompatible with llama.cpp conversion scripts

@@ -1,60 +1,66 @@
 #!/usr/bin/env python3
 """
-Merge LoRA adapter with base model and upload to Hugging Face.
+Upload merged model to Hugging Face Hub.
 
-The Hugging Face Inference API requires a full merged model, not just a LoRA adapter.
-This script merges the adapter with the base model and uploads it.
+This script uploads an already-merged model to Hugging Face Hub.
+For merging a LoRA adapter with the base model, use merge_model.py first.
 
 Usage:
-    python upload_model.py
+    python upload_model.py [--model_path PATH]
 """
 
 import os
 import sys
+import argparse
 from pathlib import Path
 from dotenv import load_dotenv
 from huggingface_hub import HfApi, login
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
+from transformers import AutoTokenizer
 
 # Load .env file
 env_path = Path(__file__).parent / ".env"
 load_dotenv(env_path)
 
-# Configuration
-HF_TOKEN = os.getenv("HF_TOKEN")
-HF_USERNAME = os.getenv("HF_USERNAME")
-HF_FINE_TUNED_MODEL_NAME = os.getenv("HF_FINE_TUNED_MODEL_NAME")
-# Adapter path - can be set via ADAPTER_PATH env var or defaults to cad-agent-qwen-2d
-ADAPTER_PATH_STR = os.getenv("ADAPTER_PATH")
-if ADAPTER_PATH_STR:
-    # Expand user home directory (~ or $HOME)
-    ADAPTER_PATH_STR = os.path.expanduser(ADAPTER_PATH_STR)
-    # Expand environment variables (e.g., $HOME)
-    ADAPTER_PATH_STR = os.path.expandvars(ADAPTER_PATH_STR)
-    ADAPTER_PATH = Path(ADAPTER_PATH_STR)
-    if not ADAPTER_PATH.is_absolute():
-        # If relative path, make it relative to script directory
-        ADAPTER_PATH = Path(__file__).parent / ADAPTER_PATH
-else:
-    # Default to cad-agent-qwen-2d in script directory
-    ADAPTER_PATH = Path(__file__).parent / "cad-agent-qwen-2d"
-BASE_MODEL = os.getenv("BASE_MODEL", "Qwen/Qwen2.5-Coder-3B-Instruct")
-PRIVATE = True
+# Configuration from .env (no hardcoded defaults)
+# All values must be set in .env file or via command-line arguments
 
-# Construct repository ID from username and fine-tuned model name
-if HF_USERNAME and HF_FINE_TUNED_MODEL_NAME:
-    REPO_ID = f"{HF_USERNAME}/{HF_FINE_TUNED_MODEL_NAME}"
-else:
-    REPO_ID = None
 
-def generate_model_card(adapter_path: Path, base_model: str, repo_id: str) -> str:
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Upload merged model to Hugging Face Hub"
+    )
+    parser.add_argument(
+        "--model_path",
+        type=str,
+        default=None,
+        help="Path to merged model directory (required: set MODEL_PATH env var or use --model_path)"
+    )
+    parser.add_argument(
+        "--base_model",
+        type=str,
+        default=None,
+        help="Base model identifier for model card (required: set BASE_MODEL env var or use --base_model)"
+    )
+    parser.add_argument(
+        "--private",
+        action="store_true",
+        default=None,
+        help="Make repository private (default: True, use --public to make public)"
+    )
+    parser.add_argument(
+        "--public",
+        action="store_true",
+        help="Make repository public (overrides --private)"
+    )
+    return parser.parse_args()
+
+def generate_model_card(model_path: Path, base_model: str, repo_id: str) -> str:
     """
-    Generate a model card (README.md) based on the adapter path and model information.
+    Generate a model card (README.md) based on the model path and model information.
     
     Args:
-        adapter_path: Path to the LoRA adapter
+        model_path: Path to the merged model
         base_model: Base model identifier
         repo_id: Hugging Face repository ID
     
@@ -62,21 +68,21 @@ def generate_model_card(adapter_path: Path, base_model: str, repo_id: str) -> st
         Model card content as string
     """
     # Check if existing README is a template (contains "[More Information Needed]")
-    adapter_readme = adapter_path / "README.md"
+    model_readme = model_path / "README.md"
     is_template = False
-    if adapter_readme.exists():
-        existing_content = adapter_readme.read_text(encoding="utf-8")
+    if model_readme.exists():
+        existing_content = model_readme.read_text(encoding="utf-8")
         # Check if it's a PEFT template
         if "[More Information Needed]" in existing_content or "Model Card for Model ID" in existing_content:
             is_template = True
-            print(f"   📄 Found template README.md in adapter path, generating new model card...")
+            print(f"   📄 Found template README.md in model path, generating new model card...")
         elif repo_id in existing_content and "base_model" in existing_content.lower():
             # It's a proper model card, use it
-            print(f"   📄 Found existing model card in adapter path, using it...")
+            print(f"   📄 Found existing model card in model path, using it...")
             return existing_content
         else:
             # It's a custom README but not a template, enhance it
-            print(f"   📄 Found custom README.md in adapter path, enhancing it...")
+            print(f"   📄 Found custom README.md in model path, enhancing it...")
             if repo_id not in existing_content:
                 enhanced = f"# {repo_id}\n\n"
                 enhanced += f"**Base Model:** {base_model}\n\n"
@@ -86,7 +92,7 @@ def generate_model_card(adapter_path: Path, base_model: str, repo_id: str) -> st
             return existing_content
     
     # Generate new model card (either no README or template detected)
-    adapter_name = adapter_path.name
+    model_name = model_path.name
     current_date = __import__("datetime").datetime.now().strftime("%Y-%m-%d")
     current_year = __import__("datetime").datetime.now().strftime("%Y")
     
@@ -231,156 +237,49 @@ This model is licensed under Apache 2.0, same as the base model.
 """
     return model_card
 
-def validate_config():
-    """Validate required configuration."""
+def validate_config(model_path: Path):
+    """Validate required configuration and model path."""
+    HF_TOKEN = os.getenv("HF_TOKEN")
+    HF_USERNAME = os.getenv("HF_USERNAME")
+    HF_FINE_TUNED_MODEL_NAME = os.getenv("HF_FINE_TUNED_MODEL_NAME")
+    
     if not HF_TOKEN:
         raise ValueError("HF_TOKEN not found in .env file. Please add HF_TOKEN=your_token_here")
     if not HF_USERNAME:
         raise ValueError("HF_USERNAME not found in .env file. Please add HF_USERNAME=your_username")
     if not HF_FINE_TUNED_MODEL_NAME:
         raise ValueError("HF_FINE_TUNED_MODEL_NAME not found in .env file. Please add HF_FINE_TUNED_MODEL_NAME=your_model_name")
-    if not REPO_ID:
-        raise ValueError("REPO_ID could not be constructed. Check HF_USERNAME and HF_FINE_TUNED_MODEL_NAME in .env file")
-    if not ADAPTER_PATH.exists():
-        raise ValueError(f"Adapter path not found: {ADAPTER_PATH}")
     
-    # Check if adapter path contains adapter_config.json (LoRA adapter) or is a merged model
-    adapter_config = ADAPTER_PATH / "adapter_config.json"
-    config_json = ADAPTER_PATH / "config.json"
+    if not model_path.exists():
+        raise ValueError(f"Model path not found: {model_path}")
     
-    # If not found at root, search recursively
-    if not adapter_config.exists() and not config_json.exists():
-        print(f"   🔍 'adapter_config.json' or 'config.json' not found at root, searching subdirectories...")
-        found_adapters = list(ADAPTER_PATH.rglob("adapter_config.json"))
-        found_configs = list(ADAPTER_PATH.rglob("config.json"))
-        
-        if found_adapters:
-            print(f"   ✅ Found {len(found_adapters)} LoRA adapter(s) in subdirectories")
-            # Validation passed - adapter exists in subdirectory
-        elif found_configs:
-            print(f"   ⚠️  Found {len(found_configs)} merged model(s) in subdirectories")
-            print(f"   WARNING: Path '{ADAPTER_PATH}' appears to contain merged models, not LoRA adapters.")
-            print(f"   This script is designed to merge LoRA adapters. If you want to upload an already-merged model,")
-            print(f"   you may need to use a different approach or ensure the path points to a LoRA adapter directory.")
-            print(f"   Continuing anyway...")
-        else:
+    # Check if model path contains config.json (merged model)
+    config_json = model_path / "config.json"
+    
+    if not config_json.exists():
+        # Search recursively
+        found_configs = list(model_path.rglob("config.json"))
+        if not found_configs:
             raise ValueError(
-                f"Adapter path '{ADAPTER_PATH}' does not contain a valid model.\n"
-                f"Expected either:\n"
-                f"  - LoRA adapter with 'adapter_config.json'\n"
-                f"  - Merged model with 'config.json'\n"
-                f"\nSearched recursively but found neither.\n"
-                f"Files found in directory:\n"
-                f"  {list(ADAPTER_PATH.iterdir())[:10] if ADAPTER_PATH.is_dir() else 'Not a directory'}"
-            )
-    else:
-        # Found at root level
-        if config_json.exists() and not adapter_config.exists():
-            print(f"⚠️  WARNING: Path '{ADAPTER_PATH}' appears to be a merged model, not a LoRA adapter.")
-            print(f"   This script is designed to merge LoRA adapters. If you want to upload an already-merged model,")
-            print(f"   you may need to use a different approach or ensure the path points to a LoRA adapter directory.")
-            print(f"   Continuing anyway...")
-
-def merge_model():
-    """Merge LoRA adapter with base model."""
-    print("=" * 60)
-    print("Merging LoRA Adapter with Base Model")
-    print("=" * 60)
-    print(f"Base model: {BASE_MODEL}")
-    print(f"Adapter: {ADAPTER_PATH}")
-    print(f"Output: {REPO_ID}")
-    print()
-    
-    # Load tokenizer first from adapter (to get the correct vocab size)
-    print("📥 Loading tokenizer from adapter...")
-    try:
-        tokenizer = AutoTokenizer.from_pretrained(str(ADAPTER_PATH), trust_remote_code=True)
-        print(f"   Tokenizer vocab size: {len(tokenizer)}")
-    except Exception as e:
-        print(f"   ⚠️  Could not load tokenizer from adapter: {e}")
-        print("   Falling back to base model tokenizer...")
-        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, trust_remote_code=True)
-        print(f"   Base model tokenizer vocab size: {len(tokenizer)}")
-    
-    # Load base model with the tokenizer to ensure vocabulary matches
-    print("\n📥 Loading base model...")
-    base_model = AutoModelForCausalLM.from_pretrained(
-        BASE_MODEL,
-        torch_dtype=torch.float16,
-        device_map="auto",
-        trust_remote_code=True
-    )
-    
-    # Resize token embeddings if needed to match tokenizer
-    tokenizer_vocab_size = len(tokenizer)
-    model_vocab_size = base_model.get_input_embeddings().weight.shape[0]
-    
-    if tokenizer_vocab_size != model_vocab_size:
-        print(f"\n⚠️  Vocabulary size mismatch detected!")
-        print(f"   Tokenizer vocab size: {tokenizer_vocab_size}")
-        print(f"   Model vocab size: {model_vocab_size}")
-        print(f"   Resizing model embeddings to match tokenizer...")
-        base_model.resize_token_embeddings(tokenizer_vocab_size)
-        print(f"   ✅ Model embeddings resized to {tokenizer_vocab_size}")
-    
-    print("📥 Loading LoRA adapter...")
-    # Check if adapter_config.json exists
-    adapter_config = ADAPTER_PATH / "adapter_config.json"
-    
-    # If not found, try to find it in subdirectories
-    actual_adapter_path = ADAPTER_PATH
-    if not adapter_config.exists():
-        print(f"   ⚠️  'adapter_config.json' not found at '{ADAPTER_PATH}'")
-        print(f"   🔍 Searching for adapter in subdirectories...")
-        
-        # Search for adapter_config.json in subdirectories
-        found_adapters = list(ADAPTER_PATH.rglob("adapter_config.json"))
-        
-        if found_adapters:
-            print(f"   ✅ Found {len(found_adapters)} adapter(s):")
-            for i, adapter in enumerate(found_adapters, 1):
-                print(f"      {i}. {adapter.parent}")
-            
-            # Use the one in a 'cadllm' subdirectory if exists, otherwise first one
-            preferred = None
-            for adapter in found_adapters:
-                if "cadllm" in str(adapter.parent).lower():
-                    preferred = adapter.parent
-                    break
-            
-            if preferred:
-                actual_adapter_path = preferred
-                print(f"   📌 Using adapter at: {actual_adapter_path}")
-            else:
-                actual_adapter_path = found_adapters[0].parent
-                print(f"   📌 Using first adapter found at: {actual_adapter_path}")
-        else:
-            raise ValueError(
-                f"LoRA adapter not found at '{ADAPTER_PATH}'.\n"
-                f"Expected 'adapter_config.json' file in the adapter directory.\n"
-                f"\nThis path may contain a merged model instead of a LoRA adapter.\n"
-                f"\nTo fix:\n"
-                f"  1. Point ADAPTER_PATH to a directory containing 'adapter_config.json'\n"
-                f"  2. Or if this is a merged model, you may need to upload it directly without merging\n"
+                f"Model path '{model_path}' does not contain a valid merged model.\n"
+                f"Expected 'config.json' file in the model directory.\n"
+                f"\nIf you have a LoRA adapter, merge it first with:\n"
+                f"  python merge_model.py --adapter_path <adapter_path> --output_dir {model_path}\n"
                 f"\nFiles found in directory:\n"
-                f"  {list(ADAPTER_PATH.iterdir())[:10] if ADAPTER_PATH.is_dir() else 'Not a directory'}"
+                f"  {list(model_path.iterdir())[:10] if model_path.is_dir() else 'Not a directory'}"
             )
-    else:
-        print(f"   ✅ Found adapter_config.json at: {ADAPTER_PATH}")
-    
-    model = PeftModel.from_pretrained(base_model, str(actual_adapter_path))
-    
-    print("🔧 Merging adapter with base model...")
-    merged_model = model.merge_and_unload()
-    
-    print("✅ Model merged successfully!")
-    return merged_model, tokenizer, actual_adapter_path
 
-def upload_merged_model(merged_model, tokenizer, adapter_path: Path):
+def upload_merged_model(model_path: Path, base_model: str, repo_id: str, private: bool = True):
     """Upload merged model to Hugging Face Hub."""
+    HF_TOKEN = os.getenv("HF_TOKEN")
+    
     print("\n" + "=" * 60)
     print("Uploading Merged Model to Hugging Face Hub")
     print("=" * 60)
+    print(f"Model path: {model_path}")
+    print(f"Repository: {repo_id}")
+    print(f"Private: {private}")
+    print()
     
     # Login
     print("🔐 Logging in to Hugging Face...")
@@ -390,15 +289,15 @@ def upload_merged_model(merged_model, tokenizer, adapter_path: Path):
     api = HfApi()
     
     # Create repository
-    print(f"📦 Creating repository: {REPO_ID}")
+    print(f"📦 Creating repository: {repo_id}")
     try:
         api.create_repo(
-            repo_id=REPO_ID,
+            repo_id=repo_id,
             repo_type="model",
-            private=PRIVATE,
+            private=private,
             exist_ok=True
         )
-        print(f"✅ Repository created: https://huggingface.co/{REPO_ID}")
+        print(f"✅ Repository created: https://huggingface.co/{repo_id}")
     except Exception as e:
         if "403" in str(e) or "rights" in str(e).lower():
             print(f"❌ Permission denied: {e}")
@@ -406,45 +305,35 @@ def upload_merged_model(merged_model, tokenizer, adapter_path: Path):
             raise
         print(f"⚠️  Repository creation: {e}")
     
-    # Save model and tokenizer locally first
-    print("\n💾 Saving merged model locally...")
-    temp_dir = Path(__file__).parent / "merged_model_temp"
-    temp_dir.mkdir(exist_ok=True)
-    
-    merged_model.save_pretrained(str(temp_dir))
-    tokenizer.save_pretrained(str(temp_dir))
-    
-    # Add README.md for proper model recognition
-    readme_content = generate_model_card(adapter_path, BASE_MODEL, REPO_ID)
-    readme_path = temp_dir / "README.md"
-    readme_path.write_text(readme_content, encoding="utf-8")
-    print("   ✅ Generated README.md (model card) for model recognition")
+    # Check if README.md exists, generate if not
+    readme_path = model_path / "README.md"
+    if not readme_path.exists():
+        print("\n📝 Generating README.md (model card)...")
+        readme_content = generate_model_card(model_path, base_model, repo_id)
+        readme_path.write_text(readme_content, encoding="utf-8")
+        print("   ✅ Generated README.md (model card) for model recognition")
+    else:
+        print("\n📄 Using existing README.md")
     
     # Upload
-    print(f"\n📤 Uploading to {REPO_ID}...")
+    print(f"\n📤 Uploading to {repo_id}...")
     api.upload_folder(
-        folder_path=str(temp_dir),
-        repo_id=REPO_ID,
+        folder_path=str(model_path),
+        repo_id=repo_id,
         repo_type="model",
-        commit_message="Merged LoRA adapter with base model for Inference API"
+        commit_message="Upload merged model for Inference API"
     )
     
-    # Cleanup
-    import shutil
-    shutil.rmtree(temp_dir)
-    print(f"🧹 Cleaned up temporary files")
-    
-    print(f"\n✅ Merged model uploaded successfully!")
-    print(f"   View at: https://huggingface.co/{REPO_ID}")
+    print(f"\n✅ Model uploaded successfully!")
+    print(f"   View at: https://huggingface.co/{repo_id}")
     print(f"\n📝 Update your .env file with:")
-    print(f"   HF_MODEL_NAME={REPO_ID}")
-    print(f"\n   Or construct it from:")
-    print(f"   HF_USERNAME={HF_USERNAME}")
-    print(f"   HF_FINE_TUNED_MODEL_NAME={HF_FINE_TUNED_MODEL_NAME}")
-    return REPO_ID
+    print(f"   HF_MODEL_NAME={repo_id}")
+    return repo_id
 
 def check_model_status(repo_id):
     """Check the status of the uploaded model and provide guidance."""
+    HF_TOKEN = os.getenv("HF_TOKEN")
+    
     print("\n" + "=" * 60)
     print("Model Status Check")
     print("=" * 60)
@@ -516,14 +405,60 @@ def check_model_status(repo_id):
 
 def main():
     """Main function."""
+    args = parse_args()
+    
+    # Determine model path (required)
+    if args.model_path:
+        model_path_str = args.model_path
+    else:
+        model_path_str = os.getenv("MODEL_PATH")
+    
+    if not model_path_str:
+        raise ValueError(
+            "MODEL_PATH is required. Set it in .env file or use --model_path argument.\n"
+            "Example: MODEL_PATH=/path/to/merged_model"
+        )
+    
+    model_path_str = os.path.expanduser(model_path_str)
+    model_path_str = os.path.expandvars(model_path_str)
+    model_path = Path(model_path_str)
+    if not model_path.is_absolute():
+        model_path = Path(__file__).parent / model_path
+    
+    # Determine base model (required)
+    base_model = args.base_model or os.getenv("BASE_MODEL")
+    if not base_model:
+        raise ValueError(
+            "BASE_MODEL is required. Set it in .env file or use --base_model argument.\n"
+            "Example: BASE_MODEL=Qwen/Qwen2.5-Coder-3B-Instruct"
+        )
+    
+    # Determine privacy setting
+    if args.public:
+        private = False
+    elif args.private is not None:
+        private = args.private
+    else:
+        # Read from .env, default to True if not set
+        private_str = os.getenv("HF_REPO_PRIVATE", "true").lower()
+        private = private_str in ("true", "1", "yes", "on")
+    
+    # Get repository ID
+    HF_USERNAME = os.getenv("HF_USERNAME")
+    HF_FINE_TUNED_MODEL_NAME = os.getenv("HF_FINE_TUNED_MODEL_NAME")
+    
+    if HF_USERNAME and HF_FINE_TUNED_MODEL_NAME:
+        repo_id = f"{HF_USERNAME}/{HF_FINE_TUNED_MODEL_NAME}"
+    else:
+        raise ValueError(
+            "REPO_ID could not be constructed. Check HF_USERNAME and HF_FINE_TUNED_MODEL_NAME in .env file"
+        )
+    
     try:
-        validate_config()
-        
-        # Merge model
-        merged_model, tokenizer, actual_adapter_path = merge_model()
+        validate_config(model_path)
         
         # Upload
-        merged_repo_id = upload_merged_model(merged_model, tokenizer, actual_adapter_path)
+        merged_repo_id = upload_merged_model(model_path, base_model, repo_id, private)
         
         print("\n" + "=" * 60)
         print("✅ UPLOAD SUCCESS!")

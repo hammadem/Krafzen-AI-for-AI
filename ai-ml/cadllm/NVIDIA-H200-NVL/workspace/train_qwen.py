@@ -145,6 +145,13 @@ def parse_args():
         default=-1,
         help="If > 0, override num_train_epochs and train only this many optimizer steps.",
     )
+    parser.add_argument(
+        "--resume_from_checkpoint",
+        type=str,
+        default=None,
+        help="Path to checkpoint directory to resume from (e.g., /workspace/cadllm/checkpoint-1000). "
+             "If not specified, Trainer will auto-detect the latest checkpoint in output_dir.",
+    )
 
     return parser.parse_args()
 
@@ -400,8 +407,19 @@ def main():
 
     if is_main_process():
         print("🚀 Starting training...", flush=True)
+        if args.resume_from_checkpoint:
+            print(f"📂 Resuming from checkpoint: {args.resume_from_checkpoint}", flush=True)
+        elif os.path.exists(args.output_dir) and os.path.isdir(args.output_dir):
+            # Check if there are any checkpoints in output_dir
+            checkpoints = [d for d in os.listdir(args.output_dir) if d.startswith("checkpoint-")]
+            if checkpoints:
+                # Sort by step number and get the latest
+                checkpoints.sort(key=lambda x: int(x.split("-")[1]))
+                latest_checkpoint = os.path.join(args.output_dir, checkpoints[-1])
+                print(f"📂 Auto-detected latest checkpoint: {latest_checkpoint}", flush=True)
+                args.resume_from_checkpoint = latest_checkpoint
 
-    trainer.train()
+    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint)
 
     if is_main_process():
         print("✅ Training complete, saving model...", flush=True)

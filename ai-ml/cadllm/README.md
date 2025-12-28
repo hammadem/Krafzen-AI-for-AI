@@ -121,7 +121,7 @@ workspace/
 ├── requirements.txt                 # Python dependencies
 ├── train.sh                         # Training launcher script
 ├── run.sh                           # Tmux session manager (auto-installs deps)
-├── dxf_parser.py                    # Coordinate to DXF parser
+├── dsl_parser.py                    # DSL format to DXF parser
 └── dataset/
     ├── scripts/                     # Dataset processing scripts
     │   ├── download_dataset.py
@@ -394,7 +394,7 @@ cadllm/
 │       ├── infer.py                 # Inference script (GPU)
 │       ├── cadllm_client.py         # Hugging Face API client
 │       ├── test_hf_api.py           # Hugging Face API test script
-│       ├── dxf_parser.py             # Coordinate to DXF parser
+│       ├── dsl_parser.py             # DSL format to DXF parser
 │       ├── upload_model.py          # Merge LoRA and upload to Hugging Face
 │       ├── requirements.txt         # Python dependencies
 │       ├── train.sh                 # Training launcher script
@@ -594,6 +594,43 @@ print(result)
 
 **For complete setup instructions, see [docs/huggingface-deployment.md](docs/huggingface-deployment.md)**
 
+### Local Inference on Mac
+
+For running the model locally on your Mac (with or without Ollama):
+
+**Quick Start:**
+```bash
+# 1. Set up .env file
+cd NVIDIA-H200-NVL/workspace
+cat > .env << EOF
+BASE_MODEL=Qwen/Qwen2.5-Coder-3B-Instruct
+MODEL_PATH=~/Projects/models/cadllm/merged_model  # For merged model (recommended)
+# OR
+ADAPTER_PATH=~/Projects/models/cadllm  # For LoRA adapter
+EOF
+
+# 2. Run inference
+python infer_local_mac.py "Create a circle with radius 10mm"
+
+# Or use Makefile
+make infer-local PROMPT="Create a rectangle 100mm x 50mm"
+```
+
+**Performance:**
+- **Apple Silicon (M1/M2/M3)**: Uses MPS acceleration, reasonably fast
+- **Intel Mac**: Uses CPU, slower but works
+- **Memory**: Requires ~6-8GB RAM for the 3B model
+
+**Using Merged Model (Recommended):**
+- Faster loading (no need to load base + adapter separately)
+- Set `MODEL_PATH` in `.env` to your merged model directory
+
+**Using LoRA Adapter:**
+- Requires downloading base model on first run
+- Set `ADAPTER_PATH` in `.env` to your adapter directory
+
+**For Ollama deployment**, see [Ollama Deployment](#ollama-deployment) section below or [OLLAMA_SETUP.md](NVIDIA-H200-NVL/workspace/OLLAMA_SETUP.md)
+
 ### GPU Inference (Training Environment)
 
 For testing on the GPU training environment, use the `infer.py` script:
@@ -639,7 +676,117 @@ Checkpoints are saved during training at regular intervals (every 500 steps by d
 - `trainer_state.json`: Training state
 - Optimizer and scheduler states (for resuming training)
 
-To resume training from a checkpoint, modify the `--output_dir` argument to point to the checkpoint directory.
+### Resuming Training from Checkpoints
+
+If your training was interrupted (e.g., server restart), you can resume from the last checkpoint.
+
+#### Quick Resume (Automatic Detection)
+
+The training script **automatically detects** the latest checkpoint in your output directory. Simply run the same training command again:
+
+```bash
+python -u train_qwen.py \
+  --data_path /workspace/dataset/jsonl/cadllm.jsonl \
+  --output_dir /workspace/cadllm \
+  --num_train_epochs 1 \
+  --max_seq_length 512 \
+  --per_device_train_batch_size 4 \
+  --gradient_accumulation_steps 2
+```
+
+The script will automatically find and resume from the latest checkpoint (e.g., `checkpoint-21000`).
+
+#### Manual Resume (Specify Checkpoint)
+
+If you want to resume from a specific checkpoint:
+
+```bash
+python -u train_qwen.py \
+  --data_path /workspace/dataset/jsonl/cadllm.jsonl \
+  --output_dir /workspace/cadllm \
+  --resume_from_checkpoint /workspace/cadllm/checkpoint-21000 \
+  --num_train_epochs 1 \
+  --max_seq_length 512 \
+  --per_device_train_batch_size 4 \
+  --gradient_accumulation_steps 2
+```
+
+#### Using Makefile
+
+You can also use the Makefile target:
+
+```bash
+# Auto-detect latest checkpoint
+make train-resume
+
+# Or specify a checkpoint
+make train-resume CHECKPOINT=/workspace/cadllm/checkpoint-21000
+```
+
+#### Finding Your Checkpoint
+
+Checkpoints are saved in subdirectories within your `output_dir`:
+
+```bash
+# List all checkpoints
+ls -la /workspace/cadllm/checkpoint-*
+
+# Find the latest checkpoint by step number
+ls -1 /workspace/cadllm/checkpoint-* | sort -V | tail -1
+```
+
+#### What Gets Resumed?
+
+When resuming from a checkpoint, the following are restored:
+- ✅ Model weights (LoRA adapter)
+- ✅ Optimizer state
+- ✅ Learning rate scheduler state
+- ✅ Training step number
+- ✅ All training arguments
+
+Training will continue from exactly where it left off, so you won't lose any progress!
+
+#### Troubleshooting Resume Issues
+
+**PyTorch Version Error (CVE-2025-32434)**
+
+If you see this error:
+```
+ValueError: Due to a serious vulnerability issue in `torch.load`, even with `weights_only=True`, 
+we now require users to upgrade torch to at least v2.6 in order to use the function.
+```
+
+**Solution**: Upgrade PyTorch and torchvision to compatible versions:
+
+```bash
+pip install --upgrade "torch>=2.6.0" "torchvision>=0.21.0"
+```
+
+This is required because checkpoints contain optimizer/scheduler state files that use `torch.load()`, which has a security vulnerability in older versions.
+
+**Torchvision Compatibility Error**
+
+If you see this error:
+```
+RuntimeError: operator torchvision::nms does not exist
+```
+
+**Solution**: This happens when torchvision is not compatible with your torch version. Upgrade both together:
+
+```bash
+pip install --upgrade "torch>=2.6.0" "torchvision>=0.21.0"
+```
+
+Or reinstall both to ensure compatibility:
+
+```bash
+pip uninstall torch torchvision -y
+pip install "torch>=2.6.0" "torchvision>=0.21.0"
+```
+
+**No checkpoint found**: Make sure your `--output_dir` path is correct and checkpoints exist in that directory.
+
+**Checkpoint mismatch**: Ensure you're using the same model, dataset, and training arguments as when the checkpoint was created.
 
 ## Training Logs
 
@@ -648,22 +795,44 @@ Training logs are saved in the `logs/` directory with timestamps:
 
 ## System Prompt
 
-The models are trained with the following system prompt:
+The models are trained with the following system prompt (from `train_qwen.py`):
 
 ```
-You are a CAD code assistant. Given a CAD description, 
-generate precise 2D CAD coordinates. Always center shapes at origin (0, 0). 
-Use exact dimensions specified. Generate single, closed shapes unless multiple objects are explicitly requested.
+You are a CAD code assistant. Given a simple CAD description, 
+output ONLY the strict DSL format shown below. Do not use natural language.
+
+Required DSL Format (STRICT - must match exactly):
+UNITS: mm
+ORIGIN_POLICY: room_center_at_(0,0)
+ROOM: rect w=WIDTH h=HEIGHT center=(0,0)
+WALLS: rect_perimeter closed=true layer=WALLS
+OBJECT_NAME: rect w=WIDTH h=HEIGHT center=(X,Y) layer=OBJECTS closed=true anchor_wall=WALL
+OBJECT_NAME: circle r=RADIUS center=(X,Y) layer=OBJECTS closed=true anchor_wall=WALL
+
+Rules:
+- Always start with UNITS, ORIGIN_POLICY, ROOM, WALLS (in that order)
+- Use rect or circle primitives only
+- Entity names must use underscores (e.g., COFFEE_TABLE not COFFEE TABLE)
+- anchor_wall must be: north, south, east, west, or none (for free placement)
+- All coordinates in mm, room centered at (0,0)
+- All objects must be within room bounds
+- Use circle for round objects (burners, round tables, columns)
+- Use rect for rectangular objects (tables, desks, appliances)
+
+Default dimensions if not specified:
+- Rooms: 3000x3000 (bedroom), 4000x3000 (kitchen), 2000x2000 (bathroom)
+- Simple shapes: r=100 (circles), 200x200 (squares), 300x200 (rectangles)
 ```
 
-The model generates coordinates in this format:
-- `<SOL>` - Start of object
-- `<Circle>: x=0.0, y=0.0, r=48.0` - Circle with center and radius
-- `<Line>: x=47.5, y=-32.0` - Line coordinates (multiple lines form a polyline)
-- `<Arc>: x=-8.5, y=-58.0, α=64.0, f=1.0` - Arc with center, angle, and flag
-- `<EOS>` - End of sequence
+The model generates structured DSL format:
+- `UNITS: mm` - Measurement units
+- `ORIGIN_POLICY: room_center_at_(0,0)` - Coordinate system policy
+- `ROOM: rect w=WIDTH h=HEIGHT center=(0,0)` - Room dimensions
+- `WALLS: rect_perimeter closed=true layer=WALLS` - Wall perimeter
+- `OBJECT_NAME: rect w=WIDTH h=HEIGHT center=(X,Y) layer=LAYER closed=true anchor_wall=WALL` - Rectangular objects
+- `OBJECT_NAME: circle r=RADIUS center=(X,Y) layer=LAYER closed=true anchor_wall=WALL` - Circular objects
 
-These coordinates are then converted to DXF files using `dxf_parser.py`.
+The DSL output is then converted to DXF files using `dsl_parser.py`.
 
 ## Notes
 
@@ -715,12 +884,50 @@ The project includes a comprehensive Makefile for automating common tasks:
 ### Training
 
 - `make train` - **Start training on RunPod server** (chmods scripts, sets correct paths, runs training)
+- `make train-resume` - **Resume training from latest checkpoint** (auto-detects) or specify `CHECKPOINT=path/to/checkpoint`
+
+### Model Management
+
+- `make merge-model` - **Merge LoRA adapter with base model** (use `ADAPTER_PATH` and `MODEL_OUTPUT_DIR` env vars)
+- `make upload-model` - **Upload merged model to Hugging Face** (use `MODEL_PATH` env var)
+- `make deploy-ollama` - **Deploy merged model to Ollama** (requires llama.cpp, see [Ollama Setup](#ollama-deployment))
+
+**Required Environment Variables (.env file):**
+
+Create a `.env` file in the `workspace/` directory with the following variables:
+
+```bash
+# Hugging Face Configuration (required for upload_model.py)
+HF_TOKEN=your_huggingface_token_here
+HF_USERNAME=your-username
+HF_FINE_TUNED_MODEL_NAME=your-model-name
+
+# Model Configuration (required for both scripts)
+BASE_MODEL=Qwen/Qwen2.5-Coder-3B-Instruct
+
+# Merge Model Configuration (required for merge_model.py)
+ADAPTER_PATH=/path/to/adapter
+OUTPUT_DIR=/path/to/merged_model
+
+# Upload Model Configuration (required for upload_model.py)
+MODEL_PATH=/path/to/merged_model
+
+# Ollama Deployment Configuration (optional, for deploy_ollama.py)
+MODEL_OUTPUT_DIR=/path/to/merged_model  # Same as MODEL_PATH after merging
+OLLAMA_MODEL_NAME=cadllm  # Optional, defaults to 'cadllm'
+GGUF_OUTPUT_DIR=./ollama-models  # Optional, defaults to ./ollama-models
+LLAMA_CPP_PATH=/path/to/llama.cpp  # Optional, auto-detects Homebrew and common locations
+
+# Repository Privacy Setting (optional, default: true)
+HF_REPO_PRIVATE=true
+```
+
+**Note:** All configuration values must be set in the `.env` file or passed as command-line arguments. There are no hardcoded defaults.
 
 ### Testing & Deployment
 
 - `make test-api` - Test Hugging Face API with default prompt
 - `make test-api-custom PROMPT="your prompt"` - Test API with custom prompt
-- `make upload-model` - Merge LoRA adapter and upload to Hugging Face
 
 ### Utilities
 
@@ -756,6 +963,103 @@ DATA_PATH=/workspace/dataset/jsonl/cadllm_2d_cleaned.jsonl \
 OUTPUT_DIR=/workspace/my-custom-model \
 make train
 ```
+
+## Ollama Deployment
+
+Deploy your merged model to Ollama for local inference:
+
+### Prerequisites
+
+1. **Install Ollama**: Download from [ollama.ai](https://ollama.ai) or via Homebrew:
+   ```bash
+   brew install ollama
+   ```
+
+2. **Install llama.cpp**: Required for converting models to GGUF format:
+   ```bash
+   brew install llama.cpp
+   ```
+   Or clone from source (uses CMake):
+   ```bash
+   git clone https://github.com/ggerganov/llama.cpp.git
+   cd llama.cpp
+   mkdir build && cd build
+   cmake ..
+   cmake --build .
+   ```
+   
+   **After building from source**, add to your `.env` file:
+   ```bash
+   LLAMA_CPP_PATH=/path/to/llama.cpp
+   ```
+   
+   Note: Point `LLAMA_CPP_PATH` to the **root** of the cloned llama.cpp directory (where `convert_hf_to_gguf.py` is located), not the `build` directory.
+
+### Deployment Steps
+
+1. **Merge your model** (if not already merged):
+   ```bash
+   make merge-model
+   ```
+
+2. **Deploy to Ollama**:
+   ```bash
+   make deploy-ollama
+   ```
+
+   This will:
+   - Convert the merged model to GGUF format using llama.cpp
+   - Create an Ollama Modelfile with the correct system prompt (matching training format)
+   - Create the Ollama model using `ollama create`
+
+3. **Test your model**:
+   ```bash
+   ollama run cadllm "Create a circle with radius 10mm"
+   ```
+
+### Configuration
+
+Set these variables in your `.env` file (optional, defaults provided):
+- `MODEL_OUTPUT_DIR` - Path to merged model (required, same as `MODEL_PATH` after merging)
+- `OLLAMA_MODEL_NAME` - Name for Ollama model (default: `cadllm`)
+- `GGUF_OUTPUT_DIR` - Output directory for GGUF file (default: `./ollama-models`)
+- `LLAMA_CPP_PATH` - Path to llama.cpp root directory (auto-detects Homebrew and common locations)
+
+**After cloning llama.cpp from source**, add this to your `.env` file:
+```bash
+LLAMA_CPP_PATH=$HOME/llama.cpp
+```
+
+**Important:** 
+- Point `LLAMA_CPP_PATH` to the **root** of the cloned llama.cpp directory (where `convert_hf_to_gguf.py` is located)
+- **NOT** the `build` subdirectory
+- The script will auto-detect Homebrew installations, so you only need to set this if you cloned from source
+
+**Example:**
+```bash
+# If you cloned to ~/llama.cpp
+LLAMA_CPP_PATH=$HOME/llama.cpp
+
+# Or use absolute path
+LLAMA_CPP_PATH=/Users/kiruthika/llama.cpp
+```
+
+### Manual Deployment
+
+You can also run the deployment script directly:
+```bash
+python deploy_ollama.py \
+  --model_path /path/to/merged_model \
+  --ollama_model_name cadllm \
+  --llama_cpp_path /path/to/llama.cpp
+```
+
+**Note:** The script automatically detects:
+- Homebrew installations of llama.cpp
+- llama.cpp in common locations (`~/llama.cpp`, `~/code/llama.cpp`, etc.)
+- Conversion scripts in `bin/` or `libexec/` directories
+
+For more detailed setup instructions, see [OLLAMA_SETUP.md](NVIDIA-H200-NVL/workspace/OLLAMA_SETUP.md).
 
 ## License
 
