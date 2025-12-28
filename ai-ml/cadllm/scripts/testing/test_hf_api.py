@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 """
-Test script for Hugging Face Inference API or Ollama (local testing).
+Test script for CAD-LLM model inference via multiple methods.
 
-This script tests the CAD-LLM model using either:
+This script tests the CAD-LLM model using one of:
 - Hugging Face Inference API (default, for cloud/remote testing)
+- Hugging Face Space API (for testing deployed Space)
 - Ollama (for local testing on Mac)
 
 It loads all configuration from the .env file and provides a simple way
 to test model inference.
 
 Usage:
-    # Use Hugging Face API (default)
+    # Use Hugging Face Inference API (default)
     python test_hf_api.py
+    
+    # Use Hugging Face Space API
+    python test_hf_api.py --space
     
     # Use Ollama for local testing
     python test_hf_api.py --ollama
     
     # With a custom prompt
     python test_hf_api.py "Create a rectangle 50x30mm"
+    python test_hf_api.py --space "Create a rectangle 50x30mm"
     python test_hf_api.py --ollama "Create a rectangle 50x30mm"
 """
 
@@ -27,10 +32,14 @@ import argparse
 import requests
 from pathlib import Path
 from dotenv import load_dotenv
+
+# Add utils directory to path for cadllm_client import
+sys.path.insert(0, str(Path(__file__).parent.parent / "utils"))
 from cadllm_client import CADLLMClient
 
-# Load environment variables from .env file
-env_path = Path(__file__).parent / ".env"
+# Load environment variables from .env file (look in project root)
+# This script is in scripts/testing/, so go up 4 levels to reach project root
+env_path = Path(__file__).parent.parent.parent.parent / ".env"
 if env_path.exists():
     load_dotenv(env_path)
     print("✅ Loaded configuration from .env file")
@@ -64,6 +73,10 @@ DEFAULT_PROMPT = "Create a circle with radius 10mm centered at origin"
 OLLAMA_MODEL_NAME = os.getenv("OLLAMA_MODEL_NAME", "cadllm")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
+# Hugging Face Space configuration
+HF_SPACE_REPO = os.getenv("HF_SPACE_REPO")
+HF_SPACE_URL = os.getenv("HF_SPACE_URL")  # Optional: direct URL override
+
 
 def validate_config():
     """
@@ -96,6 +109,113 @@ def validate_config():
                 "  Option 1: HF_MODEL_NAME=your-username/model-name\n"
                 "  Option 2: HF_USERNAME=your-username and HF_FINE_TUNED_MODEL_NAME=model-name"
             )
+
+
+def test_with_space(prompt: str):
+    """Test using Hugging Face Space API."""
+    print("=" * 60)
+    print("CAD-LLM Hugging Face Space API Test")
+    print("=" * 60)
+    
+    # Determine Space URL
+    if HF_SPACE_URL:
+        space_url = HF_SPACE_URL.rstrip('/')
+    elif HF_SPACE_REPO:
+        # Construct Space URL from repo name (format: username/space-name)
+        # Hugging Face Spaces use format: https://username-space-name.hf.space
+        repo_parts = HF_SPACE_REPO.split('/')
+        if len(repo_parts) == 2:
+            username, space_name = repo_parts
+            space_url = f"https://{username}-{space_name}.hf.space"
+        else:
+            print("❌ Error: HF_SPACE_REPO must be in format 'username/space-name'")
+            print(f"   Got: {HF_SPACE_REPO}")
+            sys.exit(1)
+    else:
+        # Try to construct from HF_MODEL_NAME or HF_USERNAME/HF_FINE_TUNED_MODEL_NAME
+        if HF_MODEL_NAME:
+            # Assume Space has similar name (this is a fallback)
+            model_parts = HF_MODEL_NAME.split('/')
+            if len(model_parts) == 2:
+                username, model_name = model_parts
+                # Try common Space naming patterns
+                space_name = model_name.replace('_', '-').lower()
+                space_url = f"https://{username}-{space_name}.hf.space"
+            else:
+                print("❌ Error: Cannot determine Space URL from HF_MODEL_NAME.")
+                print("   Please set HF_SPACE_URL or HF_SPACE_REPO in .env file.")
+                sys.exit(1)
+        elif HF_USERNAME:
+            print("❌ Error: Cannot determine Space URL.")
+            print("   Please set HF_SPACE_URL or HF_SPACE_REPO in .env file.")
+            print("   Example: HF_SPACE_REPO=username/space-name")
+            print("   Or: HF_SPACE_URL=https://username-space-name.hf.space")
+            sys.exit(1)
+        else:
+            print("❌ Error: Cannot determine Space URL.")
+            print("   Please set HF_SPACE_URL or HF_SPACE_REPO in .env file.")
+            print("   Example: HF_SPACE_REPO=username/space-name")
+            print("   Or: HF_SPACE_URL=https://username-space-name.hf.space")
+            sys.exit(1)
+    
+    print(f"Space URL: {space_url}")
+    print(f"Prompt: {prompt}")
+    print("=" * 60)
+    
+    # Test Space API endpoint
+    api_url = f"{space_url}/generate"
+    
+    payload = {
+        "instruction": prompt,
+        "max_new_tokens": 400,
+        "temperature": 0.7,
+        "top_p": 0.9
+    }
+    
+    try:
+        print("\n🔄 Generating response from Space...")
+        response = requests.post(
+            api_url,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=120
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        generated_text = result.get("output", "").strip()
+        
+        print("\n" + "=" * 60)
+        print("✅ GENERATED OUTPUT (Space API)")
+        print("=" * 60)
+        print(generated_text)
+        print("=" * 60)
+        print(f"\n✅ Space API test completed successfully!")
+        print(f"   Space URL: {space_url}")
+        
+    except requests.exceptions.ConnectionError:
+        print(f"\n❌ Cannot connect to Space at {space_url}")
+        print("   The Space may still be building or the URL is incorrect.")
+        print("\n📝 To fix this:")
+        print("   1. Check that the Space is deployed: https://huggingface.co/spaces")
+        print("   2. Wait for the Space to finish building (check the Space page)")
+        print("   3. Verify the Space URL is correct")
+        print("   4. Try accessing the Space in your browser first")
+        sys.exit(1)
+    except requests.exceptions.HTTPError as e:
+        print(f"\n❌ HTTP Error: {e}")
+        if hasattr(e, 'response') and e.response is not None:
+            try:
+                error_detail = e.response.json()
+                print(f"   Error details: {error_detail}")
+            except:
+                print(f"   Response: {e.response.text[:500]}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ Generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
 
 def test_with_ollama(prompt: str):
@@ -168,11 +288,33 @@ def main():
     a response for the test prompt.
     """
     # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Test CAD-LLM model inference")
+    parser = argparse.ArgumentParser(
+        description="Test CAD-LLM model inference",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Test with Hugging Face Inference API (default)
+  python test_hf_api.py
+  
+  # Test with Hugging Face Space API
+  python test_hf_api.py --space
+  
+  # Test with Ollama (local)
+  python test_hf_api.py --ollama
+  
+  # Custom prompt with Space API
+  python test_hf_api.py --space "Create a kitchen with sink and stove"
+        """
+    )
     parser.add_argument(
         "--ollama",
         action="store_true",
         help="Use Ollama for local inference instead of Hugging Face API"
+    )
+    parser.add_argument(
+        "--space",
+        action="store_true",
+        help="Use Hugging Face Space API instead of Inference API"
     )
     parser.add_argument(
         "prompt",
@@ -190,6 +332,11 @@ def main():
     # Use Ollama if requested
     if args.ollama:
         test_with_ollama(prompt)
+        return
+    
+    # Use Space API if requested
+    if args.space:
+        test_with_space(prompt)
         return
     
     # Otherwise use Hugging Face API
@@ -215,13 +362,8 @@ def main():
         print("   3. Run this script again")
         sys.exit(1)
     
-    # Get prompt from command line or use default
-    if len(sys.argv) > 1:
-        prompt = " ".join(sys.argv[1:])
-        print(f"\n📝 Using custom prompt from command line")
-    else:
-        prompt = DEFAULT_PROMPT
-        print(f"\n📝 Using default test prompt")
+    # Prompt is already set above from args.prompt or DEFAULT_PROMPT
+    print(f"\n📝 Prompt: {prompt}")
     
     print(f"   Model: {HF_MODEL_NAME}")
     if HF_ENDPOINT_URL:

@@ -134,7 +134,7 @@ workspace/
 **Optional Files (if you have them):**
 - `.env` file (for Hugging Face API access)
 - `cadllm_client.py` (for API testing)
-- `test_hf_api.py` (for API testing)
+- `testing/test_hf_api.py` (for API testing)
 - `upload_model.py` (for model upload to Hugging Face)
 
 **Note:** Do NOT upload:
@@ -395,8 +395,9 @@ cadllm/
 │   │   └── run.sh                  # Tmux session manager (auto-installs deps)
 │   ├── inference/                  # Inference scripts
 │   │   ├── infer.py                # Inference script (GPU/Cloud)
-│   │   ├── infer_local_mac.py      # Local inference using Ollama (Mac)
-│   │   └── test_hf_api.py          # Hugging Face API test script
+│   │   └── infer_local_mac.py      # Local inference using Ollama (Mac)
+│   ├── testing/                    # API testing scripts
+│   │   └── test_hf_api.py          # Test Hugging Face API, Space API, or Ollama
 │   ├── model_management/           # Model management scripts
 │   │   ├── merge_model.py          # Merge LoRA adapter with base model
 │   │   ├── upload_model.py         # Upload merged model to Hugging Face

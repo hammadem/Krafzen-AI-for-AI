@@ -463,7 +463,7 @@ def check_model_status(repo_id):
             print("   - Or use a Dedicated Inference Endpoint")
         
         print("\n📝 Test again:")
-        print("   python test_hf_api.py")
+        print("   python testing/test_hf_api.py")
         print("\n💡 See enable_inference_api.md for detailed instructions")
         
     except Exception as e:

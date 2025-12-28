@@ -5,6 +5,7 @@
 SCRIPTS_DIR = scripts
 TRAINING_DIR = $(SCRIPTS_DIR)/training
 INFERENCE_DIR = $(SCRIPTS_DIR)/inference
+TESTING_DIR = $(SCRIPTS_DIR)/testing
 MODEL_MGMT_DIR = $(SCRIPTS_DIR)/model_management
 DEPLOYMENT_DIR = $(SCRIPTS_DIR)/deployment
 UTILS_DIR = $(SCRIPTS_DIR)/utils
@@ -203,7 +204,7 @@ unarchive: ## Extract workspace package on training machine (RunPod) - use after
 
 test-api: ## Test Hugging Face API (requires .env file with HF_TOKEN)
 	@echo "🧪 Testing Hugging Face API..."
-	cd $(INFERENCE_DIR) && python test_hf_api.py
+	cd $(TESTING_DIR) && python test_hf_api.py
 	@echo "✅ API test complete"
 
 test-api-custom: ## Test Hugging Face API with custom prompt (usage: make test-api-custom PROMPT="your prompt")
@@ -212,7 +213,7 @@ test-api-custom: ## Test Hugging Face API with custom prompt (usage: make test-a
 		exit 1; \
 	fi
 	@echo "🧪 Testing Hugging Face API with prompt: $(PROMPT)"
-	cd $(INFERENCE_DIR) && python test_hf_api.py "$(PROMPT)"
+	cd $(TESTING_DIR) && python test_hf_api.py "$(PROMPT)"
 	@echo "✅ API test complete"
 
 infer-local: ## Run model locally on Mac using Ollama (requires .env with OLLAMA_MODEL_NAME)
@@ -398,29 +399,16 @@ update-space: ## Update Space app with latest model name from .env (does not dep
 	fi
 	@echo "✅ Space app updated (run 'make deploy-space' to push changes)"
 
-deploy-space: ## Deploy Space app to Hugging Face (commits and pushes changes)
+deploy-space: ## Deploy Space app to Hugging Face (pushes space directory to HF Space repo)
 	@echo "🚀 Deploying Space app to Hugging Face..."
 	@if [ ! -d "$(SPACE_DIR)" ]; then \
 		echo "❌ Error: Space directory not found at $(SPACE_DIR)"; \
 		exit 1; \
 	fi
-	@echo "   Checking git status..."
-	@cd $(SPACE_DIR) && \
-		if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$$(git status --porcelain)" ]; then \
-			echo "   📝 Staging changes..."; \
-			git add -A && \
-			echo "   💾 Committing changes..."; \
-			git commit -m "Update Space app configuration" || true && \
-			echo "   📤 Pushing to Hugging Face Space..."; \
-			git push origin main || git push origin master || true && \
-			echo "   ✅ Space app deployed!"; \
-			echo ""; \
-			echo "   🌐 Your Space will rebuild automatically at:"; \
-			echo "   https://huggingface.co/spaces/mkmad7/cad-llm-api"; \
-		else \
-			echo "   ✅ No changes to commit"; \
-			echo "   💡 To force rebuild, make a small change or use Hugging Face UI"; \
-		fi
+	@echo "   Using temporary git repository to push Space directory to Hugging Face..."
+	@python $(DEPLOYMENT_DIR)/deploy_space.py \
+		--space_dir "$$(cd $(SPACE_DIR) && pwd)" \
+		--commit_message "Update Space app configuration"
 	@echo "✅ Deployment complete"
 
 clean: ## Remove generated files (package, __pycache__, etc.)
@@ -456,6 +444,7 @@ info: ## Show project information and file sizes
 	@echo "📄 Python Scripts by Category:"
 	@echo "  Training: $$(find $(TRAINING_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
 	@echo "  Inference: $$(find $(INFERENCE_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
+	@echo "  Testing: $$(find $(TESTING_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
 	@echo "  Model Management: $$(find $(MODEL_MGMT_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
 	@echo "  Deployment: $$(find $(DEPLOYMENT_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
 	@echo "  Utils: $$(find $(UTILS_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
