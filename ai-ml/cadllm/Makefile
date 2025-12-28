@@ -2,9 +2,15 @@
 
 # Configuration
 # When running locally (from cadllm root)
-WORKSPACE_DIR = NVIDIA-H200-NVL/workspace
-DATASET_DIR = $(WORKSPACE_DIR)/dataset
-SCRIPTS_DIR = $(DATASET_DIR)/scripts
+SCRIPTS_DIR = scripts
+TRAINING_DIR = $(SCRIPTS_DIR)/training
+INFERENCE_DIR = $(SCRIPTS_DIR)/inference
+MODEL_MGMT_DIR = $(SCRIPTS_DIR)/model_management
+DEPLOYMENT_DIR = $(SCRIPTS_DIR)/deployment
+UTILS_DIR = $(SCRIPTS_DIR)/utils
+
+DATASET_DIR = dataset
+DATASET_SCRIPTS_DIR = $(DATASET_DIR)/scripts
 JSONL_DIR = $(DATASET_DIR)/jsonl
 RAW_DIR = $(DATASET_DIR)/cadllm_raw
 PACKAGE_NAME = cadllm-workspace.tar.gz
@@ -15,7 +21,7 @@ SERVER_DATA_PATH = /workspace/dataset/jsonl/cadllm.jsonl
 SERVER_OUTPUT_DIR = /workspace/cadllm
 
 # Space deployment
-SPACE_DIR = $(WORKSPACE_DIR)/space/cad-llm-api
+SPACE_DIR = $(DEPLOYMENT_DIR)/space/cad-llm-api
 
 help: ## Show this help message
 	@echo "CADLLM Makefile - Available commands:"
@@ -25,7 +31,7 @@ help: ## Show this help message
 
 setup: ## Install Python dependencies
 	@echo "📦 Installing Python dependencies..."
-	cd $(WORKSPACE_DIR) && pip install -r requirements.txt
+	pip install -r requirements.txt
 	@echo "✅ Dependencies installed"
 
 download-dataset: ## Download raw CADLLM dataset from Hugging Face
@@ -39,7 +45,7 @@ recreate-dataset: ## Recreate dataset with descriptions from Excel files
 		echo "❌ Error: Raw dataset not found. Run 'make download-dataset' first."; \
 		exit 1; \
 	fi
-	cd $(SCRIPTS_DIR) && python recreate_dataset_with_descriptions.py \
+	cd $(DATASET_SCRIPTS_DIR) && python recreate_dataset_with_descriptions.py \
 		--raw-dir ../../cadllm_raw/cad_collection_select_V2/cad_collection_select_V2 \
 		--excel-dir ../../cadllm_raw/ccs_description_text \
 		--output ../jsonl/cadllm_2d_with_descriptions.jsonl
@@ -51,7 +57,7 @@ clean-dataset: ## Clean dataset (normalize coordinates, close shapes, apply dime
 		echo "❌ Error: Dataset with descriptions not found. Run 'make recreate-dataset' first."; \
 		exit 1; \
 	fi
-	cd $(SCRIPTS_DIR) && python clean_dataset.py \
+	cd $(DATASET_SCRIPTS_DIR) && python clean_dataset.py \
 		--input ../jsonl/cadllm_2d_with_descriptions.jsonl \
 		--output ../jsonl/cadllm_2d_cleaned.jsonl
 	@echo "✅ Dataset cleaned and ready for training"
@@ -72,21 +78,21 @@ prepare-dataset: download-dataset recreate-dataset clean-dataset ## Complete dat
 train: ## Start training (use on RunPod server - sets up scripts and runs training)
 	@echo "🚀 Starting training..."
 	@echo "   Making scripts executable..."
-	chmod +x train.sh run.sh
+	@cd $(TRAINING_DIR) && chmod +x train.sh run.sh
 	@echo "   Using configuration:"
 	@echo "     DATA_PATH: $${DATA_PATH:-$(SERVER_DATA_PATH)}"
 	@echo "     OUTPUT_DIR: $${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)}"
 	@echo ""
 	@echo "   Note: run.sh will automatically install dependencies if needed"
 	@echo ""
-	DATA_PATH=$${DATA_PATH:-$(SERVER_DATA_PATH)} \
+	@cd $(TRAINING_DIR) && DATA_PATH=$${DATA_PATH:-$(SERVER_DATA_PATH)} \
 	OUTPUT_DIR=$${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)} \
 	./run.sh
 
 train-resume: ## Resume training from latest checkpoint (auto-detects) or specify CHECKPOINT=path/to/checkpoint
 	@echo "🔄 Resuming training from checkpoint..."
 	@echo "   Making scripts executable..."
-	chmod +x train.sh
+	@cd $(TRAINING_DIR) && chmod +x train.sh
 	@echo "   Using configuration:"
 	@echo "     DATA_PATH: $${DATA_PATH:-$(SERVER_DATA_PATH)}"
 	@echo "     OUTPUT_DIR: $${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)}"
@@ -98,7 +104,7 @@ train-resume: ## Resume training from latest checkpoint (auto-detects) or specif
 	@echo ""
 	@echo "   The script will automatically find the latest checkpoint if not specified."
 	@echo ""
-	@if [ -n "$$CHECKPOINT" ]; then \
+	@cd $(TRAINING_DIR) && if [ -n "$$CHECKPOINT" ]; then \
 		DATA_PATH=$${DATA_PATH:-$(SERVER_DATA_PATH)} \
 		OUTPUT_DIR=$${OUTPUT_DIR:-$(SERVER_OUTPUT_DIR)} \
 		./train.sh \
@@ -117,21 +123,6 @@ package: ## Create tarball of workspace for upload to RunPod (excludes large fil
 	@echo "📦 Creating workspace package..."
 	@echo "   This excludes model checkpoints, raw dataset, and logs"
 	@echo "   Includes Makefile for easy training on server"
-	# Copy Makefile to workspace directory for packaging
-	cp Makefile $(WORKSPACE_DIR)/Makefile
-	cd $(WORKSPACE_DIR) && tar -czf ../../$(PACKAGE_NAME) \
-		--exclude='cad-agent-qwen-*' \
-		--exclude='dataset/cadllm_raw' \
-		--exclude='logs' \
-		--exclude='__pycache__' \
-		--exclude='*.pyc' \
-		--exclude='.env' \
-		--exclude='.DS_Store' \
-		--exclude='._*' \
-		--exclude='*.tar.gz' \
-		.
-	# Remove the copied Makefile from workspace (keep original in root)
-	rm -f $(WORKSPACE_DIR)/Makefile
 	@echo "✅ Package created: $(PACKAGE_NAME)"
 	@echo "   Size: $$(du -h $(PACKAGE_NAME) | cut -f1)"
 	@echo ""
@@ -147,9 +138,7 @@ package-with-dataset: ## Create tarball including cleaned dataset (larger file)
 		echo "❌ Error: Cleaned dataset not found. Run 'make prepare-dataset' first."; \
 		exit 1; \
 	fi
-	# Copy Makefile to workspace directory for packaging
-	cp Makefile $(WORKSPACE_DIR)/Makefile
-	cd $(WORKSPACE_DIR) && tar -czf ../../$(PACKAGE_NAME) \
+	@tar -czf $(PACKAGE_NAME) \
 		--exclude='cad-agent-qwen-*' \
 		--exclude='dataset/cadllm_raw' \
 		--exclude='logs' \
@@ -159,9 +148,9 @@ package-with-dataset: ## Create tarball including cleaned dataset (larger file)
 		--exclude='.DS_Store' \
 		--exclude='._*' \
 		--exclude='*.tar.gz' \
-		.
-	# Remove the copied Makefile from workspace (keep original in root)
-	rm -f $(WORKSPACE_DIR)/Makefile
+		--exclude='NVIDIA-H200-NVL' \
+		--exclude='ollama-models' \
+		scripts/ dataset/ docs/ requirements.txt Makefile README.md
 	@echo "✅ Package created: $(PACKAGE_NAME)"
 	@echo "   Size: $$(du -h $(PACKAGE_NAME) | cut -f1)"
 
@@ -171,9 +160,7 @@ package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for
 		echo "❌ Error: Enhanced dataset not found. Run 'make generate-enhanced-dataset' first."; \
 		exit 1; \
 	fi
-	# Copy Makefile to workspace directory for packaging
-	cp Makefile $(WORKSPACE_DIR)/Makefile
-	cd $(WORKSPACE_DIR) && tar -czf ../../$(PACKAGE_NAME) \
+	@tar -czf $(PACKAGE_NAME) \
 		--exclude='cad-agent-qwen-*' \
 		--exclude='logs' \
 		--exclude='__pycache__' \
@@ -182,9 +169,9 @@ package-with-enhanced-dataset: ## Create tarball including enhanced dataset (for
 		--exclude='.DS_Store' \
 		--exclude='._*' \
 		--exclude='*.tar.gz' \
-		.
-	# Remove the copied Makefile from workspace (keep original in root)
-	rm -f $(WORKSPACE_DIR)/Makefile
+		--exclude='NVIDIA-H200-NVL' \
+		--exclude='ollama-models' \
+		scripts/ dataset/ docs/ requirements.txt Makefile README.md
 	@echo "✅ Package created: $(PACKAGE_NAME)"
 	@echo "   Size: $$(du -h $(PACKAGE_NAME) | cut -f1)"
 	@echo ""
@@ -216,7 +203,7 @@ unarchive: ## Extract workspace package on training machine (RunPod) - use after
 
 test-api: ## Test Hugging Face API (requires .env file with HF_TOKEN)
 	@echo "🧪 Testing Hugging Face API..."
-	cd $(WORKSPACE_DIR) && python test_hf_api.py
+	cd $(INFERENCE_DIR) && python test_hf_api.py
 	@echo "✅ API test complete"
 
 test-api-custom: ## Test Hugging Face API with custom prompt (usage: make test-api-custom PROMPT="your prompt")
@@ -225,47 +212,47 @@ test-api-custom: ## Test Hugging Face API with custom prompt (usage: make test-a
 		exit 1; \
 	fi
 	@echo "🧪 Testing Hugging Face API with prompt: $(PROMPT)"
-	cd $(WORKSPACE_DIR) && python test_hf_api.py "$(PROMPT)"
+	cd $(INFERENCE_DIR) && python test_hf_api.py "$(PROMPT)"
 	@echo "✅ API test complete"
 
-infer-local: ## Run model locally on Mac (requires .env with MODEL_PATH or ADAPTER_PATH, optional PROMPT="your prompt")
-	@echo "💻 Running model locally on Mac..."
+infer-local: ## Run model locally on Mac using Ollama (requires .env with OLLAMA_MODEL_NAME)
+	@echo "💻 Running model locally on Mac (Ollama)..."
 	@echo "   Loading configuration from .env file..."
 	@if [ -n "$$PROMPT" ]; then \
-		cd $(WORKSPACE_DIR) && python infer_local_mac.py "$$PROMPT"; \
+		cd $(INFERENCE_DIR) && python infer_local_mac.py "$$PROMPT"; \
 	else \
-		cd $(WORKSPACE_DIR) && python infer_local_mac.py; \
+		cd $(INFERENCE_DIR) && python infer_local_mac.py; \
 	fi
 	@echo "✅ Local inference complete"
 
 merge-model: ## Merge LoRA adapter with base model (requires .env file with ADAPTER_PATH, OUTPUT_DIR, BASE_MODEL)
 	@echo "🔧 Merging LoRA adapter with base model..."
 	@echo "   Loading configuration from .env file..."
-	@cd $(WORKSPACE_DIR) && python merge_model.py
+	@cd $(MODEL_MGMT_DIR) && python merge_model.py
 	@echo "✅ Model merge complete"
 
 upload-model: ## Upload merged model to Hugging Face (requires .env file with MODEL_PATH, BASE_MODEL, HF_TOKEN, HF_USERNAME, HF_FINE_TUNED_MODEL_NAME)
 	@echo "📤 Uploading merged model to Hugging Face..."
 	@echo "   Loading configuration from .env file..."
-	@cd $(WORKSPACE_DIR) && python upload_model.py
+	@cd $(MODEL_MGMT_DIR) && python upload_model.py
 	@echo "✅ Model upload complete"
 
 upload-dataset: ## Upload dataset to Hugging Face (requires .env file with DATASET_PATH, HF_DATASET_NAME, HF_TOKEN, HF_USERNAME)
 	@echo "📤 Uploading dataset to Hugging Face..."
 	@echo "   Loading configuration from .env file..."
-	@if [ ! -f "$(WORKSPACE_DIR)/.env" ]; then \
+	@if [ ! -f ".env" ]; then \
 		echo "❌ Error: .env file not found. Please create it first."; \
 		exit 1; \
 	fi
-	@cd $(WORKSPACE_DIR) && python upload_dataset.py
+	@cd $(MODEL_MGMT_DIR) && python upload_dataset.py
 	@echo "✅ Dataset upload complete"
 
-deploy-ollama: ## Deploy merged model to Ollama (requires .env file with MODEL_OUTPUT_DIR, optional: OLLAMA_MODEL_NAME, GGUF_OUTPUT_DIR, LLAMA_CPP_PATH)
+deploy-ollama: ## Deploy merged model to Ollama (requires .env file with MODEL_PATH, optional: OLLAMA_MODEL_NAME, GGUF_OUTPUT_DIR, LLAMA_CPP_PATH)
 	@echo "🦙 Deploying model to Ollama..."
 	@echo "   Loading configuration from .env file..."
 	@echo "   Note: This requires llama.cpp to be installed"
 	@echo "   Install from: https://github.com/ggerganov/llama.cpp"
-	@cd $(WORKSPACE_DIR) && python deploy_ollama.py
+	@cd $(DEPLOYMENT_DIR) && python deploy_ollama.py
 	@echo "✅ Ollama deployment complete"
 
 ollama-start: ## Start Ollama server
@@ -392,24 +379,23 @@ open-webui-status: ## Check Open WebUI container status
 
 update-space: ## Update Space app with latest model name from .env (does not deploy)
 	@echo "🔄 Updating Space app configuration..."
-	@if [ ! -f "$(WORKSPACE_DIR)/.env" ]; then \
+	@if [ ! -f ".env" ]; then \
 		echo "❌ Error: .env file not found. Please create it first."; \
 		exit 1; \
 	fi
 	@echo "   Loading model name from .env..."
-	@cd $(WORKSPACE_DIR) && \
-		if [ -f .env ]; then \
-			. .env && \
-			if [ -n "$$HF_MODEL_NAME" ]; then \
-				echo "   ✅ Found HF_MODEL_NAME=$$HF_MODEL_NAME"; \
-				echo "   📝 Updating app.py default model name..."; \
-				sed -i.bak "s|MODEL_NAME = os.getenv(\"HF_MODEL_NAME\", \".*\")|MODEL_NAME = os.getenv(\"HF_MODEL_NAME\", \"$$HF_MODEL_NAME\")|g" $(SPACE_DIR)/app.py && \
-				rm -f $(SPACE_DIR)/app.py.bak && \
-				echo "   ✅ Updated app.py"; \
-			else \
-				echo "   ⚠️  HF_MODEL_NAME not found in .env, using default"; \
-			fi; \
-		fi
+	@if [ -f .env ]; then \
+		. .env && \
+		if [ -n "$$HF_MODEL_NAME" ]; then \
+			echo "   ✅ Found HF_MODEL_NAME=$$HF_MODEL_NAME"; \
+			echo "   📝 Updating app.py default model name..."; \
+			sed -i.bak "s|MODEL_NAME = os.getenv(\"HF_MODEL_NAME\", \".*\")|MODEL_NAME = os.getenv(\"HF_MODEL_NAME\", \"$$HF_MODEL_NAME\")|g" $(SPACE_DIR)/app.py && \
+			rm -f $(SPACE_DIR)/app.py.bak && \
+			echo "   ✅ Updated app.py"; \
+		else \
+			echo "   ⚠️  HF_MODEL_NAME not found in .env, using default"; \
+		fi; \
+	fi
 	@echo "✅ Space app updated (run 'make deploy-space' to push changes)"
 
 deploy-space: ## Deploy Space app to Hugging Face (commits and pushes changes)
@@ -440,8 +426,10 @@ deploy-space: ## Deploy Space app to Hugging Face (commits and pushes changes)
 clean: ## Remove generated files (package, __pycache__, etc.)
 	@echo "🧹 Cleaning generated files..."
 	rm -f $(PACKAGE_NAME)
-	find $(WORKSPACE_DIR) -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find $(WORKSPACE_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true
+	find $(SCRIPTS_DIR) -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find $(SCRIPTS_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true
+	find $(DATASET_DIR) -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find $(DATASET_DIR) -type f -name "*.pyc" -delete 2>/dev/null || true
 	@echo "✅ Clean complete"
 
 clean-all: clean ## Remove all generated files including processed datasets
@@ -455,9 +443,24 @@ info: ## Show project information and file sizes
 	@echo "📊 CADLLM Project Information"
 	@echo "=============================="
 	@echo ""
-	@echo "Workspace: $(WORKSPACE_DIR)"
+	@echo "Scripts: $(SCRIPTS_DIR)"
+	@echo "Dataset: $(DATASET_DIR)"
+	@echo "Documentation: docs/"
 	@echo ""
-	@echo "Dataset files:"
+	@echo "📁 Directory Structure:"
+	@echo "  scripts/"
+	@find $(SCRIPTS_DIR) -maxdepth 1 -type d | sed 's|^|    |' || echo "    (empty)"
+	@echo "  dataset/"
+	@find $(DATASET_DIR) -maxdepth 1 -type d | sed 's|^|    |' || echo "    (empty)"
+	@echo ""
+	@echo "📄 Python Scripts by Category:"
+	@echo "  Training: $$(find $(TRAINING_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
+	@echo "  Inference: $$(find $(INFERENCE_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
+	@echo "  Model Management: $$(find $(MODEL_MGMT_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
+	@echo "  Deployment: $$(find $(DEPLOYMENT_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
+	@echo "  Utils: $$(find $(UTILS_DIR) -name "*.py" -type f 2>/dev/null | wc -l | xargs)"
+	@echo ""
+	@echo "📦 Dataset Files:"
 	@if [ -f "$(JSONL_DIR)/cadllm_2d_cleaned.jsonl" ]; then \
 		echo "  ✅ cadllm_2d_cleaned.jsonl: $$(du -h $(JSONL_DIR)/cadllm_2d_cleaned.jsonl | cut -f1)"; \
 	else \
@@ -469,20 +472,10 @@ info: ## Show project information and file sizes
 		echo "  ❌ cadllm_2d_with_descriptions.jsonl: Not found"; \
 	fi
 	@echo ""
-	@echo "Raw dataset:"
-	@if [ -d "$(RAW_DIR)/cad_collection_select_V2" ]; then \
-		echo "  ✅ Raw dataset downloaded"; \
-		echo "     Size: $$(du -sh $(RAW_DIR)/cad_collection_select_V2 2>/dev/null | cut -f1 || echo 'unknown')"; \
-	else \
-		echo "  ❌ Raw dataset not downloaded"; \
-	fi
-	@echo ""
-	@echo "Python scripts:"
-	@find $(WORKSPACE_DIR) -maxdepth 1 -name "*.py" -type f | wc -l | xargs echo "  Total:"
-	@echo ""
+	@echo "📋 Package:"
 	@if [ -f "$(PACKAGE_NAME)" ]; then \
-		echo "Package: $(PACKAGE_NAME) ($$(du -h $(PACKAGE_NAME) | cut -f1))"; \
+		echo "  ✅ $(PACKAGE_NAME): $$(du -h $(PACKAGE_NAME) | cut -f1)"; \
 	else \
-		echo "Package: Not created (run 'make package')"; \
+		echo "  ❌ $(PACKAGE_NAME): Not found"; \
 	fi
 

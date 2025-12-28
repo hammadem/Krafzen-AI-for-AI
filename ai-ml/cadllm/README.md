@@ -388,34 +388,48 @@ Or use RunPod's file manager to download the model directory.
 
 ```
 cadllm/
-├── NVIDIA-H200-NVL/
-│   └── workspace/
-│       ├── train_qwen.py                    # Main training script
-│       ├── infer.py                 # Inference script (GPU)
-│       ├── cadllm_client.py         # Hugging Face API client
-│       ├── test_hf_api.py           # Hugging Face API test script
-│       ├── dsl_parser.py             # DSL format to DXF parser
-│       ├── upload_model.py          # Merge LoRA and upload to Hugging Face
-│       ├── requirements.txt         # Python dependencies
-│       ├── train.sh                 # Training launcher script
-│       ├── run.sh                   # Tmux session manager (auto-installs deps)
-│       ├── cadllm/                 # Fine-tuned model output directory (local)
-│       ├── dataset/                 # Dataset and processing scripts
-│       │   ├── cadllm_raw/          # Raw dataset files (downloaded)
-│       │   ├── jsonl/               # Processed JSONL files
-│       │   │   ├── cadllm.jsonl             # Training dataset (default)
-│       │   │   ├── cadllm_2d_cleaned.jsonl  # Cleaned dataset (can be renamed to cadllm.jsonl)
-│       │   │   └── cadllm_2d_with_descriptions.jsonl
-│       │   └── scripts/             # Dataset processing scripts
-│       │       ├── download_dataset.py
-│       │       ├── recreate_dataset_with_descriptions.py
-│       │       └── clean_dataset.py
-│       ├── space/                   # Hugging Face Space deployment
-│       │   └── cad-llm-api/         # FastAPI server for Space
-│       └── logs/                    # Training logs
-│       └── logs/                   # Training logs
-├── docs/                           # Documentation
-│   └── huggingface-deployment.md   # Hugging Face API deployment guide
+├── scripts/                        # All Python scripts organized by functionality
+│   ├── training/                   # Training-related scripts
+│   │   ├── train_qwen.py           # Main training script
+│   │   ├── train.sh                # Training launcher script
+│   │   └── run.sh                  # Tmux session manager (auto-installs deps)
+│   ├── inference/                  # Inference scripts
+│   │   ├── infer.py                # Inference script (GPU/Cloud)
+│   │   ├── infer_local_mac.py      # Local inference using Ollama (Mac)
+│   │   └── test_hf_api.py          # Hugging Face API test script
+│   ├── model_management/           # Model management scripts
+│   │   ├── merge_model.py          # Merge LoRA adapter with base model
+│   │   ├── upload_model.py         # Upload merged model to Hugging Face
+│   │   └── upload_dataset.py       # Upload dataset to Hugging Face
+│   ├── deployment/                 # Deployment scripts
+│   │   ├── deploy_ollama.py        # Deploy model to Ollama
+│   │   ├── space/                  # Hugging Face Space deployment
+│   │   │   └── cad-llm-api/        # FastAPI server for Space
+│   │   └── ollama-models/          # Ollama model files (generated)
+│   └── utils/                      # Utility scripts
+│       ├── dsl_parser.py           # DSL format to DXF parser
+│       └── cadllm_client.py       # Hugging Face API client
+├── dataset/                        # Dataset and processing scripts
+│   ├── cadllm_raw/                 # Raw dataset files (downloaded)
+│   ├── jsonl/                      # Processed JSONL files
+│   │   ├── cadllm.jsonl           # Training dataset (default)
+│   │   ├── cadllm_2d_cleaned.jsonl # Cleaned dataset
+│   │   └── cadllm_2d_with_descriptions.jsonl
+│   └── scripts/                    # Dataset processing scripts
+│       ├── download_dataset.py
+│       ├── recreate_dataset_with_descriptions.py
+│       └── clean_dataset.py
+├── docs/                           # Documentation organized by topic
+│   ├── training/                   # Training documentation
+│   │   ├── CAD_PROMPT_ENHANCEMENT_FINETUNING.md
+│   │   └── prompt_examples.md
+│   ├── deployment/                 # Deployment documentation
+│   │   ├── OLLAMA_SETUP.md         # Ollama setup and deployment guide
+│   │   └── huggingface-deployment.md
+│   └── dataset/                    # Dataset documentation
+│       └── README.md                # Dataset processing guide
+├── requirements.txt                # Python dependencies
+├── Makefile                        # Automation targets
 └── README.md                       # This file
 ```
 
@@ -888,7 +902,7 @@ The project includes a comprehensive Makefile for automating common tasks:
 
 ### Model Management
 
-- `make merge-model` - **Merge LoRA adapter with base model** (use `ADAPTER_PATH` and `MODEL_OUTPUT_DIR` env vars)
+- `make merge-model` - **Merge LoRA adapter with base model** (use `ADAPTER_PATH` and `MODEL_PATH` env vars)
 - `make upload-model` - **Upload merged model to Hugging Face** (use `MODEL_PATH` env var)
 - `make upload-dataset` - **Upload dataset to Hugging Face** (use `DATASET_PATH` env var)
 - `make deploy-ollama` - **Deploy merged model to Ollama** (requires llama.cpp, see [Ollama Setup](#ollama-deployment))
@@ -908,18 +922,15 @@ BASE_MODEL=Qwen/Qwen2.5-Coder-3B-Instruct
 
 # Merge Model Configuration (required for merge_model.py)
 ADAPTER_PATH=/path/to/adapter
-OUTPUT_DIR=/path/to/merged_model
+MODEL_PATH=/path/to/merged_model  # Output directory for merged model
 
 # Upload Dataset Configuration (required for upload_dataset.py)
 DATASET_PATH=./dataset/jsonl/cadllm.jsonl
 HF_DATASET_NAME=cadllm-dataset
 HF_DATASET_PRIVATE=true  # Optional, defaults to true
 
-# Upload Model Configuration (required for upload_model.py)
-MODEL_PATH=/path/to/merged_model
-
-# Ollama Deployment Configuration (optional, for deploy_ollama.py)
-MODEL_OUTPUT_DIR=/path/to/merged_model  # Same as MODEL_PATH after merging
+# Note: MODEL_PATH is used by merge_model.py, upload_model.py, and deploy_ollama.py
+# No need to set separate variables for each script
 OLLAMA_MODEL_NAME=cadllm  # Optional, defaults to 'cadllm'
 GGUF_OUTPUT_DIR=./ollama-models  # Optional, defaults to ./ollama-models
 LLAMA_CPP_PATH=/path/to/llama.cpp  # Optional, auto-detects Homebrew and common locations
@@ -1119,7 +1130,7 @@ Deploy your merged model to Ollama for local inference:
 ### Configuration
 
 Set these variables in your `.env` file (optional, defaults provided):
-- `MODEL_OUTPUT_DIR` - Path to merged model (required, same as `MODEL_PATH` after merging)
+- `MODEL_PATH` - Path to merged model (required, same variable used by merge, upload, and deploy scripts)
 - `OLLAMA_MODEL_NAME` - Name for Ollama model (default: `cadllm`)
 - `GGUF_OUTPUT_DIR` - Output directory for GGUF file (default: `./ollama-models`)
 - `LLAMA_CPP_PATH` - Path to llama.cpp root directory (auto-detects Homebrew and common locations)

@@ -58,7 +58,7 @@ def parse_args():
         "--model_path",
         type=str,
         default=None,
-        help="Path to merged model directory (required: set MODEL_OUTPUT_DIR env var or use --model_path)"
+        help="Path to merged model directory (required: set MODEL_PATH env var or use --model_path)"
     )
     parser.add_argument(
         "--ollama_model_name",
@@ -460,11 +460,12 @@ def main():
     args = parse_args()
     
     # Get model path from args or env
-    model_path = args.model_path or os.getenv("MODEL_OUTPUT_DIR")
+    # Check MODEL_PATH first (preferred), then MODEL_OUTPUT_DIR for backward compatibility
+    model_path = args.model_path or os.getenv("MODEL_PATH") or os.getenv("MODEL_OUTPUT_DIR")
     if not model_path:
         raise ValueError(
             "Model path not specified.\n"
-            "Set MODEL_OUTPUT_DIR in .env file or use --model_path argument."
+            "Set MODEL_PATH in .env file or use --model_path argument."
         )
     # Expand environment variables and user home directory
     model_path = os.path.expandvars(model_path)  # Expands $HOME, $VAR, etc.

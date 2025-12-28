@@ -41,7 +41,7 @@ def parse_args():
         "--model_output_dir",
         type=str,
         default=None,
-        help="Output directory for merged model (required: set MODEL_OUTPUT_DIR env var or use --model_output_dir)"
+        help="Output directory for merged model (required: set MODEL_PATH env var or use --model_output_dir)"
     )
     parser.add_argument(
         "--base_model",
@@ -248,15 +248,16 @@ def main():
             adapter_path = Path(__file__).parent / adapter_path
     
     # Determine output directory (required)
+    # Check MODEL_PATH first (preferred), then MODEL_OUTPUT_DIR for backward compatibility
     if args.model_output_dir:
         model_output_dir_str = args.model_output_dir
     else:
-        model_output_dir_str = os.getenv("MODEL_OUTPUT_DIR")
+        model_output_dir_str = os.getenv("MODEL_PATH") or os.getenv("MODEL_OUTPUT_DIR")
     
     if not model_output_dir_str:
         raise ValueError(
-            "MODEL_OUTPUT_DIR is required. Set it in .env file or use --model_output_dir argument.\n"
-            "Example: MODEL_OUTPUT_DIR=/path/to/merged_model"
+            "MODEL_PATH is required. Set it in .env file or use --model_output_dir argument.\n"
+            "Example: MODEL_PATH=/path/to/merged_model"
         )
     
     model_output_dir_str = os.path.expanduser(model_output_dir_str)
