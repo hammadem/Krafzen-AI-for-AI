@@ -107,7 +107,10 @@ app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
+app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"])
+from app.routes import chat_routes
+app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"])
 
 # Include parser router if available
 sys.stdout.write(f"🔍 Parser status: available={parser_available}, parser={parser is not None}\n")

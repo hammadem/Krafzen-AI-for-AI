@@ -16,6 +16,17 @@ check_port() {
     fi
 }
 
+# Function to kill process on port
+kill_port() {
+    local port=$1
+    local pid=$(lsof -Pi :$port -sTCP:LISTEN -t)
+    if [ ! -z "$pid" ]; then
+        echo "   ⚠️  Killing process $pid on port $port..."
+        kill -9 $pid 2>/dev/null
+        sleep 1
+    fi
+}
+
 # Function to cleanup on exit
 cleanup() {
     echo ""
@@ -36,9 +47,11 @@ trap cleanup SIGINT SIGTERM
 
 # Check backend port
 if check_port 8000; then
-    echo "✅ Backend port 8000 is already in use (server may be running)"
-    echo "   If you want to restart, please stop the existing server first"
-else
+    echo "⚠️  Backend port 8000 is in use. Stopping existing server..."
+    kill_port 8000
+fi
+
+if true; then
     echo "📦 Starting Backend Server..."
     echo "   Backend will run on: http://localhost:8000"
     echo "   API Docs: http://localhost:8000/docs"
@@ -55,6 +68,8 @@ else
         pip install -r requirements.txt || { echo "❌ Error: Failed to install dependencies"; exit 1; }
     else
         source venv/bin/activate
+        echo "📥 Checking backend dependencies..."
+        pip install -r requirements.txt || { echo "❌ Error: Failed to install dependencies"; exit 1; }
     fi
     
     # Check if .env exists
@@ -92,14 +107,15 @@ if [ ! -z "$BACKEND_PID" ]; then
 fi
 
 # Check frontend port
-if check_port 3000; then
-    echo ""
-    echo "✅ Frontend port 3000 is already in use (server may be running)"
-    echo "   If you want to restart, please stop the existing server first"
-else
+if check_port 3001; then
+    echo "⚠️  Frontend port 3001 is in use. Stopping existing server..."
+    kill_port 3001
+fi
+
+if true; then
     echo ""
     echo "📦 Starting Frontend Server..."
-    echo "   Frontend will run on: http://localhost:3000"
+    echo "   Frontend will run on: http://localhost:3001"
     echo ""
     
     cd frontend || { echo "❌ Error: frontend directory not found"; exit 1; }
@@ -127,7 +143,7 @@ echo "=============================================="
 echo "✅ Development Servers Started!"
 echo ""
 echo "📍 Backend:  http://localhost:8000"
-echo "📍 Frontend: http://localhost:3000"
+echo "📍 Frontend: http://localhost:3001"
 echo "📍 API Docs: http://localhost:8000/docs"
 echo ""
 echo "📋 Logs:"
@@ -137,6 +153,12 @@ echo ""
 echo "Press Ctrl+C to stop all servers"
 echo "=============================================="
 echo ""
+
+# Stream logs to console
+echo "📋 Streaming logs (Ctrl+C to stop)..."
+# Using tail -f to stream logs from both files, forcing output to stdout
+tail -f /tmp/krafzen-backend.log /tmp/krafzen-frontend.log &
+TAIL_PID=$!
 
 # Wait for user interrupt
 wait

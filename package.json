@@ -1,0 +1,9 @@
+{
+    "name": "krafzen-ai-root",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "./start-dev.sh",
+        "stop": "pkill -f uvicorn; pkill -f 'next dev'; pkill -f 'next-server'; echo '🛑 Stopped all servers'"
+    }
+}

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     
     # CORS - Store as string to avoid JSON parsing issues with List[str]
     # Access via ALLOWED_ORIGINS_LIST property which converts to list
-    ALLOWED_ORIGINS: str = "http://localhost:3000,https://krafzen-ai-staging.vercel.app,https://*.vercel.app,https://staging.krafzen.com,https://app.krafzen.com"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,https://krafzen-ai-staging.vercel.app,https://*.vercel.app,https://staging.krafzen.com,https://app.krafzen.com"
     
     @property
     def ALLOWED_ORIGINS_LIST(self) -> List[str]:
@@ -27,6 +27,7 @@ class Settings(BaseSettings):
         if not self.ALLOWED_ORIGINS:
             return [
                 "http://localhost:3000",
+                "http://localhost:3001",
                 "https://krafzen-ai-staging.vercel.app",
                 "https://*.vercel.app",
                 "https://staging.krafzen.com",
@@ -58,6 +59,17 @@ class Settings(BaseSettings):
     # File Upload Configuration
     MAX_FILE_SIZE_MB: float = 25.0
     ALLOWED_AUDIO_FORMATS: str = "mp3,wav,m4a,ogg,flac,webm"
+
+    # Ollama Configuration
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL_NAME: str = "fine-tuned-model"
+
+    # Gemini Configuration
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.0-flash-001"
+    GEMINI_IMAGE_MODEL: str = "models/nano-banana-pro-preview"
+ # Available model per list_models.py
+
     
     @property
     def ALLOWED_AUDIO_FORMATS_LIST(self) -> List[str]:

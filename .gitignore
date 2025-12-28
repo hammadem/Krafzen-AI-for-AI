@@ -85,3 +85,4 @@ ai-ml/**/logs/
 ai-ml/**/*.tar.gz
 ai-ml/**/cadllm-workspace.tar.gz
 ai-ml/cadllm/NVIDIA-H200-NVL/workspace/space/cad-llm-api/
+scripts/test_output.txt
