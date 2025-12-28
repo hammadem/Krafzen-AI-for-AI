@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Inference script for fine-tuned CAD model (matches training format).
+Inference script for fine-tuned CAD model (GPU/Cloud testing).
+
+This script is for testing on GPU machines (e.g., cloud instances with CUDA).
+For local Mac testing, use infer_local_mac.py which uses Ollama.
 
 This script uses the same Qwen chat template format as training.
 """

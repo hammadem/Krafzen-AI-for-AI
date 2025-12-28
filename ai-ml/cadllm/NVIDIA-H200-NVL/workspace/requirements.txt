@@ -20,5 +20,8 @@ python-dotenv>=1.0.0
 # Hugging Face Inference API
 huggingface-hub==0.36.0
 
+# HTTP requests for Ollama API
+requests>=2.31.0
+
 # Note: For Ollama deployment, the gguf module comes with llama.cpp source
 # Do not install the PyPI 'gguf' package - it's incompatible with llama.cpp conversion scripts

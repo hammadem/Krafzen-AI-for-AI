@@ -1,20 +1,30 @@
 #!/usr/bin/env python3
 """
-Test script for Hugging Face Inference API.
+Test script for Hugging Face Inference API or Ollama (local testing).
 
-This script tests the CAD-LLM model using the Hugging Face Inference API.
+This script tests the CAD-LLM model using either:
+- Hugging Face Inference API (default, for cloud/remote testing)
+- Ollama (for local testing on Mac)
+
 It loads all configuration from the .env file and provides a simple way
 to test model inference.
 
 Usage:
+    # Use Hugging Face API (default)
     python test_hf_api.py
     
-    Or with a custom prompt:
+    # Use Ollama for local testing
+    python test_hf_api.py --ollama
+    
+    # With a custom prompt
     python test_hf_api.py "Create a rectangle 50x30mm"
+    python test_hf_api.py --ollama "Create a rectangle 50x30mm"
 """
 
 import os
 import sys
+import argparse
+import requests
 from pathlib import Path
 from dotenv import load_dotenv
 from cadllm_client import CADLLMClient
@@ -50,6 +60,10 @@ HF_ENDPOINT_URL = os.getenv("HF_ENDPOINT_URL")
 # Default test prompt
 DEFAULT_PROMPT = "Create a circle with radius 10mm centered at origin"
 
+# Ollama configuration
+OLLAMA_MODEL_NAME = os.getenv("OLLAMA_MODEL_NAME", "cadllm")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
 
 def validate_config():
     """
@@ -84,13 +98,101 @@ def validate_config():
             )
 
 
+def test_with_ollama(prompt: str):
+    """Test using Ollama (local inference)."""
+    print("=" * 60)
+    print("CAD-LLM Ollama Test (Local)")
+    print("=" * 60)
+    print(f"Model: {OLLAMA_MODEL_NAME}")
+    print(f"Ollama URL: {OLLAMA_BASE_URL}")
+    print(f"Prompt: {prompt}")
+    print("=" * 60)
+    
+    # Check if Ollama is running
+    try:
+        response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=2)
+        if response.status_code != 200:
+            raise Exception("Ollama not accessible")
+    except Exception as e:
+        print(f"\n❌ Ollama is not running or not accessible: {e}")
+        print(f"   Expected URL: {OLLAMA_BASE_URL}")
+        print("\n📝 To fix this:")
+        print("   1. Make sure Ollama is installed: https://ollama.ai")
+        print("   2. Start Ollama (it should run automatically)")
+        print("   3. Deploy the model: make deploy-ollama")
+        sys.exit(1)
+    
+    # Generate using Ollama
+    payload = {
+        "model": OLLAMA_MODEL_NAME,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "num_predict": 400,
+        }
+    }
+    
+    try:
+        print("\n🔄 Generating response...")
+        response = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            json=payload,
+            timeout=120
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        generated_text = result.get("response", "").strip()
+        
+        print("\n" + "=" * 60)
+        print("✅ GENERATED OUTPUT")
+        print("=" * 60)
+        print(generated_text)
+        print("=" * 60)
+        print("\n✅ Test completed successfully!")
+        
+    except Exception as e:
+        print(f"\n❌ Generation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
 def main():
     """
-    Main function to test the Hugging Face Inference API.
+    Main function to test the Hugging Face Inference API or Ollama.
     
     Loads configuration from .env, initializes the client, and generates
     a response for the test prompt.
     """
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Test CAD-LLM model inference")
+    parser.add_argument(
+        "--ollama",
+        action="store_true",
+        help="Use Ollama for local inference instead of Hugging Face API"
+    )
+    parser.add_argument(
+        "prompt",
+        nargs="*",
+        help="Custom prompt (optional)"
+    )
+    args = parser.parse_args()
+    
+    # Get prompt
+    if args.prompt:
+        prompt = " ".join(args.prompt)
+    else:
+        prompt = DEFAULT_PROMPT
+    
+    # Use Ollama if requested
+    if args.ollama:
+        test_with_ollama(prompt)
+        return
+    
+    # Otherwise use Hugging Face API
     print("=" * 60)
     print("CAD-LLM Hugging Face Inference API Test")
     print("=" * 60)

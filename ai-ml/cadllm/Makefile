@@ -1,4 +1,4 @@
-.PHONY: help setup download-dataset recreate-dataset clean-dataset generate-enhanced-dataset train train-resume merge-model upload-model upload-dataset deploy-ollama deploy-space update-space package package-with-dataset package-with-enhanced-dataset extract unarchive clean clean-all info test-api test-api-custom infer-local open-webui-start open-webui-stop open-webui-logs open-webui-status
+.PHONY: help setup download-dataset recreate-dataset clean-dataset generate-enhanced-dataset train train-resume merge-model upload-model upload-dataset deploy-ollama ollama-start ollama-stop ollama-start-all ollama-stop-all deploy-space update-space package package-with-dataset package-with-enhanced-dataset extract unarchive clean clean-all info test-api test-api-custom infer-local open-webui-start open-webui-stop open-webui-logs open-webui-status
 
 # Configuration
 # When running locally (from cadllm root)
@@ -267,6 +267,73 @@ deploy-ollama: ## Deploy merged model to Ollama (requires .env file with MODEL_O
 	@echo "   Install from: https://github.com/ggerganov/llama.cpp"
 	@cd $(WORKSPACE_DIR) && python deploy_ollama.py
 	@echo "✅ Ollama deployment complete"
+
+ollama-start: ## Start Ollama server
+	@echo "🚀 Starting Ollama server..."
+	@if pgrep -f "ollama serve" > /dev/null 2>&1; then \
+		echo "   ✅ Ollama is already running"; \
+		echo "   Access at: http://localhost:11434"; \
+	else \
+		if command -v ollama > /dev/null 2>&1; then \
+			echo "   Starting Ollama server in background..."; \
+			ollama serve > /dev/null 2>&1 & \
+			sleep 2; \
+			if pgrep -f "ollama serve" > /dev/null 2>&1; then \
+				echo "   ✅ Ollama started successfully"; \
+				echo "   Access at: http://localhost:11434"; \
+			else \
+				echo "   ⚠️  Ollama may have failed to start"; \
+				echo "   Try running manually: ollama serve"; \
+				echo "   Or open the Ollama app if installed via macOS app"; \
+			fi; \
+		else \
+			echo "   ❌ Ollama command not found"; \
+			echo "   Install Ollama from: https://ollama.ai"; \
+			echo "   Or via Homebrew: brew install ollama"; \
+			exit 1; \
+		fi; \
+	fi
+
+ollama-stop: ## Stop Ollama server
+	@echo "🛑 Stopping Ollama server..."
+	@if pgrep -f "ollama serve" > /dev/null 2>&1; then \
+		echo "   Found Ollama process, stopping..."; \
+		pkill -f "ollama serve" && \
+		sleep 1 && \
+		if pgrep -f "ollama serve" > /dev/null 2>&1; then \
+			echo "   ⚠️  Process still running, trying force kill..."; \
+			pkill -9 -f "ollama serve" && \
+			sleep 1; \
+		fi; \
+		if pgrep -f "ollama serve" > /dev/null 2>&1; then \
+			echo "   ❌ Failed to stop Ollama. Try manually: killall ollama"; \
+			exit 1; \
+		else \
+			echo "   ✅ Ollama stopped successfully"; \
+		fi; \
+	else \
+		echo "   ⚠️  Ollama is not running"; \
+	fi
+
+ollama-start-all: ## Start both Ollama server and Open WebUI
+	@echo "🚀 Starting Ollama and Open WebUI..."
+	@echo ""
+	@$(MAKE) ollama-start
+	@echo ""
+	@$(MAKE) open-webui-start
+	@echo ""
+	@echo "✅ Both Ollama and Open WebUI are running!"
+	@echo "   Ollama: http://localhost:11434"
+	@echo "   Open WebUI: http://localhost:3000"
+
+ollama-stop-all: ## Stop both Ollama server and Open WebUI
+	@echo "🛑 Stopping Ollama and Open WebUI..."
+	@echo ""
+	@$(MAKE) open-webui-stop
+	@echo ""
+	@$(MAKE) ollama-stop
+	@echo ""
+	@echo "✅ Both Ollama and Open WebUI have been stopped"
 
 open-webui-start: ## Start Open WebUI container for Ollama (accessible at http://localhost:3000)
 	@echo "🌐 Starting Open WebUI for Ollama..."
