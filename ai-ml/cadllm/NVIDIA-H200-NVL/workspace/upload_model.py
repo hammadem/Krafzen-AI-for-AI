@@ -55,7 +55,7 @@ def parse_args():
     )
     return parser.parse_args()
 
-def generate_model_card(model_path: Path, base_model: str, repo_id: str) -> str:
+def generate_model_card(model_path: Path, base_model: str, repo_id: str, dataset_repo_id: str = None) -> str:
     """
     Generate a model card (README.md) based on the model path and model information.
     
@@ -63,6 +63,7 @@ def generate_model_card(model_path: Path, base_model: str, repo_id: str) -> str:
         model_path: Path to the merged model
         base_model: Base model identifier
         repo_id: Hugging Face repository ID
+        dataset_repo_id: Optional Hugging Face dataset repository ID (e.g., "username/dataset-name")
     
     Returns:
         Model card content as string
@@ -132,14 +133,25 @@ This model is a fine-tuned version of {base_model} specifically trained for 2D C
 
 ### Output Format
 
-The model generates coordinates in the following format:
-- `<SOL>` - Start of object
-- `<Circle>: x=0.0, y=0.0, r=48.0` - Circle with center and radius
-- `<Line>: x=47.5, y=-32.0` - Line coordinates (multiple lines form a polyline)
-- `<Arc>: x=-8.5, y=-58.0, α=64.0, f=1.0` - Arc with center, angle, and flag
-- `<EOS>` - End of sequence
+The model generates output in **DSL (Domain-Specific Language) format**, not coordinate format. The DSL format is structured as follows:
 
-These coordinates are automatically converted to DXF files using coordinate parsers.
+```
+UNITS: mm
+ORIGIN_POLICY: room_center_at_(0,0)
+ROOM: rect w=WIDTH h=HEIGHT center=(0,0)
+WALLS: rect_perimeter closed=true layer=WALLS
+OBJECT_NAME: rect w=WIDTH h=HEIGHT center=(X,Y) layer=OBJECTS closed=true anchor_wall=WALL
+OBJECT_NAME: circle r=RADIUS center=(X,Y) layer=OBJECTS closed=true anchor_wall=WALL
+```
+
+**Format Rules:**
+- Always starts with `UNITS`, `ORIGIN_POLICY`, `ROOM`, `WALLS` (in that order)
+- Uses `rect` or `circle` primitives only
+- Entity names use underscores (e.g., `COFFEE_TABLE`)
+- `anchor_wall` must be: `north`, `south`, `east`, `west`, or `none`
+- All coordinates in mm, room centered at (0,0)
+
+The DSL output is automatically converted to DXF files using the `dsl_parser.py` script.
 
 ## Uses
 
@@ -191,13 +203,28 @@ print(f"DXF file saved to: {{dxf_path}}")
 
 ### Training Data
 
-The model was trained on the CADLLM 2D dataset, which contains natural language CAD descriptions paired with coordinate outputs.
+The model was trained on the **CADLLM 2D dataset**, which contains natural language CAD descriptions paired with DSL format outputs.
+
+**Dataset Details:**
+- **Dataset Name:** CADLLM 2D Dataset
+- **Format:** JSONL (JSON Lines)
+- **Total Records:** ~200,000 examples
+- **Content:** Natural language CAD instructions paired with structured DSL outputs
+- **Output Format:** DSL (Domain-Specific Language) format with UNITS, ROOM, WALLS, and object definitions
+
+**Dataset Structure:**
+Each training example contains:
+- `instruction`: Natural language CAD description (e.g., "Draw a kitchen with sink, stove, and refrigerator")
+- `input`: Optional input context (usually "(none)")
+- `output`: DSL format output with room dimensions, walls, and object placements
+
 
 ### Training Procedure
 
 - **Training Method:** LoRA (Low-Rank Adaptation) fine-tuning
 - **Base Model:** {base_model}
 - **Training Date:** {current_date}
+- **Dataset:** CADLLM 2D Dataset (see Training Data section above)
 
 ### Training Hyperparameters
 
@@ -269,7 +296,7 @@ def validate_config(model_path: Path):
                 f"  {list(model_path.iterdir())[:10] if model_path.is_dir() else 'Not a directory'}"
             )
 
-def upload_merged_model(model_path: Path, base_model: str, repo_id: str, private: bool = True):
+def upload_merged_model(model_path: Path, base_model: str, repo_id: str, private: bool = True, dataset_repo_id: str = None):
     """Upload merged model to Hugging Face Hub."""
     HF_TOKEN = os.getenv("HF_TOKEN")
     
@@ -305,23 +332,64 @@ def upload_merged_model(model_path: Path, base_model: str, repo_id: str, private
             raise
         print(f"⚠️  Repository creation: {e}")
     
-    # Check if README.md exists, generate if not
+    # Always regenerate README.md if:
+    # 1. README doesn't exist
+    # 2. Dataset link is missing (when dataset_repo_id is provided)
+    # 3. Old output format is present (coordinate format instead of DSL)
     readme_path = model_path / "README.md"
+    should_regenerate = False
+    regenerate_reason = []
+    
     if not readme_path.exists():
+        should_regenerate = True
+        regenerate_reason.append("README.md doesn't exist")
         print("\n📝 Generating README.md (model card)...")
-        readme_content = generate_model_card(model_path, base_model, repo_id)
-        readme_path.write_text(readme_content, encoding="utf-8")
-        print("   ✅ Generated README.md (model card) for model recognition")
     else:
-        print("\n📄 Using existing README.md")
+        existing_content = readme_path.read_text(encoding="utf-8")
+        
+        # Check for old output format (coordinate format)
+        if "<SOL>" in existing_content or "<Circle>:" in existing_content or "<Line>:" in existing_content:
+            should_regenerate = True
+            regenerate_reason.append("old coordinate format detected")
+        
+        # Check if dataset link is missing
+        if dataset_repo_id and dataset_repo_id not in existing_content:
+            should_regenerate = True
+            regenerate_reason.append("dataset link missing")
+        
+        if should_regenerate:
+            print(f"\n📝 Regenerating README.md ({', '.join(regenerate_reason)})...")
+        else:
+            print("\n📄 Using existing README.md")
+    
+    if should_regenerate:
+        if dataset_repo_id:
+            print(f"   📊 Including dataset reference: {dataset_repo_id}")
+        readme_content = generate_model_card(model_path, base_model, repo_id, dataset_repo_id)
+        readme_path.write_text(readme_content, encoding="utf-8")
+        print("   ✅ Generated/updated README.md (model card)")
     
     # Upload
     print(f"\n📤 Uploading to {repo_id}...")
+    
+    # If README was regenerated, upload it explicitly first to ensure it's updated
+    if should_regenerate and readme_path.exists():
+        print("   📄 Uploading updated README.md...")
+        api.upload_file(
+            path_or_fileobj=str(readme_path),
+            path_in_repo="README.md",
+            repo_id=repo_id,
+            repo_type="model",
+            commit_message="Update model card with dataset information and DSL format"
+        )
+        print("   ✅ README.md uploaded")
+    
+    # Upload all files (or remaining files)
     api.upload_folder(
         folder_path=str(model_path),
         repo_id=repo_id,
         repo_type="model",
-        commit_message="Upload merged model for Inference API"
+        commit_message="Upload merged model for Inference API" if not should_regenerate else "Update model files and card"
     )
     
     print(f"\n✅ Model uploaded successfully!")
@@ -454,11 +522,19 @@ def main():
             "REPO_ID could not be constructed. Check HF_USERNAME and HF_FINE_TUNED_MODEL_NAME in .env file"
         )
     
+    # Get dataset repository ID (optional)
+    HF_DATASET_NAME = os.getenv("HF_DATASET_NAME")
+    dataset_repo_id = None
+    if HF_USERNAME and HF_DATASET_NAME:
+        dataset_repo_id = f"{HF_USERNAME}/{HF_DATASET_NAME}"
+        print(f"📊 Dataset repository detected: {dataset_repo_id}")
+        print("   Will be included in model card")
+    
     try:
         validate_config(model_path)
         
         # Upload
-        merged_repo_id = upload_merged_model(model_path, base_model, repo_id, private)
+        merged_repo_id = upload_merged_model(model_path, base_model, repo_id, private, dataset_repo_id)
         
         print("\n" + "=" * 60)
         print("✅ UPLOAD SUCCESS!")

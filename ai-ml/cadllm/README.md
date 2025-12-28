@@ -890,6 +890,7 @@ The project includes a comprehensive Makefile for automating common tasks:
 
 - `make merge-model` - **Merge LoRA adapter with base model** (use `ADAPTER_PATH` and `MODEL_OUTPUT_DIR` env vars)
 - `make upload-model` - **Upload merged model to Hugging Face** (use `MODEL_PATH` env var)
+- `make upload-dataset` - **Upload dataset to Hugging Face** (use `DATASET_PATH` env var)
 - `make deploy-ollama` - **Deploy merged model to Ollama** (requires llama.cpp, see [Ollama Setup](#ollama-deployment))
 
 **Required Environment Variables (.env file):**
@@ -908,6 +909,11 @@ BASE_MODEL=Qwen/Qwen2.5-Coder-3B-Instruct
 # Merge Model Configuration (required for merge_model.py)
 ADAPTER_PATH=/path/to/adapter
 OUTPUT_DIR=/path/to/merged_model
+
+# Upload Dataset Configuration (required for upload_dataset.py)
+DATASET_PATH=./dataset/jsonl/cadllm.jsonl
+HF_DATASET_NAME=cadllm-dataset
+HF_DATASET_PRIVATE=true  # Optional, defaults to true
 
 # Upload Model Configuration (required for upload_model.py)
 MODEL_PATH=/path/to/merged_model
@@ -963,6 +969,99 @@ DATA_PATH=/workspace/dataset/jsonl/cadllm_2d_cleaned.jsonl \
 OUTPUT_DIR=/workspace/my-custom-model \
 make train
 ```
+
+## Dataset Upload
+
+Upload your processed dataset to Hugging Face Hub for sharing and reproducibility:
+
+### Prerequisites
+
+1. **Hugging Face Account**: Create an account at [huggingface.co](https://huggingface.co)
+2. **Access Token**: Get your token from [Settings > Access Tokens](https://huggingface.co/settings/tokens)
+3. **Processed Dataset**: Ensure you have a valid JSONL dataset file
+
+### Configuration
+
+Add the following to your `.env` file:
+
+```bash
+# Dataset Upload Configuration
+DATASET_PATH=./dataset/jsonl/cadllm.jsonl
+HF_DATASET_NAME=cadllm-dataset
+HF_USERNAME=your-username
+HF_TOKEN=your_huggingface_token_here
+HF_DATASET_PRIVATE=true  # Optional, defaults to true (private)
+```
+
+### Upload Steps
+
+1. **Prepare your dataset**: Ensure your JSONL file is valid and ready
+2. **Set environment variables**: Add the configuration above to your `.env` file
+3. **Upload**: Run the make target:
+
+```bash
+make upload-dataset
+```
+
+The script will:
+- ✅ Validate the JSONL file format
+- ✅ Create the dataset repository on Hugging Face (if it doesn't exist)
+- ✅ Upload the dataset file
+- ✅ Generate and upload a dataset card (README.md) with statistics
+- ✅ Provide a link to the uploaded dataset
+
+### Using the Uploaded Dataset
+
+After upload, you can load the dataset with:
+
+```python
+from datasets import load_dataset
+
+dataset = load_dataset('your-username/cadllm-dataset')
+```
+
+### Dataset Card
+
+The script automatically generates a dataset card that includes:
+- Dataset description and statistics
+- Usage instructions
+- Sample records
+- Citation information
+
+You can view and edit the dataset card on the Hugging Face dataset page.
+
+### Model Card Integration
+
+When you upload a model using `make upload-model`, if `HF_DATASET_NAME` is set in your `.env` file, the model card will automatically include a link to the dataset repository. This helps others understand what data was used to train the model.
+
+**Example:** If you have:
+```bash
+HF_USERNAME=your-username
+HF_DATASET_NAME=cadllm-dataset
+```
+
+The model card will automatically include:
+```
+**Dataset:** [your-username/cadllm-dataset](https://huggingface.co/datasets/your-username/cadllm-dataset)
+```
+
+### Command-Line Options
+
+You can also use the script directly with command-line arguments:
+
+```bash
+python upload_dataset.py \
+  --dataset_path ./dataset/jsonl/cadllm.jsonl \
+  --dataset_name cadllm-dataset \
+  --public  # Make repository public (optional)
+```
+
+### Notes
+
+- **Validation**: The script validates JSONL format before upload. Use `--skip_validation` to skip (not recommended)
+- **Privacy**: Datasets are private by default. Use `--public` flag or set `HF_DATASET_PRIVATE=false` to make public
+- **Repository**: The dataset will be created at `https://huggingface.co/datasets/your-username/cadllm-dataset`
+- **Model Cards**: When uploading models, the model card will automatically reference the dataset if you've uploaded it
 
 ## Ollama Deployment
 

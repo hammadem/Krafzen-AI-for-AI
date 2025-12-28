@@ -1,4 +1,4 @@
-.PHONY: help setup download-dataset recreate-dataset clean-dataset generate-enhanced-dataset train train-resume merge-model upload-model deploy-ollama deploy-space update-space package package-with-dataset package-with-enhanced-dataset extract unarchive clean clean-all info test-api test-api-custom infer-local open-webui-start open-webui-stop open-webui-logs open-webui-status
+.PHONY: help setup download-dataset recreate-dataset clean-dataset generate-enhanced-dataset train train-resume merge-model upload-model upload-dataset deploy-ollama deploy-space update-space package package-with-dataset package-with-enhanced-dataset extract unarchive clean clean-all info test-api test-api-custom infer-local open-webui-start open-webui-stop open-webui-logs open-webui-status
 
 # Configuration
 # When running locally (from cadllm root)
@@ -249,6 +249,16 @@ upload-model: ## Upload merged model to Hugging Face (requires .env file with MO
 	@echo "   Loading configuration from .env file..."
 	@cd $(WORKSPACE_DIR) && python upload_model.py
 	@echo "✅ Model upload complete"
+
+upload-dataset: ## Upload dataset to Hugging Face (requires .env file with DATASET_PATH, HF_DATASET_NAME, HF_TOKEN, HF_USERNAME)
+	@echo "📤 Uploading dataset to Hugging Face..."
+	@echo "   Loading configuration from .env file..."
+	@if [ ! -f "$(WORKSPACE_DIR)/.env" ]; then \
+		echo "❌ Error: .env file not found. Please create it first."; \
+		exit 1; \
+	fi
+	@cd $(WORKSPACE_DIR) && python upload_dataset.py
+	@echo "✅ Dataset upload complete"
 
 deploy-ollama: ## Deploy merged model to Ollama (requires .env file with MODEL_OUTPUT_DIR, optional: OLLAMA_MODEL_NAME, GGUF_OUTPUT_DIR, LLAMA_CPP_PATH)
 	@echo "🦙 Deploying model to Ollama..."
