@@ -37,7 +37,7 @@ async def generate_chat_response(request: ChatRequest):
 
         # 2. Gemini Validation
         logger.info("Validating with Gemini")
-        validated_text = await gemini_service.validate_and_correct(ollama_output)
+        validated_text = await gemini_service.validate_and_correct(ollama_output, request.message)
 
         # 3. Gemini Image Generation
         # Note: If validation failed (empty), we might fall back to ollama output or error
