@@ -25,7 +25,7 @@ export default function Navbar() {
     return (
         <div className='h-[100px]'>
             <nav
-                className="absolute top-0 left-0 z-999 w-full"
+                className="absolute top-0 left-0 z-50 w-full"
             >
                 {/** Parent Div Navbar */}
                 <div className="relative w-full flex h-[100px] items-center">
@@ -48,7 +48,7 @@ export default function Navbar() {
                     </div>
 
 
-                    {/** Company Logo */}
+                    {/** Company Logo - Always Visible now */}
                     <div className="flex mx-2 lg:flex-1 md:flex-1 xlg:flex-1 w-full items-between justify-between">
                         <CompanyLogo />
 

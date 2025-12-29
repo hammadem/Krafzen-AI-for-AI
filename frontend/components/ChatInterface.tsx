@@ -16,7 +16,7 @@ import {
     DialogClose
 } from "@/components/ui/dialog"
 
-interface Message {
+export interface Message {
     id: string
     role: 'user' | 'assistant'
     content?: string
@@ -24,10 +24,21 @@ interface Message {
     timestamp: Date
 }
 
-export function ChatInterface() {
-    const [messages, setMessages] = useState<Message[]>([])
-    const [inputValue, setInputValue] = useState("")
-    const [isLoading, setIsLoading] = useState(false)
+interface ChatInterfaceProps {
+    messages: Message[]
+    inputValue: string
+    isLoading: boolean
+    onInputChange: (value: string) => void
+    onSendMessage: () => void
+}
+
+export function ChatInterface({
+    messages,
+    inputValue,
+    isLoading,
+    onInputChange,
+    onSendMessage
+}: ChatInterfaceProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const scrollToBottom = () => {
@@ -38,49 +49,10 @@ export function ChatInterface() {
         scrollToBottom()
     }, [messages])
 
-    const handleSendMessage = async () => {
-        if (!inputValue.trim() || isLoading) return
-
-        const userMessage: Message = {
-            id: Date.now().toString(),
-            role: 'user',
-            content: inputValue,
-            timestamp: new Date()
-        }
-
-        setMessages(prev => [...prev, userMessage])
-        setInputValue("")
-        setIsLoading(true)
-
-        try {
-            const response = await sendChatMessage(userMessage.content!)
-
-            const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                imageUrl: response.image_url,
-                timestamp: new Date()
-            }
-
-            setMessages(prev => [...prev, assistantMessage])
-        } catch (error) {
-            console.error("Chat error:", error)
-            const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: "Sorry, something went wrong. Please try again.",
-                timestamp: new Date()
-            }
-            setMessages(prev => [...prev, errorMessage])
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
-            handleSendMessage()
+            onSendMessage()
         }
     }
 
@@ -131,7 +103,7 @@ export function ChatInterface() {
     return (
         <div className="flex flex-col h-full w-full mx-auto overflow-hidden relative">
             <div className="flex-1 overflow-y-auto w-full custom-scrollbar">
-                <div className="max-w-3xl mx-auto w-full p-4 pb-32 space-y-8"> {/* Added padding-bottom for input area */}
+                <div className="max-w-3xl mx-auto w-full p-4 pb-32 space-y-8">
                     {messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center text-muted-foreground opacity-50 space-y-4 py-20 min-h-[400px]">
                             <div className="p-4 rounded-full bg-primary/10">
@@ -250,13 +222,13 @@ export function ChatInterface() {
                         <Input
                             placeholder="Describe your design requirements..."
                             value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
+                            onChange={(e) => onInputChange(e.target.value)}
                             onKeyDown={handleKeyDown}
                             disabled={isLoading}
                             className="flex-1 bg-transparent border-none text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 h-10"
                         />
                         <Button
-                            onClick={handleSendMessage}
+                            onClick={onSendMessage}
                             disabled={isLoading || !inputValue.trim()}
                             size="icon"
                             className="ml-2 rounded-full w-10 h-10 bg-primary hover:bg-primary/90 text-primary-foreground"
@@ -265,9 +237,7 @@ export function ChatInterface() {
                             <span className="sr-only">Send</span>
                         </Button>
                     </div>
-                    <p className="text-[10px] text-gray-600 text-center mt-3 font-mono">
-                        AI-generated content may be inaccurate. Verify important information.
-                    </p>
+                    {/* Disclaimer removed here */}
                 </div>
             </div>
         </div>
