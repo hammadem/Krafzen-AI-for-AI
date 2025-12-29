@@ -63,7 +63,22 @@ class GeminiService:
             
             # Wrap the DSL in a clear instruction if needed, though the model might handle raw DSL.
             # Based on testing, a clear prompt helps.
-            enhanced_prompt = f"Generate a high-quality CAD technical drawing (floor plan) based on this specification:\n{prompt}"
+            # Wrapper with explicit styling instructions for consistent CAD output
+            enhanced_prompt = f"""
+            Generate a professional 2D CAD technical drawing (floor plan) based on the specification below.
+
+            STYLING REQUIREMENTS:
+            1. View: Strictly top-down 2D orthographic view.
+            2. Background: Use a uniform **dark blueprint style background** strictly matching **RGB(0, 51, 102)** (Classic Engineering Blue) with a **visible fine engineering grid overlay**.
+            3. Line Work: Use clear, high-contrast **white or light-colored lines** for walls and objects.
+            4. Details:
+               - Include a **graphical scale ruler** in the bottom corner (e.g., 0-5m).
+               - Include a small **legend** or clear text labels for major furniture items.
+            5. Aesthetics: Minimalist, clean, engineering precision. No 3D perspective or artistic shading.
+
+            SPECIFICATION:
+            {prompt}
+            """
             
             logger.info(f"Generating image with model {settings.GEMINI_IMAGE_MODEL}...")
             response = await model.generate_content_async(enhanced_prompt)
