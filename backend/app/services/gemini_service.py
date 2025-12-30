@@ -181,3 +181,60 @@ class GeminiService:
             # Fallback to placeholder on error to keep UI functional
             return "https://placehold.co/600x400?text=Image+Generation+Failed"
 
+    async def vision_refinement(self, image_url: str, user_request: str) -> str:
+        """
+        Uses Gemini 2.0 Flash (Vision) to look at the previous image and 
+        generate a consolidated description that includes the new user request.
+        """
+        if not settings.GEMINI_API_KEY:
+             raise Exception("Gemini API Key not configured")
+
+        import httpx
+        from PIL import Image
+        import io
+        import base64
+
+        try:
+            # 1. Get Image Data
+            image_data = None
+            if image_url.startswith("data:"):
+                # Handle base64
+                encoded = image_url.split(",")[1]
+                image_bytes = base64.b64decode(encoded)
+                image_data = Image.open(io.BytesIO(image_bytes))
+            else:
+                # Handle URL
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(image_url)
+                    resp.raise_for_status()
+                    image_data = Image.open(io.BytesIO(resp.content))
+
+            # 2. Call Vision Model
+            # use 2.0 Flash for vision capabilities
+            model = genai.GenerativeModel("gemini-2.0-flash-exp")
+            
+            prompt = f"""
+            You are an expert architectural assistant.
+            
+            TASK:
+            1. Analyze the attached floor plan image. Identify the EXACT layout, room dimensions, and position of all furniture/walls.
+            2. The user wants to Modify this plan: "{user_request}".
+            3. Generate a NEW, highly detailed specification that:
+               - Keepts the ORIGINAL layout and dimensions for existing parts (unless the user asked to move/remove them).
+               - Adds the NEW requested items in a logical place.
+            
+            OUTPUT:
+            Return ONLY the full detailed specification text. Do not output markdown or conversation.
+            """
+            
+            logger.info("Sending Image + Prompt to Gemini Vision...")
+            response = await model.generate_content_async([prompt, image_data])
+            logger.info(f"Gemini Vision Output: {response.text[:100]}...")
+            
+            return response.text.strip()
+            
+        except Exception as e:
+            logger.error(f"Vision refinement failed: {e}")
+            # Fallback: Just return the user request effectively bypassing vision
+            return user_request
+

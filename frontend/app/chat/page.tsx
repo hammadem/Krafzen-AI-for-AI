@@ -47,7 +47,17 @@ export default function ChatPage() {
         setIsLoading(true);
 
         try {
-            const response = await sendChatMessage(userMessage.content!);
+            // Prepare history (exclude the current message we are sending, and keep only role/content)
+            const history = updatedMessages
+                .slice(0, -1) // Exclude the optimistic user message we just added
+                .map(m => ({
+                    role: m.role,
+                    content: m.content || "",
+                    imageUrl: m.imageUrl // Include imageUrl if present
+                }))
+                .filter(m => m.content !== "" || m.imageUrl); // Keep provided it has content OR image
+
+            const response = await sendChatMessage(userMessage.content!, history);
 
             const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),
