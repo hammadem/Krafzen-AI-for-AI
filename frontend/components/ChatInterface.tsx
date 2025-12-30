@@ -9,13 +9,6 @@ import { Card } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
-import {
     Dialog,
     DialogContent,
     DialogTrigger,
@@ -35,8 +28,6 @@ interface ChatInterfaceProps {
     messages: Message[]
     inputValue: string
     isLoading: boolean
-    selectedProvider: string
-    onProviderChange: (value: string) => void
     onInputChange: (value: string) => void
     onSendMessage: () => void
 }
@@ -45,8 +36,6 @@ export function ChatInterface({
     messages,
     inputValue,
     isLoading,
-    selectedProvider,
-    onProviderChange,
     onInputChange,
     onSendMessage
 }: ChatInterfaceProps) {
@@ -230,19 +219,6 @@ export function ChatInterface({
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent pt-10">
                 <div className="max-w-3xl mx-auto w-full">
                     <div className="bg-zinc-900/90 border border-gray-700/50 rounded-full p-2 pl-2 pr-2 flex items-center shadow-2xl backdrop-blur-md">
-                        <div className="border-r border-gray-700 pr-2 mr-2">
-                            <Select value={selectedProvider} onValueChange={onProviderChange}>
-                                <SelectTrigger className="w-[140px] h-10 border-none bg-transparent focus:ring-0 text-gray-300">
-                                    <SelectValue placeholder="Model" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-900 border-gray-700 text-gray-100">
-                                    <SelectItem value="default">Default</SelectItem>
-                                    <SelectItem value="gemini">Gemini 2.0</SelectItem>
-                                    <SelectItem value="stable-diffusion">Stable Diffusion 3.5</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
                         <Input
                             placeholder="Describe your design requirements..."
                             value={inputValue}

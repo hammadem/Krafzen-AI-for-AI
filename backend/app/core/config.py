@@ -71,8 +71,6 @@ class Settings(BaseSettings):
     
     # Stable Diffusion / Image Config
     USE_GEMINI_FOR_IMAGE: bool = True
-    USE_STABLE_DIFFUSION: bool = False
-    HF_TOKEN: str | None = None
 
     
     @property

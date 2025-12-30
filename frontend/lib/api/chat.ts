@@ -7,13 +7,13 @@ export interface ChatResponse {
     image_url: string;
 }
 
-export async function sendChatMessage(message: string, provider: string = "default"): Promise<ChatResponse> {
+export async function sendChatMessage(message: string): Promise<ChatResponse> {
     const response = await fetch(`${API_BASE_URL}/api/v1/chat/generate`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message, image_provider: provider }),
+        body: JSON.stringify({ message }),
     });
 
     if (!response.ok) {
