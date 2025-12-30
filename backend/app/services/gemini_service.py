@@ -114,7 +114,10 @@ class GeminiService:
 
             # Wrapper with explicit styling instructions for consistent CAD output
             enhanced_prompt = f"""
-            Generate a professional 2D CAD technical drawing (floor plan).
+            Generate a professional 2D CAD technical drawing (floor plan) based on the specification below.
+            
+            IMPORTANT: You are an image generation model. You must generate an IMAGE.
+            DO NOT output text descriptions. OUTPUT ONLY THE IMAGE.
             
             {validation_instruction}
 
@@ -132,8 +135,28 @@ class GeminiService:
             """
             
             logger.info(f"Generating image with model {settings.GEMINI_IMAGE_MODEL}...")
-            response = await model.generate_content_async(enhanced_prompt)
             
+            # Configure safety settings to strict minimal blocking (CAD drawings are safe)
+            from google.generativeai.types import HarmCategory, HarmBlockThreshold
+            safety_settings = {
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            }
+
+            response = await model.generate_content_async(enhanced_prompt, safety_settings=safety_settings)
+            
+            # Check for refusal/empty candidates before accessing parts
+            if not response.candidates:
+                logger.warning("Gemini returned NO CANDIDATES.")
+                try:
+                    logger.warning(f"Full Response Feedback: {response.prompt_feedback}")
+                except Exception as e:
+                    logger.warning(f"Could not read prompt_feedback: {e}")
+                
+                return "https://placehold.co/600x400?text=Gemini+Refused+Generation"
+
             # Extract image from response
             for part in response.parts:
                 if hasattr(part, 'inline_data') and part.inline_data:
@@ -147,7 +170,7 @@ class GeminiService:
             
             # If no inline data found, check for text (maybe SVG code?)
             if response.text:
-                logger.warning("Gemini returned text instead of image data. Returning text as failure/debug.")
+                logger.warning(f"Gemini returned text instead of image data. Content: {response.text[:200]}")
                 # Fallback: if it returns SVG code, we might want to handle it, but for now just log it.
                 return "https://placehold.co/600x400?text=Generation+returned+text+not+image"
 

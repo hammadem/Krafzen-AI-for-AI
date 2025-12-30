@@ -1,19 +1,19 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export interface ChatResponse {
-    original_prompt: str;
-    ollama_response: str;
-    validated_response: str;
-    image_url: str;
+    original_prompt: string;
+    ollama_response: string;
+    validated_response: string;
+    image_url: string;
 }
 
-export async function sendChatMessage(message: string): Promise<ChatResponse> {
+export async function sendChatMessage(message: string, provider: string = "default"): Promise<ChatResponse> {
     const response = await fetch(`${API_BASE_URL}/api/v1/chat/generate`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, image_provider: provider }),
     });
 
     if (!response.ok) {

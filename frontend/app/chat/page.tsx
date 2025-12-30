@@ -18,6 +18,7 @@ export default function ChatPage() {
     ]);
     const [currentSessionId, setCurrentSessionId] = useState<string>('1');
     const [inputValue, setInputValue] = useState("");
+    const [provider, setProvider] = useState("default");
     const [isLoading, setIsLoading] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -47,7 +48,7 @@ export default function ChatPage() {
         setIsLoading(true);
 
         try {
-            const response = await sendChatMessage(userMessage.content!);
+            const response = await sendChatMessage(userMessage.content!, provider);
 
             const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),
@@ -162,6 +163,8 @@ export default function ChatPage() {
                                 messages={currentSession.messages}
                                 inputValue={inputValue}
                                 isLoading={isLoading}
+                                selectedProvider={provider}
+                                onProviderChange={setProvider}
                                 onInputChange={setInputValue}
                                 onSendMessage={handleSendMessage}
                             />
