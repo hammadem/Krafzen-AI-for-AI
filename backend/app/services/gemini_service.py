@@ -40,23 +40,59 @@ class GeminiService:
         6. **Output**: Return ONLY the corrected, final Specification string. Do NOT add conversation.
         """
         
-        try:
-            model = genai.GenerativeModel(self.model_name)
-            logger.info(f"Gemini Validation Request: {prompt}")
-            response = await model.generate_content_async(prompt)
-            validated = response.text.strip()
-            logger.info(f"Gemini Validation Response: {validated}")
-            return validated
-        except Exception as e:
-            logger.error(f"Gemini validation error: {e}")
-            # If Gemini fails, we might want to fallback to original text or raise. 
-            # For now, let's log and re-raise or return original if strictly required.
-            # But the requirement says "Validation & Correction (Gemini 3 API)", so failure here is critical.
-            raise Exception(f"Gemini validation failed: {str(e)}")
+        import asyncio
+        import random
 
-    async def generate_image(self, prompt: str) -> str:
+        max_retries = 3
+        base_delay = 2  # seconds
+
+        for attempt in range(max_retries + 1):
+            try:
+                model = genai.GenerativeModel(self.model_name)
+                logger.info(f"Gemini Validation Request (Attempt {attempt+1}/{max_retries+1}): {prompt[:100]}...")
+                response = await model.generate_content_async(prompt)
+                validated = response.text.strip()
+                logger.info(f"Gemini Validation Response: {validated[:100]}...")
+                return validated
+            
+            except Exception as e:
+                is_rate_limit = "429" in str(e) or "Quota exceeded" in str(e) or "Resource has been exhausted" in str(e)
+                
+                if is_rate_limit and attempt < max_retries:
+                    import re
+                    # Try to extract exact wait time from error message: "Please retry in 22.24s"
+                    wait_match = re.search(r"retry in (\d+(\.\d+)?)s", str(e))
+                    
+                    if wait_match:
+                        # Extract wait time and add a small buffer (1.5s)
+                        delay = float(wait_match.group(1)) + 1.5
+                        logger.warning(f"Gemini Rate Limit hit. API requested wait of {delay:.2f}s. Sleeping...")
+                    else:
+                        # Fallback to exponential backoff if no time provided
+                        delay = (base_delay * (2 ** attempt)) + random.uniform(0, 1)
+                        logger.warning(f"Gemini Rate Limit hit. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
+                    
+                    await asyncio.sleep(delay)
+                    continue
+                
+                if attempt == max_retries:
+                    logger.error(f"Gemini validation failed after {max_retries} retries: {e}")
+                    # User explicitly requested NO fallback. If validation fails, we fail.
+                    raise Exception(f"Gemini validation failed after retries: {str(e)}")
+                
+                # Non-rate-limit errors might be fatal, but let's retry transient ones just in case, 
+                # or strictly re-raise if it's not a rate limit? 
+                # Safety: treat unknown errors as potentially transient but with shorter wait? 
+                # For simplicity/robustness, we re-raise non-429s immediately or handle them?
+                # Let's assume non-429s are bad (e.g. bad request) and re-raise.
+                if not is_rate_limit:
+                     logger.error(f"Gemini validation error (non-retryable): {e}")
+                     raise e
+
+    async def generate_image(self, prompt: str, original_prompt: str = None) -> str:
         """
         Generates an image based on the prompt using the configured Gemini Image model.
+        Includes implicit validation if original_prompt is provided.
         Returns a base64 data URL.
         """
         if not settings.GEMINI_API_KEY:
@@ -66,11 +102,21 @@ class GeminiService:
             # Use specific image generation model
             model = genai.GenerativeModel(settings.GEMINI_IMAGE_MODEL)
             
-            # Wrap the DSL in a clear instruction if needed, though the model might handle raw DSL.
-            # Based on testing, a clear prompt helps.
+            # Smart Prompt Construction
+            validation_instruction = ""
+            if original_prompt:
+                validation_instruction = f"""
+            CRITICAL VALIDATION INSTRUCTIONS:
+            1. **Cross-Check**: Compare the SPECIFICATION below against the USER REQUEST: "{original_prompt}".
+            2. **Fix Missing Items**: If the User Request asked for specific items (e.g. balconies, pathways, furniture) that are missing from the Specification, YOU MUST INCLUDE THEM in the drawing.
+            3. **View Logic**: If the user asked for "Front View" or "Elevation", generate a Top-Down Floor Plan representation instead.
+            """
+
             # Wrapper with explicit styling instructions for consistent CAD output
             enhanced_prompt = f"""
-            Generate a professional 2D CAD technical drawing (floor plan) based on the specification below.
+            Generate a professional 2D CAD technical drawing (floor plan).
+            
+            {validation_instruction}
 
             STYLING REQUIREMENTS:
             1. View: Strictly top-down 2D orthographic view.

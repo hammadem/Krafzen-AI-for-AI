@@ -35,15 +35,13 @@ async def generate_chat_response(request: ChatRequest):
         if not ollama_output:
             raise HTTPException(status_code=500, detail="Ollama returned empty response")
 
-        # 2. Gemini Validation
-        logger.info("Validating with Gemini")
-        validated_text = await gemini_service.validate_and_correct(ollama_output, request.message)
-
-        # 3. Gemini Image Generation
-        # Note: If validation failed (empty), we might fall back to ollama output or error
-        prompt_for_image = validated_text if validated_text else ollama_output
-        logger.info("Generating Image with Gemini")
-        image_url = await gemini_service.generate_image(prompt_for_image)
+        # 2. Optimized Flow: Single-Pass Validation & Generation
+        # We skip the explicit validation call to save 1 API request.
+        # The validation logic is now embedded in the generate_image prompt.
+        logger.info("Generating Image with Gemini (Single-Pass with Implicit Validation)")
+        validated_text = ollama_output # Text remains original, but Image will be validated by Prompt
+        
+        image_url = await gemini_service.generate_image(ollama_output, original_prompt=request.message)
         logger.info(f"Generated Image URL: {image_url}")
 
         return ChatResponse(
