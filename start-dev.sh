@@ -39,6 +39,10 @@ cleanup() {
         kill $FRONTEND_PID 2>/dev/null
         echo "   ✅ Frontend stopped"
     fi
+    if [ ! -z "$TAIL_PID" ]; then
+        kill $TAIL_PID 2>/dev/null
+        echo "   ✅ Log streamer stopped"
+    fi
     exit 0
 }
 
