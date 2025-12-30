@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Image as ImageIcon, Loader2, Download, Maximize2 } from "lucide-react"
-import { sendChatMessage } from "@/lib/api/chat"
+import { Send, Image as ImageIcon, Loader2, Download, Maximize2, FileCode } from "lucide-react"
+import { sendChatMessage, downloadDxf } from "@/lib/api/chat"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -179,14 +179,38 @@ export function ChatInterface({
                                             </DialogContent>
                                         </Dialog>
 
-                                        <div className="flex justify-end">
+                                        <div className="flex justify-end gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2"
+                                                onClick={async () => {
+                                                    try {
+                                                        const blob = await downloadDxf(message.imageUrl!, message.content);
+                                                        const url = window.URL.createObjectURL(blob);
+                                                        const link = document.createElement('a');
+                                                        link.href = url;
+                                                        link.download = `plan-${Date.now()}.dxf`;
+                                                        document.body.appendChild(link);
+                                                        link.click();
+                                                        document.body.removeChild(link);
+                                                        window.URL.revokeObjectURL(url);
+                                                    } catch (e) {
+                                                        console.error("DXF Download error:", e);
+                                                        alert("Failed to download DXF. Please try again.");
+                                                    }
+                                                }}
+                                            >
+                                                <FileCode className="w-3 h-3" /> Download DXF
+                                            </Button>
+
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
                                                 className="text-xs text-gray-400 hover:text-white gap-2"
                                                 onClick={() => handleDownload(message.imageUrl!)}
                                             >
-                                                <Download className="w-3 h-3" /> Download High-Res
+                                                <Download className="w-3 h-3" /> Download Image
                                             </Button>
                                         </div>
                                     </div>

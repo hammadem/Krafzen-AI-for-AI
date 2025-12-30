@@ -17,24 +17,30 @@ FastAPI backend for voice/text to DXF generation using fine-tuned CAD-LLM model.
    - OpenAI API key (for Whisper transcription)
    - Hugging Face token and model (for CAD-LLM)
 3. `./scripts/setup_supabase.sh` (pushes schema.sql)
-4. `make run` → http://localhost:8000/docs
+4. `make run` → <http://localhost:8000/docs>
 
 ## Configuration
 
 ### Required Environment Variables
 
 **Supabase** (for database):
+
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 **OpenAI** (for audio transcription):
+
 - `OPENAI_API_KEY`
 
 **Hugging Face** (for CAD-LLM model - recommended):
+
 - `HF_TOKEN` - Your Hugging Face API token
 - `HF_MODEL_NAME` - Model identifier (e.g., "username/cad-llm-krafzen")
 - `HF_ENDPOINT_URL` - Optional: Custom endpoint URL (e.g., Hugging Face Space)
+38:
+39: **Api2Convert** (for professional DXF conversion):
+40: - `API_2_CONVERT_KEY` - API Key from api2convert.com (V2)
 
 See `env.example` for complete configuration options.
 

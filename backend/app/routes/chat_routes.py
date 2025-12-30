@@ -1,10 +1,13 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 from app.services.ollama_service import OllamaService
 from app.services.gemini_service import GeminiService
+from app.services.dxf_service import DxfService
 from app.core.config import settings
 import logging
+import os
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,6 +21,43 @@ class ChatResponse(BaseModel):
     ollama_response: str
     validated_response: str
     image_url: str
+
+class DxfRequest(BaseModel):
+    image_url: str
+    prompt: Optional[str] = None
+
+@router.post("/chat/dxf")
+async def generate_dxf(request: DxfRequest):
+    """
+    Generates a DXF file from an image URL.
+    Uses External Service (Api2Convert) for high-fidelity Raster-to-Vector conversion.
+    """
+    try:
+        from app.services.external_dxf_service import ExternalDxfService
+        dxf_service = ExternalDxfService() # External provider
+
+        logger.info(f"Requesting External DXF Conversion for image...")
+        
+        # Call external API
+        file_path = await dxf_service.convert_to_dxf(request.image_url)
+        
+        # Check and Return
+        if not os.path.exists(file_path):
+             raise HTTPException(status_code=500, detail="Failed to retrieve DXF file from external provider")
+
+        return FileResponse(
+            path=file_path, 
+            filename=os.path.basename(file_path),
+            media_type='application/dxf'
+        )
+
+    except Exception as e:
+        logger.error(f"DXF Generation Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    except Exception as e:
+        logger.error(f"DXF Generation Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat/generate", response_model=ChatResponse)
 async def generate_chat_response(request: ChatRequest):

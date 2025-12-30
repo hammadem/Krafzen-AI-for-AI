@@ -8,7 +8,7 @@ from starlette.responses import Response
 from app.core.config import settings
 from app.core.logging_config import init_sentry
 from app.utils.error_handler import add_exception_handlers
-from app.routes import project_routes, job_routes, file_routes
+from app.routes import project_routes, job_routes, file_routes, chat_routes
 from app.api import health, transcriber
 from app.db.supabase_client import db
 import logging
@@ -99,9 +99,15 @@ app.add_middleware(WildcardCORSMiddleware)
 
 
 # Include API routers
+from app.routes import project_routes, job_routes, file_routes, chat_routes
+
+# ... (middle of file)
+
+# Include API routers
 app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"])
+app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 

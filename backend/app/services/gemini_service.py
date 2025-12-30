@@ -129,6 +129,12 @@ class GeminiService:
                - Include a **graphical scale ruler** in the bottom corner (e.g., 0-5m).
                - Include a small **legend** or clear text labels for major furniture items.
             5. Aesthetics: Minimalist, clean, engineering precision. No 3D perspective or artistic shading.
+            
+            STRICT CAD STANDARDS (MUST FOLLOW):
+            - **Orientation**: All walls and furniture must be purely vertical or horizontal (90-degree angles). NO diagonal lines.
+            - **Alignment**: Align furniture edges to walls or other furniture. Do not place objects randomly.
+            - **CLEARANCE**: Maintain a minimum **900mm** (approx 1 meter) clearance corridor for walking between islands and counters.
+            - **Sizing**: Use standard sizes (Counter Depth = 600mm, Island Depth = 900mm-1200mm).
 
             SPECIFICATION:
             {prompt}
@@ -144,6 +150,8 @@ class GeminiService:
                 HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             }
+
+            logger.info(f"--- GEMINI IMAGE GENERATION PROMPT ---\n{enhanced_prompt}\n----------------------------------")
 
             response = await model.generate_content_async(enhanced_prompt, safety_settings=safety_settings)
             
@@ -237,4 +245,109 @@ class GeminiService:
             logger.error(f"Vision refinement failed: {e}")
             # Fallback: Just return the user request effectively bypassing vision
             return user_request
+
+    async def extract_dxf_data(self, image_url: str, prompt_context: str = None) -> dict:
+        """
+        Extracts vector data (walls, furniture, dimensions) from an image using Gemini Vision.
+        Returns a dictionary suitable for DXF generation.
+        """
+        if not settings.GEMINI_API_KEY:
+            raise Exception("Gemini API Key not configured")
+
+        import httpx
+        from PIL import Image
+        import io
+        import base64
+        import json
+
+        try:
+            # 1. Get Image Data (Reuse logic if possible, but distinct function here)
+            image_data = None
+            if image_url.startswith("data:"):
+                encoded = image_url.split(",")[1]
+                image_bytes = base64.b64decode(encoded)
+                image_data = Image.open(io.BytesIO(image_bytes))
+            else:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.get(image_url)
+                    resp.raise_for_status()
+                    image_data = Image.open(io.BytesIO(resp.content))
+
+            # 2. Call Vision Model
+            model = genai.GenerativeModel("gemini-2.0-flash-exp")
+            
+            user_context_str = ""
+            if prompt_context:
+                user_context_str = f"USER CONTEXT (The prompt that generated this image): '{prompt_context}'. Use this to correctly Name/Label the furniture (e.g. 'Island', 'Sofa', 'Reception Desk')."
+
+            prompt = """
+            You are a Reverse Engineering CAD Engine.
+            
+            TASK:
+            Analyze the attached image. It is a 2D Floor Plan.
+            You must extract the EXACT geometry to reconstruct it in CAD.
+            """ + user_context_str + """
+            
+            CRITICAL:
+            1.  **Coordinate System**: Visualize a **1000x1000 GRID** over the image.
+                - Top-Left = (0, 0)
+                - Bottom-Right = (1000, 1000)
+                - Return ALL coordinates in this **0-1000 Normalized Space**. Do NOT use raw pixels.
+            2.  **Scale Calibration**: 
+                - Identify a standard object (e.g. Standard Door Width = 900mm, or Kitchen Counter Depth = 600mm).
+                - Calculate `scale_factor_mm_per_unit` = (Real Size in mm) / (Size in 0-1000 units).
+            
+            OUTPUT FORMAT:
+            {
+              "metadata": {
+                "coordinate_system": "normalized_1000x1000",
+                "scale_factor_mm_per_unit": 15.0
+              },
+              "walls": [
+                {"start": [x1, y1], "end": [x2, y2]} 
+              ],
+              "furniture": [
+                {"name": "string", "center": [x, y], "width": 100, "depth": 100, "rotation_degrees": 0}
+              ],
+              "text_annotations": [
+                 {"text": "string", "position": [x, y]}
+              ]
+            }
+            
+            INSTRUCTIONS:
+            - **Walls**: Must be continuous strings of lines. Do not miss the outer boundary.
+            - **Furniture Labels**: Return ONLY the object name (e.g. "Island", "Sink"). DO NOT include coordinates, dimensions, or debug values in the name string.
+            - **Text Annotations**: Extract ROOM NAMES only (e.g. "KITCHEN", "LIVING ROOM"). DO NOT extract every single dimension number found on the image. We want a clean CAD file.
+            
+            GEOMETRY RECTIFICATION (CRITICAL):
+            - The input image might have slight hand-drawn imperfections. You must **CORRECT** them.
+            - **Rule of Orthogonality**: All lines must be strictly Vertical or Horizontal. No diagonals unless explicitly architectural.
+            - **Snap-to-Grid**: Round all coordinates to the nearest logical grid line (e.g. nearest 10 or 50 units).
+            - **Alignment**: If two objects look like they align (e.g. Island starts where Counter ends), ensure their X or Y coordinates match EXACTLY.
+            """
+            
+            logger.info(f"--- GEMINI VISION DXF PROMPT ---\n{prompt}\n------------------------------")
+            logger.info("Extracting DXF Data from Image...")
+            response = await model.generate_content_async([prompt, image_data])
+            
+            # Clean response (sometimes it wraps in ```json ... ```)
+            text = response.text
+             
+            import re
+            # Extract JSON block using regex (searches for outermost {})
+            json_match = re.search(r'\{.*\}', text, re.DOTALL)
+            
+            if not json_match:
+                 logger.error(f"Gemini returned no JSON. Raw output: {text}")
+                 raise Exception("Gemini failed to generate valid JSON")
+
+            data = json.loads(json_match.group(0))
+            
+            logger.info(f"DEBUG - Full Extracted Data: {json.dumps(data, indent=2)}")
+            logger.info(f"Extracted {len(data.get('walls', []))} walls and {len(data.get('furniture', []))} items.")
+            return data
+
+        except Exception as e:
+            logger.error(f"DXF Extraction failed: {e}")
+            raise Exception(f"Failed to extract vector data: {e}")
 

@@ -29,3 +29,24 @@ export async function sendChatMessage(
 
     return response.json();
 }
+
+export const downloadDxf = async (imageUrl: string, prompt?: string) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/chat/dxf`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image_url: imageUrl, prompt }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to download DXF: ${response.statusText}`);
+        }
+
+        return await response.blob();
+    } catch (error) {
+        console.error('Error downloading DXF:', error);
+        throw error;
+    }
+};

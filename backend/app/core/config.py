@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     
     # Stable Diffusion / Image Config
     USE_GEMINI_FOR_IMAGE: bool = True
+    
+    # External DXF Service (Api2Convert)
+    API_2_CONVERT_KEY: Optional[str] = None
 
     
     @property
