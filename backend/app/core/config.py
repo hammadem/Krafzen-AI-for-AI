@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     
     # External DXF Service (Api2Convert)
     API_2_CONVERT_KEY: Optional[str] = None
+    API_2_CONVERT_URL: str = "https://api.api2convert.com/v2"
 
     
     @property

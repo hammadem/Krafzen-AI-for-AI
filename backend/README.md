@@ -40,7 +40,8 @@ FastAPI backend for voice/text to DXF generation using fine-tuned CAD-LLM model.
 - `HF_ENDPOINT_URL` - Optional: Custom endpoint URL (e.g., Hugging Face Space)
 38:
 39: **Api2Convert** (for professional DXF conversion):
-40: - `API_2_CONVERT_KEY` - API Key from api2convert.com (V2)
+- `API_2_CONVERT_KEY` - API Key from api2convert.com (V2)
+- `API_2_CONVERT_URL` - API Endpoint (default: `https://api.api2convert.com/v2`)
 
 See `env.example` for complete configuration options.
 

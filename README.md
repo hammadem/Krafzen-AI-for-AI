@@ -188,7 +188,8 @@ SUPABASE_ANON_KEY=your-anon-key-here
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 173: 
 174: # Api2Convert (Required for DXF Generation)
-175: API_2_CONVERT_KEY=your-api-key-here
+API_2_CONVERT_KEY=your-api-key-here
+API_2_CONVERT_URL=https://api.api2convert.com/v2
 
 # CORS
 ALLOWED_ORIGINS=http://localhost:3000,https://*.vercel.app

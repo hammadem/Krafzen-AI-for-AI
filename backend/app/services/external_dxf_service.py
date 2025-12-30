@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class ExternalDxfService:
     def __init__(self, output_dir: str = "temp"):
         self.api_key = settings.API_2_CONVERT_KEY
-        self.base_url = "https://api.api2convert.com/v2"
+        self.base_url = settings.API_2_CONVERT_URL
         self.output_dir = output_dir
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
