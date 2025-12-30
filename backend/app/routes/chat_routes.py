@@ -2,6 +2,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.services.ollama_service import OllamaService
 from app.services.gemini_service import GeminiService
+from app.core.config import settings
+import logging
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
 class ChatRequest(BaseModel):
     message: str
 
@@ -39,7 +45,7 @@ async def generate_chat_response(request: ChatRequest):
         return ChatResponse(
             original_prompt=request.message,
             ollama_response=ollama_output,
-            validated_response=validated_text,
+            validated_response=ollama_output,
             image_url=image_url
         )
 
