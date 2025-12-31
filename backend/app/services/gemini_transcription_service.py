@@ -20,8 +20,8 @@ class GeminiTranscriptionService:
             raise ValueError("GEMINI_API_KEY is not configured")
         
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        # Use gemini-1.5-flash for fast and cost-effective transcription
-        self.model_name = "gemini-1.5-flash"
+        # Use gemini-2.0-flash-001 as 1.5 is unavailable/deprecated for this key
+        self.model_name = "gemini-2.0-flash-001"
         self.model = genai.GenerativeModel(self.model_name)
     
     async def transcribe_file(
