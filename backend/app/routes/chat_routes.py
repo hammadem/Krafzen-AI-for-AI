@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
-from app.services.ollama_service import OllamaService
+from app.services.cadllm_service import cadllm_service
 from app.services.gemini_service import GeminiService
 from app.services.dxf_service import DxfService
 from app.core.config import settings
@@ -68,7 +68,9 @@ async def generate_chat_response(request: ChatRequest):
     3. Image Generation (Gemini or Stable Diffusion based on Config/Request).
     """
     try:
-        ollama_service = OllamaService()
+        if not cadllm_service:
+             raise HTTPException(status_code=503, detail="CADLLM Service Unavailable")
+
         gemini_service = GeminiService()
         
         # 1. Vision Analysis (If previous image exists) vs Text Generation
@@ -107,8 +109,8 @@ async def generate_chat_response(request: ChatRequest):
                 """
                 logger.info(f"Using Context-Aware Prompt. History length: {len(request.history)}")
                 
-            logger.info(f"Generating Ollama response for: {request.message}")
-            ollama_output = await ollama_service.generate_response(full_prompt)
+            logger.info(f"Generating CADLLM response for: {request.message}")
+            ollama_output = await cadllm_service.generate_text(full_prompt)
         
         if not ollama_output:
             raise HTTPException(status_code=500, detail="Ollama returned empty response")

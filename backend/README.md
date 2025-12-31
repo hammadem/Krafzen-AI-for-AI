@@ -35,9 +35,9 @@ FastAPI backend for voice/text to DXF generation using fine-tuned CAD-LLM model.
 
 **Hugging Face** (for CAD-LLM model - recommended):
 
-- `HF_TOKEN` - Your Hugging Face API token
-- `HF_MODEL_NAME` - Model identifier (e.g., "username/cad-llm-krafzen")
-- `HF_ENDPOINT_URL` - Optional: Custom endpoint URL (e.g., Hugging Face Space)
+- `HF_TOKEN` - Your Hugging Face API token (Required for Space access)
+- `HF_MODEL_NAME` - Model identifier (e.g., "mkmad7/cad-llm-api")
+- `HF_ENDPOINT_URL` - Endpoint URL (e.g., `https://mkmad7-cad-llm-api.hf.space/generate`)
 38:
 39: **Api2Convert** (for professional DXF conversion):
 - `API_2_CONVERT_KEY` - API Key from api2convert.com (V2)

@@ -154,6 +154,26 @@ Use exact dimensions specified in the request. Generate single, closed shapes un
             logger.error(f"CADLLM generation error: {e}", exc_info=True)
             return None, str(e)
     
+    async def generate_text(self, prompt: str) -> str:
+        """
+        Generate generic text response from the model (for chat/description).
+        
+        Args:
+            prompt: Input text prompt
+            
+        Returns:
+            Generated text response
+        """
+        if not self.is_configured():
+            raise ValueError("CADLLM service is not configured")
+            
+        try:
+            logger.info(f"Calling CAD-LLM model for text generation: {prompt[:50]}...")
+            return await self._generate_coordinates(prompt)
+        except Exception as e:
+            logger.error(f"CADLLM text generation error: {e}", exc_info=True)
+            raise e
+            
     async def _generate_coordinates(self, prompt: str) -> str:
         """
         Call the Hugging Face model to generate coordinates.
@@ -204,14 +224,12 @@ Use exact dimensions specified in the request. Generate single, closed shapes un
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         
+        # payload for custom FastAPI app on HF Space
         payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 400,
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "return_full_text": False
-            }
+            "instruction": prompt,
+            "max_new_tokens": 400,
+            "temperature": 0.7,
+            "top_p": 0.9
         }
         
         try:
@@ -232,23 +250,9 @@ Use exact dimensions specified in the request. Generate single, closed shapes un
             
             result = response.json()
             
-            # Handle different response formats
-            if isinstance(result, list) and len(result) > 0:
-                if "generated_text" in result[0]:
-                    return result[0]["generated_text"]
-                elif "text" in result[0]:
-                    return result[0]["text"]
-                else:
-                    return str(result[0])
-            elif isinstance(result, dict):
-                if "generated_text" in result:
-                    return result["generated_text"]
-                elif "text" in result:
-                    return result["text"]
-                else:
-                    return str(result)
-            else:
-                return str(result)
+            # Custom app returns {"output": "..."}
+            if isinstance(result, dict) and "output" in result:
+                return result["output"]
                 
         except requests.exceptions.RequestException as e:
             logger.error(f"HTTP request to endpoint failed: {e}")
