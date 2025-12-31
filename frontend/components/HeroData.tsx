@@ -1,4 +1,3 @@
-"use client";
 import { useDashboard } from "@/context/DashboardContex";
 
 export default function HeroData() {

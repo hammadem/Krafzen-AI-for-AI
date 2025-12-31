@@ -33,7 +33,7 @@ export default function Hero() {
                 /> */}
 
                 <Image
-                    src="/hero/image.png"
+                    src="/hero/image.webp"
                     alt="Hero Image"
                     fill
                     loading="eager"

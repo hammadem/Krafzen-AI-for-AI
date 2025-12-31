@@ -6,21 +6,18 @@ export default function About() {
     return (
         <>
             <NavHeader currentNav={"About"} />
-
             <section className="max-w-5xl mx-auto px-6 mt-16 text-white flex flex-col gap-10">
-
                 {/* Image */}
                 <div className="flex flex-col sm:flex-row gap-10 items-center">
-                    <div className="relative rounded-[10px] w-full sm:w-[40%] h-[80vh] max-h-[423px] sm:max-h-[600px]">
+
+                    <div className="relative w-full sm:w-[40%] h-[80vh] max-h-[423px] sm:max-h-[600px]">
                         <Image
-                            src="/about/image.svg"
+                            src="/about/image.webp"
                             fill
                             alt="About Rectangle"
                             className="object-cover grayscale rounded-[10px]"
                         />
                     </div>
-
-
                     <div className="max-w-xl sm:w-[60%] rounded-lg">
                         <h2 className="text-3xl sm:text-3xl font-semibold mb-4">
                             {aboutData[0].heading}
@@ -34,9 +31,7 @@ export default function About() {
                             {aboutData[0].p[1]}
                         </p>
                     </div>
-
                 </div>
-
 
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-10 items-center">
                     {aboutData.map((abt, ind) => {
@@ -56,16 +51,11 @@ export default function About() {
                                     </p>
                                 ))}
                             </div>
-
                         );
                     }
                     )}
                 </div>
-
-
-
             </section >
-
         </>
     );
 }

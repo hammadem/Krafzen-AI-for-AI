@@ -26,7 +26,7 @@ export default function ContactCTA() {
             </span>
 
             <Image
-                src="/contact/tilt.svg"
+                src="/contact/tilt.webp"
                 width={600}
                 height={600}
                 alt="Tilted Image"

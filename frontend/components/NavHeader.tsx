@@ -3,19 +3,21 @@ import Link from "next/link";
 
 export default function NavHeader({ currentNav }: { currentNav: string }) {
     return (
-        <div className="relative w-full h-[18vh] sm:h-[22vh] border-y border-[#090909] overflow-hidden">
+        <div className="relative w-full h-[18vh] sm:h-[22vh] border-y-[1px] border-[#595959] overflow-hidden">
 
             {/* Background Image */}
+            {/* Filter fixes needed to be */}
             <Image
-                src="/navheader/nav-image2.svg"
+                src="/navheader/nav-image2.webp"
                 alt="Header background"
                 fill
                 className="object-cover z-0"
                 priority
+
             />
 
             {/* Optional dark overlay for contrast */}
-            <div className="absolute inset-0 bg-black/30 z-0" />
+            {/* <div className="absolute inset-0 bg-black/30 z-0" /> */}
 
             {/* Content */}
             <div className="relative z-10 h-full flex items-center">
@@ -25,11 +27,10 @@ export default function NavHeader({ currentNav }: { currentNav: string }) {
                             {currentNav}
                         </h1>
 
-                        <div className="flex items-center mt-2 gap-2">
+                        <div className="flex items-center mt-2 gap-2 font-semibold">
                             <Link
                                 href="/"
                                 aria-label="Home Link"
-                                className="font-"
                             >
                                 Home
                             </Link>
@@ -39,10 +40,10 @@ export default function NavHeader({ currentNav }: { currentNav: string }) {
                                 height={15}
                                 width={15}
                                 alt="Breadcrumb separator"
-                                className="translate-y-[1.5px]"
+                                className="translate-y-[2px]"
                             />
 
-                            <p className="font-">{currentNav}</p>
+                            <p className="font-semibold">{currentNav}</p>
                         </div>
                     </div>
                 </div>
