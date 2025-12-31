@@ -50,3 +50,21 @@ export const downloadDxf = async (imageUrl: string, prompt?: string) => {
         throw error;
     }
 };
+
+export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'rec.webm');
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/transcribe`, {
+        method: 'POST',
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Transcription failed');
+    }
+
+    const data = await response.json();
+    return data.text;
+}

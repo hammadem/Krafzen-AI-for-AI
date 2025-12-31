@@ -34,10 +34,10 @@ except Exception as e:
     gpt_parser_service = None
 
 try:
-    from app.services.whisper_service import whisper_service
+    from app.services.gemini_transcription_service import gemini_transcription_service
 except Exception as e:
-    logger.warning(f"Failed to import whisper_service: {e}.")
-    whisper_service = None
+    logger.warning(f"Failed to import gemini_transcription_service: {e}.")
+    gemini_transcription_service = None
 
 try:
     from app.services.cadllm_service import cadllm_service
@@ -279,10 +279,10 @@ async def generate_dxf_from_audio(
     Returns:
         DXF file as binary response
     """
-    if not whisper_service:
+    if not gemini_transcription_service:
         raise HTTPException(
             status_code=503,
-            detail="Whisper service is not configured. Please check OPENAI_API_KEY."
+            detail="Gemini transcription service is not configured. Please check GEMINI_API_KEY."
         )
     
     if not dxf_generator_service:
@@ -302,13 +302,13 @@ async def generate_dxf_from_audio(
             )
         
         # Step 1: Transcribe audio
-        logger.info("Transcribing audio file...")
+        logger.info("Transcribing audio file with Gemini...")
         file_content = await file.read()
         
         if not file_content:
             raise HTTPException(status_code=400, detail="Empty file provided")
         
-        transcribed_text, detected_language, duration = await whisper_service.transcribe_file(
+        transcribed_text, detected_language, duration = await gemini_transcription_service.transcribe_file(
             file_content=file_content,
             filename=file.filename or "audio",
             language=language
@@ -746,10 +746,11 @@ async def generate_dxf_from_audio_cadllm(
     Returns:
         DXF file as binary response
     """
-    if not whisper_service:
+    """
+    if not gemini_transcription_service:
         raise HTTPException(
             status_code=503,
-            detail="Whisper service is not configured. Please check OPENAI_API_KEY."
+            detail="Gemini transcription service is not configured. Please check GEMINI_API_KEY."
         )
     
     if not cadllm_service:
@@ -766,13 +767,13 @@ async def generate_dxf_from_audio_cadllm(
     
     try:
         # Step 1: Transcribe audio
-        logger.info("Transcribing audio file...")
+        logger.info("Transcribing audio file with Gemini...")
         file_content = await file.read()
         
         if not file_content:
             raise HTTPException(status_code=400, detail="Empty file provided")
         
-        transcribed_text, detected_language, duration = await whisper_service.transcribe_file(
+        transcribed_text, detected_language, duration = await gemini_transcription_service.transcribe_file(
             file_content=file_content,
             filename=file.filename or "audio",
             language=language

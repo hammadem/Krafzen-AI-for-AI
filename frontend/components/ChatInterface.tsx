@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Image as ImageIcon, Loader2, Download, Maximize2, FileCode } from "lucide-react"
-import { sendChatMessage, downloadDxf } from "@/lib/api/chat"
+import { Send, Image as ImageIcon, Loader2, Download, Maximize2, FileCode, Mic } from "lucide-react"
+import { sendChatMessage, downloadDxf, transcribeAudio } from "@/lib/api/chat"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -40,10 +40,58 @@ export function ChatInterface({
     onSendMessage
 }: ChatInterfaceProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const [isRecording, setIsRecording] = useState(false)
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+    const chunksRef = useRef<Blob[]>([])
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
+
+    const handleMicClick = async () => {
+        if (isRecording) {
+            // Stop recording
+            mediaRecorderRef.current?.stop();
+            setIsRecording(false);
+        } else {
+            // Start recording
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const recorder = new MediaRecorder(stream);
+                mediaRecorderRef.current = recorder;
+                chunksRef.current = [];
+
+                recorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        chunksRef.current.push(e.data);
+                    }
+                };
+
+                recorder.onstop = async () => {
+                    const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                    // Provide visual feedback or loading state if needed
+                    try {
+                        onInputChange("Transcribing...");
+                        const text = await transcribeAudio(blob);
+                        onInputChange(text);
+                    } catch (error) {
+                        console.error("Transcription error:", error);
+                        onInputChange("Error transcribing audio.");
+                    }
+
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                recorder.start();
+                setIsRecording(true);
+            } catch (err) {
+                console.error("Error accessing microphone:", err);
+                alert("Could not access microphone.");
+            }
+        }
+    };
+
 
     useEffect(() => {
         scrollToBottom()
@@ -251,6 +299,15 @@ export function ChatInterface({
                             disabled={isLoading}
                             className="flex-1 bg-transparent border-none text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 h-10"
                         />
+                        <Button
+                            onClick={handleMicClick}
+                            disabled={isLoading}
+                            size="icon"
+                            variant="ghost"
+                            className={`rounded-full w-10 h-10 hover:bg-white/10 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}
+                        >
+                            <Mic className="h-5 w-5" />
+                        </Button>
                         <Button
                             onClick={onSendMessage}
                             disabled={isLoading || !inputValue.trim()}
