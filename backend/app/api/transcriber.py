@@ -25,7 +25,6 @@ async def transcribe_audio(
 ):
     """
     Transcribe audio file to text using Google Gemini
-    """
     
     Args:
         file: Audio file (mp3, wav, m4a, ogg, flac, webm)
