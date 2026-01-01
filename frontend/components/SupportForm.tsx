@@ -44,29 +44,29 @@ export default function SupportForm() {
     }
 
     return (
-        <Card className="w-full sm:max-w-md  bg-[#1d1c1cff] border-0 text-white">
+        <Card className="w-full sm:max-w-xl bg-zinc-900 border border-white/10 text-white shadow-xl">
             <CardHeader>
-                <CardTitle>Let&apos;s connect</CardTitle>
-                <CardDescription>
-                    Reach out to us at Krafzen by sending us a message and get back to you as soon as we receive your message.
+                <CardTitle className="text-2xl font-bold">Let&apos;s connect</CardTitle>
+                <CardDescription className="text-gray-400">
+                    Reach out to us at Krafzen. We'll get back to you as soon as possible.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
-                    <FieldGroup>
-                        <div className="flex w-full gap-4">
+                    <FieldGroup className="space-y-4">
+                        <div className="flex flex-col sm:flex-row w-full gap-4">
                             <Controller
                                 name="firstname"
                                 control={form.control}
                                 render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
+                                    <Field className="w-full" data-invalid={fieldState.invalid}>
                                         <Input
                                             {...field}
-                                            id="form-rhf-demo-title"
+                                            id="firstname"
                                             aria-invalid={fieldState.invalid}
                                             placeholder="First Name"
                                             autoComplete="off"
-                                            className="border-2 border-[#3F3F3F] bg-[#2F2F2F] p-5"
+                                            className="border border-white/10 bg-black p-5 h-12 focus-visible:ring-1 focus-visible:ring-white"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
@@ -78,14 +78,14 @@ export default function SupportForm() {
                                 name="lastname"
                                 control={form.control}
                                 render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
+                                    <Field className="w-full" data-invalid={fieldState.invalid}>
                                         <Input
                                             {...field}
-                                            id="form-rhf-demo-title"
+                                            id="lastname"
                                             aria-invalid={fieldState.invalid}
                                             placeholder="Last Name"
                                             autoComplete="off"
-                                            className="border-2 border-[#3F3F3F] bg-[#2F2F2F] p-5"
+                                            className="border border-white/10 bg-black p-5 h-12 focus-visible:ring-1 focus-visible:ring-white"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
@@ -101,11 +101,11 @@ export default function SupportForm() {
                                 <Field data-invalid={fieldState.invalid}>
                                     <Input
                                         {...field}
-                                        id="form-rhf-demo-title"
+                                        id="email"
                                         aria-invalid={fieldState.invalid}
                                         placeholder="Email"
                                         autoComplete="off"
-                                        className="border-2 border-[#3F3F3F] bg-[#2F2F2F] p-5"
+                                        className="border border-white/10 bg-black p-5 h-12 focus-visible:ring-1 focus-visible:ring-white"
                                     />
                                     {fieldState.invalid && (
                                         <FieldError errors={[fieldState.error]} />
@@ -120,11 +120,11 @@ export default function SupportForm() {
                                 <Field data-invalid={fieldState.invalid}>
                                     <Input
                                         {...field}
-                                        id="form-rhf-demo-title"
+                                        id="phone"
                                         aria-invalid={fieldState.invalid}
                                         placeholder="Phone Number"
                                         autoComplete="off"
-                                        className="border-2 border-[#3F3F3F] bg-[#2F2F2F] p-5"
+                                        className="border border-white/10 bg-black p-5 h-12 focus-visible:ring-1 focus-visible:ring-white"
                                     />
                                     {fieldState.invalid && (
                                         <FieldError errors={[fieldState.error]} />
@@ -138,21 +138,23 @@ export default function SupportForm() {
                             control={form.control}
                             render={({ field, fieldState }) => (
                                 <Field data-invalid={fieldState.invalid}>
-                                    <InputGroup className="border-2 border-[#3F3F3F] bg-[#2F2F2F]">
-                                        <InputGroupTextarea
-                                            {...field}
-                                            id="form-rhf-demo-description"
-                                            placeholder="Message"
-                                            rows={6}
-                                            className="min-h-24 resize-none p-5"
-                                            aria-invalid={fieldState.invalid}
-                                        />
-                                        <InputGroupAddon align="block-end">
-                                            <InputGroupText className="tabular-nums">
-                                                {field.value.length}/100 characters
-                                            </InputGroupText>
-                                        </InputGroupAddon>
-                                    </InputGroup>
+                                    <div className="relative">
+                                        <InputGroup className="border border-white/10 bg-black rounded-md focus-within:ring-1 focus-within:ring-white">
+                                            <InputGroupTextarea
+                                                {...field}
+                                                id="message"
+                                                placeholder="Message"
+                                                rows={6}
+                                                className="min-h-32 resize-none p-4 bg-transparent border-0 focus:ring-0"
+                                                aria-invalid={fieldState.invalid}
+                                            />
+                                            <InputGroupAddon align="block-end" className="border-t border-white/10 bg-zinc-900/50">
+                                                <InputGroupText className="tabular-nums text-xs text-gray-400 p-2">
+                                                    {field.value.length}/100 characters
+                                                </InputGroupText>
+                                            </InputGroupAddon>
+                                        </InputGroup>
+                                    </div>
                                     {fieldState.invalid && (
                                         <FieldError errors={[fieldState.error]} />
                                     )}
@@ -163,11 +165,11 @@ export default function SupportForm() {
                 </form>
             </CardContent>
             <CardFooter>
-                <Field orientation="horizontal">
-                    <Button type="submit" form="form-rhf-demo" variant="secondary" className="rounded-full w-full cursor-pointer hover:bg-green-400 bg-green-400">
+                <div className="w-full">
+                    <Button type="submit" form="form-rhf-demo" className="rounded-full w-full h-12 text-black font-semibold bg-green-400 hover:bg-green-500 transition-colors">
                         Submit
                     </Button>
-                </Field>
+                </div>
             </CardFooter>
         </Card>
     )

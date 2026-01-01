@@ -111,15 +111,15 @@ if [ ! -z "$BACKEND_PID" ]; then
 fi
 
 # Check frontend port
-if check_port 3001; then
-    echo "⚠️  Frontend port 3001 is in use. Stopping existing server..."
-    kill_port 3001
+if check_port 3000; then
+    echo "⚠️  Frontend port 3000 is in use. Stopping existing server..."
+    kill_port 3000
 fi
 
 if true; then
     echo ""
     echo "📦 Starting Frontend Server..."
-    echo "   Frontend will run on: http://localhost:3001"
+    echo "   Frontend will run on: http://localhost:3000"
     echo ""
     
     cd frontend || { echo "❌ Error: frontend directory not found"; exit 1; }
@@ -147,7 +147,7 @@ echo "=============================================="
 echo "✅ Development Servers Started!"
 echo ""
 echo "📍 Backend:  http://localhost:8000"
-echo "📍 Frontend: http://localhost:3001"
+echo "📍 Frontend: http://localhost:3000"
 echo "📍 API Docs: http://localhost:8000/docs"
 echo ""
 echo "📋 Logs:"

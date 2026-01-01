@@ -16,51 +16,50 @@ export default function Pricing() {
         <section>
             {/** Pricing text */}
 
-            <div className="text-white bg-black flex flex-col items-center justify-evenly">
-                <h1 className="font-bold text-[5vh]">Pricing Plans</h1>
-                <p className="text-center px-1">Choose the plan that works best for you.</p>
+            <div className="bg-black w-full pb-20">
+                <div className="w-full max-w-5xl mx-auto px-4 flex flex-col items-center gap-8">
+                    <div className="text-center space-y-4">
+                        <h2 className="text-3xl md:text-4xl font-bold text-white">Pricing Plans</h2>
+                        <p className="text-gray-400">Choose the plan that works best for you.</p>
+                    </div>
 
-                <div className="mt-10 relative bg-[#1d1c1cff] border-2 border-[#1d1c1cff] rounded-full flex">
-                    <div
-                        className={
-                            classNames("absolute z-99 top-0 left-0 h-full bg-black rounded-full transition-transform duration-1000 ease-out",
-                                monthly ? "translate-x-0 w-[51%]" : "translate-x-full w-[50%]"
-                            )}
-                    ></div>
-                    <Button
-                        onClick={() => setMonthly(true)}
-                        className={classNames("cursor-pointer rounded-full bg-[#1d1c1cff]"
-                            , monthly ? "hover:bg-black bg-black" : "hover:bg-[#1d1c1cff]"
-                        )}
-                    >
-                        <p className="z-999 w-[100%] px-12">Monthly</p>
-                    </Button>
-                    <Button
-                        onClick={() => setMonthly(false)}
-                        className={classNames(
-                            "cursor-pointer rounded-full bg-[#1d1c1cff]",
-                            !monthly ? "hover:bg-black bg-black" : "hover:bg-[#1d1c1cff]"
-                        )}
-                    >
-                        <p className="z-999 w-[100%] px-12">Annual</p>
-                    </Button>
+                    <div className="relative bg-zinc-900 border border-white/10 p-1 rounded-full flex w-fit mx-auto">
+                        <div
+                            className={
+                                classNames("absolute z-10 top-1 bottom-1 left-1 bg-black rounded-full transition-transform duration-500 ease-out border border-white/10",
+                                    monthly ? "translate-x-0 w-[calc(50%-4px)]" : "translate-x-[100%] w-[calc(50%-4px)]"
+                                )}
+                        ></div>
+                        <Button
+                            onClick={() => setMonthly(true)}
+                            variant="ghost"
+                            className={classNames("relative z-20 rounded-full w-32 hover:bg-transparent", monthly ? "text-white" : "text-gray-400")}
+                        >
+                            Monthly
+                        </Button>
+                        <Button
+                            onClick={() => setMonthly(false)}
+                            variant="ghost"
+                            className={classNames("relative z-20 rounded-full w-32 hover:bg-transparent", !monthly ? "text-white" : "text-gray-400")}
+                        >
+                            Annual
+                        </Button>
+                    </div>
+
+                    <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {
+                            monthly
+                                ?
+                                PricingPlans.monthly.map((price: PricingDetails, index: number) => (
+                                    <PricingDiv key={price.price} price={price} index={index} />
+                                ))
+                                :
+                                PricingPlans.annual.map((price: PricingDetails, index: number) => (
+                                    <PricingDiv key={price.price} price={price} index={index} />
+                                ))
+                        }
+                    </div>
                 </div>
-
-            </div>
-
-            {/** Pricing Menu */}
-            <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 bg-black py-8 px-6 sm:px-20">
-                {
-                    monthly
-                        ?
-                        PricingPlans.monthly.map((price: PricingDetails, index: number) => (
-                            <PricingDiv key={price.price} price={price} index={index} />
-                        ))
-                        :
-                        PricingPlans.annual.map((price: PricingDetails, index: number) => (
-                            <PricingDiv key={price.price} price={price} index={index} />
-                        ))
-                }
             </div>
 
         </section>

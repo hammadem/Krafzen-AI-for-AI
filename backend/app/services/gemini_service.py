@@ -121,14 +121,15 @@ class GeminiService:
             
             {validation_instruction}
 
-            STYLING REQUIREMENTS:
+            STYLING REQUIREMENTS (STRICT TEMPLATE TO FOLLOW):
             1. View: Strictly top-down 2D orthographic view.
-            2. Background: Use a uniform **dark blueprint style background** strictly matching **RGB(0, 51, 102)** (Classic Engineering Blue) with a **visible fine engineering grid overlay**.
-            3. Line Work: Use clear, high-contrast **white or light-colored lines** for walls and objects.
-            4. Details:
-               - Include a **graphical scale ruler** in the bottom corner (e.g., 0-5m).
-               - Include a small **legend** or clear text labels for major furniture items.
-            5. Aesthetics: Minimalist, clean, engineering precision. No 3D perspective or artistic shading.
+            2. Background: Use a **pure white background** with a **MANDATORY faint blue/grey engineering grid** overlay (1m spacing).
+            3. Line Work: Use clear, high-contrast **black lines** for all architectural elements (walls, windows, doors).
+            4. MANDATORY TEMPLATE ELEMENTS:
+               - **Scale Ruler**: A clear, High-Contrast graphical scale bar (e.g., 0-5m) MUST be present in the bottom right corner.
+               - **Dimensions**: Essential dimensions (total width/length) must be visible.
+               - **Grid**: The background MUST show a fine grid to imply scale.
+            5. Aesthetics: Professional CAD plot style. No artistic shading. Looks like a printed technical drawing.
             
             STRICT CAD STANDARDS (MUST FOLLOW):
             - **Orientation**: All walls and furniture must be purely vertical or horizontal (90-degree angles). NO diagonal lines.

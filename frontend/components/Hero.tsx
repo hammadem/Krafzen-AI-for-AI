@@ -17,7 +17,7 @@ export default function Hero() {
                     loading="eager"
                 />
 
-                <div className="z-99 flex flex-col items-center">
+                <div className="relative z-10 flex flex-col items-center">
                     <span
                         className="sm:h-80 h-20"
                     ></span>

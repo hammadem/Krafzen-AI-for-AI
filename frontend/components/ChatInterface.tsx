@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Image as ImageIcon, Loader2, Download, Maximize2, FileCode, Mic } from "lucide-react"
+import { Send, Image as ImageIcon, Loader2, Download, Maximize2, FileCode, Mic, User, ChevronsLeft } from "lucide-react"
 import { sendChatMessage, downloadDxf, transcribeAudio } from "@/lib/api/chat"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -32,6 +32,8 @@ interface ChatInterfaceProps {
     onSendMessage: () => void
 }
 
+import { useAuth } from "@/context/AuthContext"
+
 export function ChatInterface({
     messages,
     inputValue,
@@ -39,6 +41,7 @@ export function ChatInterface({
     onInputChange,
     onSendMessage
 }: ChatInterfaceProps) {
+    const { user } = useAuth()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const [isRecording, setIsRecording] = useState(false)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -47,6 +50,8 @@ export function ChatInterface({
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
+
+    // ... (keep handleMicClick and other functions)
 
     const handleMicClick = async () => {
         if (isRecording) {
@@ -153,12 +158,30 @@ export function ChatInterface({
             <div className="flex-1 overflow-y-auto w-full custom-scrollbar">
                 <div className="max-w-3xl mx-auto w-full p-4 pb-32 space-y-8">
                     {messages.length === 0 && (
-                        <div className="flex flex-col items-center justify-center text-muted-foreground opacity-50 space-y-4 py-20 min-h-[400px]">
-                            <div className="p-4 rounded-full bg-primary/10">
-                                <ImageIcon className="w-12 h-12 text-primary" />
+                        <div className="flex flex-col items-center justify-center h-full space-y-8 mt-20">
+                            <div className="text-center space-y-2">
+                                <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400">
+                                    Welcome back, {user?.firstname || "Designer"}!
+                                </h1>
+                                <h2 className="text-2xl font-medium text-gray-400">What do you want to draw today?</h2>
                             </div>
-                            <p className="text-lg font-medium">Describe your CAD design...</p>
-                            <p className="text-sm text-gray-500">Try "Floor plan for a modern 2-bedroom appartment"</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl">
+                                {[
+                                    { title: "Draw a 12x10 kitchen", subtitle: "with a door on the right" },
+                                    { title: "Create a 15x12 bedroom", subtitle: "with two windows and a door" },
+                                    { title: "Draw a 10x8 bathroom", subtitle: "with a door on left" },
+                                    { title: "Draw a 12x10 garage", subtitle: "with a large door in the middle" }
+                                ].map((example, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => onInputChange(`${example.title} ${example.subtitle}`)}
+                                        className="text-left p-4 rounded-xl bg-zinc-900 border border-white/10 hover:bg-zinc-800 transition-colors group"
+                                    >
+                                        <div className="font-medium text-white mb-1">{example.title}</div>
+                                        <div className="text-sm text-gray-500 group-hover:text-gray-400">{example.subtitle}</div>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     )}
 
@@ -167,9 +190,15 @@ export function ChatInterface({
                             key={message.id}
                             className={`flex items-start gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
                         >
-                            <Avatar className="w-8 h-8 border border-white/10 shrink-0">
-                                <AvatarFallback className="bg-primary/20 text-primary">{message.role === 'user' ? 'U' : 'AI'}</AvatarFallback>
-                                {message.role === 'assistant' && <AvatarImage src="/bot-avatar.png" />}
+                            <Avatar className="w-8 h-8 shrink-0">
+                                <AvatarFallback className={`${message.role === 'user' ? 'bg-white text-black font-bold' : 'bg-white text-black'}`}>
+                                    {message.role === 'user' ? (
+                                        (user?.firstname?.[0] || user?.email?.[0]?.toUpperCase() || "U")
+                                    ) : (
+                                        <ChevronsLeft className="w-5 h-5 stroke-[3px]" />
+                                    )}
+                                </AvatarFallback>
+                                {message.role === 'assistant' && <AvatarImage src="/bot-avatar.png" className="bg-white p-1" />}
                             </Avatar>
 
                             <div
@@ -272,7 +301,9 @@ export function ChatInterface({
                     {isLoading && (
                         <div className="flex items-start gap-4">
                             <Avatar className="w-8 h-8 border border-white/10 shrink-0">
-                                <AvatarFallback className="bg-primary/20 text-primary">AI</AvatarFallback>
+                                <AvatarFallback className="bg-white text-black">
+                                    <ChevronsLeft className="w-5 h-5 stroke-[3px]" />
+                                </AvatarFallback>
                             </Avatar>
                             <div className="bg-zinc-900 border border-white/10 p-4 rounded-2xl rounded-tl-sm">
                                 <div className="flex space-x-2 items-center">
@@ -304,7 +335,7 @@ export function ChatInterface({
                             disabled={isLoading}
                             size="icon"
                             variant="ghost"
-                            className={`rounded-full w-10 h-10 hover:bg-white/10 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-400'}`}
+                            className={`rounded-full w-10 h-10 ${isRecording ? 'bg-red-500 text-white animate-pulse hover:bg-red-600' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}
                         >
                             <Mic className="h-5 w-5" />
                         </Button>
@@ -312,13 +343,17 @@ export function ChatInterface({
                             onClick={onSendMessage}
                             disabled={isLoading || !inputValue.trim()}
                             size="icon"
-                            className="ml-2 rounded-full w-10 h-10 bg-primary hover:bg-primary/90 text-primary-foreground"
+                            className="ml-2 rounded-full w-10 h-10 bg-green-400 hover:bg-green-400 text-black"
                         >
                             {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                             <span className="sr-only">Send</span>
                         </Button>
                     </div>
-                    {/* Disclaimer removed here */}
+                    <div className="text-center mt-3">
+                        <p className="text-xs text-gray-500">
+                            Krafzen AI can make mistakes, so double-check it
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

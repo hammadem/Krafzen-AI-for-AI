@@ -3,135 +3,140 @@ import Image from "next/image";
 export default function Features() {
     return (
         <>
-            <div
-                className="h-20 sm:h-10 bg-black"
-            ></div>
-
-            <div className="w-full p-6 bg-black grid grid-cols-1 sm:grid-cols-2 gap-20">
-                <span className="w-[100%] flex justify-center sm:justify-end">
-                    <Image
-                        src="/features/f1.png"
-                        alt="Voice to DWG"
-                        width={300}
-                        height={300}
-                    />
-                </span>
-                <span className="w-[100%] flex justify-center sm:justify-start">
-                    <Image
-                        src="/features/f2.png"
-                        alt="Auto MEP As-Builts"
-                        width={300}
-                        height={300}
-                    />
-                </span>
-                <span className="w-[100%] flex justify-center sm:justify-end">
-                    <Image
-                        src="/features/f3.png"
-                        alt="AI Error Detections"
-                        width={300}
-                        height={300}
-                    />
-                </span>
-                <span className="w-[100%] flex justify-center sm:justify-start">
-                    <Image
-                        src="/features/f4.png"
-                        alt="CAD/BIM Integrations"
-                        width={300}
-                        height={300}
-                    />
-                </span>
-            </div>
-
-            <div className="relative w-[100%] h-100vh sm:h-[70vh] bg-black flex flex-col items-center justify-evenly">
-
-                <span
-                    className="h-20 sm:h-10"
-                ></span>
-
-                <div className="text-white text-[6vh] font-semibold">How it works</div>
-
-                <span
-                    className="h-20 sm:h-0"
-                ></span>
-
-                <div className="flex flex-col sm:flex-row items-center justify-evenly w-full">
-
-                    <div className="relative flex flex-col h-[25vh] sm:h-[40vh] items-center justify-around sm:justify-evenly">
-                        <p className="text-white font-semibold">Record Voice</p>
-                        <Image
-                            src="/hiw/micfile.png"
-                            alt="Mic File"
-                            width={50}
-                            height={50}
-                            className="object-fit"
-                        />
-                        <p className="text-white">Transcript generated.</p>
+            <div className="bg-black py-20">
+                <div className="w-full max-w-5xl mx-auto px-4">
+                    {/* Feature Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-16 md:gap-24 mb-32">
+                        <div className="flex justify-center md:justify-end">
+                            <Image
+                                src="/features/f1.png"
+                                alt="Voice to DWG"
+                                width={300}
+                                height={300}
+                                className="object-contain"
+                            />
+                        </div>
+                        <div className="flex justify-center md:justify-start">
+                            <Image
+                                src="/features/f2.png"
+                                alt="Auto MEP As-Builts"
+                                width={300}
+                                height={300}
+                                className="object-contain"
+                            />
+                        </div>
+                        <div className="flex justify-center md:justify-end">
+                            <Image
+                                src="/features/f3.png"
+                                alt="AI Error Detections"
+                                width={300}
+                                height={300}
+                                className="object-contain"
+                            />
+                        </div>
+                        <div className="flex justify-center md:justify-start">
+                            <Image
+                                src="/features/f4.png"
+                                alt="CAD/BIM Integrations"
+                                width={300}
+                                height={300}
+                                className="object-contain"
+                            />
+                        </div>
                     </div>
 
-                    <span
-                        className="h-20 sm:h-0"
-                    />
+                    {/* How It Works */}
+                    <div className="flex flex-col items-center gap-16">
+                        <h2 className="text-3xl md:text-5xl font-bold text-white text-center">How it works</h2>
 
-                    <div className="relative">
-                        <Image
-                            src="/hiw/arrowicon.png"
-                            alt="Arrow"
-                            width={50}
-                            height={10}
-                            className="object-fit rotate-90 sm:rotate-0"
-                        />
-                    </div>
+                        <div className="w-full flex flex-col md:flex-row items-center justify-between gap-8 md:gap-4">
+                            {/* Step 1 */}
+                            <div className="flex flex-col items-center gap-4 text-center">
+                                <p className="text-white font-semibold text-lg">Record Voice</p>
+                                <div className="p-4 bg-zinc-900 rounded-full border border-white/10">
+                                    <Image
+                                        src="/hiw/micfile.png"
+                                        alt="Mic File"
+                                        width={40}
+                                        height={40}
+                                        className="object-contain"
+                                    />
+                                </div>
+                                <p className="text-gray-400 text-sm">Transcript generated.</p>
+                            </div>
 
-                    <span
-                        className="h-20 sm:h-0"
-                    />
+                            {/* Arrow */}
+                            <div className="hidden md:block">
+                                <Image
+                                    src="/hiw/arrowicon.png"
+                                    alt="Arrow"
+                                    width={40}
+                                    height={8}
+                                    className="object-contain"
+                                />
+                            </div>
+                            <div className="md:hidden rotate-90">
+                                <Image
+                                    src="/hiw/arrowicon.png"
+                                    alt="Arrow"
+                                    width={30}
+                                    height={6}
+                                    className="object-contain"
+                                />
+                            </div>
 
-                    <div className="relative flex flex-col h-[25vh] sm:h-[40vh] items-center justify-evenly">
-                        <p className="text-white font-semibold">AI interprets</p>
-                        <Image
-                            src="/hiw/design.png"
-                            alt="Design"
-                            width={50}
-                            height={50}
-                            className="object-fit"
-                        />
-                        <p className="text-white">Generates CAD plan.</p>
-                    </div>
+                            {/* Step 2 */}
+                            <div className="flex flex-col items-center gap-4 text-center">
+                                <p className="text-white font-semibold text-lg">AI interprets</p>
+                                <div className="p-4 bg-zinc-900 rounded-full border border-white/10">
+                                    <Image
+                                        src="/hiw/design.png"
+                                        alt="Design"
+                                        width={40}
+                                        height={40}
+                                        className="object-contain"
+                                    />
+                                </div>
+                                <p className="text-gray-400 text-sm">Generates CAD plan.</p>
+                            </div>
 
-                    <span
-                        className="h-20 sm:h-10"
-                    />
+                            {/* Arrow */}
+                            <div className="hidden md:block">
+                                <Image
+                                    src="/hiw/arrowicon.png"
+                                    alt="Arrow"
+                                    width={40}
+                                    height={8}
+                                    className="object-contain"
+                                />
+                            </div>
+                            <div className="md:hidden rotate-90">
+                                <Image
+                                    src="/hiw/arrowicon.png"
+                                    alt="Arrow"
+                                    width={30}
+                                    height={6}
+                                    className="object-contain"
+                                />
+                            </div>
 
-                    <div className="relative">
-                        <Image
-                            src="/hiw/arrowicon.png"
-                            alt="Arrow"
-                            width={50}
-                            height={10}
-                            className="object-fit rotate-90 sm:rotate-0"
-                        />
-                    </div>
-
-                    <span
-                        className="h-20 sm:h-0"
-                    />
-
-                    <div className="relative flex flex-col h-[25vh] sm:h-[40vh] items-center justify-evenly">
-                        <p className="text-white font-semibold">Get result</p>
-                        <Image
-                            src="/hiw/rocket.png"
-                            alt="Rocket"
-                            width={50}
-                            height={50}
-                            className="object-fit"
-                        />
-                        <p className="text-white">Export to DWG, DXF , Revit.</p>
+                            {/* Step 3 */}
+                            <div className="flex flex-col items-center gap-4 text-center">
+                                <p className="text-white font-semibold text-lg">Get result</p>
+                                <div className="p-4 bg-zinc-900 rounded-full border border-white/10">
+                                    <Image
+                                        src="/hiw/rocket.png"
+                                        alt="Rocket"
+                                        width={40}
+                                        height={40}
+                                        className="object-contain"
+                                    />
+                                </div>
+                                <p className="text-gray-400 text-sm">Export to DWG, DXF, Revit.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
-
-                <span
-                    className="h-10 sm:h-0"
-                ></span>
             </div>
         </>
     )

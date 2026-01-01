@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { useRouter } from "next/navigation";
 
 interface AuthContextType {
   user: User | null; // ← from your global types
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const supabase = createClient();
+  const router = useRouter();
 
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -37,7 +39,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: data.session.user.email || undefined,
           access_token: data.session.access_token,
           firstname: data?.session?.user?.user_metadata?.firstname,
-          lastname: data?.session?.user?.user_metadata?.lastname
+          lastname: data?.session?.user?.user_metadata?.lastname,
+          avatar_url: data?.session?.user?.user_metadata?.avatar_url,
+          subscription_plan: data?.session?.user?.user_metadata?.subscription_plan || "Free Trial"
         });
       } else {
         setUser(null);
@@ -58,7 +62,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: session.user.email || undefined,
           access_token: session.access_token,
           firstname: session?.user?.user_metadata?.firstname,
-          lastname: session?.user?.user_metadata?.lastname
+          lastname: session?.user?.user_metadata?.lastname,
+          avatar_url: session?.user?.user_metadata?.avatar_url,
+          subscription_plan: session?.user?.user_metadata?.subscription_plan || "Free Trial"
         });
       } else {
         setUser(null);
@@ -78,6 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
+      router.push("/");
     } catch (err) {
       console.log(err)
     } finally {

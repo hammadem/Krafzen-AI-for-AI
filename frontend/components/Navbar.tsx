@@ -5,6 +5,16 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from "next/navigation";
 import CompanyLogo from './CompanyLogo';
+import { useAuth } from '@/context/AuthContext';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 const navigation = [
     { name: 'About', href: '/about' },
@@ -21,11 +31,12 @@ function classNames(...classes: string[]) {
 export default function Navbar() {
     const [open, setOpen] = useState(false);
     const pathname = usePathname();
+    const { user, logout } = useAuth();
 
     return (
         <div className='h-[100px]'>
             <nav
-                className="absolute top-0 left-0 z-50 w-full"
+                className="absolute top-0 left-0 z-[100] w-full"
             >
                 {/** Parent Div Navbar */}
                 <div className="relative w-full flex h-[100px] items-center">
@@ -49,7 +60,7 @@ export default function Navbar() {
 
 
                     {/** Company Logo - Always Visible now */}
-                    <div className="flex mx-2 lg:flex-1 md:flex-1 xlg:flex-1 w-full items-between justify-between">
+                    <div className="flex mx-2 lg:flex-1 md:flex-1 xlg:flex-1 w-full items-center justify-between">
                         <CompanyLogo />
 
 
@@ -74,20 +85,19 @@ export default function Navbar() {
                                     )
                                 })}
 
-                                <Button
-                                    variant="secondary"
-                                    className="cursor-pointer rounded-full bg-green-400 hover:bg-green-400"
-                                >
-
-                                    <Link
-                                        href="/dashboard"
-                                        className={classNames(
-                                            'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
-                                        )}
+                                {user ? (
+                                    <UserDropdown user={user} logout={logout} />
+                                ) : (
+                                    <Button
+                                        variant="secondary"
+                                        className="cursor-pointer rounded-full bg-green-400 hover:bg-green-400"
+                                        asChild
                                     >
-                                        Start Free Trial
-                                    </Link>
-                                </Button>
+                                        <Link href="/login">
+                                            Start Free Trial
+                                        </Link>
+                                    </Button>
+                                )}
                             </div>
                         </div>
 
@@ -121,14 +131,78 @@ export default function Navbar() {
                             </Link>
                         )
                     })}
-                    <Button
-                        variant="secondary"
-                        className="z-9999 cursor-pointer rounded-full bg-green-400 hover:bg-green-400 my-2"
-                    >
-                        Start Free Trial
-                    </Button>
+
+                    {user ? (
+                        <div className="my-4 flex flex-col items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <Avatar className="h-8 w-8">
+                                    <AvatarImage src={user.avatar_url || ""} />
+                                    <AvatarFallback className="bg-green-400 text-black font-bold">
+                                        {user.firstname?.[0] || user.email?.[0]?.toUpperCase()}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <span className="text-white font-medium">{user.firstname || user.email}</span>
+                            </div>
+                            <Link href="/account" className="text-gray-300 hover:text-white text-sm">Account Settings</Link>
+                            <Button
+                                variant="ghost"
+                                className="text-red-400 hover:text-red-300 hover:bg-transparent p-0 h-auto"
+                                onClick={logout}
+                            >
+                                Sign Out
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button
+                            variant="secondary"
+                            className="z-9999 cursor-pointer rounded-full bg-green-400 hover:bg-green-400 my-2"
+                            asChild
+                        >
+                            <Link href="/login">Start Free Trial</Link>
+                        </Button>
+                    )}
                 </div>
             </nav>
         </div>
+    )
+}
+
+function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <div className="relative h-10 w-10 cursor-pointer rounded-full overflow-hidden border border-white/20 hover:border-green-400 transition-colors">
+                    <Avatar className="h-full w-full">
+                        <AvatarImage src={user.avatar_url || ""} className="object-cover" />
+                        <AvatarFallback className="bg-zinc-800 text-white font-bold flex items-center justify-center h-full w-full">
+                            {user.firstname?.[0] || user.email?.[0]?.toUpperCase()}
+                        </AvatarFallback>
+                    </Avatar>
+                </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-zinc-900 border-zinc-800 text-white">
+                <div className="flex flex-col space-y-1 p-2">
+                    <p className="text-sm font-medium leading-none">{user.firstname ? `${user.firstname} ${user.lastname || ''}` : "User"}</p>
+                    <p className="text-xs leading-none text-gray-400">{user.email}</p>
+                </div>
+                <div className="px-2 py-1.5 text-xs font-semibold text-green-400 bg-green-400/10 rounded-sm mx-2 mb-2">
+                    Plan: {user.subscription_plan || "Free Trial"}
+                </div>
+                <DropdownMenuSeparator className="bg-zinc-800" />
+                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white">
+                    <Link href="/account">Account Settings</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white">
+                    <Link href="/dashboard">Dashboard</Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-zinc-800" />
+                <DropdownMenuItem
+                    className="cursor-pointer text-red-400 focus:text-red-400 focus:bg-red-400/10"
+                    onClick={logout}
+                >
+                    Log out
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     )
 }
