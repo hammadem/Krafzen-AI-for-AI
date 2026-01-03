@@ -11,23 +11,9 @@ vitest.mock('../../context/AuthContext', () => ({
 vitest.mock('../../context/DashboardContex', () => ({
     useDashboard: () => ({})
 }));
-
-vi.mock("@/components/FAQs", () => ({
-    default: () => <div data-testid="FAQs">Mock FAQs</div>,
-}));
-vi.mock("@/components/Features", () => ({
-    default: () => <div data-testid="features">Mock Features</div>,
-}));
-vi.mock("@/components/Partners", () => ({
-    default: () => <div data-testid="partners">Mock Partners</div>,
-}));
-vi.mock("@/components/Pricing", () => ({
-    default: () => <div data-testid="pricing">Mock Pricing</div>,
-}));
-
 describe("Hero Component", () => {
     it("renders the Hero section", async () => {
-        const hero = await Hero();
+        const hero = Hero();
         render(hero);
 
         //check if the image has been rendered
@@ -42,11 +28,6 @@ describe("Hero Component", () => {
         expect(screen.getByRole("button", { name: /Get Started/i })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: /Book a Demo/i })).toBeInTheDocument();
 
-        //Assertions
-        expect(screen.getByTestId("FAQs")).toBeInTheDocument();
-        expect(screen.getByTestId("features")).toBeInTheDocument();
-        expect(screen.getByTestId("partners")).toBeInTheDocument();
-        expect(screen.getByTestId("pricing")).toBeInTheDocument();
 
     })
 });

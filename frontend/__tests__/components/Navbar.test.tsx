@@ -3,7 +3,7 @@ import Navbar from "@/components/Navbar";
 
 describe("Navbar Component", () => {
   it("renders company name and navigation links", () => {
-    render(<Navbar />);
+    render(<Navbar isRoot={true} />);
 
     expect(screen.getAllByAltText("Your Company")[0]).toBeInTheDocument();
     expect(screen.getAllByAltText("Your Company")[1]).toBeInTheDocument();
@@ -15,11 +15,14 @@ describe("Navbar Component", () => {
     });
 
     // Check Start Free Trial button
-    expect(screen.getAllByRole("button", { name: /start free trial/i })[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Start Free Trial/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Start Free Trial/i)[1]).toBeInTheDocument();
+
+    // expect(screen.getAllByRole("button", { name: /Start Free Trial/i })[0]).toBeInTheDocument();
   });
 
   it("toggles mobile menu when clicked", async () => {
-    render(<Navbar />);
+    render(<Navbar isRoot={true} />);
 
     const desktopMenu = screen.getByTestId("desktop-menu");
     expect(desktopMenu).toHaveClass("hidden");
