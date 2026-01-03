@@ -1,15 +1,66 @@
 import Image from "next/image";
 import { Button } from "./ui/button";
-import Features from "./Features";
-import Pricing from "./Pricing";
-import FAQ from "./FAQs";
-import Partners from "./Partners";
 import Navbar from "./Navbar";
 import HeroData from "./HeroData";
+import dynamic from "next/dynamic";
+import { Skeleton } from "./ui/skeleton";
 
-// const style = {
-//     filter: "brightness(1.8)",
-// }
+const Partners = dynamic(() => import("./Partners"), {
+    loading: () => (
+        <div className="h-[200px] bg-black flex items-center justify-center">
+            <Skeleton className="w-[60%] h-6 rounded-md" />
+        </div>
+    )
+});
+const Features = dynamic(() => import("./Features"), {
+    loading: () => (
+        <div className="bg-black py-16 grid grid-cols-1 sm:grid-cols-3 gap-6 px-8">
+            {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="p-6 bg-[#1d1c1c] rounded-xl space-y-4 m-4">
+                    <Skeleton className="h-6 w-[60%]" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-[90%]" />
+                </div>
+            ))}
+        </div>
+    ),
+});
+const Pricing = dynamic(() => import("./Pricing"), {
+    ssr: false,
+    loading: () => (
+        <div className="bg-black py-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 px-8">
+            {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-[#1d1c1c] rounded-xl p-6 space-y-4">
+                    <Skeleton className="h-6 w-[50%]" />
+                    <Skeleton className="h-8 w-[40%]" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-10 w-full rounded-full" />
+                </div>
+            ))}
+        </div>
+    ),
+});
+const FAQ = dynamic(() => import("./FAQs"), {
+    ssr: false,
+    loading: () => (
+        <div className="w-full h-[50vh] flex sm: p-5 bg-black">
+            <div className=" rounded-md flex flex-col items-center w-[35%] justify-start gap-4">
+                <Skeleton className="w-[50%] h-[15%] rounded-md" />
+                <Skeleton className="w-[50%] h-[15%] rounded-md" />
+                <Skeleton className="w-[50%] h-[15%] rounded-md" />
+            </div>
+            <div className="w-[65%] gap-4 flex flex-col justify-around items-center">
+                <Skeleton className="w-[80%] h-[25%] rounded-md" />
+                <Skeleton className="w-[80%] h-[25%] rounded-md" />
+                <Skeleton className="w-[80%] h-[25%] rounded-md" />
+
+                <div className="w-[80%] h-[15%]">
+                    <Skeleton className="w-[15%] ml-[7vh] h-[100%] rounded-full" />
+                </div>
+            </div>
+        </div>
+    ),
+});
 
 export default function Hero() {
     return (
@@ -17,29 +68,12 @@ export default function Hero() {
             <Navbar isRoot={true} />
 
             <section
-                style={{
-                    // backgroundImage: "url('/hero/image.svg')",
-                    // backgroundSize: "contain",
-                    // backgroundPosition: "center",
-                    // backgroundRepeat: "no-repeat",
-                }}
                 className="relative w-full flex flex-col items-center justify-center">
-                {/* <Image
-                    src="/hero/Frame 434.svg"
-                    alt="Hero"
-                    fill
-                    priority
-                    className="object-cover object-center"
-                /> */}
-
                 <Image
                     src="/hero/image.webp"
                     alt="Hero Image"
                     fill
-                    loading="eager"
-                    // style={{
-                    //     filter: "sm:brightness(0.8)",
-                    // }}
+                    priority
                     className=""
                 />
 
@@ -106,7 +140,6 @@ export default function Hero() {
             <Features />
             <Pricing />
             <FAQ />
-
         </>
     );
 }

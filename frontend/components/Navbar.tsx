@@ -67,6 +67,7 @@ export default function Navbar({ isRoot }: {
                                         className={classNames(
                                             'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
                                         )}
+                                        aria-label={`Link to ${item.name} section`}
                                     >
                                         <h1 className={isActive ? "font-bold text-white inline" : "text-white inline font-semibold hover:text-gray-300 cursor-pointer"}>{item.name}</h1>
                                     </Link>
@@ -83,6 +84,7 @@ export default function Navbar({ isRoot }: {
                                     className={classNames(
                                         'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
                                     )}
+                                    aria-label={`Link to support form`}
                                 >
                                     Start Free Trial
                                 </Link>
@@ -115,6 +117,7 @@ export default function Navbar({ isRoot }: {
                             className={classNames(
                                 'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
                             )}
+                            aria-label={`Link to ${item.name} section`}
                         >
                             <h1 className={isActive ? "font-bold text-white inline" : "text-white inline font-semibold hover:text-gray-300 cursor-pointer"}>{item.name}</h1>
                         </Link>
@@ -129,6 +132,7 @@ export default function Navbar({ isRoot }: {
                         className={classNames(
                             'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
                         )}
+                        aria-label={`Link to support form section`}
                     >
                         Start Free Trial
                     </Link>

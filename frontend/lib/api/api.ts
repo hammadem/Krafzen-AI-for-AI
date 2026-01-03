@@ -32,7 +32,7 @@ const GPT_PARSERS = {
 } as const;
 
 const DXF_GENERATER = {
-    GENERATE: () => `/api/v1/dxf/generate`,
+    GENERATE: () => `/api/v1/generate`,
     GENERATE_FROM_TEXT: () => `api/v1/generate-from-text`,
     VALIDATE: () => `api/v1/validate`
 } as const;
@@ -45,7 +45,7 @@ export async function generateADXF(
     user: User | null,
     body: { text: string }
 ) {
-    return apiClient("POST", DXF_GENERATER.GENERATE(), user, body);
+    return apiClient("POST", DXF_GENERATER.VALIDATE(), user, body);
 }
 
 export async function parseAnInput(
