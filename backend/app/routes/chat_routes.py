@@ -10,6 +10,8 @@ import os
 
 from app.middlewares.auth import require_auth
 from fastapi import APIRouter, HTTPException, Depends
+
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
 class ChatRequest(BaseModel):
