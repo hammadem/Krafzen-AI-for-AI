@@ -44,7 +44,7 @@ export default function PricingDiv({ price, index }: { price: PricingDetails; in
                 {price.features.map((feature, i) => (
                     <div key={i} className="flex items-start gap-3">
                         <div className="mt-1 flex-shrink-0 text-white">
-                            <Check size={18} strokeWidth={2} className="rounded-full border border-white/20 p-0.5" />
+                            <Check data-testid="check-icon" size={18} strokeWidth={2} className="rounded-full border border-white/20 p-0.5" />
                         </div>
                         <span className="text-sm text-gray-400 font-light leading-relaxed">{feature}</span>
                     </div>

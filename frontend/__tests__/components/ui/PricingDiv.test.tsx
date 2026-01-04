@@ -23,13 +23,13 @@ describe("Pricing Task", () => {
         expect(screen.getByText(/Starter/i)).toBeInTheDocument();
         expect(screen.getByText(/\$249/i)).toBeInTheDocument();
 
-        const tickImages = screen.getAllByAltText("Tick Image");
+        const tickImages = screen.getAllByTestId("check-icon");
         expect(tickImages.length).toBe(pricing.features.length);
 
         pricing.features.forEach((feature) => {
             expect(screen.getByText(feature)).toBeInTheDocument();
         })
 
-        expect(screen.getByRole("button", { name: /Start Free/i })).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: /Get Started/i })).toBeInTheDocument();
     })
 })

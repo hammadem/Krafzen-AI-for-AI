@@ -6,7 +6,7 @@ describe("About Page", () => {
     it("renders the About Page", () => {
         render(<About />);
 
-        expect(screen.getByAltText("About Rectangle")).toBeInTheDocument();
+        expect(screen.getByAltText("About Krafzen")).toBeInTheDocument();
 
         aboutData.map(about => {
             expect(screen.getByText(about.heading)).toBeInTheDocument();
