@@ -9,13 +9,19 @@ export interface ChatResponse {
 
 export async function sendChatMessage(
     message: string,
-    history: { role: string, content: string, imageUrl?: string }[] = []
+    history: { role: string, content: string, imageUrl?: string }[] = [],
+    token?: string
 ): Promise<ChatResponse> {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/v1/chat/generate`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
             message,
             history
