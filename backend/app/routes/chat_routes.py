@@ -8,7 +8,8 @@ from app.core.config import settings
 import logging
 import os
 
-router = APIRouter()
+from app.middlewares.auth import require_auth
+from fastapi import APIRouter, HTTPException, Depends
 logger = logging.getLogger(__name__)
 
 class ChatRequest(BaseModel):
@@ -25,7 +26,7 @@ class DxfRequest(BaseModel):
     image_url: str
     prompt: Optional[str] = None
 
-@router.post("/chat/dxf")
+@router.post("/chat/dxf", dependencies=[Depends(require_auth)])
 async def generate_dxf(request: DxfRequest):
     """
     Generates a DXF file from an image URL.
@@ -56,7 +57,7 @@ async def generate_dxf(request: DxfRequest):
 
 
 
-@router.post("/chat/generate", response_model=ChatResponse)
+@router.post("/chat/generate", response_model=ChatResponse, dependencies=[Depends(require_auth)])
 async def generate_chat_response(request: ChatRequest):
     """
     Process chat message:
