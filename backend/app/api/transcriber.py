@@ -2,7 +2,8 @@
 Transcriber API endpoints for voice-to-text conversion
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
+from app.middlewares.auth import require_auth
 from fastapi.responses import JSONResponse
 from typing import Optional
 from app.services.gemini_transcription_service import gemini_transcription_service
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/transcribe", response_model=TranscriptionResponse)
+@router.post("/transcribe", response_model=TranscriptionResponse, dependencies=[Depends(require_auth)])
 async def transcribe_audio(
     file: UploadFile = File(...),
     language: Optional[str] = Query("en", description="Language code (ISO 639-1)")
@@ -66,7 +67,7 @@ async def transcribe_audio(
             detail="Transcription failed due to an internal error."
         )
 
-@router.post("/transcribe-url", response_model=TranscriptionResponse)
+@router.post("/transcribe-url", response_model=TranscriptionResponse, dependencies=[Depends(require_auth)])
 async def transcribe_from_url(
     audio_url: str = Query(..., description="URL of the audio file"),
     language: Optional[str] = Query("en", description="Language code (ISO 639-1)")

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Send, Loader2, Download, Maximize2, FileCode, Mic, ChevronsLeft } from "lucide-react"
 import { sendChatMessage, downloadDxf, transcribeAudio } from "@/lib/api/chat"
+import { createClient } from "@/lib/supabase/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -41,7 +42,7 @@ export function ChatInterface({
     onInputChange,
     onSendMessage
 }: ChatInterfaceProps) {
-    const { user } = useAuth()
+    const { user, session } = useAuth()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const [isRecording, setIsRecording] = useState(false)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -77,7 +78,11 @@ export function ChatInterface({
                     // Provide visual feedback or loading state if needed
                     try {
                         onInputChange("Transcribing...");
-                        const text = await transcribeAudio(blob);
+                        const token = session?.access_token;
+                        if (!token) {
+                            throw new Error("No authentication token found");
+                        }
+                        const text = await transcribeAudio(blob, token);
                         onInputChange(text);
                     } catch (error) {
                         console.error("Transcription error:", error);
@@ -263,7 +268,13 @@ export function ChatInterface({
                                                 className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2"
                                                 onClick={async () => {
                                                     try {
-                                                        const blob = await downloadDxf(message.imageUrl!, message.content);
+                                                        // Dynamically import to avoid top-level issues if any, or just use the imported one if I add import
+                                                        // Better: use createClient from library
+                                                        const supabase = createClient();
+                                                        const { data: { session } } = await supabase.auth.getSession();
+                                                        const token = session?.access_token;
+
+                                                        const blob = await downloadDxf(message.imageUrl!, message.content, token);
                                                         const url = window.URL.createObjectURL(blob);
                                                         const link = document.createElement('a');
                                                         link.href = url;
