@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "react-toastify";
 import { Loader2, Upload } from "lucide-react";
@@ -92,9 +92,10 @@ export default function AccountPage() {
                 toast.success("Profile updated successfully!");
             }
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
-            toast.error(error.message || "Failed to update profile");
+            const errorMessage = error instanceof Error ? error.message : "Failed to update profile";
+            toast.error(errorMessage);
         } finally {
             setIsLoading(false);
         }

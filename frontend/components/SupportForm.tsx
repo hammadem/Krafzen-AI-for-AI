@@ -48,7 +48,7 @@ export default function SupportForm() {
             <CardHeader>
                 <CardTitle className="text-2xl font-bold">Let&apos;s connect</CardTitle>
                 <CardDescription className="text-gray-400">
-                    Reach out to us at Krafzen. We'll get back to you as soon as possible.
+                    Reach out to us at Krafzen. We&apos;ll get back to you as soon as possible.
                 </CardDescription>
             </CardHeader>
             <CardContent>

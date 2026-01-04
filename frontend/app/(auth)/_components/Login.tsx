@@ -1,6 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/AuthContext";
+
 import { useDashboard } from "@/context/DashboardContex";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import Image from "next/image";
@@ -21,9 +21,10 @@ export default function Login() {
                 }
             });
             if (error) throw error;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Login error:", error);
-            toast.error(error.message || "Failed to login");
+            const errorMessage = error instanceof Error ? error.message : "Failed to login";
+            toast.error(errorMessage);
         } finally {
             setLoading(false);
         }

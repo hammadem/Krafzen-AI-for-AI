@@ -131,7 +131,7 @@ export default function LoginWithCred() {
 
                     <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
                         <p>Continue with your work mail - SSO login</p>
-                        <p>Don't have an account? {" "}
+                        <p>Don&apos;t have an account? {" "}
                             <Link
                                 href="/signup"
                                 aria-label="Link to Sign Up Page"

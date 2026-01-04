@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Image as ImageIcon, Loader2, Download, Maximize2, FileCode, Mic, User, ChevronsLeft } from "lucide-react"
+import { Send, Loader2, Download, Maximize2, FileCode, Mic, ChevronsLeft } from "lucide-react"
 import { sendChatMessage, downloadDxf, transcribeAudio } from "@/lib/api/chat"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -132,7 +132,7 @@ export function ChatInterface({
             const blobUrl = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = blobUrl;
-            link.download = `generated-image-${Date.now()}.png`;
+            link.download = `generated-image-${new Date().getTime()}.png`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -145,7 +145,7 @@ export function ChatInterface({
             // Last resort fallback
             const link = document.createElement('a');
             link.href = imageUrl;
-            link.download = `generated-image-${Date.now()}.png`;
+            link.download = `generated-image-${new Date().getTime()}.png`;
             link.target = '_blank';
             document.body.appendChild(link);
             link.click();
@@ -267,7 +267,7 @@ export function ChatInterface({
                                                         const url = window.URL.createObjectURL(blob);
                                                         const link = document.createElement('a');
                                                         link.href = url;
-                                                        link.download = `plan-${Date.now()}.dxf`;
+                                                        link.download = `plan-${new Date().getTime()}.dxf`;
                                                         document.body.appendChild(link);
                                                         link.click();
                                                         document.body.removeChild(link);
