@@ -28,8 +28,7 @@ class Settings(BaseSettings):
             return [
                 "http://localhost:3000",
                 "http://localhost:3001",
-                "https://krafzen-ai-staging.vercel.app",
-                "https://*.vercel.app",
+                # "https://*.vercel.app",  # Security: Disable wildcard in production
                 "https://staging.krafzen.com",
                 "https://app.krafzen.com"
             ]

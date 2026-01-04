@@ -21,7 +21,9 @@ def add_exception_handlers(app):
     
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
+        import logging
+        logging.getLogger("app.error_handler").error(f"Global exception: {exc}", exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"message": "Internal Server Error", "detail": str(exc)},
+            content={"message": "Internal Server Error", "detail": "An unexpected error occurred. Please contact support."},
         )

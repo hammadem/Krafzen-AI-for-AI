@@ -26,7 +26,7 @@ class GeminiTranscriptionService:
     
     async def transcribe_file(
         self, 
-        file_content: bytes, 
+        file_input, # bytes or UploadFile
         filename: str,
         language: Optional[str] = "en"
     ) -> Tuple[str, Optional[str], Optional[float]]:
@@ -34,7 +34,7 @@ class GeminiTranscriptionService:
         Transcribe audio file using Gemini API
         
         Args:
-            file_content: Audio file content as bytes
+            file_input: Audio file content as bytes or UploadFile
             filename: Original filename
             language: Language code (optional)
         
@@ -54,13 +54,26 @@ class GeminiTranscriptionService:
         upload_ref = None
         
         try:
-            # Save bytes to temp file because genai.upload_file expects a path
+            # Save to temp file
             temp_fd, temp_file_path = tempfile.mkstemp(suffix=f".{file_ext}")
             with os.fdopen(temp_fd, 'wb') as temp_file:
-                temp_file.write(file_content)
+                if isinstance(file_input, bytes):
+                    temp_file.write(file_input)
+                else:
+                    # Assume UploadFile or generic file-like
+                    # Reset cursor if possible
+                    if hasattr(file_input, 'seek'):
+                        await file_input.seek(0)
+                        
+                    # Stream in chunks
+                    while True:
+                        chunk = await file_input.read(1024 * 1024) # 1MB chunks
+                        if not chunk:
+                            break
+                        temp_file.write(chunk)
                 temp_file.flush()
             
-            logger.info(f"Uploading audio file to Gemini: {len(file_content)} bytes")
+            logger.info(f"Uploading audio file to Gemini...")
             
             # Upload file to Gemini
             upload_ref = genai.upload_file(temp_file_path, mime_type=f"audio/{file_ext if file_ext != 'mp3' else 'mpeg'}")

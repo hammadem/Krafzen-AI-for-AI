@@ -40,15 +40,9 @@ async def transcribe_audio(
         )
     
     try:
-        # Read file content
-        file_content = await file.read()
-        
-        if not file_content:
-            raise HTTPException(status_code=400, detail="Empty file provided")
-        
-        # Transcribe using Gemini service
+        # Transcribe using Gemini service (streaming)
         transcribed_text, detected_language, duration = await gemini_transcription_service.transcribe_file(
-            file_content=file_content,
+            file_input=file,
             filename=file.filename or "audio",
             language=language
         )
@@ -64,12 +58,12 @@ async def transcribe_audio(
         
     except ValueError as e:
         logger.error(f"Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid input provided.")
     except Exception as e:
         logger.error(f"Transcription error: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Transcription failed: {str(e)}"
+            detail="Transcription failed due to an internal error."
         )
 
 @router.post("/transcribe-url", response_model=TranscriptionResponse)

@@ -72,9 +72,8 @@ async def generate_dxf_from_audio(
     try:
         # 1. Transcribe
         logger.info("Transcribing audio file with Gemini...")
-        file_content = await file.read()
         transcribed_text, _, _ = await gemini_transcription_service.transcribe_file(
-            file_content=file_content,
+            file_input=file,
             filename=file.filename or "audio",
             language=language
         )
@@ -121,7 +120,8 @@ async def generate_dxf_from_audio(
         
     except Exception as e:
         logger.error(f"Unified audio flow failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return generic error
+        raise HTTPException(status_code=500, detail="An error occurred during DXF generation.")
 
 
 @router.post("/generate-from-text")
@@ -178,7 +178,7 @@ async def generate_dxf_from_text(
         
     except Exception as e:
         logger.error(f"Unified text flow failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred during text-to-DXF generation.")
 
 
 @router.post("/generate-and-store")
@@ -258,7 +258,7 @@ async def generate_and_store_dxf(
         logger.error(f"DXF generation and storage error: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"DXF generation and storage failed: {str(e)}"
+            detail="DXF generation and storage failed due to an internal error."
         )
 
 
@@ -309,7 +309,7 @@ async def download_project_dxf(
         logger.error(f"DXF download error: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"DXF download failed: {str(e)}"
+            detail="DXF download failed due to an internal error."
         )
 
 
