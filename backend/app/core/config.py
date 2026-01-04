@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     
     # CORS - Store as string to avoid JSON parsing issues with List[str]
     # Access via ALLOWED_ORIGINS_LIST property which converts to list
-    ALLOWED_ORIGINS: str = "http://localhost:3000,https://krafzen-ai-staging.vercel.app,https://*.vercel.app,https://staging.krafzen.com,https://app.krafzen.com"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,https://krafzen-ai-staging.vercel.app,https://*.vercel.app,https://staging.krafzen.com,https://app.krafzen.com"
     
     @property
     def ALLOWED_ORIGINS_LIST(self) -> List[str]:
@@ -27,6 +27,7 @@ class Settings(BaseSettings):
         if not self.ALLOWED_ORIGINS:
             return [
                 "http://localhost:3000",
+                "http://localhost:3001",
                 "https://krafzen-ai-staging.vercel.app",
                 "https://*.vercel.app",
                 "https://staging.krafzen.com",
@@ -49,9 +50,32 @@ class Settings(BaseSettings):
     GPT_MAX_TOKENS: int = 2000
     GPT_TEMPERATURE: float = 0.3
     
+    # Hugging Face Configuration (for CADLLM model)
+    HF_TOKEN: Optional[str] = None
+    HF_MODEL_NAME: Optional[str] = None  # e.g., "username/cad-llm-krafzen"
+    HF_ENDPOINT_URL: Optional[str] = None  # Optional: custom endpoint URL (e.g., Hugging Face Space)
+    HF_TIMEOUT: int = 180  # Timeout in seconds for API calls
+    
     # File Upload Configuration
     MAX_FILE_SIZE_MB: float = 25.0
     ALLOWED_AUDIO_FORMATS: str = "mp3,wav,m4a,ogg,flac,webm"
+
+    # Ollama Configuration
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL_NAME: str = "fine-tuned-model"
+
+    # Gemini Configuration
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.0-flash-exp" # Keep the smart tex model
+    GEMINI_IMAGE_MODEL: str = "models/nano-banana-pro-preview" # Restoring the working image model
+    
+    # Stable Diffusion / Image Config
+    USE_GEMINI_FOR_IMAGE: bool = True
+    
+    # External DXF Service (Api2Convert)
+    API_2_CONVERT_KEY: Optional[str] = None
+    API_2_CONVERT_URL: str = "https://api.api2convert.com/v2"
+
     
     @property
     def ALLOWED_AUDIO_FORMATS_LIST(self) -> List[str]:
@@ -75,20 +99,6 @@ class Settings(BaseSettings):
     # Render Configuration (optional)
     RENDER_SERVICE_ID_PRODUCTION: str = ""
     RENDER_SERVICE_ID_STAGING: str = ""
-    
-    # GPT-4 Parser Configuration
-    GPT_MODEL: str = "gpt-4-turbo-preview"
-    GPT_MAX_TOKENS: int = 2000
-    GPT_TEMPERATURE: float = 0.3
-    
-    # File Upload Configuration
-    MAX_FILE_SIZE_MB: int = 25
-    ALLOWED_AUDIO_FORMATS: str = "mp3,wav,m4a,ogg,flac,webm"
-    
-    @property
-    def ALLOWED_AUDIO_FORMATS_LIST(self) -> List[str]:
-        """Get allowed audio formats as a list"""
-        return [fmt.strip() for fmt in self.ALLOWED_AUDIO_FORMATS.split(',') if fmt.strip()]
     
     class Config:
         env_file = ".env"

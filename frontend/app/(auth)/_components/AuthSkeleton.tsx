@@ -3,23 +3,28 @@ import Image from "next/image";
 
 export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
     return (
-        <div className="w-full h-[100vh] flex flex-row">
+        <div className="relative w-full h-screen overflow-hidden bg-black">
 
-            <div className="relative w-[50%] my-5 mx-5">
+            <div className="absolute top-0 left-0 w-[60%] h-full z-0">
                 <Image
                     src="/auth/sideImage.png"
                     alt="Auth Hero Image"
                     fill
-                    className="h-[100vh] w-[50%]"
+                    className="object-cover"
+                    priority
                 />
+                {/* Gradient overlay for seamless blending with right panel */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/40 to-black pointer-events-none"></div>
             </div>
 
-            <div className="flex flex-col text-white items-center justify-evenly w-[50%] py-12 gap-4">
-                <div className="flex w-full items-center -translate-x-4">
+            <div className="relative ml-auto w-1/2 h-full flex flex-col text-white items-center justify-center p-10 gap-8 z-10">
+                <div className="flex w-full justify-center">
                     <CompanyLogo />
                 </div>
 
-                <AuthType />
+                <div className="w-full max-w-md">
+                    <AuthType />
+                </div>
             </div>
         </div>
     )

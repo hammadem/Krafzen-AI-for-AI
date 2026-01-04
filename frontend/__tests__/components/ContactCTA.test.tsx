@@ -6,6 +6,6 @@ describe("ContactCTA Components", () => {
         render(<ContactCTA />);
 
         expect(screen.getByRole("button", { name: /Book an appointment/i })).toBeInTheDocument();
-        expect(screen.getByAltText("Tilted Image")).toBeInTheDocument();
+        expect(screen.getByAltText("CAD Background")).toBeInTheDocument();
     });
 })

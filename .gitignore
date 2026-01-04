@@ -69,7 +69,23 @@ render.yaml.lock  # If generated
 *.tmp
 
 # Test artifacts
+backend/test_output/
 backend/test_audio.wav
 backend/tests/*.wav
 backend/tests/*.mp3
 backend/tests/*.m4a
+
+# AI/ML datasets (too large for git)
+ai-ml/**/dataset/cadllm_raw/
+ai-ml/**/dataset/jsonl/
+ai-ml/**/cadllm_raw/
+ai-ml/**/*.jsonl
+ai-ml/**/cad-agent-qwen-*/
+ai-ml/**/logs/
+ai-ml/**/*.tar.gz
+ai-ml/**/cadllm-workspace.tar.gz
+ai-ml/cadllm/NVIDIA-H200-NVL/workspace/space/cad-llm-api/
+scripts/test_output.txt
+
+# Temp folders
+backend/temp/

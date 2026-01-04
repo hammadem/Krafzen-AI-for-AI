@@ -8,7 +8,7 @@ export default function CompanyLogo() {
                 href="/"
                 aria-label="Back to HomePage"
                 className="flex sm:mx-auto"
-                >
+            >
                 <div className="flex">
                     <Image
                         width={24}

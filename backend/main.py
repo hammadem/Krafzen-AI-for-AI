@@ -20,13 +20,15 @@ logger = logging.getLogger(__name__)
 parser_available = False
 parser = None
 try:
-    sys.stdout.write("🔍 Attempting to import parser module...\n")
-    sys.stdout.flush()
+    if settings.DEBUG:
+        sys.stdout.write("🔍 Attempting to import parser module...\n")
+        sys.stdout.flush()
     from app.api import parser
     parser_available = True
-    sys.stdout.write("✅ Parser module imported successfully\n")
-    sys.stdout.flush()
-    logger.info("Parser module imported successfully")
+    if settings.DEBUG:
+        sys.stdout.write("✅ Parser module imported successfully\n")
+        sys.stdout.flush()
+        logger.info("Parser module imported successfully")
 except Exception as e:
     import traceback
     error_msg = f"⚠️ Failed to import parser module: {e}"
@@ -49,12 +51,17 @@ if settings.SENTRY_DSN and settings.ENVIRONMENT != "development":
 
 
 # App initialization
+# App initialization
+# Only enable docs in development
+docs_url = "/docs" if settings.ENVIRONMENT == "development" else None
+redoc_url = "/redoc" if settings.ENVIRONMENT == "development" else None
+
 app = FastAPI(
     title="KRAFZEN AI API",
     description="AI-powered CAD/BIM generation from voice and text",
     version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=docs_url,
+    redoc_url=redoc_url,
 )
 
 
@@ -107,19 +114,25 @@ app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
+app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"])
+from app.routes import chat_routes
+app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"])
 
 # Include parser router if available
-sys.stdout.write(f"🔍 Parser status: available={parser_available}, parser={parser is not None}\n")
-sys.stdout.flush()
+if settings.DEBUG:
+    sys.stdout.write(f"🔍 Parser status: available={parser_available}, parser={parser is not None}\n")
+    sys.stdout.flush()
 if parser_available and parser:
     try:
-        sys.stdout.write("🔍 Attempting to register parser router...\n")
-        sys.stdout.flush()
+        if settings.DEBUG:
+            sys.stdout.write("🔍 Attempting to register parser router...\n")
+            sys.stdout.flush()
         app.include_router(parser.router, prefix="/api/v1", tags=["Parser"])
-        sys.stdout.write("✅ Parser router registered successfully\n")
-        sys.stdout.flush()
-        logger.info("Parser router registered successfully")
+        if settings.DEBUG:
+            sys.stdout.write("✅ Parser router registered successfully\n")
+            sys.stdout.flush()
+            logger.info("Parser router registered successfully")
     except Exception as e:
         import traceback
         error_msg = f"❌ Failed to register parser router: {e}"

@@ -17,7 +17,7 @@ describe("FAQs Page", () => {
         buttons.map((button, ind) => {
             fireEvent.click(button);
 
-            expect(screen.getByTitle(faqs[ind].type)).toBeInTheDocument();
+            expect(screen.getByRole("button", { name: faqs[ind].type })).toBeInTheDocument();
 
             faqs[ind].QandA.map(qanda => {
                 expect(screen.getByText(qanda.question)).toBeInTheDocument();

@@ -79,51 +79,53 @@ export default function SignUp() {
 
 
     return (
-        <div className="w-full flex flex-col items-center gap-8 w-full">
-            <h1 className="text-[4vh]">Sign up</h1>
+        <div className="w-full flex flex-col items-center gap-8 min-h-screen justify-center py-10">
+            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Sign up</h1>
 
-            <Card className="sm:max-w-md bg-black border-0 text-white w-[50%]">
-                <CardContent>
+            <Card className="w-full max-w-md bg-zinc-900 border border-white/10 text-white shadow-xl">
+                <CardContent className="pt-6">
                     <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
-                        <FieldGroup className="flex gap-2">
-                            <Controller
-                                name="firstname"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
-                                        <Input
-                                            {...field}
-                                            id="form-rhf-demo-title"
-                                            aria-invalid={fieldState.invalid}
-                                            placeholder="First Name"
-                                            autoComplete="off"
-                                            className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4"
-                                        />
-                                        {fieldState.invalid && (
-                                            <FieldError errors={[fieldState.error]} />
-                                        )}
-                                    </Field>
-                                )}
-                            />
-                            <Controller
-                                name="lastname"
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
-                                        <Input
-                                            {...field}
-                                            id="form-rhf-demo-title"
-                                            aria-invalid={fieldState.invalid}
-                                            placeholder="Last Name"
-                                            autoComplete="off"
-                                            className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4"
-                                        />
-                                        {fieldState.invalid && (
-                                            <FieldError errors={[fieldState.error]} />
-                                        )}
-                                    </Field>
-                                )}
-                            />
+                        <FieldGroup className="space-y-4">
+                            <div className="flex gap-4">
+                                <Controller
+                                    name="firstname"
+                                    control={form.control}
+                                    render={({ field, fieldState }) => (
+                                        <Field className="w-full" data-invalid={fieldState.invalid}>
+                                            <Input
+                                                {...field}
+                                                id="firstname"
+                                                aria-invalid={fieldState.invalid}
+                                                placeholder="First Name"
+                                                autoComplete="off"
+                                                className="border border-white/10 bg-black p-4 h-12 focus-visible:ring-1 focus-visible:ring-white"
+                                            />
+                                            {fieldState.invalid && (
+                                                <FieldError errors={[fieldState.error]} />
+                                            )}
+                                        </Field>
+                                    )}
+                                />
+                                <Controller
+                                    name="lastname"
+                                    control={form.control}
+                                    render={({ field, fieldState }) => (
+                                        <Field className="w-full" data-invalid={fieldState.invalid}>
+                                            <Input
+                                                {...field}
+                                                id="lastname"
+                                                aria-invalid={fieldState.invalid}
+                                                placeholder="Last Name"
+                                                autoComplete="off"
+                                                className="border border-white/10 bg-black p-4 h-12 focus-visible:ring-1 focus-visible:ring-white"
+                                            />
+                                            {fieldState.invalid && (
+                                                <FieldError errors={[fieldState.error]} />
+                                            )}
+                                        </Field>
+                                    )}
+                                />
+                            </div>
                             <Controller
                                 name="email"
                                 control={form.control}
@@ -131,11 +133,11 @@ export default function SignUp() {
                                     <Field data-invalid={fieldState.invalid}>
                                         <Input
                                             {...field}
-                                            id="form-rhf-demo-title"
+                                            id="email"
                                             aria-invalid={fieldState.invalid}
                                             placeholder="Email"
                                             autoComplete="off"
-                                            className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4"
+                                            className="border border-white/10 bg-black p-4 h-12 focus-visible:ring-1 focus-visible:ring-white"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
@@ -150,11 +152,12 @@ export default function SignUp() {
                                     <Field data-invalid={fieldState.invalid}>
                                         <Input
                                             {...field}
-                                            id="form-rhf-demo-title"
+                                            type="password"
+                                            id="password"
                                             aria-invalid={fieldState.invalid}
                                             placeholder="Password"
                                             autoComplete="off"
-                                            className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4"
+                                            className="border border-white/10 bg-black p-4 h-12 focus-visible:ring-1 focus-visible:ring-white"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
@@ -170,11 +173,12 @@ export default function SignUp() {
                                     <Field data-invalid={fieldState.invalid}>
                                         <Input
                                             {...field}
-                                            id="form-rhf-demo-title"
+                                            type="password"
+                                            id="confirmPassword"
                                             aria-invalid={fieldState.invalid}
                                             placeholder="Confirm Password"
                                             autoComplete="off"
-                                            className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4"
+                                            className="border border-white/10 bg-black p-4 h-12 focus-visible:ring-1 focus-visible:ring-white"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
@@ -185,25 +189,26 @@ export default function SignUp() {
                         </FieldGroup>
                     </form>
                 </CardContent>
-                <CardFooter>
-                    <Field orientation="horizontal">
-                        <Button type="submit" disabled={loading} form="form-rhf-demo" variant="secondary" className="rounded-full w-full cursor-pointer bg-[#68D585] bg-green-400 hover:bg-green-400">
-                            {loading ? "Submitting" : "Submit"}
+                <CardFooter className="flex flex-col gap-4">
+                    <Field orientation="horizontal" className="w-full">
+                        <Button type="submit" disabled={loading} form="form-rhf-demo" className="rounded-full w-full h-12 bg-green-400 hover:bg-green-500 text-black font-bold">
+                            {loading ? "Submitting..." : "Submit"}
                         </Button>
                     </Field>
-                </CardFooter>
 
-                <span className="flex items-center flex-col gap-2">
-                    <p>Continue with your work mail - SSO login</p>
-                    <p className="text-[#696969]">I already have an account? {" "}
-                        <Link
-                            href="/login"
-                            aria-label="Link to Login Page"
-                        >
-                            <b>Sign In</b>
-                        </Link>
-                    </p>
-                </span>
+                    <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
+                        <p>Continue with your work mail - SSO login</p>
+                        <p>Already have an account? {" "}
+                            <Link
+                                href="/login"
+                                aria-label="Link to Login Page"
+                                className="text-white hover:underline font-bold"
+                            >
+                                Sign In
+                            </Link>
+                        </p>
+                    </div>
+                </CardFooter>
             </Card>
         </div>
     )

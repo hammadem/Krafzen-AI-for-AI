@@ -30,71 +30,55 @@ export default function FAQ() {
     ];
 
     return (
-        <div className="w-full bg-black text-white font-semibold sm:h-full md:h-[85vh] justify-center items-center">
-            <div className="flex flex-col items-center gap-4 justify-center h-full">
+        <div className="w-full bg-black text-white font-semibold py-20">
+            <div className="w-full max-w-6xl mx-auto px-4">
 
-                <div className="flex w-[80%] sm:flex-row flex-col sm:gap-0 gap-6">
-                    
-                    <div className="w-[40%] sm:flex flex-col items-start justify-start hidden">
-                        <h1 className="text-[4vh]">Frequently</h1>
-                        <h1 className="text-[4vh]">Asked</h1>
-                        <h1 className="text-[4vh]"> Questions (FAQs)</h1>
+                <div className="flex flex-col md:flex-row gap-12 md:gap-8 justify-between">
+
+                    {/* Left Side: Heading */}
+                    <div className="md:w-1/3 flex flex-col md:items-start items-center text-center md:text-left">
+                        <h1 className="text-4xl md:text-5xl font-bold leading-tight">Frequently <br />Asked <br />Questions (FAQs)</h1>
                     </div>
 
-                    <div className="sm:w-[30%] w-full flex flex-col items-center justify-center flex sm:hidden">
-                        <h1 className="text-[4vh]">Frequently Asked</h1>
-                        <h1 className="text-[4vh]"> Questions (FAQs)</h1>
+                    {/* Right Side: FAQs & Read More */}
+                    <div className="md:w-2/3 flex flex-col items-center md:items-end gap-8">
+                        <div className="w-full flex flex-col gap-4">
+                            {faqs.map((faq, index: number) => (
+                                <div key={index} className="w-full">
+                                    {/* Question */}
+                                    <div
+                                        onClick={() => toggle(index)}
+                                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl flex items-center justify-between px-6 py-5 cursor-pointer transition-all duration-300 hover:bg-zinc-800"
+                                    >
+                                        <p className="font-medium text-lg">{faq.question}</p>
+                                        <div className={`transition-transform duration-300 ${openIndex === index ? "rotate-180" : ""}`}>
+                                            <Image src="/faqs/chevron-down.png" width={24} height={24} alt="expand" className="opacity-70" />
+                                        </div>
+                                    </div>
+                                    {/* Answer (Animated) */}
+                                    <div
+                                        className={`transition-all duration-500 ease-in-out overflow-hidden ${openIndex === index ? "max-h-40 opacity-100 mt-3 px-2" : "max-h-0 opacity-0"}`}
+                                    >
+                                        <p className="font-light text-gray-400 leading-relaxed">{faq.answer}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Read More Button */}
+                        <Button
+                            variant="secondary"
+                            asChild
+                            className="rounded-full bg-green-400 hover:bg-green-500 text-black font-bold px-8 py-2 transition-colors"
+                        >
+                            <Link href="/faqs">
+                                Read more
+                            </Link>
+                        </Button>
                     </div>
-                    <div className="sm:w-[60%] w-full flex flex-col items-start justify-start gap-6">
-
-                        {faqs.map((faq, index: number) => (
-                            <div key={index} className="w-full">
-
-                                {/* Question */}
-                                <div
-                                    onClick={() => toggle(index)}
-                                    className="w-full bg-[#1d1c1cff] rounded-[10px] flex items-center justify-between px-6 py-5 cursor-pointer transition-colors duration-300 hover:bg-[#2a2929]"
-                                >
-                                    <p className="font-normal">{faq.question}</p>
-                                    <Image
-                                        src="/faqs/chevron-down.png"
-                                        width={30}
-                                        height={30}
-                                        alt="toggle"
-                                        className={`sm:hidden block transition-transform duration-300 ${openIndex === index ? "rotate-180" : ""
-                                            }`}
-                                    />
-                                </div>
-                                {/* Answer (Animated) */}
-                                <div
-                                    className={`transition-all duration-500 ease-in-out overflow-hidden ${openIndex === index ? "max-h-40 opacity-100 mt-3" : "max-h-0 opacity-0"
-                                        }`}
-                                >
-                                    <p className="font-thin">{faq.answer}</p>
-                                </div>
-
-
-                            </div>
-                                
-                        ))}
 
                 </div>
             </div>
-            <div className="w-[80%] flex items-center justify-center">
-                <Button
-                    variant="secondary"
-                    className="rounded-full cursor-pointer mx-8 my-4 bg-green-400 hover:bg-green-400"
-                >
-                    <Link
-                    href="/faqs"
-                    aria-label="Navigate to FAQs"
-                    >
-                        Read more
-                    </Link>
-                </Button>
-            </div>
-
         </div>
-        </div >
     );
 }

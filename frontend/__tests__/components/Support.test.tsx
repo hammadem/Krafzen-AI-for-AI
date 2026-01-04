@@ -5,7 +5,7 @@ describe("Support Form Components Check", () => {
     it("renders the support form component", async () => {
         render(<SupportForm />);
 
-        expect(screen.getByText(/Reach out to us at Krafzen by sending us a message and get back to you as soon as we receive your message./i)).toBeInTheDocument();
+        expect(screen.getByText(/Reach out to us at Krafzen. We/i)).toBeInTheDocument();
         expect(screen.getByText(/Let's connect/i)).toBeInTheDocument();
 
         expect(await screen.findByPlaceholderText(/First Name/i)).toBeInTheDocument();
@@ -18,7 +18,7 @@ describe("Support Form Components Check", () => {
         expect(submitButton).toBeInTheDocument();
 
         fireEvent.click(submitButton);
-        
+
         // After submission of form then input fields are empty
         expect(await screen.findByPlaceholderText(/First Name/i)).toBeEmptyDOMElement();
         expect(await screen.findByPlaceholderText(/Last Name/i)).toBeEmptyDOMElement();

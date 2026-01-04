@@ -54,6 +54,8 @@ export global {
         email: string | undefined;
         firstname: string | undefined?;
         lastname: string | undefined?;
+        avatar_url: string | undefined?;
+        subscription_plan: string | undefined?;
     }
 
 }

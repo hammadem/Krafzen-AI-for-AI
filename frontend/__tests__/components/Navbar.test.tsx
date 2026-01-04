@@ -1,5 +1,19 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import Navbar from "@/components/Navbar";
+import { vi } from 'vitest';
+
+// Mock the AuthContext
+vi.mock("@/context/AuthContext", () => ({
+  useAuth: () => ({
+    user: null,
+    logout: vi.fn(),
+  }),
+}));
+
+// Mock next/navigation
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+}));
 
 describe("Navbar Component", () => {
   it("renders company name and navigation links", () => {
@@ -15,7 +29,7 @@ describe("Navbar Component", () => {
     });
 
     // Check Start Free Trial button
-    expect(screen.getAllByRole("button", { name: /start free trial/i })[0]).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /start free trial/i })[0]).toBeInTheDocument();
   });
 
   it("toggles mobile menu when clicked", async () => {

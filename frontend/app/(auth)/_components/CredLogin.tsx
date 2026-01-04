@@ -56,10 +56,11 @@ export default function LoginWithCred() {
                 email: user?.user?.user_metadata?.email,
                 firstname: user?.user?.user_metadata?.firstname,
                 lastname: user?.user?.user_metadata?.lastname,
+                avatar_url: user?.user?.user_metadata?.avatar_url,
+                subscription_plan: user?.user?.user_metadata?.subscription_plan || "Free Trial",
                 access_token: user?.session?.access_token
             })
 
-            toast.success("Logged In Successfully");
             router.push("/dashboard");
         } catch (err) {
             console.log(err);
@@ -72,25 +73,25 @@ export default function LoginWithCred() {
 
 
     return (
-        <div className="w-full flex flex-col items-center gap-8 w-full">
-            <h1 className="text-[4vh]">Sign up</h1>
+        <div className="w-full flex flex-col items-center gap-8 justify-center h-full">
+            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Log in</h1>
 
-            <Card className="sm:max-w-md bg-black border-0 text-white w-[50%]">
-                <CardContent>
+            <Card className="w-full max-w-md bg-zinc-900 border border-white/10 text-white shadow-xl">
+                <CardContent className="pt-6">
                     <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
-                        <FieldGroup className="flex gap-2">
+                        <FieldGroup className="space-y-4">
                             <Controller
                                 name="email"
                                 control={form.control}
                                 render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
+                                    <Field className="w-full" data-invalid={fieldState.invalid}>
                                         <Input
                                             {...field}
-                                            id="form-rhf-demo-title"
+                                            id="email"
                                             aria-invalid={fieldState.invalid}
                                             placeholder="Email"
                                             autoComplete="off"
-                                            className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4"
+                                            className="border border-white/10 bg-black p-4 h-12 focus-visible:ring-1 focus-visible:ring-white"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
@@ -102,14 +103,15 @@ export default function LoginWithCred() {
                                 name="password"
                                 control={form.control}
                                 render={({ field, fieldState }) => (
-                                    <Field data-invalid={fieldState.invalid}>
+                                    <Field className="w-full" data-invalid={fieldState.invalid}>
                                         <Input
                                             {...field}
-                                            id="form-rhf-demo-title"
+                                            id="password"
                                             aria-invalid={fieldState.invalid}
                                             placeholder="Password"
+                                            type="password"
                                             autoComplete="off"
-                                            className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4"
+                                            className="border border-white/10 bg-black p-4 h-12 focus-visible:ring-1 focus-visible:ring-white"
                                         />
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
@@ -117,38 +119,39 @@ export default function LoginWithCred() {
                                     </Field>
                                 )}
                             />
-
                         </FieldGroup>
                     </form>
                 </CardContent>
-                <CardFooter>
-                    <Field orientation="horizontal">
-                        <Button disabled={loading} type="submit" form="form-rhf-demo" variant="secondary" className="rounded-full w-full cursor-pointer bg-[#68D585] bg-green-400 hover:bg-green-400">
-                            {loading ? "Submitting" : "Submit"}
+                <CardFooter className="flex flex-col gap-4">
+                    <Field orientation="horizontal" className="w-full">
+                        <Button disabled={loading} type="submit" form="form-rhf-demo" variant="secondary" className="rounded-full w-full h-12 cursor-pointer bg-green-400 hover:bg-green-500 text-black font-bold">
+                            {loading ? "Submitting..." : "Submit"}
                         </Button>
                     </Field>
+
+                    <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
+                        <p>Continue with your work mail - SSO login</p>
+                        <p>Don&apos;t have an account? {" "}
+                            <Link
+                                href="/signup"
+                                aria-label="Link to Sign Up Page"
+                                className="text-white hover:underline font-bold"
+                            >
+                                Sign Up
+                            </Link>
+                        </p>
+
+                        <p>Forgot Password? {" "}
+                            <Link
+                                href="/forgot"
+                                aria-label="Link to Reset Password Page"
+                                className="text-white hover:underline font-bold"
+                            >
+                                Reset Password
+                            </Link>
+                        </p>
+                    </div>
                 </CardFooter>
-
-                <span className="flex items-center flex-col gap-2">
-                    <p>Continue with your work mail - SSO login</p>
-                    <p className="text-[#696969]">I already have an account? {" "}
-                        <Link
-                            href="/signup"
-                            aria-label="Link to Login Page"
-                        >
-                            <b>Sign Up</b>
-                        </Link>
-                    </p>
-
-                    <p className="text-[#696969]">Forgot Password? {" "}
-                        <Link
-                            href="/forgot"
-                            aria-label="Link to Login Page"
-                        >
-                            <b>Reset Password</b>
-                        </Link>
-                    </p>
-                </span>
             </Card>
         </div>
     )

@@ -4,9 +4,13 @@ import structlog
 from app.core.config import settings
 
 # Basic stdlib setup
+# Determine log level based on DEBUG flag
+log_level = logging.DEBUG if settings.DEBUG else logging.WARNING
+
+# Basic stdlib setup
 logging.basicConfig(
-    level=getattr(logging, settings.LOG_LEVEL),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=log_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s" if settings.DEBUG else "%(message)s",
 )
 
 # Structured logging

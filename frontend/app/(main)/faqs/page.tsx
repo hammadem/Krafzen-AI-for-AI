@@ -24,97 +24,101 @@ export default function Faqs() {
         <>
             <NavHeader currentNav="FAQs" />
 
-            <div className="hidden sm:flex flex-cols w-full py-16 justify-evenly items-center md:h-[80vh] sm:h-[110vh]">
+            <div className="bg-black w-full min-h-screen py-10">
+                <div className="w-full max-w-5xl mx-auto px-4">
+                    {/* Desktop View */}
+                    <div className="hidden md:grid grid-cols-12 gap-8">
+                        {/* Sidebar */}
+                        <div className="col-span-4 flex flex-col gap-2">
+                            {faqs.map((faq, ind) => (
+                                <Button
+                                    key={ind}
+                                    variant="ghost"
+                                    className={classNames(
+                                        "w-full justify-start py-6 px-4 text-left transition-all duration-200",
+                                        ind === currentQues
+                                            ? "bg-white text-black font-semibold"
+                                            : "text-gray-400 hover:text-white hover:bg-zinc-900"
+                                    )}
+                                    onClick={() => setQues(ind)}
+                                >
+                                    <span className="text-lg">{faq.type}</span>
+                                </Button>
+                            ))}
+                        </div>
 
-                <span className="flex flex-col items-center h-full gap-4 w-[50%] md:w-[50%]">
-                    {faqs.map((faq, ind) => {
-                        return (
-                            <Button
-                                className={classNames("bg-[#1d1c1cff] hover:bg-[#1d1c1cff] cursor-pointer md:w-[63%] sm:w-[80%] py-6 pl-6 flex items-center justify-start", ind === currentQues ? "bg-white text-black hover:bg-white" : "")}
-                                key={ind}
-                                variant="default"
-                                onClick={() => setQues(ind)}
-                            >
-                                <p className="text-[2vh]">{faq.type}</p>
-                            </Button>
-                        )
-                    })}
-                </span>
+                        {/* Divider */}
+                        <div className="col-span-1 flex justify-center">
+                            <div className="w-[1px] h-full bg-white/10"></div>
+                        </div>
 
-                <span className="w-[1px] h-full bg-white" />
+                        {/* Content */}
+                        <div className="col-span-7 text-white space-y-8">
+                            <h2 className="text-2xl font-bold border-b border-white/10 pb-4">{faqs[currentQues].type}</h2>
+                            <div className="space-y-8">
+                                {faqs[currentQues].QandA.map((val, ind) => (
+                                    <div key={val.question + ind} className="space-y-3">
+                                        <h3 className="font-semibold text-lg text-white">{val.question}</h3>
+                                        <div className="text-gray-400 leading-relaxed font-light">
+                                            {val.answer.length === 1 ? (
+                                                <p>{val.answer[0]}</p>
+                                            ) : (
+                                                <ul className="space-y-2">
+                                                    {val.answer.map((ans, i) => (
+                                                        <li key={i} className="flex gap-2">
+                                                            <span>•</span>
+                                                            <span>{renderWithBold(ans)}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
 
-                <span className="text-white pl-20 pr-4 md:pr-10 flex items-evenly gap-4 flex-col h-full w-[90%]">
-                    <h1 title={faqs[currentQues].type} className="font-semibold">{faqs[currentQues].type}</h1>
-                    {
-                        faqs[currentQues].QandA.map((val, ind) => {
-                            return (
-                                <span key={ind.toString() + val}>
-                                    <h1 className="font-semibold my-3">{val.question}</h1>
-                                    {
-                                        val.answer.length === 1
-                                            ?
-                                            <p className="font-thin">{val.answer}</p>
-                                            :
-                                            val.answer.map(ans => {
-                                                return (
-                                                    <span className="flex" key={ans}>
-                                                        <p className="mx-2">•</p>
-                                                        <p
-                                                            className="font-thin"
-                                                        >{renderWithBold(ans)}
-                                                        </p>
-                                                    </span >
-                                                )
-                                            })
-                                    }
-                                </span >
+                    {/* Mobile View */}
+                    <div className="md:hidden flex flex-col gap-8">
+                        <ComboboxDemo setValue={setValue} value={value} />
 
-                            );
-                        })
-                    }
-                </span>
-            </div >
+                        {!value && (
+                            <div className="text-center py-10 text-gray-400">
+                                <p className="text-xl">Select a topic to view FAQs.</p>
+                            </div>
+                        )}
 
-            <div className="w-full sm:hidden flex flex-col items-center justify-evenly py-10">
-                <ComboboxDemo setValue={setValue} value={value} />
-                <span className="w-[80%] mt-2">
-                    <p className="text-white text-[3vh]">Select a topic to see FAQs.</p>
-                </span>
-
-                {
-                    faqs.filter(faq => faq.type === value).length > 0 &&
-                    <span className="text-white px-4 py-12 flex items-evenly justify-evenly flex-col h-full w-[90%]">
-                        <h1 className="font-semibold">{faqs.filter(faq => faq.type === value)[0].type}</h1>
-
-                        {
-                            faqs.filter(faq => faq.type === value)[0].QandA.map((val, ind) => {
-                                return (
-                                    <span key={ind.toString() + val}>
-                                        <h1 className="font-semibold mt-8 mb-4">{val.question}</h1>
-                                        {
-                                            val.answer.length === 1
-                                                ?
-                                                <p className="font-thin">{val.answer}</p>
-                                                :
-                                                val.answer.map(ans => {
-                                                    return (
-                                                        <span className="flex" key={ans}>
-                                                            <p className="mx-2">•</p>
-                                                            <p
-                                                                className="font-thin"
-                                                            >{renderWithBold(ans)}
-                                                            </p>
-                                                        </span >
-                                                    )
-                                                })
-                                        }
-                                    </span >
-                                );
-                            })
-                        }
-                    </span>
-                }
-
+                        {value && (
+                            <div className="space-y-8 text-white">
+                                {faqs.filter(faq => faq.type === value).map((faqGroup) => (
+                                    <div key={faqGroup.type} className="space-y-8">
+                                        <h2 className="text-2xl font-bold border-b border-white/10 pb-4">{faqGroup.type}</h2>
+                                        {faqGroup.QandA.map((val, ind) => (
+                                            <div key={ind} className="space-y-3">
+                                                <h3 className="font-semibold text-lg">{val.question}</h3>
+                                                <div className="text-gray-400 leading-relaxed font-light">
+                                                    {val.answer.length === 1 ? (
+                                                        <p>{val.answer[0]}</p>
+                                                    ) : (
+                                                        <ul className="space-y-2">
+                                                            {val.answer.map((ans, i) => (
+                                                                <li key={i} className="flex gap-2">
+                                                                    <span>•</span>
+                                                                    <span>{renderWithBold(ans)}</span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
         </>
     )
