@@ -7,6 +7,7 @@ import { sendChatMessage } from "@/lib/api/chat";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import { createClient } from "@/lib/supabase/supabaseClient";
 
 interface SessionData {
     id: string;
@@ -34,6 +35,10 @@ export default function DashboardPage() {
     const handleSendMessage = async () => {
         if (!inputValue.trim() || isLoading) return;
 
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
         const userMessage: Message = {
             id: Date.now().toString(),
             role: 'user',
@@ -58,7 +63,7 @@ export default function DashboardPage() {
                 }))
                 .filter(m => m.content !== "" || m.imageUrl); // Keep provided it has content OR image
 
-            const response = await sendChatMessage(userMessage.content!, history);
+            const response = await sendChatMessage(userMessage.content!, history, token);
 
             const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),

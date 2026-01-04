@@ -9,13 +9,19 @@ export interface ChatResponse {
 
 export async function sendChatMessage(
     message: string,
-    history: { role: string, content: string, imageUrl?: string }[] = []
+    history: { role: string, content: string, imageUrl?: string }[] = [],
+    token?: string
 ): Promise<ChatResponse> {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/v1/chat/generate`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
             message,
             history
@@ -30,13 +36,18 @@ export async function sendChatMessage(
     return response.json();
 }
 
-export const downloadDxf = async (imageUrl: string, prompt?: string) => {
+export const downloadDxf = async (imageUrl: string, prompt?: string, token?: string) => {
     try {
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const response = await fetch(`${API_BASE_URL}/api/v1/chat/dxf`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers,
             body: JSON.stringify({ image_url: imageUrl, prompt }),
         });
 
@@ -51,12 +62,18 @@ export const downloadDxf = async (imageUrl: string, prompt?: string) => {
     }
 };
 
-export async function transcribeAudio(audioBlob: Blob): Promise<string> {
+export async function transcribeAudio(audioBlob: Blob, token?: string): Promise<string> {
     const formData = new FormData();
     formData.append('file', audioBlob, 'rec.webm');
 
+    const headers: Record<string, string> = {};
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/v1/transcribe`, {
         method: 'POST',
+        headers,
         body: formData,
     });
 

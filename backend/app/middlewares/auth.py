@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel
 from app.core.security import decode_supabase_token
 from app.core.config import settings
+import logging
 
 
 class ErrorResponse(BaseModel):
@@ -26,14 +27,18 @@ async def require_auth(authorization: str = Header(None)) -> Dict[str, Any]:
 
     payload = decode_supabase_token(token)
     if not payload:
+        import logging
+        logging.getLogger(__name__).error("Token decode failed or returned None")
         raise HTTPException(
             status_code=401,
             detail=ErrorResponse(error="Invalid or expired token").model_dump()
         )
 
 
+
     user_id = payload.get("sub")
     if not user_id:
+        logging.getLogger(__name__).error(f"Token missing user ID. Payload keys: {payload.keys()}")
         raise HTTPException(
             status_code=401,
             detail=ErrorResponse(error="Token missing user ID").model_dump()
@@ -42,7 +47,9 @@ async def require_auth(authorization: str = Header(None)) -> Dict[str, Any]:
 
     expected_base = f"https://{settings.SUPABASE_PROJECT_ID}.supabase.co"
 
+    # Normalize issuer for check (handle trailing slash mismatch)
     if not issuer.startswith(expected_base):
+        logging.getLogger(__name__).error(f"Invalid issuer: {issuer}. Expected startswith: {expected_base}")
         raise HTTPException(
             status_code=401,
             detail=ErrorResponse(
