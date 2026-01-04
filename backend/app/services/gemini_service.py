@@ -16,10 +16,11 @@ class GeminiService:
         self.model_name = settings.GEMINI_MODEL 
 
 
-    async def generate_image(self, prompt: str, original_prompt: str = None) -> str:
+    async def generate_image(self, prompt: str, original_prompt: str = None, previous_image_url: str = None) -> str:
         """
         Generates an image based on the prompt using the configured Gemini Image model.
         Includes implicit validation if original_prompt is provided.
+        Uses previous_image_url as context if provided to preserve history.
         Returns a base64 data URL.
         """
         if not settings.GEMINI_API_KEY:
@@ -35,6 +36,9 @@ class GeminiService:
                 validation_instruction = f"""
             CRITICAL PRE-GENERATION VALIDATION & CORRECTION:
             You are acting as a Senior Architect and Quality Control AI.
+            
+            CONTEXT:
+            - **Previous Design**: An image of the previous floor plan is attached (if available). Use this as the BASE. Maintain the style, layout, and existing elements unless explicitly asked to change them.
             
             INPUTS:
             - **User Request**: "{original_prompt}"
@@ -93,7 +97,36 @@ class GeminiService:
 
             logger.info(f"--- GEMINI IMAGE GENERATION PROMPT ---\n{enhanced_prompt}\n----------------------------------")
             
-            response = await model.generate_content_async(enhanced_prompt, safety_settings=safety_settings)
+            # Prepare content parts
+            content_parts = [enhanced_prompt]
+            
+            # If previous image functionality is desired and supported by the model (e.g. Gemini 1.5 Pro/Flash)
+            # We can download and convert the previous image to include in the prompt context
+            if previous_image_url:
+                try:
+                    import httpx
+                    from PIL import Image
+                    import io
+                    import base64
+                    
+                    image_data = None
+                    if previous_image_url.startswith("data:"):
+                        encoded = previous_image_url.split(",")[1]
+                        image_bytes = base64.b64decode(encoded)
+                        image_data = Image.open(io.BytesIO(image_bytes))
+                    else:
+                         async with httpx.AsyncClient() as client:
+                            resp = await client.get(previous_image_url)
+                            if resp.status_code == 200:
+                                image_data = Image.open(io.BytesIO(resp.content))
+                    
+                    if image_data:
+                        logger.info("Including previous image in generation context.")
+                        content_parts.append(image_data)
+                except Exception as e:
+                    logger.warning(f"Failed to process previous image for context: {e}")
+
+            response = await model.generate_content_async(content_parts, safety_settings=safety_settings)
             
             # Check for refusal/empty candidates before accessing parts
             if not response.candidates:

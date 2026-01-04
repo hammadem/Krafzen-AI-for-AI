@@ -100,7 +100,23 @@ async def generate_chat_response(request: ChatRequest):
 
         # 2. Image Generation (Gemini Only)
         logger.info("Generating Image with Gemini (Single Pass with Implicit Validation)")
-        image_url = await gemini_service.generate_image(ollama_output, original_prompt=request.message)
+        
+        # Retrieve previous image URL to maintain history context
+        previous_image_url = None
+        if request.history:
+            for msg in reversed(request.history):
+                if msg.get("role") == "assistant" and msg.get("imageUrl"):
+                    previous_image_url = msg.get("imageUrl")
+                    break
+        
+        if previous_image_url:
+            logger.info("Found previous image in history. Passing to Gemini for context preservation.")
+        
+        image_url = await gemini_service.generate_image(
+            ollama_output, 
+            original_prompt=request.message,
+            previous_image_url=previous_image_url
+        )
             
         logger.info(f"Generated Image URL: {image_url[:50]}...")
 
