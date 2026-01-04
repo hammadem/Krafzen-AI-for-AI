@@ -191,3 +191,11 @@ class ExternalDxfService:
                 f.write(resp.content)
             
             return filepath
+
+
+# Global instance
+try:
+    external_dxf_service = ExternalDxfService() if settings.API_2_CONVERT_KEY else None
+except Exception as e:
+    logger.warning(f"Failed to initialize External DXF service: {e}")
+    external_dxf_service = None

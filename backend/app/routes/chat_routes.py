@@ -3,8 +3,7 @@ from fastapi.responses import FileResponse
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 from app.services.cadllm_service import cadllm_service
-from app.services.gemini_service import GeminiService
-from app.services.dxf_service import DxfService
+from app.services.gemini_service import gemini_service
 from app.core.config import settings
 import logging
 import os
@@ -55,9 +54,7 @@ async def generate_dxf(request: DxfRequest):
         logger.error(f"DXF Generation Error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-    except Exception as e:
-        logger.error(f"DXF Generation Error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/chat/generate", response_model=ChatResponse)
 async def generate_chat_response(request: ChatRequest):
@@ -71,46 +68,32 @@ async def generate_chat_response(request: ChatRequest):
         if not cadllm_service:
              raise HTTPException(status_code=503, detail="CADLLM Service Unavailable")
 
-        gemini_service = GeminiService()
+
         
-        # 1. Vision Analysis (If previous image exists) vs Text Generation
-        previous_image_url = None
-        # Look backwards for the last assistant message with an image
+        # Unified Flow: Always Text -> CADLLM Enhance
+        # We treat the history as context for the unified prompt enhancement
+        full_prompt = request.message
+        
         if request.history:
-            for msg in reversed(request.history):
-                if msg.get("role") == "assistant" and msg.get("imageUrl"):
-                    previous_image_url = msg.get("imageUrl")
-                    break
-        
-        ollama_output = ""
-        
-        if previous_image_url:
-            logger.info("Found previous image in history. Engaging Vision Refinement.")
-            # Use Gemini Vision to describe the old image + apply new request logic
-            ollama_output = await gemini_service.vision_refinement(previous_image_url, request.message)
-        else:
-            # Fallback to Text-Only Ollama Flow
-            full_prompt = request.message
+            # Construct a context-aware prompt
+            context_str = "\n".join([f"{msg.get('role', 'unknown').upper()}: {msg.get('content', '')}" for msg in request.history])
             
-            if request.history:
-                # Construct a context-aware prompt
-                context_str = "\n".join([f"{msg.get('role', 'unknown').upper()}: {msg.get('content', '')}" for msg in request.history])
-                
-                full_prompt = f"""
-                PREVIOUS CONVERSATION HISTORY:
-                {context_str}
-                
-                CURRENT USER REQUEST:
-                "{request.message}"
-                
-                TASK:
-                Based on the previous conversation and the new request, generate a UPDATED, FULL, and COMPREHENSIVE scene description. 
-                Do not just describe the changes. Describe the entire scene as it should look now.
-                """
-                logger.info(f"Using Context-Aware Prompt. History length: {len(request.history)}")
-                
-            logger.info(f"Generating CADLLM response for: {request.message}")
-            ollama_output = await cadllm_service.generate_text(full_prompt)
+            full_prompt = f"""
+            PREVIOUS CONVERSATION HISTORY:
+            {context_str}
+            
+            CURRENT USER REQUEST:
+            "{request.message}"
+            
+            TASK:
+            Based on the previous conversation and the new request, generate a UPDATED, FULL, and COMPREHENSIVE scene description. 
+            Do not just describe the changes. Describe the entire scene as it should look now.
+            """
+            logger.info(f"Using Context-Aware Prompt. History length: {len(request.history)}")
+        
+        # Use CADLLM Enhance instead of generate_text (which was removed)
+        logger.info(f"Generating CADLLM response for: {request.message}")
+        ollama_output = await cadllm_service.enhance_prompt(full_prompt)
         
         if not ollama_output:
             raise HTTPException(status_code=500, detail="Ollama returned empty response")

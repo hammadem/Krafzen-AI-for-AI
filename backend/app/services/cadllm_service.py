@@ -1,8 +1,8 @@
 """
-CADLLM Service for generating DXF files using the fine-tuned CAD-LLM model.
+CADLLM Service for prompt enhancement.
 
-This service uses the Hugging Face Inference API to call the fine-tuned model
-that outputs coordinates in a specific format, which are then converted to DXF files.
+This service uses the Hugging Face Inference API to call a fine-tuned model
+that enhances basic architectural descriptions into detailed prompts for image generation.
 """
 
 import os
@@ -22,23 +22,17 @@ except ImportError:
     requests = None
 
 from app.core.config import settings
-from app.services.coordinate_parser import parse_coordinates_to_dxf
+
 
 logger = logging.getLogger(__name__)
 
 
 class CADLLMService:
     """
-    Service for generating DXF files using the fine-tuned CAD-LLM model.
+    Service for enhancing architectural descriptions using the fine-tuned CAD-LLM model.
     
-    The model outputs coordinates in format:
-    - <SOL> - Start of object
-    - <Circle>: x=0.0, y=0.0, r=48.0 - Circle with center and radius
-    - <Line>: x=47.5, y=-32.0 - Line coordinates (multiple lines form a polyline)
-    - <Arc>: x=-8.5, y=-58.0, α=64.0, f=1.0 - Arc with center, angle, and flag
-    - <EOS> - End of sequence
-    
-    These coordinates are then converted to DXF files.
+    This service acts as a "Prompt Engineer", taking basic user inputs and 
+    converting them into highly detailed specifications suitable for image generation.
     """
     
     def __init__(self):
@@ -69,120 +63,17 @@ class CADLLMService:
             logger.warning("No HF_MODEL_NAME or HF_ENDPOINT_URL configured. CADLLM service will not work.")
             self.client = None
         
-        self.system_prompt = """You are a CAD code assistant. Given a CAD description, 
-generate precise 2D CAD coordinates. Always center shapes at origin (0, 0). 
-Use exact dimensions specified in the request. Generate single, closed shapes unless multiple objects are explicitly requested."""
+
     
-    def format_prompt(self, instruction: str, input_text: str = "(none)") -> str:
+    async def _generate_text_response(self, prompt: str) -> str:
         """
-        Format user instruction into model prompt.
-        
-        Args:
-            instruction: User's CAD description
-            input_text: Additional input (default: "(none)")
-        
-        Returns:
-            Formatted prompt string
-        """
-        text = (
-            self.system_prompt
-            + "\n\n### Instruction\n"
-            + instruction
-            + "\n\n### Input\n"
-            + input_text
-            + "\n\n### CAD Coordinates Output\n"
-        )
-        return text
-    
-    async def generate_dxf_from_text(
-        self,
-        text: str,
-        filename: Optional[str] = None
-    ) -> Tuple[bytes, Optional[str]]:
-        """
-        Generate DXF file from text description using CAD-LLM model.
-        
-        Args:
-            text: Natural language CAD description
-            filename: Optional filename for logging
-        
-        Returns:
-            Tuple of (dxf_bytes, error_message)
-        
-        Raises:
-            ValueError: If service is not configured
-            Exception: If generation fails
-        """
-        if not self.is_configured():
-            raise ValueError("CADLLM service is not configured. Set HF_TOKEN and HF_MODEL_NAME or HF_ENDPOINT_URL.")
-        
-        try:
-            # Format prompt
-            prompt = self.format_prompt(text)
-            
-            # Generate coordinates from model
-            logger.info(f"Calling CAD-LLM model for text: {text[:100]}...")
-            coordinates_output = await self._generate_coordinates(prompt)
-            
-            if not coordinates_output:
-                return None, "Model returned empty output"
-            
-            logger.info(f"Model output received: {len(coordinates_output)} characters")
-            
-            # Parse coordinates to DXF
-            logger.info("Converting coordinates to DXF file...")
-            dxf_path = parse_coordinates_to_dxf(
-                text=coordinates_output,
-                output_path=None,  # Use temp file
-                center_at_origin=True
-            )
-            
-            # Read DXF file as bytes
-            with open(dxf_path, 'rb') as f:
-                dxf_bytes = f.read()
-            
-            # Clean up temp file
-            try:
-                os.unlink(dxf_path)
-            except:
-                pass
-            
-            logger.info(f"DXF file generated: {len(dxf_bytes)} bytes")
-            return dxf_bytes, None
-            
-        except Exception as e:
-            logger.error(f"CADLLM generation error: {e}", exc_info=True)
-            return None, str(e)
-    
-    async def generate_text(self, prompt: str) -> str:
-        """
-        Generate generic text response from the model (for chat/description).
-        
-        Args:
-            prompt: Input text prompt
-            
-        Returns:
-            Generated text response
-        """
-        if not self.is_configured():
-            raise ValueError("CADLLM service is not configured")
-            
-        try:
-            logger.info(f"Calling CAD-LLM model for text generation: {prompt[:50]}...")
-            return await self._generate_coordinates(prompt)
-        except Exception as e:
-            logger.error(f"CADLLM text generation error: {e}", exc_info=True)
-            raise e
-            
-    async def _generate_coordinates(self, prompt: str) -> str:
-        """
-        Call the Hugging Face model to generate coordinates.
+        Call the Hugging Face model to generate text response.
         
         Args:
             prompt: Formatted prompt for the model
         
         Returns:
-            Raw model output (coordinate format)
+            Raw model output (text)
         """
         if self._endpoint_url:
             # Use direct HTTP request for custom endpoint
@@ -190,6 +81,8 @@ Use exact dimensions specified in the request. Generate single, closed shapes un
         else:
             # Use InferenceClient
             return await self._generate_via_client(prompt)
+            
+
     
     async def _generate_via_client(self, prompt: str) -> str:
         """Generate using InferenceClient (standard Inference API)"""
@@ -260,6 +153,39 @@ Use exact dimensions specified in the request. Generate single, closed shapes un
                 logger.error(f"Response: {e.response.text}")
             raise
     
+    async def enhance_prompt(self, text: str) -> str:
+        """
+        Enhance a user's architectural description into a detailed prompt for image generation.
+        
+        Args:
+            text: Basic user description (e.g., "10x12 kitchen with island")
+            
+        Returns:
+            Detailed prompt for the image generator
+        """
+        if not self.is_configured():
+            raise ValueError("CADLLM service is not configured")
+
+        system_prompt = """You are an expert architectural prompt engineer. 
+Your goal is to take a basic description of a floor plan and convert it into a HIGHLY DETAILED specification for an image generator.
+
+RULES:
+1. Keep the layout and dimensions EXACTLY as described.
+2. Add architectural details (door widths, counter depths, standard clearances) if not specified.
+3. Describe the scene from a top-down technical drawing perspective.
+4. Output ONLY the enhanced prompt string. Do not add conversational filler.
+"""
+        
+        prompt = f"{system_prompt}\n\nUser Description: {text}\n\nEnhanced Prompt:"
+        
+        try:
+             # reuse the existing client mechanisms
+             return await self._generate_text_response(prompt)
+        except Exception as e:
+             logger.error(f"CADLLM prompt enhancement failed: {e}")
+             # Fallback to original text if enhancement fails
+             return text
+
     def is_configured(self) -> bool:
         """Check if service is properly configured"""
         if not HF_AVAILABLE:
