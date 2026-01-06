@@ -3,7 +3,7 @@ import Faqs from "@/app/(main)/faqs/page";
 import { faqs } from "@/lib/data";
 
 describe("FAQs Page", () => {
-    it("renders the About Page", () => {
+    it("renders the Faq Page", () => {
         render(<Faqs />);
 
         const buttons = faqs.map(faq => {

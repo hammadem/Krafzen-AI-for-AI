@@ -26,27 +26,36 @@ const PROJECT_URLS = {
     DELETE: (projectId: string) => `/api/v1/projects/${projectId}`,
 } as const;
 
+// Text to CAD maker api
 const GPT_PARSERS = {
     PARSE: () => `/api/v1/parse`,
-    PARSE_TRANSCRIPTION: () => `api/v1/parse-transcription`
+    PARSE_TRANSCRIPTION: () => `/api/v1/parse-transcription`
 } as const;
 
-const DXF_GENERATER = {
-    GENERATE: () => `/api/v1/generate`,
-    GENERATE_FROM_TEXT: () => `api/v1/generate-from-text`,
-    VALIDATE: () => `api/v1/validate`
-} as const;
-
+// Audio to text maker
 const AUDIO_PARSER = {
     PARSE: () => `/api/v1/transcribe`,
-}
+} as const;
 
-export async function generateADXF(
-    user: User | null,
-    body: { text: string }
-) {
-    return apiClient("POST", DXF_GENERATER.VALIDATE(), user, body);
-}
+// Chat routes
+// const DXF_INSTRUCTIONS_GENERATOR = {
+//     GENERATE_FROM_IMAGE: () => `/api/v1/chat/dxf`,
+//     GENERATE_FROM_TEXT: () => `/api/v1/chat/generate`,
+// } as const;
+
+// const DXF_FILE_GENERATOR = {
+//     GENERATE: () => `/generate-from-text`,
+//     GENERATE_FROM_AUDIO: () => `/generate-from-audio`,
+// } as const;
+
+// export async function generateADXF(
+//     user: User | null,
+//     body: {
+//         message: string,
+//     }
+// ) {
+//     return apiClient("POST", DXF_INSTRUCTIONS_GENERATOR.GENERATE_FROM_TEXT(), user, body);
+// }
 
 export async function parseAnInput(
     user: User | null,

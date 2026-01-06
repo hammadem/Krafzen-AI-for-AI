@@ -65,14 +65,7 @@ export default function DashboardLayout({
                         </div>
                     </div>}
 
-
-                {/** This is the prompt input bar */}
-                {/** what else can be done the divs above components can be moved to components like for this one in particular
-                 * the eaccch state of toolbar can have its own component
-                 */}
-                {/* <div className={classNames("bg-black mr-4 sm:m-0 self-end sm:self-center sm:w-[55%] items-start transition-all duration-500")}> */}
                 <Toolbar />
-                {/* </div> */}
 
             </div >
 

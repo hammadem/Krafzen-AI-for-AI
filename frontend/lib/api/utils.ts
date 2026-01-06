@@ -28,6 +28,8 @@ export async function apiClient(
         "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     };
 
+    console.log(process.env.NEXT_PUBLIC_API_URL + url);
+
     try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${url}`, {
             method,
@@ -41,8 +43,9 @@ export async function apiClient(
             ...(controller ? { signal: controller.signal } : {}),
         });
 
-
         const data = await response.json();
+
+        console.log(data);
 
         let result: ApiRes;
         if (response.ok) {

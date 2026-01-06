@@ -206,7 +206,7 @@ export function Projects({ createProject, setProjectName }: { createProject: () 
 
                 <Dialog>
                     <DialogTrigger className="flex text-[2vh] text-white gap-2 items-center justify-around"><FolderPlus className="hover:scale-120 cursor-pointer" /> Create Project</DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px] bg-[#191919] text-white border-0">
+                    <DialogContent className="sm:max-w-[425px] bg-[#191919] text-white border-0 z-999999999!">
                         <DialogHeader>
                             <DialogTitle>Project Name</DialogTitle>
 

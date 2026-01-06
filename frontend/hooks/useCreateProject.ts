@@ -5,7 +5,10 @@ import { createAProject } from '@/lib/api/api';
 import { useDashboard } from '@/context/DashboardContex';
 import { useFetchProjects } from './useFetchProjects';
 
-export function useCreateProject() {
+export function useCreateProject(
+    setFile?: (file: string) => void,
+    setInput?: (input: string) => void
+) {
     const { forceRefetch } = useFetchProjects();
     const { user, setCurrentProject } = useAuth();
     const { setUserAction } = useDashboard();
@@ -48,6 +51,10 @@ export function useCreateProject() {
                 setCurrentProject(project);
                 forceRefetch();
                 setStatus("success");
+                if (setInput && setFile) {
+                    setInput("");
+                    setFile("");
+                }
                 router.push(`/dashboard/id/${project.id} `);
             } else {
                 setStatus("error");
@@ -55,7 +62,7 @@ export function useCreateProject() {
             }
 
             controllerRef.current = null;
-        }, [setCurrentProject, setUserAction, forceRefetch, router, user, setStatus, setApiError]);
+        }, [setCurrentProject, setInput, setFile, setUserAction, forceRefetch, router, user, setStatus, setApiError]);
 
     return {
         cancel,

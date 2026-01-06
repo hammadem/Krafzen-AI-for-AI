@@ -87,7 +87,7 @@ export default function FAQ() {
                     >
                         <Link
                             href="/faqs"
-                            aria-label="Navigate to FAQs"
+                            aria-label="Navigate to FAQs Read More"
                         >
                             Read more
                         </Link>
