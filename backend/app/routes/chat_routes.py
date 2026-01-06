@@ -73,33 +73,22 @@ async def generate_chat_response(request: ChatRequest):
 
 
         
-        # Unified Flow: Always Text -> CADLLM Enhance
-        # We treat the history as context for the unified prompt enhancement
-        full_prompt = request.message
+        # Unified Flow: Always Text -> CADLLM (DSL Generation)
+        # Note: The CAD-LLM model does not support context rewriting, so we pass the request directly.
+        # Future TODO: Use a separate LLM to merge conversational context before calling CAD-LLM.
+        
+        # We rely on the Frontend to send the full "state" if needed, or accept single-turn instructions.
+        dxf_instruction = request.message
         
         if request.history:
-            # Construct a context-aware prompt
-            context_str = "\n".join([f"{msg.get('role', 'unknown').upper()}: {msg.get('content', '')}" for msg in request.history])
-            
-            full_prompt = f"""
-            PREVIOUS CONVERSATION HISTORY:
-            {context_str}
-            
-            CURRENT USER REQUEST:
-            "{request.message}"
-            
-            TASK:
-            Based on the previous conversation and the new request, generate a UPDATED, FULL, and COMPREHENSIVE scene description. 
-            Do not just describe the changes. Describe the entire scene as it should look now.
-            """
-            logger.info(f"Using Context-Aware Prompt. History length: {len(request.history)}")
+              logger.warning("History context is currently ignored by the specialized CAD-LLM model.")
         
-        # Use CADLLM Enhance instead of generate_text (which was removed)
-        logger.info(f"Generating CADLLM response for: {request.message}")
-        ollama_output = await cadllm_service.enhance_prompt(full_prompt)
+        # Use CADLLM to generate DSL Spec
+        logger.info(f"Generating CADLLM response for: {dxf_instruction}")
+        cad_dsl = await cadllm_service.enhance_prompt(dxf_instruction)
         
-        if not ollama_output:
-            raise HTTPException(status_code=500, detail="Ollama returned empty response")
+        if not cad_dsl:
+            raise HTTPException(status_code=500, detail="CADLLM returned empty response")
 
         # 2. Image Generation (Gemini Only)
         logger.info("Generating Image with Gemini (Single Pass with Implicit Validation)")
@@ -116,7 +105,7 @@ async def generate_chat_response(request: ChatRequest):
             logger.info("Found previous image in history. Passing to Gemini for context preservation.")
         
         image_url = await gemini_service.generate_image(
-            ollama_output, 
+            cad_dsl, 
             original_prompt=request.message,
             previous_image_url=previous_image_url
         )
@@ -125,8 +114,8 @@ async def generate_chat_response(request: ChatRequest):
 
         return ChatResponse(
             original_prompt=request.message,
-            ollama_response=ollama_output,
-            validated_response=ollama_output,
+            ollama_response=cad_dsl,
+            validated_response=cad_dsl,
             image_url=image_url
         )
 

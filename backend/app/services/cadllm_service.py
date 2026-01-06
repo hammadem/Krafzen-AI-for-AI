@@ -31,8 +31,9 @@ class CADLLMService:
     """
     Service for enhancing architectural descriptions using the fine-tuned CAD-LLM model.
     
-    This service acts as a "Prompt Engineer", taking basic user inputs and 
-    converting them into highly detailed specifications suitable for image generation.
+    This service acts as a "Spec Generator", taking basic user inputs and 
+    converting them into a precise Domain Specific Language (DSL) format
+    that describes the floor plan geometry for the image generator.
     """
     
     def __init__(self):
@@ -161,22 +162,18 @@ class CADLLMService:
             text: Basic user description (e.g., "10x12 kitchen with island")
             
         Returns:
-            Detailed prompt for the image generator
+            DSL Specification String (e.g., "UNITS: mm\nROOM: ...")
         """
         if not self.is_configured():
             raise ValueError("CADLLM service is not configured")
 
-        system_prompt = """You are an expert architectural prompt engineer. 
-Your goal is to take a basic description of a floor plan and convert it into a HIGHLY DETAILED specification for an image generator.
-
-RULES:
-1. Keep the layout and dimensions EXACTLY as described.
-2. Add architectural details (door widths, counter depths, standard clearances) if not specified.
-3. Describe the scene from a top-down technical drawing perspective.
-4. Output ONLY the enhanced prompt string. Do not add conversational filler.
-"""
+                # The CAD-LLM model is a specialized model trained to convert text -> DSL.
+        # It is based on Qwen2.5-Coder-Instruct, which REQUIRES ChatML formatting to work correctly.
+        # Without this, it treats the input as a completion task and hallucinates.
         
-        prompt = f"{system_prompt}\n\nUser Description: {text}\n\nEnhanced Prompt:"
+        formatted_prompt = f"<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n"
+        
+        prompt = formatted_prompt
         
         try:
              # reuse the existing client mechanisms
