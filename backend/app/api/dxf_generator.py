@@ -47,6 +47,15 @@ except Exception as e:
     logger.warning(f"Failed to import external_dxf_service: {e}.")
     external_dxf_service = None
 
+try:
+    from app.services.local_dxf_service import local_dxf_service
+except Exception as e:
+    logger.warning(f"Failed to import local_dxf_service: {e}.")
+    local_dxf_service = None
+
+from app.core.config import settings
+
+
 
 router = APIRouter()
 
@@ -66,8 +75,11 @@ async def generate_dxf_from_audio(
         raise HTTPException(status_code=503, detail="CADLLM service unavailable.")
     if not gemini_service:
         raise HTTPException(status_code=503, detail="Gemini service unavailable.")
-    if not external_dxf_service:
+    if settings.DXF_GENERATION_METHOD == "API" and not external_dxf_service:
         raise HTTPException(status_code=503, detail="External DXF service unavailable.")
+    if settings.DXF_GENERATION_METHOD == "LOCAL" and not local_dxf_service:
+        raise HTTPException(status_code=503, detail="Local DXF service unavailable.")
+
     
     try:
         # 1. Transcribe
@@ -96,8 +108,13 @@ async def generate_dxf_from_audio(
             raise HTTPException(status_code=500, detail="Image generation failed.")
             
         # 4. Convert to DXF (Api2Convert)
-        logger.info("Converting Image to DXF...")
-        dxf_path = await external_dxf_service.convert_to_dxf(image_url)
+        if settings.DXF_GENERATION_METHOD == "LOCAL":
+            logger.info("Converting Image to DXF (Local - Potrace)...")
+            dxf_path = await local_dxf_service.convert_to_dxf(image_url)
+        else:
+            logger.info("Converting Image to DXF (API)...")
+            dxf_path = await external_dxf_service.convert_to_dxf(image_url)
+
         
         # 5. Return File
         with open(dxf_path, 'rb') as f:
@@ -137,8 +154,11 @@ async def generate_dxf_from_text(
         raise HTTPException(status_code=503, detail="CADLLM service unavailable.")
     if not gemini_service:
         raise HTTPException(status_code=503, detail="Gemini service unavailable.")
-    if not external_dxf_service:
+    if settings.DXF_GENERATION_METHOD == "API" and not external_dxf_service:
         raise HTTPException(status_code=503, detail="External DXF service unavailable.")
+    if settings.DXF_GENERATION_METHOD == "LOCAL" and not local_dxf_service:
+        raise HTTPException(status_code=503, detail="Local DXF service unavailable.")
+
     
     try:
         # 1. Enhance Prompt (CADLLM)
@@ -154,8 +174,13 @@ async def generate_dxf_from_text(
             raise HTTPException(status_code=500, detail="Image generation failed.")
             
         # 3. Convert to DXF (Api2Convert)
-        logger.info("Converting Image to DXF...")
-        dxf_path = await external_dxf_service.convert_to_dxf(image_url)
+        if settings.DXF_GENERATION_METHOD == "LOCAL":
+            logger.info("Converting Image to DXF (Local - Potrace)...")
+            dxf_path = await local_dxf_service.convert_to_dxf(image_url)
+        else:
+            logger.info("Converting Image to DXF (API)...")
+            dxf_path = await external_dxf_service.convert_to_dxf(image_url)
+
         
         # 4. Return File
         with open(dxf_path, 'rb') as f:
@@ -195,8 +220,11 @@ async def generate_and_store_dxf(
         raise HTTPException(status_code=503, detail="CADLLM service unavailable.")
     if not gemini_service:
         raise HTTPException(status_code=503, detail="Gemini service unavailable.")
-    if not external_dxf_service:
+    if settings.DXF_GENERATION_METHOD == "API" and not external_dxf_service:
         raise HTTPException(status_code=503, detail="External DXF service unavailable.")
+    if settings.DXF_GENERATION_METHOD == "LOCAL" and not local_dxf_service:
+        raise HTTPException(status_code=503, detail="Local DXF service unavailable.")
+
     
     try:
         # 1. Enhance Prompt (CADLLM)
@@ -208,8 +236,14 @@ async def generate_and_store_dxf(
         if "placehold.co" in image_url:
             raise HTTPException(status_code=500, detail="Image generation failed.")
         
-        # 3. Convert to DXF (Api2Convert)
-        dxf_path = await external_dxf_service.convert_to_dxf(image_url)
+        if settings.DXF_GENERATION_METHOD == "LOCAL":
+            logger.info("Converting Image to DXF (Local - Potrace)...")
+            dxf_path = await local_dxf_service.convert_to_dxf(image_url)
+        else:
+            # 3. Convert to DXF (Api2Convert)
+            logger.info("Converting Image to DXF (API)...")
+            dxf_path = await external_dxf_service.convert_to_dxf(image_url)
+
         
         # 4. Read File
         with open(dxf_path, 'rb') as f:
