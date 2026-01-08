@@ -126,7 +126,7 @@ export function SeePlans({ ind, plan }: { ind: number, plan: PricingDetails }) {
                                     if (ind > 1) {
                                         return <p key={feat} className="text-[2vh] flex items-center gap-2 justify-center">
                                             <Image
-                                                src="/pricing/tick.png"
+                                                src="/pricing/tick.svg"
                                                 width={25}
                                                 height={25}
                                                 alt="Tick Image"

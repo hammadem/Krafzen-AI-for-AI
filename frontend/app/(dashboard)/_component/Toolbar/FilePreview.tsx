@@ -34,7 +34,7 @@ export default function FilePreview({ file, setFile, status, setInput, fileInput
                             :
                             <>
                                 <Image
-                                    src="/dashboard/sound.png"
+                                    src="/dashboard/sound.svg"
                                     width={50}
                                     height={50}
                                     alt="User Input File"
