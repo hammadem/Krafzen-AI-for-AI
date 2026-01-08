@@ -11,7 +11,7 @@ KRAFZEN AI is an AI-powered SaaS platform that converts voice and text instructi
 - **Framework**: FastAPI (Python 3.12)
 - **Hosting**: Render.com (Multi-environment: Staging + Production)
 - **Database**: Supabase (PostgreSQL)
-- **AI Services**: OpenAI Whisper (transcription) + GPT-4 (parsing)
+- **AI Services**: Google Gemini 2.0 (Transcription & Image Gen), GPT-4 (Parsing)
 - **CAD Engine**: ezdxf (Python library)
 - **CI/CD**: GitHub Actions with branch protection
 - **Monitoring**: Sentry (error tracking) + Health checks
@@ -179,27 +179,33 @@ ENVIRONMENT=development
 DEBUG=True
 PORT=8000
 
-# OpenAI (Required for AI features)
+# OpenAI (Required for Parsing)
 OPENAI_API_KEY=sk-your-openai-key-here
 
-# Supabase (Required for database)
+# Google Gemini (Required for Image & Audio)
+GEMINI_API_KEY=your-gemini-key
+GEMINI_IMAGE_MODEL=gemini-2.0-flash-exp
+
+# Supabase (Required for Database & Auth)
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key-here
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
-173: 
-174: # Api2Convert (Required for DXF Generation)
+SUPABASE_DATABASE_URL=postgresql://postgres:[password]@db.project.supabase.co:5432/postgres
+
+# Stripe (Payments)
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_100_MINS=price_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+
+# Api2Convert (DXF Generation)
 API_2_CONVERT_KEY=your-api-key-here
-API_2_CONVERT_URL=https://api.api2convert.com/v2
+
+# Third Party
+NEXT_PUBLIC_CALENDLY_URL=https://calendly.com/your-link
 
 # CORS
 ALLOWED_ORIGINS=http://localhost:3000,https://*.vercel.app
-
-# Optional
-SENTRY_DSN=your-sentry-dsn-here
-GPT_MODEL=gpt-4-turbo-preview
-GPT_MAX_TOKENS=2000
-GPT_TEMPERATURE=0.3
-MAX_FILE_SIZE_MB=25
 ```
 
 **Frontend** (`frontend/.env.local`):
@@ -487,83 +493,3 @@ Proprietary - KRAFZEN AI
 - **Sentry Dashboard**: <https://sentry.io>
 - **Render Dashboard**: <https://dashboard.render.com>
 - **Vercel Dashboard**: <https://vercel.com/dashboard>
-
-## 🧭 Contributing Guidelines – Krafzen AI Frontend (Next.js)
-
-### 🌿 Branch Strategy
-
-| Branch Name | Purpose |
-|--------------|----------|
-| `main`       | Production-ready code |
-| `staging`    | Integration testing & pre-demo before merging into main |
-| `feature/*`   | Active branch on to add new feature |
-
-### ✍️ Commit Message Format
-
-We follow **[Conventional Commits](https://www.conventionalcommits.org/)**.
-
-**Format:**
-
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer(s)]
-
-```
-
-**Types:**
-
-- `feat`: new feature (e.g. `feat: add voice recording UI`)
-- `fix`: bug fix (e.g. `fix: handle Supabase auth refresh`)
-- `chore`: setup or minor update (e.g. `chore: setup Sentry + PostHog`)
-- `refactor`: code improvement
-- `style`: UI or CSS updates
-- `docs`: documentation updates
-
-### 🚀 Development Workflow
-
-```bash
-# Pre-checks tests and linting error
-npm run lint
-npm run test
-
-# Check for staging branch locally 
-git checkout staging
-
-# Fetch the fresh changes from staging branch
-git pull origin staging
-
-# Create branch feature/details to make a meaningful commit
-git checkout -b feature/setup
-
-# Make your changes and commit
-git add .
-git commit -m "feat: add new component"
-
-# Push to your fork
-git push origin feature/setup
-
-# Create a Pull Request to staging branch
-# Do not merge the pull request untill someone from the team reviews it
-```
-
-### 🧪 Testing
-
-```bash
-# Run tests
-npm test
-
-# Run tests in UI mode
-npm run test:ui
-
-```
-
-### 📝 Code Style
-
-- Use TypeScript for all new files
-- Follow ESLint rules
-- Use Prettier for formatting
-- Write meaningful commit messages
-- Add tests for new features
