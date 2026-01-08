@@ -41,7 +41,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           firstname: data?.session?.user?.user_metadata?.firstname,
           lastname: data?.session?.user?.user_metadata?.lastname,
           avatar_url: data?.session?.user?.user_metadata?.avatar_url,
-          subscription_plan: data?.session?.user?.user_metadata?.subscription_plan || "Free Trial"
+          subscription_plan: data?.session?.user?.user_metadata?.subscription_plan || "Free Trial",
+          remaining_minutes: 0,
+          total_minutes_purchased: 0
         });
       } else {
         setUser(null);
@@ -64,9 +66,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           firstname: session?.user?.user_metadata?.firstname,
           lastname: session?.user?.user_metadata?.lastname,
           avatar_url: session?.user?.user_metadata?.avatar_url,
-          subscription_plan: session?.user?.user_metadata?.subscription_plan || "Free Trial"
+          subscription_plan: session?.user?.user_metadata?.subscription_plan || "Free Trial",
+          remaining_minutes: 0,
+          total_minutes_purchased: 0
         });
+
+        // 3️⃣ Fetch detailed profile from Backend
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/users/profile`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        })
+          .then(res => res.json())
+          .then(data => {
+            setUser(prev => prev ? {
+              ...prev,
+              remaining_minutes: data.remaining_minutes,
+              total_minutes_purchased: data.total_minutes_purchased,
+              subscription_plan: data.plan_tier || prev.subscription_plan
+            } : null);
+          })
+          .catch(err => console.error("Failed to fetch profile:", err));
+
       } else {
+
         setUser(null);
       }
 

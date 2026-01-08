@@ -187,6 +187,39 @@ function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
                 <div className="px-2 py-1.5 text-xs font-semibold text-green-400 bg-green-400/10 rounded-sm mx-2 mb-2">
                     Plan: {user.subscription_plan || "Free Trial"}
                 </div>
+                <div className="px-2 py-1.5 text-xs font-semibold text-blue-400 bg-blue-400/10 rounded-sm mx-2 mb-2">
+                    Credits: {user.remaining_minutes ? user.remaining_minutes.toFixed(1) : "0"} mins
+                </div>
+
+                <DropdownMenuSeparator className="bg-zinc-800" />
+
+                <DropdownMenuItem
+                    className="cursor-pointer focus:bg-zinc-800 focus:text-white"
+                    onClick={async () => {
+                        try {
+                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/payments/create-checkout-session`, {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${user.access_token}`
+                                }
+                            });
+                            const data = await res.json();
+                            if (data.url) window.location.href = data.url;
+                        } catch (e) {
+                            console.error("Payment error", e);
+                            alert("Failed to start payment session");
+                        }
+                    }}
+                >
+                    Buy 100 Minutes ($10)
+                </DropdownMenuItem>
+
+                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white">
+                    <a href={process.env.NEXT_PUBLIC_CALENDLY_URL || "https://calendly.com"} target="_blank" rel="noopener noreferrer">
+                        Book a Demo
+                    </a>
+                </DropdownMenuItem>
+
                 <DropdownMenuSeparator className="bg-zinc-800" />
                 <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white">
                     <Link href="/account">Account Settings</Link>

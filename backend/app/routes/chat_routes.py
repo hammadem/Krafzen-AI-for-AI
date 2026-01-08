@@ -1,28 +1,33 @@
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 from app.services.cadllm_service import cadllm_service
 from app.services.gemini_service import gemini_service
+from app.services.chat_history_service import chat_history_service
+from app.services.subscription_service import subscription_service
 from app.core.config import settings
 import logging
 import os
+import uuid
 
 from app.middlewares.auth import require_auth
-from fastapi import APIRouter, HTTPException, Depends
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: Optional[str] = None
+    # maintained for backward compatibility but ignored if session_id is used for persistence
     history: List[Dict[str, Any]] = []
 
 class ChatResponse(BaseModel):
+    session_id: str
     original_prompt: str
     ollama_response: str
     validated_response: str
     image_url: str
+    remaining_minutes: float
 
 class DxfRequest(BaseModel):
     image_url: str
@@ -45,8 +50,6 @@ async def generate_dxf(request: DxfRequest):
              logger.info(f"Requesting External DXF Conversion for image...")
              file_path = await dxf_service.convert_to_dxf(request.image_url)
 
-
-        
         # Check and Return
         if not os.path.exists(file_path):
              raise HTTPException(status_code=500, detail="Failed to retrieve DXF file from external provider")
@@ -64,28 +67,38 @@ async def generate_dxf(request: DxfRequest):
 
 
 @router.post("/chat/generate", response_model=ChatResponse, dependencies=[Depends(require_auth)])
-async def generate_chat_response(request: ChatRequest):
+async def generate_chat_response(request: ChatRequest, req: Request):
     """
     Process chat message:
-    1. Ollama generates text.
-    2. Gemini validates/corrects text (Optional/Implicit).
-    3. Image Generation (Gemini or Stable Diffusion based on Config/Request).
+    1. Check Balance.
+    2. Retrieve/Create Session.
+    3. Load Context.
+    4. Generate Response (CADLLM + Gemini).
+    5. Save & Deduct.
     """
+    user_id = req.state.user.id
+
+    # 1. Check Balance
+    balance = await subscription_service.check_balance(user_id)
+    if balance <= 0:
+        raise HTTPException(status_code=402, detail="Insufficient minutes. Please top up.")
+
     try:
+        session_id = request.session_id
+        if not session_id:
+            # Create new session
+            session_id = await chat_history_service.create_session(user_id, title=request.message[:30] + "...")
+        
+        # 2. Persist User Message
+        await chat_history_service.add_message(session_id, "user", request.message)
+
+        # 3. Load Context (Optional: Fetch last N messages to pass to LLM if needed)
+        # For now, we are keeping the logic similar to before, focusing on the current message + potential previous image
+        
         if not cadllm_service:
              raise HTTPException(status_code=503, detail="CADLLM Service Unavailable")
-
-
         
-        # Unified Flow: Always Text -> CADLLM (DSL Generation)
-        # Note: The CAD-LLM model does not support context rewriting, so we pass the request directly.
-        # Future TODO: Use a separate LLM to merge conversational context before calling CAD-LLM.
-        
-        # We rely on the Frontend to send the full "state" if needed, or accept single-turn instructions.
         dxf_instruction = request.message
-        
-        if request.history:
-              logger.warning("History context is currently ignored by the specialized CAD-LLM model.")
         
         # Use CADLLM to generate DSL Spec
         logger.info(f"Generating CADLLM response for: {dxf_instruction}")
@@ -94,20 +107,21 @@ async def generate_chat_response(request: ChatRequest):
         if not cad_dsl:
             raise HTTPException(status_code=500, detail="CADLLM returned empty response")
 
-        # 2. Image Generation (Gemini Only)
-        logger.info("Generating Image with Gemini (Single Pass with Implicit Validation)")
+        # 4. Image Generation (Gemini) with Context
+        logger.info("Generating Image with Gemini")
         
-        # Retrieve previous image URL to maintain history context
+        # Try to find previous image in DB history for this session
         previous_image_url = None
-        if request.history:
-            for msg in reversed(request.history):
-                if msg.get("role") == "assistant" and msg.get("imageUrl"):
-                    previous_image_url = msg.get("imageUrl")
-                    break
+        messages = await chat_history_service.get_session_messages(session_id)
+        # Iterate backwards to find last assistant message with image
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant" and msg.get("image_url"):
+                previous_image_url = msg.get("image_url")
+                break
         
         if previous_image_url:
-            logger.info("Found previous image in history. Passing to Gemini for context preservation.")
-        
+            logger.info("Found previous image in history.")
+
         image_url = await gemini_service.generate_image(
             cad_dsl, 
             original_prompt=request.message,
@@ -116,13 +130,55 @@ async def generate_chat_response(request: ChatRequest):
             
         logger.info(f"Generated Image URL: {image_url[:50]}...")
 
+        # 5. Persist Assistant Response
+        await chat_history_service.add_message(
+            session_id, 
+            "assistant", 
+            cad_dsl, 
+            image_url=image_url
+        )
+
+        # 6. Deduct Minutes
+        # Assuming 1 request = 0.5 minutes (30 seconds) cost for now, since it's a fixed interaction
+        cost = 0.5 
+        new_balance = await subscription_service.deduct_minutes(user_id, cost)
+
         return ChatResponse(
+            session_id=session_id,
             original_prompt=request.message,
             ollama_response=cad_dsl,
             validated_response=cad_dsl,
-            image_url=image_url
+            image_url=image_url,
+            remaining_minutes=new_balance
         )
 
     except Exception as e:
         logger.error(f"Chat generation error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/chat/history", dependencies=[Depends(require_auth)])
+async def get_chat_history(req: Request):
+    """
+    Get all chat sessions for the user.
+    """
+    user_id = req.state.user.id
+    return await chat_history_service.get_user_sessions(user_id)
+
+@router.get("/chat/history/{session_id}", dependencies=[Depends(require_auth)])
+async def get_session_history(session_id: str, req: Request):
+    """
+    Get messages for a specific session.
+    """
+    # Todo: verify session belongs to user (RLS handles this in DB, but good to be safe)
+    # The service blindly fetches, but RLS on Supabase side should restrict it if configured correctly.
+    # We constructed the service to use the 'service_role' client (admin) which BYPASSES RLS.
+    # IMPORTANT: We should verify ownership here if using admin client.
+    
+    user_id = req.state.user.id
+    
+    # Check ownership
+    sessions = await chat_history_service.get_user_sessions(user_id)
+    if not any(s['id'] == session_id for s in sessions):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return await chat_history_service.get_session_messages(session_id)

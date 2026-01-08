@@ -42,3 +42,6 @@ anyio<4,>=3.5.0
 
 # Image Processing
 Pillow>=10.0.0
+
+# Payments
+stripe>=8.0.0
