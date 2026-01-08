@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import FileResponse
 from typing import List, Dict, Optional, Any
 from pydantic import BaseModel
 from app.services.cadllm_service import cadllm_service
@@ -33,13 +34,14 @@ class DxfRequest(BaseModel):
     image_url: str
     prompt: Optional[str] = None
 
-@router.post("/chat/dxf", dependencies=[Depends(require_auth)])
-async def generate_dxf(request: DxfRequest):
+@router.post("/chat/dxf")
+async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_auth)):
     """
     Generates a DXF file from an image URL.
     Uses External Service (Api2Convert) for high-fidelity Raster-to-Vector conversion.
     """
     try:
+        user_id = user_data["user_id"] # Just to verify auth
         if settings.DXF_GENERATION_METHOD == "LOCAL":
              from app.services.local_dxf_service import local_dxf_service
              logger.info("Requesting Local DXF Conversion (Potrace)...")
@@ -66,8 +68,8 @@ async def generate_dxf(request: DxfRequest):
 
 
 
-@router.post("/chat/generate", response_model=ChatResponse, dependencies=[Depends(require_auth)])
-async def generate_chat_response(request: ChatRequest, req: Request):
+@router.post("/chat/generate", response_model=ChatResponse)
+async def generate_chat_response(request: ChatRequest, user_data: dict = Depends(require_auth)):
     """
     Process chat message:
     1. Check Balance.
@@ -76,7 +78,7 @@ async def generate_chat_response(request: ChatRequest, req: Request):
     4. Generate Response (CADLLM + Gemini).
     5. Save & Deduct.
     """
-    user_id = req.state.user.id
+    user_id = user_data["user_id"]
 
     # 1. Check Balance
     balance = await subscription_service.check_balance(user_id)
@@ -156,16 +158,16 @@ async def generate_chat_response(request: ChatRequest, req: Request):
         logger.error(f"Chat generation error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/chat/history", dependencies=[Depends(require_auth)])
-async def get_chat_history(req: Request):
+@router.get("/chat/history")
+async def get_chat_history(user_data: dict = Depends(require_auth)):
     """
     Get all chat sessions for the user.
     """
-    user_id = req.state.user.id
+    user_id = user_data["user_id"]
     return await chat_history_service.get_user_sessions(user_id)
 
-@router.get("/chat/history/{session_id}", dependencies=[Depends(require_auth)])
-async def get_session_history(session_id: str, req: Request):
+@router.get("/chat/history/{session_id}")
+async def get_session_history(session_id: str, user_data: dict = Depends(require_auth)):
     """
     Get messages for a specific session.
     """
@@ -174,7 +176,7 @@ async def get_session_history(session_id: str, req: Request):
     # We constructed the service to use the 'service_role' client (admin) which BYPASSES RLS.
     # IMPORTANT: We should verify ownership here if using admin client.
     
-    user_id = req.state.user.id
+    user_id = user_data["user_id"]
     
     # Check ownership
     sessions = await chat_history_service.get_user_sessions(user_id)
@@ -182,3 +184,20 @@ async def get_session_history(session_id: str, req: Request):
         raise HTTPException(status_code=403, detail="Access denied")
 
     return await chat_history_service.get_session_messages(session_id)
+
+@router.delete("/chat/history/{session_id}")
+async def delete_chat_session(session_id: str, user_data: dict = Depends(require_auth)):
+    """
+    Delete a chat session.
+    """
+    user_id = user_data["user_id"]
+    try:
+        success = await chat_history_service.delete_session(session_id, user_id)
+        if not success:
+             raise HTTPException(status_code=404, detail="Session not found or access denied")
+        return {"status": "success", "id": session_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete session")

@@ -37,17 +37,23 @@ CREATE TABLE IF NOT EXISTS files (
 
 -- RLS Policies (Basic Auth - Expand for Full Layers)
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own projects" ON projects;
 CREATE POLICY "Users view own projects" ON projects FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users insert own projects" ON projects;
 CREATE POLICY "Users insert own projects" ON projects FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Jobs policies
 ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own jobs" ON jobs;
 CREATE POLICY "Users view own jobs" ON jobs FOR ALL USING (auth.uid() = (SELECT user_id FROM projects WHERE id = project_id));
+DROP POLICY IF EXISTS "Users insert own jobs" ON jobs;
 CREATE POLICY "Users insert own jobs" ON jobs FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM projects WHERE id = project_id));
 
 -- Files policies (FIXED: job_id instead of file_id)
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own files" ON files;
 CREATE POLICY "Users view own files" ON files FOR ALL USING (auth.uid() = (SELECT user_id FROM jobs j JOIN projects p ON j.project_id = p.id WHERE j.id = files.job_id));
+DROP POLICY IF EXISTS "Users insert own files" ON files;
 CREATE POLICY "Users insert own files" ON files FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM jobs j JOIN projects p ON j.project_id = p.id WHERE j.id = files.job_id));
 
 
@@ -69,7 +75,8 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.user_subscriptions (user_id, remaining_minutes)
-  VALUES (new.id, 100.0);
+  VALUES (new.id, 100.0)
+  ON CONFLICT (user_id) DO NOTHING; -- Idempotency
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -113,18 +120,26 @@ CREATE TABLE IF NOT EXISTS payment_history (
 
 -- RLS for new tables
 ALTER TABLE user_subscriptions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own subscription" ON user_subscriptions;
 CREATE POLICY "Users view own subscription" ON user_subscriptions FOR SELECT USING (auth.uid() = user_id);
 -- Only system can update subscriptions usually, but if we need frontend to update? No, backend updates.
 
 ALTER TABLE chat_sessions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own sessions" ON chat_sessions;
 CREATE POLICY "Users view own sessions" ON chat_sessions FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users insert own sessions" ON chat_sessions;
 CREATE POLICY "Users insert own sessions" ON chat_sessions FOR INSERT WITH CHECK (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users update own sessions" ON chat_sessions;
 CREATE POLICY "Users update own sessions" ON chat_sessions FOR UPDATE USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users delete own sessions" ON chat_sessions;
 CREATE POLICY "Users delete own sessions" ON chat_sessions FOR DELETE USING (auth.uid() = user_id);
 
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own messages" ON chat_messages;
 CREATE POLICY "Users view own messages" ON chat_messages FOR SELECT USING (auth.uid() = (SELECT user_id FROM chat_sessions WHERE id = session_id));
+DROP POLICY IF EXISTS "Users insert own messages" ON chat_messages;
 CREATE POLICY "Users insert own messages" ON chat_messages FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM chat_sessions WHERE id = session_id));
 
 ALTER TABLE payment_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own payments" ON payment_history;
 CREATE POLICY "Users view own payments" ON payment_history FOR SELECT USING (auth.uid() = user_id);

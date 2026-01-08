@@ -53,6 +53,16 @@ export async function fetchSessionMessages(sessionId: string, token: string) {
     return res.json();
 }
 
+export async function deleteChatSession(sessionId: string, token: string) {
+    const headers = { 'Authorization': `Bearer ${token}` };
+    const res = await fetch(`${API_BASE_URL}/api/v1/chat/history/${sessionId}`, {
+        method: 'DELETE',
+        headers
+    });
+    if (!res.ok) throw new Error("Failed to delete session");
+    return res.json();
+}
+
 export const downloadDxf = async (imageUrl: string, prompt?: string, token?: string) => {
     try {
         const headers: Record<string, string> = {

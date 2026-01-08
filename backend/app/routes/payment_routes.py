@@ -7,13 +7,13 @@ import logging
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.post("/payments/create-checkout-session", dependencies=[Depends(require_auth)])
-async def create_checkout_session(request: Request):
+@router.post("/payments/create-checkout-session")
+async def create_checkout_session(request: Request, user_data: dict = Depends(require_auth)):
     """
     Creates a Stripe Checkout session to buy 100 minutes.
     """
     try:
-        user_id = request.state.user.id
+        user_id = user_data["user_id"]
         
         # Define success/cancel URLs based on frontend URL
         # We append ?success=true or ?canceled=true so frontend can show toasts

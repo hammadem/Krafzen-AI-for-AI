@@ -75,4 +75,17 @@ class ChatHistoryService:
             return sessions[0]["id"]
         return await self.create_session(user_id)
 
+    async def delete_session(self, session_id: str, user_id: str) -> bool:
+        """Deletes a chat session."""
+        try:
+            # RLS policies should ideally handle user_id check, but we add explicit check here
+            response = db.table("chat_sessions").delete().eq("id", session_id).eq("user_id", user_id).execute()
+            if not response.data:
+                # If no data returned, it implies session didn't exist or wasn't owned by user
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting session: {e}")
+            raise e
+
 chat_history_service = ChatHistoryService()

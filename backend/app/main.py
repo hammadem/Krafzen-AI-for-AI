@@ -83,8 +83,13 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
             return response
         
         # Process request
-        response = await call_next(request)
-        
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            logger.error(f"Middleware Exception: {e}")
+            from starlette.responses import JSONResponse
+            response = JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+
         # Add CORS headers if allowed
         if is_allowed:
             response.headers["Access-Control-Allow-Origin"] = origin

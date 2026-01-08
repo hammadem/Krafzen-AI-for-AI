@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { ChatInterface, Message } from "@/components/ChatInterface";
 import { ChatSidebar, ChatSession } from "@/components/ChatSidebar";
-import { sendChatMessage, fetchChatHistory, fetchSessionMessages } from "@/lib/api/chat";
+import { sendChatMessage, fetchChatHistory, fetchSessionMessages, deleteChatSession } from "@/lib/api/chat";
 import { useAuth } from "@/context/AuthContext";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -151,8 +151,19 @@ export default function DashboardPage() {
         setIsMobileMenuOpen(false);
     };
 
-    const deleteSession = (id: string) => {
-        // TODO: Implement delete API call if needed. For now just hide from UI
+    const deleteSession = async (id: string) => {
+        // Implement delete API call
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) {
+            try {
+                await deleteChatSession(id, token);
+            } catch (e) {
+                console.error("Failed to delete session", e);
+            }
+        }
+
         setSessions(prev => prev.filter(s => s.id !== id));
         if (id === currentSessionId) {
             setCurrentSessionId(null);

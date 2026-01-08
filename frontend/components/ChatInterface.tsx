@@ -212,7 +212,7 @@ export function ChatInterface({
                                     : 'bg-zinc-900 border border-white/10 text-gray-100 rounded-2xl rounded-tl-sm'
                                     }`}
                             >
-                                {message.content && <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>}
+                                {message.content && !message.imageUrl && <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>}
 
                                 {message.imageUrl && (
                                     <div className="mt-2 space-y-2">
