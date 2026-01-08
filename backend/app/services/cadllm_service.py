@@ -146,7 +146,21 @@ class CADLLMService:
             
             # Custom app returns {"output": "..."}
             if isinstance(result, dict) and "output" in result:
-                return result["output"]
+                output = result["output"]
+                # Cleanup: Many endpoints echo the system prompt/user prompt. 
+                # We want only the Assistant's response.
+                
+                # Check for standard ChatML specific markers in output
+                if "<|im_start|>assistant" in output:
+                    output = output.split("<|im_start|>assistant")[-1]
+                
+                # Check for plain text "assistant" marker (common in the screenshot seen)
+                # The screenshot showed: "assistant\nHere's the CAD code..."
+                elif "assistant\n" in output:
+                    output = output.split("assistant\n")[-1]
+                    
+                # Clean leading whitespace/newlines
+                return output.strip()
                 
         except requests.exceptions.RequestException as e:
             logger.error(f"HTTP request to endpoint failed: {e}")

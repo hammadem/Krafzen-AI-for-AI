@@ -83,8 +83,13 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
             return response
         
         # Process request
-        response = await call_next(request)
-        
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            logger.error(f"Middleware Exception: {e}")
+            from starlette.responses import JSONResponse
+            response = JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+
         # Add CORS headers if allowed
         if is_allowed:
             response.headers["Access-Control-Allow-Origin"] = origin
@@ -99,7 +104,7 @@ app.add_middleware(WildcardCORSMiddleware)
 
 
 # Include API routers
-from app.routes import project_routes, job_routes, file_routes, chat_routes
+from app.routes import project_routes, job_routes, file_routes, chat_routes, payment_routes, user_routes
 
 # ... (middle of file)
 
@@ -108,6 +113,8 @@ app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"])
 app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"])
+app.include_router(payment_routes.router, prefix="/api/v1", tags=["Payments"])
+app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 

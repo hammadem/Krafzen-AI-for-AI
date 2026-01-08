@@ -56,6 +56,8 @@ export global {
         lastname: string | undefined?;
         avatar_url: string | undefined?;
         subscription_plan: string | undefined?;
+        remaining_minutes: number | undefined;
+        total_minutes_purchased: number | undefined;
     }
 
 }

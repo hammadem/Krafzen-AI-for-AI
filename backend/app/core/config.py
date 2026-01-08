@@ -78,6 +78,14 @@ class Settings(BaseSettings):
     # DXF Generation Strategy
     DXF_GENERATION_METHOD: str = "API" # Options: "API", "LOCAL"
 
+    # Stripe
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_PRICE_ID_100_MINS: Optional[str] = None # Price ID for purchasing minutes
+
+    # External Links
+    CALENDLY_URL: str = "https://calendly.com/" # Default or empty
+
 
     
     @property

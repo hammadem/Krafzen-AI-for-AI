@@ -90,6 +90,9 @@ if true; then
         fi
     fi
     
+    echo "🔄 Initializing Database Schema..."
+    python app/db/init_db.py || { echo "⚠️  Database initialization failed. Continuing..."; }
+    echo ""
     echo "🚀 Starting backend server..."
     echo "   (Press Ctrl+C to stop all servers)"
     echo ""

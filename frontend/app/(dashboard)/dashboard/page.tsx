@@ -1,36 +1,84 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { ChatInterface, Message } from "@/components/ChatInterface";
 import { ChatSidebar, ChatSession } from "@/components/ChatSidebar";
-import { sendChatMessage } from "@/lib/api/chat";
+import { sendChatMessage, fetchChatHistory, fetchSessionMessages, deleteChatSession } from "@/lib/api/chat";
+import { useAuth } from "@/context/AuthContext";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/supabaseClient";
 
-interface SessionData {
-    id: string;
-    messages: Message[];
-}
-
 export default function DashboardPage() {
-    const [sessions, setSessions] = useState<SessionData[]>([
-        { id: '1', messages: [] } // Initial empty session
-    ]);
-    const [currentSessionId, setCurrentSessionId] = useState<string>('1');
+    const { user, setUser } = useAuth();
+    // Current session messages
+    const [messages, setMessages] = useState<Message[]>([]);
+
+    // List of sessions from backend
+    const [sessions, setSessions] = useState<{ id: string, title: string, updated_at: string }[]>([]);
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
     const [inputValue, setInputValue] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    // Helpers
-    const currentSession = sessions.find(s => s.id === currentSessionId)!;
+    // Initial Load: Fetch Sessions
+    useEffect(() => {
+        const loadSessions = async () => {
+            const supabase = createClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+            if (token) {
+                try {
+                    const history = await fetchChatHistory(token);
+                    setSessions(history);
+                    if (history.length > 0) {
+                        setCurrentSessionId(history[0].id);
+                    } else {
+                        setCurrentSessionId(null); // No sessions
+                    }
+                } catch (e) {
+                    console.error("Failed to load history", e);
+                }
+            }
+        };
+        loadSessions();
+    }, []);
 
-    const updateCurrentSessionMessages = (newMessages: Message[]) => {
-        setSessions(prev => prev.map(s =>
-            s.id === currentSessionId ? { ...s, messages: newMessages } : s
-        ));
-    };
+    // Load Messages when Current Session Updates
+    useEffect(() => {
+        const loadMessages = async () => {
+            if (!currentSessionId) {
+                setMessages([]);
+                return;
+            }
+            // If it's a temp ID (not from backend yet), don't fetch
+            if (currentSessionId === 'new') return;
+
+            const supabase = createClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+            if (token) {
+                try {
+                    const msgs = await fetchSessionMessages(currentSessionId, token);
+                    // Adapt backend messages to frontend format
+                    const adapted: Message[] = msgs.map((m: any) => ({
+                        id: m.id,
+                        role: m.role,
+                        content: m.content,
+                        imageUrl: m.image_url,
+                        timestamp: new Date(m.created_at)
+                    }));
+                    setMessages(adapted);
+                } catch (e) {
+                    console.error("Failed to load messages", e);
+                    setMessages([]);
+                }
+            }
+        };
+        loadMessages();
+    }, [currentSessionId]);
 
     const handleSendMessage = async () => {
         if (!inputValue.trim() || isLoading) return;
@@ -38,6 +86,7 @@ export default function DashboardPage() {
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
+        if (!token) return;
 
         const userMessage: Message = {
             id: Date.now().toString(),
@@ -47,32 +96,39 @@ export default function DashboardPage() {
         };
 
         // Optimistic update
-        const updatedMessages = [...currentSession.messages, userMessage];
-        updateCurrentSessionMessages(updatedMessages);
+        setMessages(prev => [...prev, userMessage]);
         setInputValue("");
         setIsLoading(true);
 
         try {
-            // Prepare history (exclude the current message we are sending, and keep only role/content)
-            const history = updatedMessages
-                .slice(0, -1) // Exclude the optimistic user message we just added
-                .map(m => ({
-                    role: m.role,
-                    content: m.content || "",
-                    imageUrl: m.imageUrl // Include imageUrl if present
-                }))
-                .filter(m => m.content !== "" || m.imageUrl); // Keep provided it has content OR image
+            // If currentSessionId is 'new' or null, we pass undefined to backend => create new
+            const targetSessionId = (currentSessionId === 'new' || !currentSessionId) ? undefined : currentSessionId;
 
-            const response = await sendChatMessage(userMessage.content!, history, token);
+            const response = await sendChatMessage(userMessage.content!, [], token, targetSessionId);
 
             const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'assistant',
+                content: response.validated_response, // Use validated response (DSL)
                 imageUrl: response.image_url,
                 timestamp: new Date()
             };
 
-            updateCurrentSessionMessages([...updatedMessages, assistantMessage]);
+            setMessages(prev => [...prev, assistantMessage]);
+
+            // Update remaining minutes if provided
+            if (response.remaining_minutes !== undefined && user) {
+                setUser({ ...user, remaining_minutes: response.remaining_minutes });
+            }
+
+            // If we just created a new session, update state
+            if (response.session_id && response.session_id !== currentSessionId) {
+                setCurrentSessionId(response.session_id);
+                // Also refresh session list
+                const history = await fetchChatHistory(token);
+                setSessions(history);
+            }
+
         } catch (error) {
             console.error("Chat error:", error);
             const errorMessage: Message = {
@@ -81,47 +137,46 @@ export default function DashboardPage() {
                 content: "Sorry, something went wrong. Please try again.",
                 timestamp: new Date()
             };
-            updateCurrentSessionMessages([...updatedMessages, errorMessage]);
+            setMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
         }
     };
 
     const createNewChat = () => {
-        const newSessionId = Date.now().toString();
-        const newSession: SessionData = { id: newSessionId, messages: [] };
-        setSessions(prev => [newSession, ...prev]);
-        setCurrentSessionId(newSessionId);
+        // Just clear the view. Logic will create session on first message.
+        setCurrentSessionId('new');
+        setMessages([]);
         setInputValue("");
         setIsMobileMenuOpen(false);
     };
 
-    const deleteSession = (id: string) => {
-        setSessions(prev => {
-            const newSessions = prev.filter(s => s.id !== id);
-            // If we deleted the active session, switch to the first available or create new
-            if (id === currentSessionId) {
-                if (newSessions.length > 0) {
-                    setCurrentSessionId(newSessions[0].id);
-                } else {
-                    // Create a fresh one if all deleted
-                    const freshId = Date.now().toString();
-                    return [{ id: freshId, messages: [] }];
-                }
+    const deleteSession = async (id: string) => {
+        // Implement delete API call
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) {
+            try {
+                await deleteChatSession(id, token);
+            } catch (e) {
+                console.error("Failed to delete session", e);
             }
-            return newSessions;
-        });
+        }
+
+        setSessions(prev => prev.filter(s => s.id !== id));
+        if (id === currentSessionId) {
+            setCurrentSessionId(null);
+            setMessages([]);
+        }
     };
 
     // Derived props for Sidebar
-    const sidebarSessions: ChatSession[] = sessions.map(s => {
-        const firstUserMsg = s.messages.find(m => m.role === 'user');
-        return {
-            id: s.id,
-            title: firstUserMsg ? firstUserMsg.content?.slice(0, 30) + (firstUserMsg.content && firstUserMsg.content.length > 30 ? '...' : '') : 'New Chat',
-            date: new Date(parseInt(s.id) || Date.now()) // Fallback for '1'
-        };
-    });
+    const sidebarSessions: ChatSession[] = sessions.map(s => ({
+        id: s.id,
+        title: s.title || "New Chat",
+        date: new Date(s.updated_at)
+    }));
 
     return (
         <div className="flex flex-col h-screen bg-black overflow-hidden relative">
@@ -180,7 +235,7 @@ export default function DashboardPage() {
                     <div className="w-full max-w-5xl flex flex-col h-full space-y-8 relative z-10"> {/* Costrained max-w to ensure centering look */}
                         <div className="flex-1 min-h-0 w-full pb-0 relative">
                             <ChatInterface
-                                messages={currentSession.messages}
+                                messages={messages}
                                 inputValue={inputValue}
                                 isLoading={isLoading}
                                 onInputChange={setInputValue}
