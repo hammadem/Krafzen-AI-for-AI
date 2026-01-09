@@ -203,7 +203,7 @@ export function ChatInterface({
                                         <ChevronsLeft className="w-5 h-5 stroke-[3px]" />
                                     )}
                                 </AvatarFallback>
-                                {message.role === 'assistant' && <AvatarImage src="/navbar/icon.svg" className="bg-white p-2" />}
+                                {message.role === 'assistant' && <AvatarImage src="/navbar/Vector.svg" className="bg-white p-2 invert" />}
                             </Avatar>
 
                             <div
