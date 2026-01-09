@@ -1,4 +1,6 @@
+"use client";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "./ui/button";
 import Navbar from "./Navbar";
 import HeroData from "./HeroData";
@@ -103,21 +105,30 @@ export default function Hero() {
 
                     <div className="w-full flex flex-col sm:flex-row p-2 items-center h-60 sm:h-25 sm:justify-evenly sm:items-evenly">
                         <Button
+                            asChild
                             variant="secondary"
                             className="rounded-full px-6 py-4 cursor-pointer my-4 bg-green-400 hover:bg-green-400"
                         >
-                            <Image
-                                src="/hero/getstartedbuttonicon.svg"
-                                alt="Get Started Button Icon"
-                                width={20}
-                                height={20}
-                            ></Image>
-                            Get Started
+                            <Link href="/login">
+                                <Image
+                                    src="/hero/getstartedbuttonicon.svg"
+                                    alt="Get Started Button Icon"
+                                    width={20}
+                                    height={20}
+                                ></Image>
+                                Get Started
+                            </Link>
                         </Button>
 
                         <Button
                             variant="default"
                             className="rounded-full px-6 py-4 cursor-pointer my-4 bg-transparent border-1 border-green-400 text-green-400 hover:bg-transparent font-normal"
+                            onClick={() =>
+                                window.open(
+                                    "https://calendly.com/khadija-krafzen/30min?month=2026-01",
+                                    "_blank"
+                                )
+                            }
                         >
                             <Image
                                 src="/hero/calendar-outline.svg"

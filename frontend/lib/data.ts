@@ -142,125 +142,131 @@ export const aboutData: AboutData[] = [
 ]
 
 // Pricing Plans Data Here
+// Pricing Plans Data Here
 export const PricingPlans: PricingPlans = {
-    monthly: [
-        {
-            type: "Starter",
-            price: "$249",
-            features: [
-                "Includes 500 mins. per month",
-                "$0.30/min for more usage",
-                "Up to 3 team seats",
-                "Access to transcript view",
-                "Built-in JSON editor",
-                "DXF export support",
-                "Email support included",
-                "Unlimited Projects"
-            ],
-        },
-        {
-            type: "Professional",
-            price: "$649",
-            features: [
-                "Includes 3,000 mins. per month",
-                "$0.20/min for more usage",
-                "Up to 10 team seats",
-                "Batch uploads for faster workflows",
-                "Google Drive & Dropbox connectors",
-                "Priority queue for faster processing",
-                "CSV export support",
-                "Unlimited projects"
-            ]
-        },
-        {
-            type: "Enterprise",
-            price: "$1,799",
-            features: [
-                "Includes 10,000 mins. per month",
-                "$0.12/min for more usage",
-                "Up to 25 team seats",
-                "API access & webhooks integration",
-                "Single Sign-On (SSO) & role management",
-                "Region pinning for data control",
-                "White-label reports for branding",
-                "API access & webhooks integration",
-                "Unlimited projects"
-            ]
-        },
-        {
-            type: "Enterprise Plus",
-            price: "Custom",
-            features: [
-                "Includes 25,000-100,000 mins per month",
-                "$0.07/min for more usage",
-                "25+ team seats",
-                "Dedicated workers for faster performance",
-                "Private storage for enhanced security",
-                "Custom data retention options",
-                "Quarterly model review with experts",
-                "Private storage for enhanced security",
-                "White-label reports for full branding control"
-            ]
-        }
-    ],
-    annual: [
-        {
-            type: "Starter",
-            price: "$2,490",
-            features: [
-                "Includes 500 mins. per month",
-                "$0.30/min for more usage",
-                "Up to 3 team seats",
-                "Access to transcript view",
-                "Built-in JSON editor",
-                "DXF export support",
-                "Email support included",
-                "Unlimited Projects"
-            ],
-        },
-        {
-            type: "Professional",
-            price: "$6,490",
-            features: [
-                "Includes 3,000 mins. per month",
-                "$0.20/min for more usage",
-                "Up to 10 team seats",
-                "Batch uploads for faster workflows",
-                "Google Drive & Dropbox connectors",
-                "Priority queue for faster processing",
-                "CSV export support",
-                "Unlimited projects"
-            ]
-        },
-        {
-            type: "Enterprise",
-            price: "$17,990",
-            features: [
-                "Includes 10,000 mins. per month",
-                "$0.12/min for more usage",
-                "Up to 25 team seats",
-                "API access & webhooks integration",
-                "Single Sign-On (SSO) & role management",
-                "Region pinning for data control",
-                "White-label reports for branding",
-                "API access & webhooks integration",
-                "Unlimited projects"
-            ]
-        },
-        {
-            type: "Enterprise Plus",
-            price: "Custom",
-            features: [
-                "Includes 25,000-100,000 mins per month",
-                "$0.07/min for more usage",
-                "25+ team seats",
-                "Dedicated workers for faster performance",
-                "Private storage for enhanced security",
-                "Custom data retention options",
-                "Quarterly model review with experts",
-                "Private storage for enhanced security",
-                "White-label reports for full branding control"
-            ]
-        }
-    ],
-}
+  monthly: [
+    {
+      type: "Starter",
+      price: "$249",
+      stripeLink: "https://buy.stripe.com/aFa9ATd2b1dr6b71zQ4wM01",
+      features: [
+        "Includes 500 mins. per month",
+        "$0.30/min for more usage",
+        "Up to 3 team seats",
+        "Access to transcript view",
+        "Built-in JSON editor",
+        "DXF export support",
+        "Email support included",
+        "Unlimited Projects",
+      ],
+    },
+    {
+      type: "Professional",
+      price: "$649",
+      stripeLink: "https://buy.stripe.com/8x2eVdbY709n1URemC4wM02",
+      features: [
+        "Includes 3,000 mins. per month",
+        "$0.20/min for more usage",
+        "Up to 10 team seats",
+        "Batch uploads for faster workflows",
+        "Google Drive & Dropbox connectors",
+        "Priority queue for faster processing",
+        "CSV export support",
+        "Unlimited projects",
+      ],
+    },
+    {
+      type: "Enterprise",
+      price: "$1,799",
+      stripeLink: "https://buy.stripe.com/6oUdR94vF09n7fb1zQ4wM04",
+      features: [
+        "Includes 10,000 mins. per month",
+        "$0.12/min for more usage",
+        "Up to 25 team seats",
+        "API access & webhooks integration",
+        "Single Sign-On (SSO) & role management",
+        "Region pinning for data control",
+        "White-label reports for branding",
+        "Unlimited projects",
+      ],
+    },
+    {
+      type: "Enterprise Plus",
+      price: "Custom",
+      stripeLink: undefined, // Contact Us
+      features: [
+        "Includes 25,000-100,000 mins per month",
+        "$0.07/min for more usage",
+        "25+ team seats",
+        "Dedicated workers for faster performance",
+        "Private storage for enhanced security",
+        "Custom data retention options",
+        "Quarterly model review with experts",
+        "White-label reports for full branding control",
+      ],
+    },
+  ],
+
+  annual: [
+    {
+      type: "Starter",
+      price: "$2,490",
+      stripeLink: "https://buy.stripe.com/fZu7sL4vFcW9dDz7Ye4wM05",
+      features: [
+        "Includes 500 mins. per month",
+        "$0.30/min for more usage",
+        "Up to 3 team seats",
+        "Access to transcript view",
+        "Built-in JSON editor",
+        "DXF export support",
+        "Email support included",
+        "Unlimited Projects",
+      ],
+    },
+    {
+      type: "Professional",
+      price: "$6,490",
+      stripeLink: "https://buy.stripe.com/5kQaEX8LVe0d9njdiy4wM07",
+      features: [
+        "Includes 3,000 mins. per month",
+        "$0.20/min for more usage",
+        "Up to 10 team seats",
+        "Batch uploads for faster workflows",
+        "Google Drive & Dropbox connectors",
+        "Priority queue for faster processing",
+        "CSV export support",
+        "Unlimited projects",
+      ],
+    },
+    {
+      type: "Enterprise",
+      price: "$18,190",
+      stripeLink: "https://buy.stripe.com/5kQdR92nx09n8jfceu4wM08",
+      features: [
+        "Includes 10,000 mins. per month",
+        "$0.12/min for more usage",
+        "Up to 25 team seats",
+        "API access & webhooks integration",
+        "Single Sign-On (SSO) & role management",
+        "Region pinning for data control",
+        "White-label reports for branding",
+        "Unlimited projects",
+      ],
+    },
+    {
+      type: "Enterprise Plus",
+      price: "Custom",
+      stripeLink: undefined, // Contact Us
+      features: [
+        "Includes 25,000-100,000 mins per month",
+        "$0.07/min for more usage",
+        "25+ team seats",
+        "Dedicated workers for faster performance",
+        "Private storage for enhanced security",
+        "Custom data retention options",
+        "Quarterly model review with experts",
+        "White-label reports for full branding control",
+      ],
+    },
+  ],
+};

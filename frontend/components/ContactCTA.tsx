@@ -1,3 +1,5 @@
+'use client';
+
 import Image from "next/image";
 import { Button } from "./ui/button";
 
@@ -11,11 +13,18 @@ export default function ContactCTA() {
                         <span className="text-gray-200">Get started today</span>
                     </h2>
 
-                    <Button
-                        className="rounded-full h-14 px-8 text-black font-bold text-lg bg-green-400 hover:bg-green-500 transition-all duration-300 shadow-[0_0_20px_rgba(74,222,128,0.3)] hover:shadow-[0_0_30px_rgba(74,222,128,0.5)]"
-                    >
-                        Book an appointment
-                    </Button>
+                   <Button
+  className="rounded-full h-14 px-8 text-black font-bold text-lg bg-green-400 hover:bg-green-500 transition-all duration-300 shadow-[0_0_20px_rgba(74,222,128,0.3)] hover:shadow-[0_0_30px_rgba(74,222,128,0.5)]"
+  onClick={() =>
+    window.open(
+      "https://calendly.com/khadija-krafzen/30min?month=2026-01",
+      "_blank"
+    )
+  }
+>
+  Book an appointment
+</Button>
+
                 </div>
             </div>
 

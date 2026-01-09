@@ -73,7 +73,7 @@ export default function Footer() {
 
             <div className="text-white">
                 <p className="font-thin mb-4 md:mb-0 md:mt-5">
-                    © 2025 All Rights Reserved
+                    © 2026 All Rights Reserved
                 </p>
             </div>
 
