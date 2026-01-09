@@ -222,7 +222,7 @@ export default function DashboardPage() {
                     {/* Background CAD Image */}
                     <div className="absolute right-0 bottom-0 top-0 w-full md:w-2/3 lg:w-1/2 opacity-30 md:opacity-50 pointer-events-none mix-blend-screen z-0">
                         <Image
-                            src="/contact/tilt.png"
+                            src="/contact/tilt.webp"
                             alt="CAD Background"
                             fill
                             className="object-contain object-right-bottom"
