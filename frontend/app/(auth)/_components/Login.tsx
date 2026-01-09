@@ -46,7 +46,7 @@ export default function Login() {
                             width={20}
                             height={20}
                             alt="Google"
-                            src="/auth/google.png"
+                            src="/auth/google.svg"
                         /> Google
                     </Button>
                     <Button
@@ -74,7 +74,7 @@ export default function Login() {
                             width={20}
                             height={20}
                             alt="LinkedIn"
-                            src="/auth/linkedIN.png"
+                            src="/auth/linkedIN.svg"
                         />
                         LinkedIn
                     </Button>
@@ -90,7 +90,7 @@ export default function Login() {
                             width={20}
                             height={20}
                             alt="Email"
-                            src="/auth/mail.png"
+                            src="/auth/mail.svg"
                             className="invert"
                         />
                         Sign in with Email
