@@ -74,7 +74,7 @@ export default function Hero() {
                     alt="Hero Image"
                     fill
                     priority
-                    className=""
+                    className="brightness-110 contrast-125 saturate-125"
                 />
 
                 <div className="relative z-10 flex flex-col items-center">

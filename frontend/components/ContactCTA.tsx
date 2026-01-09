@@ -20,17 +20,17 @@ export default function ContactCTA() {
             </div>
 
             {/* Background CAD Image */}
-            <div className="absolute right-0 bottom-0 top-0 w-full md:w-2/3 lg:w-1/2 opacity-30 md:opacity-50 pointer-events-none mix-blend-screen">
+            <div className="absolute right-0 bottom-0 top-0 w-full md:w-2/3 lg:w-1/2 opacity-100 pointer-events-none mix-blend-screen">
                 <Image
                     src="/contact/tilt.webp"
                     alt="CAD Background"
                     fill
-                    className="object-contain object-right-bottom"
+                    className="object-contain object-right-bottom brightness-150 contrast-125 saturate-150"
                 />
             </div>
 
             {/* Gradient Overlay for smooth fade */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent pointer-events-none"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/20 to-transparent pointer-events-none"></div>
         </div>
     );
 }

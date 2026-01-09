@@ -1,14 +1,13 @@
 "use client";
 import { Button } from "@/components/ui/button";
-
-import { useDashboard } from "@/context/DashboardContex";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "react-toastify";
 
 export default function Login() {
-    const { setLoading } = useDashboard();
+    const [loading, setLoading] = useState(false);
 
     const handleLogin = async (provider: 'google' | 'facebook' | 'apple' | 'linkedin') => {
         try {

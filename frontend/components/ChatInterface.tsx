@@ -329,7 +329,7 @@ export function ChatInterface({
                 </div>
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/80 to-transparent pt-10">
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/0 to-transparent pt-10">
                 <div className="max-w-3xl mx-auto w-full">
                     <div className="bg-zinc-900/90 border border-gray-700/50 rounded-full p-2 pl-2 pr-2 flex items-center shadow-2xl backdrop-blur-md">
                         <Input
@@ -353,7 +353,7 @@ export function ChatInterface({
                             onClick={onSendMessage}
                             disabled={isLoading || !inputValue.trim()}
                             size="icon"
-                            className="ml-2 rounded-full w-10 h-10 bg-green-400 hover:bg-green-400 text-black"
+                            className="ml-2 rounded-full w-10 h-10 bg-green-400 hover:bg-green-500 text-black shadow-[0_0_20px_rgba(74,222,128,0.4)] hover:shadow-[0_0_25px_rgba(74,222,128,0.6)] transition-all duration-300"
                         >
                             {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
                             <span className="sr-only">Send</span>
