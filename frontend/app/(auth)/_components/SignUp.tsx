@@ -18,7 +18,7 @@ import { loginSchema } from "@/lib/validation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { toast } from "react-toastify";
-import { useDashboard } from "@/context/DashboardContex";
+import { useState } from "react";
 
 
 export default function SignUp() {
@@ -32,7 +32,7 @@ export default function SignUp() {
             confirmPassword: ""
         },
     });
-    const { loading, setLoading } = useDashboard();
+    const [loading, setLoading] = useState(false);
 
     async function onSubmit(data: z.infer<typeof loginSchema>) {
         if (data?.password.toString() !== data?.confirmPassword.toString()) {

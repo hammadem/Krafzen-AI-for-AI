@@ -20,7 +20,7 @@ import { createClient } from "@/lib/supabase/supabaseClient";
 import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useDashboard } from "@/context/DashboardContex";
+import { useState } from "react";
 
 
 export default function LoginWithCred() {
@@ -33,7 +33,7 @@ export default function LoginWithCred() {
     });
     const { setUser } = useAuth();
     const router = useRouter();
-    const { loading, setLoading } = useDashboard();
+    const [loading, setLoading] = useState(false);
 
     async function onSubmit(data: z.infer<typeof loginCredSchema>) {
         try {
