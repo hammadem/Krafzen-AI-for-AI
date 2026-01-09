@@ -14,7 +14,7 @@ export default function About() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12 text-white items-center">
                         <div className="relative rounded-2xl overflow-hidden aspect-[4/5] h-auto grayscale hover:grayscale-0 transition-all duration-500">
                             <Image
-                                src="/about/image.png"
+                                src="/about/image.webp"
                                 fill
                                 alt="About Krafzen"
                                 className="object-cover"
