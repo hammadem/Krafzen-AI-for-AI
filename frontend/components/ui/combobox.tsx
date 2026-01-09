@@ -1,91 +1,135 @@
 "use client";
-import * as React from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import {
-    Command,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/components/ui/popover";
 import { faqs } from "@/lib/data";
 
-export function ComboboxDemo({ setValue, value }: { setValue: React.Dispatch<React.SetStateAction<string>>, value: string }) {
-    const [open, setOpen] = React.useState(false)
+export function ComboboxDemo({
+    value,
+    setValue,
+}: {
+    value: string;
+    setValue: React.Dispatch<React.SetStateAction<string>>;
+}) {
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    // Close on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (
+                wrapperRef.current &&
+                !wrapperRef.current.contains(e.target as Node)
+            ) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const filtered = faqs.filter((item) =>
+        item.type.toLowerCase().includes(search.toLowerCase())
+    );
 
     return (
-        <Popover open={open} onOpenChange={setOpen} >
-            <PopoverTrigger asChild>
-                <Button
-                    variant="secondary"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-[80%] h-[10vh] justify-between bg-[#1d1c1cff] border-[1px] border-[white] opacity-60 cursor-pointer"
-                >
-                    <p className="text-white font-thin">
-                        {
-                            value === ""
-                                ?
-                                "Select Category"
-                                :
-                                value
-                        }
-                    </p>
+        <div
+            ref={wrapperRef}
+            className="relative w-full flex justify-center"
+        >
+            {/* Trigger */}
+            <button
+                onClick={() => setOpen((p) => !p)}
+                className="
+          w-[90%] h-[10vh]
+          flex items-center justify-between
+          rounded-lg
+          bg-[#1d1c1cff]
+          border-1 border-[#7F7F7F]
+          px-4
+          opacity-90
+          cursor-pointer
+        "
+            >
+                <p className="text-[#6F6F6F] text-xl font-normal">
+                    {value || "Select Category"}
+                </p>
 
-                    <ChevronsUpDown className="ml-2 h-4 w-6 text-white shrink-0 opacity-100" />
-                </Button>
-            </PopoverTrigger>
+                <ChevronsUpDown
+                    className={`h-6 w-8 text-white transition-transform duration-300 ${open ? "rotate-180" : "rotate-0"
+                        }`}
+                />
+            </button>
 
-            <PopoverContent className="w-[100%] p-0 z-99999">
-                <Command className="bg-[#1d1c1cff]">
-                    <CommandInput className="text-black bg-[#1d1c1cff] h-full text-white font-thin" placeholder="Select Category" />
-                    <CommandList>
+            {/* Dropdown */}
+            <div
+                className={`
+          absolute top-[110%]
+          w-[90%]
+          mx-auto
+          rounded-lg
+          bg-[#1d1c1cff]
+          border border-white
+          z-[99999]
+          overflow-hidden
+          transition-all duration-300 ease-in-out
+          ${open ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"}
+        `}
+            >
+                {/* Search input */}
+                <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Select Category"
+                    className="
+            w-full
+            bg-[#1d1c1cff]
+            px-5 py-4
+            text-white text-2xl font-thin
+            outline-none
+            border-b border-white
+          "
+                />
 
-                        <CommandGroup className="bg-[#1d1c1cff]">
+                {/* List */}
+                <ul className="max-h-[500px] overflow-y-auto">
+                    {filtered.map((item) => (
+                        <li
+                            key={item.type}
+                            onClick={() => {
+                                setValue(item.type);
+                                setOpen(false);
+                                setSearch("");
+                            }}
+                            className="
+                flex items-center
+                gap-5
+                h-[8vh]
+                px-5
+                my-2
+                text-xl text-white font-normal
+                rounded-md
+                cursor-pointer
+                hover:bg-[#2a2929]
+                transition-colors
+              "
+                        >
+                            <Check
+                                className={`h-4 w-4 text-white ${value === item.type ? "opacity-100" : "opacity-0"
+                                    }`}
+                            />
+                            {item.type}
+                        </li>
+                    ))}
 
-                            {faqs.map((framework) => (
-                                <CommandItem
-                                    className="
-                                        text-white font-thin
-                                        data-[selected=true]:bg-[#1d1c1cff]
-                                        data-[selected=true]:text-white
-                                        hover:bg-[#2a2929]
-                                        transition-colors
-                                        cursor-pointer
-                                    "
-                                    key={framework.type}
-                                    onSelect={(currentValue) => {
-                                        setValue(
-                                            currentValue === value
-                                                ? value
-                                                : currentValue
-                                        )
-                                        setOpen(false);
-                                    }}
-                                >
-
-                                    <Check
-                                        className={cn(
-                                            "mr-2 h-4 w-4 font-white",
-                                            value === framework.type ? "opacity-100" : "opacity-0"
-                                        )}
-                                    />
-                                    {framework.type}
-                                </CommandItem>
-                            ))}
-
-                        </CommandGroup>
-
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
-    )
+                    {filtered.length === 0 && (
+                        <li className="px-5 py-4 text-gray-400">
+                            No results found
+                        </li>
+                    )}
+                </ul>
+            </div>
+        </div>
+    );
 }

@@ -7,7 +7,7 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
 
             <div className="absolute top-0 left-0 w-[60%] h-full z-0">
                 <Image
-                    src="/auth/sideImage.png"
+                    src="/auth/sideImage.webp"
                     alt="Auth Hero Image"
                     fill
                     className="object-cover"
