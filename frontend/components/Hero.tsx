@@ -123,6 +123,12 @@ export default function Hero() {
                         <Button
                             variant="default"
                             className="rounded-full px-6 py-4 cursor-pointer my-4 bg-transparent border-1 border-green-400 text-green-400 hover:bg-transparent font-normal"
+                            onClick={() =>
+                                window.open(
+                                    "https://calendly.com/khadija-krafzen/30min?month=2026-01",
+                                    "_blank"
+                                )
+                            }
                         >
                             <Image
                                 src="/hero/calendar-outline.svg"
