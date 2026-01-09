@@ -89,3 +89,8 @@ scripts/test_output.txt
 
 # Temp folders
 backend/temp/
+.vercel
+.env*.local
+
+# Google Client Secret
+client_secret_*.json

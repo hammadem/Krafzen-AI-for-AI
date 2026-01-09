@@ -33,3 +33,52 @@ export function formatTime(dateString: string) {
     hour12: true
   });
 }
+
+const convertGroupToHistory = (item: ProjectDetails, grouped: HistoryData[]) => {
+  const isoDate = item.created_at.split("T")[0];        // 2025-11-16
+  const displayDate = formatDate(item.created_at);      // 16th Nov 2025
+  const displayTime = formatTime(item.created_at);      // 07:21 PM
+
+  let group = grouped.find(g => g.iso === isoDate);
+
+  if (!group) {
+    group = {
+      iso: isoDate,
+      date: displayDate,
+      searches: []
+    };
+    grouped.push(group);
+  }
+
+  group.searches.push({
+    title: item.input_text,
+    time: displayTime,
+    isoTime: item.created_at,   // <-- Add raw timestamp for time sorting
+    chats: item?.dxf_url,
+    id: item?.id
+  });
+
+  // Sort groups by date (newest → oldest)
+  grouped.sort((a, b) =>
+    new Date(b.iso).getTime() - new Date(a.iso).getTime()
+  );
+  // Sort searches *inside each day* by newest time first
+  grouped.forEach(group => {
+    group.searches.sort((a, b) =>
+      new Date(b.isoTime).getTime() - new Date(a.isoTime).getTime()
+    );
+  }
+  )
+};
+
+export const organizeProjectsAsHistory = ({ projects }: { projects: ProjectDetails[] }) => {
+  const history = projects;
+
+  const grouped: HistoryData[] = [];
+  history.forEach((item: ProjectDetails) => {
+    convertGroupToHistory(item, grouped);
+  });
+
+  return grouped;
+}
+

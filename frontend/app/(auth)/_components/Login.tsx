@@ -1,14 +1,13 @@
 "use client";
 import { Button } from "@/components/ui/button";
-
-import { useDashboard } from "@/context/DashboardContex";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "react-toastify";
 
 export default function Login() {
-    const { setLoading } = useDashboard();
+    const [loading, setLoading] = useState(false);
 
     const handleLogin = async (provider: 'google' | 'facebook' | 'apple' | 'linkedin') => {
         try {
@@ -46,7 +45,7 @@ export default function Login() {
                             width={20}
                             height={20}
                             alt="Google"
-                            src="/auth/google.png"
+                            src="/auth/google.svg"
                         /> Google
                     </Button>
                     <Button
@@ -74,7 +73,7 @@ export default function Login() {
                             width={20}
                             height={20}
                             alt="LinkedIn"
-                            src="/auth/linkedIN.png"
+                            src="/auth/linkedIN.svg"
                         />
                         LinkedIn
                     </Button>
@@ -90,7 +89,7 @@ export default function Login() {
                             width={20}
                             height={20}
                             alt="Email"
-                            src="/auth/mail.png"
+                            src="/auth/mail.svg"
                             className="invert"
                         />
                         Sign in with Email

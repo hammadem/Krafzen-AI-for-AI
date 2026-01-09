@@ -6,12 +6,11 @@ import { useRouter } from "next/navigation";
 interface AuthContextType {
   user: User | null; // ← from your global types
   session: Session | null;
+  // this is for session managment you cannot manipulate this directly
   loading: boolean;
   logout: () => void;
-  projects: ProjectDetails[];
-  setProjects: (value: ProjectDetails[]) => void;
-  currentProject: Searches | undefined;
-  setCurrentProject: (value: Searches | undefined) => void;
+  currentProject: ProjectDetails | false | null;
+  setCurrentProject: (value: ProjectDetails | false | null) => void;
   setUser: (value: User) => void;
 }
 
@@ -24,8 +23,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [projects, setProjects] = useState<ProjectDetails[]>([]);
-  const [currentProject, setCurrentProject] = useState<Searches>();
+  const [currentProject, setCurrentProject] = useState<ProjectDetails | false | null>(null);
 
   useEffect(() => {
     // 1️⃣ Load session on mount
@@ -38,9 +36,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           userId: data.session.user.id,
           email: data.session.user.email || undefined,
           access_token: data.session.access_token,
-          firstname: data?.session?.user?.user_metadata?.firstname,
-          lastname: data?.session?.user?.user_metadata?.lastname,
-          avatar_url: data?.session?.user?.user_metadata?.avatar_url,
+          firstname: data?.session?.user?.user_metadata?.firstname || data?.session?.user?.user_metadata?.full_name?.split(' ')[0],
+          lastname: data?.session?.user?.user_metadata?.lastname || data?.session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
+          avatar_url: data?.session?.user?.user_metadata?.avatar_url || data?.session?.user?.user_metadata?.picture,
           subscription_plan: data?.session?.user?.user_metadata?.subscription_plan || "Free Trial",
           remaining_minutes: 0,
           total_minutes_purchased: 0
@@ -63,9 +61,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           userId: session.user.id,
           email: session.user.email || undefined,
           access_token: session.access_token,
-          firstname: session?.user?.user_metadata?.firstname,
-          lastname: session?.user?.user_metadata?.lastname,
-          avatar_url: session?.user?.user_metadata?.avatar_url,
+          firstname: session?.user?.user_metadata?.firstname || session?.user?.user_metadata?.full_name?.split(' ')[0],
+          lastname: session?.user?.user_metadata?.lastname || session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
+          avatar_url: session?.user?.user_metadata?.avatar_url || session?.user?.user_metadata?.picture,
           subscription_plan: session?.user?.user_metadata?.subscription_plan || "Free Trial",
           remaining_minutes: 0,
           total_minutes_purchased: 0
@@ -101,8 +99,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const resetAuthState = () => {
+    setLoading(false);
+    setCurrentProject(null);
+  }
+
   const logout = async () => {
     setLoading(true);
+
     try {
       await supabase.auth.signOut();
       setUser(null);
@@ -111,7 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       console.log(err)
     } finally {
-      setLoading(false);
+      resetAuthState();
     }
   };
 
@@ -122,8 +126,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         session,
         loading,
         logout,
-        projects,
-        setProjects,
         currentProject,
         setCurrentProject,
         setUser

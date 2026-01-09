@@ -1,19 +1,12 @@
 "use client";
-import Main from "./(main)/page";
-import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ContactCTA from "@/components/ContactCTA";
+import Hero from "@/components/Hero";
 
-export default function Home({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
+export default function Home() {
     return (
         <>
-            <Navbar />
-            <Main />
-            {children}
+            <Hero />
             <ContactCTA />
             <Footer />
         </>
