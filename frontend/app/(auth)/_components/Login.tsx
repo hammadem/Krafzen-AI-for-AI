@@ -7,11 +7,8 @@ import Link from "next/link";
 import { toast } from "react-toastify";
 
 export default function Login() {
-    const [loading, setLoading] = useState(false);
-
     const handleLogin = async (provider: 'google' | 'facebook' | 'apple' | 'linkedin') => {
         try {
-            setLoading(true);
             const supabase = createClient();
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: provider,
@@ -24,8 +21,6 @@ export default function Login() {
             console.error("Login error:", error);
             const errorMessage = error instanceof Error ? error.message : "Failed to login";
             toast.error(errorMessage);
-        } finally {
-            setLoading(false);
         }
     };
 

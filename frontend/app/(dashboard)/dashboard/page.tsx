@@ -63,6 +63,7 @@ export default function DashboardPage() {
                 try {
                     const msgs = await fetchSessionMessages(currentSessionId, token);
                     // Adapt backend messages to frontend format
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const adapted: Message[] = msgs.map((m: any) => ({
                         id: m.id,
                         role: m.role,
