@@ -3,6 +3,7 @@ export global {
         type: string,
         price: string,
         features: string[]
+        stripeLink?: string
     }
 
     type PricingPlans = {
