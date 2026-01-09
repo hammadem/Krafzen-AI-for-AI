@@ -89,3 +89,5 @@ scripts/test_output.txt
 
 # Temp folders
 backend/temp/
+.vercel
+.env*.local

@@ -58,7 +58,9 @@ export default function LoginWithCred() {
                 lastname: user?.user?.user_metadata?.lastname,
                 avatar_url: user?.user?.user_metadata?.avatar_url,
                 subscription_plan: user?.user?.user_metadata?.subscription_plan || "Free Trial",
-                access_token: user?.session?.access_token
+                access_token: user?.session?.access_token,
+                remaining_minutes: 0,
+                total_minutes_purchased: 0
             })
 
             router.push("/dashboard");

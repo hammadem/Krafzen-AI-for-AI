@@ -22,7 +22,7 @@ export async function sendChatMessage(
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const body: any = { message, history };
+    const body: Record<string, unknown> = { message, history };
     if (sessionId) body.session_id = sessionId;
 
     const response = await fetch(`${API_BASE_URL}/api/v1/chat/generate`, {
