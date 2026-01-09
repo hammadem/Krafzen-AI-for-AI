@@ -5,5 +5,8 @@
     "scripts": {
         "dev": "./start-dev.sh",
         "stop": "pkill -f uvicorn; pkill -f 'next dev'; pkill -f 'next-server'; echo '🛑 Stopped all servers'"
+    },
+    "devDependencies": {
+        "next": "^16.1.1"
     }
 }
