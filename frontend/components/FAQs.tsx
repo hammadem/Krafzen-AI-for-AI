@@ -25,7 +25,7 @@ export default function FAQ() {
         {
             question: "Is there a free plan?",
             answer:
-                "Yes. The Free Plan allows limited projects per month with basic exports (DXF/DWG). It’s a great way to test the platform before upgrading.",
+                "Yes. The Free Plan allows limited projects per month with basic exports (DXF/DWG). It's a great way to test the platform before upgrading.",
         },
     ];
 
@@ -52,7 +52,7 @@ export default function FAQ() {
                                     >
                                         <p className="font-medium text-lg">{faq.question}</p>
                                         <div className={`transition-transform duration-300 ${openIndex === index ? "rotate-180" : ""}`}>
-                                            <Image src="/faqs/chevron-down.png" width={24} height={24} alt="expand" className="opacity-70" />
+                                            <Image src="/faqs/chevron-down.svg" width={24} height={24} alt="expand" className="opacity-70" />
                                         </div>
                                     </div>
                                     {/* Answer (Animated) */}
@@ -71,7 +71,7 @@ export default function FAQ() {
                             asChild
                             className="rounded-full bg-green-400 hover:bg-green-500 text-black font-bold px-8 py-2 transition-colors"
                         >
-                            <Link href="/faqs">
+                            <Link href="/faqs" aria-label="Navigate to FAQs Read More">
                                 Read more
                             </Link>
                         </Button>

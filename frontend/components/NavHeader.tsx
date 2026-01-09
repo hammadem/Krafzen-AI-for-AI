@@ -1,13 +1,13 @@
 import Image from "next/image";
 import Link from "next/link";
 
-export default function NavHeader({ currentNav }: { currentNav: string; }) {
+export default function NavHeader({ currentNav }: { currentNav: string }) {
     return (
         <div className="w-full pt-[120px] pb-10 flex items-center justify-center relative bg-black overflow-hidden">
             {/* Background Image */}
             <div className="absolute inset-0 w-full h-full z-0 opacity-80">
                 <Image
-                    src="/navheader/nav-image2.png"
+                    src="/navheader/nav-image2.webp"
                     alt="Header Background"
                     fill
                     className="object-cover object-center"

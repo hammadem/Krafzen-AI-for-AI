@@ -32,6 +32,7 @@ export default function Footer() {
                                 'text-white hover:text-gray-300 cursor-pointer hidden md:block',
                                 'rounded-md sm:px-0 py-2 text-sm font-medium',
                             )}
+                            aria-label={`Link to ${item.name} section`}
                         >
                             {item.name}
                         </Link>
@@ -47,6 +48,7 @@ export default function Footer() {
                                     'text-white hover:text-gray-300 cursor-pointer',
                                     'rounded-md md:px-0 py-2 text-md font-medium',
                                 )}
+                                aria-label={`Link to ${item.name} section`}
                             >
                                 {item.name}
                             </Link>
@@ -63,7 +65,8 @@ export default function Footer() {
                             className="rounded-full cursor-pointer bg-green-400 hover:bg-green-400"
 
                         >
-                            Start Free Trial</Button>
+                            Start Free Trial
+                        </Button>
                     </div>
                 </div>
             </div>

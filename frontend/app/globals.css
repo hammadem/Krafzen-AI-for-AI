@@ -116,12 +116,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
-body{
+body {
   background-color: black;
 }
 
@@ -131,15 +132,18 @@ button {
 
 /* custom-scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 3px;              /* scrollbar width */
+  width: 3px;
+  /* scrollbar width */
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #111;        /* track color */
+  background: #111;
+  /* track color */
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: white;  /* thumb color */
+  background-color: white;
+  /* thumb color */
   border-radius: 10px;
 }
 
@@ -147,8 +151,37 @@ button {
   background-color: #666;
 }
 
-/* custom-scrollbar */
-.custom-scrollbar2::-webkit-scrollbar {
-  width: 0px;              /* scrollbar width */
+.custom-scrollbar1::-webkit-scrollbar {
+  width: 3px;
+  /* scrollbar width */
 }
 
+.custom-scrollbar1::-webkit-scrollbar-track {
+  background: white;
+  /* track color */
+}
+
+.custom-scrollbar1::-webkit-scrollbar-thumb {
+  background-color: gray;
+  /* thumb color */
+  border-radius: 10px;
+}
+
+.custom-scrollbar1::-webkit-scrollbar-thumb:hover {
+  background-color: white;
+}
+
+/* custom-scrollbar */
+.custom-scrollbar2::-webkit-scrollbar {
+  width: 0px;
+  /* scrollbar width */
+}
+
+h1,
+p,
+h2,
+h3,
+h4,
+h5 {
+  overflow-wrap: anywhere;
+}

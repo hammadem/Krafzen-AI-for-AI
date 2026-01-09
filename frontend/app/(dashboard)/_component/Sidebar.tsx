@@ -2,35 +2,37 @@
 import { Badge } from "@/components/ui/badge";
 import { BellRing, CircleQuestionMark } from "lucide-react";
 import Image from "next/image";
-import { History, NavLinks, Projects } from "./Examples";
+import { NavLinks, Projects } from "./Examples";
 import { useDashboard } from "@/context/DashboardContex";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchProjects, fetchPromptHistory } from "@/hooks/fetchApiData";
-
+import { History } from "./History";
+import { createAProject } from "@/lib/api/api";
+import { classNames, organizeProjectsAsHistory } from "@/lib/utils";
+import { useFetchProjects } from "@/hooks/useFetchProjects";
 
 export default function Sidebar() {
-    const { setHistory, history, sideBarOpen, setSideBarOpen, setCurrentRoute, route, loading, setLoading } = useDashboard();
-    const { user, setCurrentProject, setProjects } = useAuth();
-    function classNames(...classes: string[]) {
-        return classes.filter(Boolean).join(' ')
-    };
-    const [project, setProjectName] = useState<string>("Create a GYM");
+    const { sideBarOpen, setSideBarOpen, route, setCurrentRoute } = useDashboard();
+    const { user } = useAuth();
+    const [projectName, setProjectName] = useState<string>("Create a GYM");
+    const { projects, status } = useFetchProjects();
+    const [history, setHistory] = useState<HistoryData[]>([]);
 
     useEffect(() => {
-        if (!user?.access_token) return;
-        fetchPromptHistory({ user, setHistory, setProjects, setLoading });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        const fetchHistoryData = async () => setHistory(organizeProjectsAsHistory({ projects }));
+        fetchHistoryData();
+    }, [projects, user]);
+
 
     const createProject = async () => {
-        fetchProjects({ user, project });
+        const res = await createAProject(user, projectName);
+        console.log(res);
     }
 
     return (
         <div className={classNames(
-            "w-[20%] absolute bg-black border-r-1 h-full border-[#919191] flex flex-col justify-between px-1 translation-all duration-500",
-            sideBarOpen ? "" : "w-[5%]!"
+            "w-[50%] z-999999 sm:w-[20%] absolute bg-black border-r-1 h-full border-[#919191] flex flex-col justify-between px-1 translation-all duration-500",
+            sideBarOpen ? "" : "md:w-[5.2%]! sm:w-[7%]! w-[15%]!"
         )}>
 
             <div className="flex justify-between items-between px-1 my-2">
@@ -46,14 +48,14 @@ export default function Sidebar() {
                         width={24}
                         height={40.8}
                         alt="Your Company"
-                        src="/navbar/Vector (6).png"
+                        src="/navbar/Vector.svg"
                         className="h-8 p-0 m-0"
                     />
                     <Image
                         width={34}
                         height={40.8}
                         alt="Your Company"
-                        src="/navbar/Vector (7).png"
+                        src="/navbar/Vector1.svg"
                         className="h-8 w-auto p-0 m-0 -translate-x-3"
                     />
                 </div>
@@ -69,13 +71,13 @@ export default function Sidebar() {
                                 :
                                 true
                         )}
-                        preload
+                        priority
                         width={25.76}
                         height={40.8}
                         alt="Toggle Button"
-                        src="/navbar/Icon.png"
+                        src="/navbar/icon.svg"
                         className={classNames(
-                            "h-4 p-0 m-2 cursor-ew-resize transition-transform duration-500",
+                            "p-0 m-2 cursor-ew-resize transition-transform duration-500",
                             !sideBarOpen ? "rotate-90 hidden" : "rotate-0"
                         )}
                     />
@@ -87,13 +89,12 @@ export default function Sidebar() {
                 <NavLinks setCurrentRoute={setCurrentRoute} />
 
                 {
-                    route === "home" ? <History data={history} setCurrentProject={setCurrentProject} loading={loading} />
-
-                        : route === "projects" ? <Projects createProject={createProject} setProjectName={setProjectName} /> :
-                            route === "templates" ? "" :
-                                route === "exports" ? "" :
-                                    route === "billing" ? "" :
-                                        route === "settings" ? "" :
+                    route.home ? <History data={history} status={status} />
+                        : route.projects ? <Projects createProject={createProject} setProjectName={setProjectName} /> :
+                            route.templates ? "" :
+                                route.exports ? "" :
+                                    route.billing ? "" :
+                                        route.settings ? "" :
                                             ""
                 }
 
