@@ -9,7 +9,7 @@ export default function Features() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-16 md:gap-24 mb-32">
                         <div className="flex justify-center md:justify-end">
                             <Image
-                                src="/features/f1.png"
+                                src="/features/f1mic.svg"
                                 alt="Voice to DWG"
                                 width={300}
                                 height={300}
@@ -18,7 +18,7 @@ export default function Features() {
                         </div>
                         <div className="flex justify-center md:justify-start">
                             <Image
-                                src="/features/f2.png"
+                                src="/features/f2pipe.svg"
                                 alt="Auto MEP As-Builts"
                                 width={300}
                                 height={300}
@@ -27,7 +27,7 @@ export default function Features() {
                         </div>
                         <div className="flex justify-center md:justify-end">
                             <Image
-                                src="/features/f3.png"
+                                src="/features/f3eye.svg"
                                 alt="AI Error Detections"
                                 width={300}
                                 height={300}
@@ -36,7 +36,7 @@ export default function Features() {
                         </div>
                         <div className="flex justify-center md:justify-start">
                             <Image
-                                src="/features/f4.png"
+                                src="/features/f4file-export.svg"
                                 alt="CAD/BIM Integrations"
                                 width={300}
                                 height={300}
@@ -55,7 +55,7 @@ export default function Features() {
                                 <p className="text-white font-semibold text-lg">Record Voice</p>
                                 <div className="p-4 bg-zinc-900 rounded-full border border-white/10">
                                     <Image
-                                        src="/hiw/micfile.png"
+                                        src="/hiw/micfile.svg"
                                         alt="Mic File"
                                         width={40}
                                         height={40}
@@ -68,7 +68,7 @@ export default function Features() {
                             {/* Arrow */}
                             <div className="hidden md:block">
                                 <Image
-                                    src="/hiw/arrowicon.png"
+                                    src="/hiw/arrowicon.svg"
                                     alt="Arrow"
                                     width={40}
                                     height={8}
@@ -77,7 +77,7 @@ export default function Features() {
                             </div>
                             <div className="md:hidden rotate-90">
                                 <Image
-                                    src="/hiw/arrowicon.png"
+                                    src="/hiw/arrowicon.svg"
                                     alt="Arrow"
                                     width={30}
                                     height={6}
@@ -90,7 +90,7 @@ export default function Features() {
                                 <p className="text-white font-semibold text-lg">AI interprets</p>
                                 <div className="p-4 bg-zinc-900 rounded-full border border-white/10">
                                     <Image
-                                        src="/hiw/design.png"
+                                        src="/hiw/design.svg"
                                         alt="Design"
                                         width={40}
                                         height={40}
@@ -103,7 +103,7 @@ export default function Features() {
                             {/* Arrow */}
                             <div className="hidden md:block">
                                 <Image
-                                    src="/hiw/arrowicon.png"
+                                    src="/hiw/arrowicon.svg"
                                     alt="Arrow"
                                     width={40}
                                     height={8}
@@ -112,7 +112,7 @@ export default function Features() {
                             </div>
                             <div className="md:hidden rotate-90">
                                 <Image
-                                    src="/hiw/arrowicon.png"
+                                    src="/hiw/arrowicon.svg"
                                     alt="Arrow"
                                     width={30}
                                     height={6}
@@ -125,7 +125,7 @@ export default function Features() {
                                 <p className="text-white font-semibold text-lg">Get result</p>
                                 <div className="p-4 bg-zinc-900 rounded-full border border-white/10">
                                     <Image
-                                        src="/hiw/rocket.png"
+                                        src="/hiw/rocket.svg"
                                         alt="Rocket"
                                         width={40}
                                         height={40}
