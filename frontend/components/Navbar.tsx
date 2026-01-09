@@ -187,52 +187,35 @@ function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
                 <div className="px-2 py-1.5 text-xs font-semibold text-green-400 bg-green-400/10 rounded-sm mx-2 mb-2">
                     Plan: {user.subscription_plan || "Free Trial"}
                 </div>
-                <div className="px-2 py-1.5 text-xs font-semibold text-blue-400 bg-blue-400/10 rounded-sm mx-2 mb-2">
-                    Credits: {user.remaining_minutes ? user.remaining_minutes.toFixed(1) : "0"} mins
+                <div className="px-2 py-1.5 text-xs font-semibold text-blue-400 bg-blue-400/10 rounded-sm mx-2 mb-2 flex justify-between items-center">
+                    <span>Credits: {user.remaining_minutes ? user.remaining_minutes.toFixed(1) : "0"} mins</span>
+                    <Link href="/pricing" className="bg-blue-500 hover:bg-blue-400 text-white px-3 py-0.5 rounded-full text-[10px] uppercase tracking-wide shadow-sm transition-all hover:shadow-blue-500/20">
+                        Buy more
+                    </Link>
                 </div>
 
                 <DropdownMenuSeparator className="bg-zinc-800" />
 
-                <DropdownMenuItem
-                    className="cursor-pointer focus:bg-zinc-800 focus:text-white"
-                    onClick={async () => {
-                        try {
-                            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/payments/create-checkout-session`, {
-                                method: 'POST',
-                                headers: {
-                                    'Authorization': `Bearer ${user.access_token}`
-                                }
-                            });
-                            const data = await res.json();
-                            if (data.url) window.location.href = data.url;
-                        } catch (e) {
-                            console.error("Payment error", e);
-                            alert("Failed to start payment session");
-                        }
-                    }}
-                >
-                    Buy 100 Minutes ($10)
-                </DropdownMenuItem>
-
-                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white">
-                    <a href={process.env.NEXT_PUBLIC_CALENDLY_URL || "https://calendly.com"} target="_blank" rel="noopener noreferrer">
-                        Book a Demo
-                    </a>
-                </DropdownMenuItem>
-
                 <DropdownMenuSeparator className="bg-zinc-800" />
-                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white">
-                    <Link href="/account">Account Settings</Link>
+                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-2">
+                    <Link href="/account" className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 rounded-sm mx-2 hover:bg-amber-400/20 transition-colors">
+                        Account Settings
+                    </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white">
-                    <Link href="/dashboard">Dashboard</Link>
+                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-1">
+                    <Link href="/dashboard" className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-purple-400 bg-purple-400/10 rounded-sm mx-2 hover:bg-purple-400/20 transition-colors">
+                        Dashboard
+                    </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-zinc-800" />
                 <DropdownMenuItem
-                    className="cursor-pointer text-red-400 focus:text-red-400 focus:bg-red-400/10"
+                    className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-2 mb-1"
                     onClick={logout}
+                    asChild
                 >
-                    Log out
+                    <div className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-red-400 bg-red-400/10 rounded-sm mx-2 hover:bg-red-400/20 transition-colors">
+                        Log out
+                    </div>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
