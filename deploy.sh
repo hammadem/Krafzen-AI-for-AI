@@ -94,6 +94,15 @@ if [ -d "../.git" ]; then
     mv "../.git" "../.git_temp"
 fi
 
+# Trap to ensure .git is restored even if script fails/exits
+cleanup() {
+    if [ -d "../.git_temp" ]; then
+        echo -e "${YELLOW}🙈 Restoring .git directory...${NC}"
+        mv "../.git_temp" "../.git"
+    fi
+}
+trap cleanup EXIT
+
 echo -e "${YELLOW}Running: npx vercel $VERCEL_ARGS${NC}"
 # Use yes string to pipe 'y' to any prompts Vercel might throw (like "Deploy to [Team]?")
 # actually 'npx -y vercel' is 'npx --yes', but vercel CLI also asks questions.
@@ -102,14 +111,12 @@ echo -e "${YELLOW}Running: npx vercel $VERCEL_ARGS${NC}"
 # We can use 'vercel --confirm' (if available) or rely on previous linking.
 # 'vercel ... --yes' is deprecated or specific.
 # But since we are linked, usually it just goes.
+
+# We allow vercel to fail without exiting the script immediately (set +e is safer here or just capturing status)
+set +e
 npx -y vercel $VERCEL_ARGS
-
 EXIT_CODE=$?
-
-if [ -d "../.git_temp" ]; then
-    echo -e "${YELLOW}🙈 Restoring .git directory...${NC}"
-    mv "../.git_temp" "../.git"
-fi
+set -e
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo -e "${RED}❌ Vercel deployment failed!${NC}"
