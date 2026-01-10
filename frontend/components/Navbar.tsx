@@ -196,14 +196,13 @@ function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
 
                 <DropdownMenuSeparator className="bg-zinc-800" />
 
-                <DropdownMenuSeparator className="bg-zinc-800" />
                 <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-2">
-                    <Link href="/account" className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-amber-400 bg-amber-400/10 rounded-sm mx-2 hover:bg-amber-400/20 transition-colors">
+                    <Link href="/account" className="w-full text-sm font-medium">
                         Account Settings
                     </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-1">
-                    <Link href="/dashboard" className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-purple-400 bg-purple-400/10 rounded-sm mx-2 hover:bg-purple-400/20 transition-colors">
+                    <Link href="/dashboard" className="w-full text-sm font-medium">
                         Dashboard
                     </Link>
                 </DropdownMenuItem>
@@ -213,7 +212,7 @@ function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
                     onClick={logout}
                     asChild
                 >
-                    <div className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-red-400 bg-red-400/10 rounded-sm mx-2 hover:bg-red-400/20 transition-colors">
+                    <div className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-red-500 bg-red-500/10 rounded-sm mx-2 hover:bg-red-500/20 transition-colors">
                         Log out
                     </div>
                 </DropdownMenuItem>
