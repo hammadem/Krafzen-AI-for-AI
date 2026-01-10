@@ -86,7 +86,17 @@ export default function Navbar({ isRoot = false }: {
                                 })}
 
                                 {user ? (
-                                    <UserDropdown user={user} logout={logout} />
+                                    <>
+                                        <Button
+                                            asChild
+                                            className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white border-0 rounded-full font-semibold shadow-lg shadow-blue-500/20 transition-all duration-300 hover:scale-105"
+                                        >
+                                            <Link href="/dashboard">
+                                                Dashboard
+                                            </Link>
+                                        </Button>
+                                        <UserDropdown user={user} logout={logout} />
+                                    </>
                                 ) : (
                                     <Button
                                         variant="secondary"
@@ -196,14 +206,11 @@ function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
 
                 <DropdownMenuSeparator className="bg-zinc-800" />
 
-                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-2">
-                    <Link href="/account" className="w-full text-sm font-medium">
-                        Account Settings
-                    </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-1">
-                    <Link href="/dashboard" className="w-full text-sm font-medium">
-                        Dashboard
+                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-2 mb-1">
+                    <Link href="/account" className="w-full">
+                        <div className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-indigo-400 bg-indigo-400/10 rounded-sm hover:bg-indigo-400/20 transition-colors">
+                            Account Settings
+                        </div>
                     </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-zinc-800" />

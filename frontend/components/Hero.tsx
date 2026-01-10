@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "./ui/button";
 import Navbar from "./Navbar";
 import HeroData from "./HeroData";
+import { useAuth } from "@/context/AuthContext";
 import dynamic from "next/dynamic";
 import { Skeleton } from "./ui/skeleton";
 
@@ -65,6 +66,7 @@ const FAQ = dynamic(() => import("./FAQs"), {
 });
 
 export default function Hero() {
+    const { user } = useAuth();
     return (
         <>
             <Navbar isRoot={true} />
@@ -104,21 +106,23 @@ export default function Hero() {
                     />
 
                     <div className="w-full flex flex-col sm:flex-row p-2 items-center h-60 sm:h-25 sm:justify-evenly sm:items-evenly">
-                        <Button
-                            asChild
-                            variant="secondary"
-                            className="rounded-full px-6 py-4 cursor-pointer my-4 bg-green-400 hover:bg-green-400"
-                        >
-                            <Link href="/login">
-                                <Image
-                                    src="/hero/getstartedbuttonicon.svg"
-                                    alt="Get Started Button Icon"
-                                    width={20}
-                                    height={20}
-                                ></Image>
-                                Get Started
-                            </Link>
-                        </Button>
+                        {!user && (
+                            <Button
+                                asChild
+                                variant="secondary"
+                                className="rounded-full px-6 py-4 cursor-pointer my-4 bg-green-400 hover:bg-green-400"
+                            >
+                                <Link href="/login">
+                                    <Image
+                                        src="/hero/getstartedbuttonicon.svg"
+                                        alt="Get Started Button Icon"
+                                        width={20}
+                                        height={20}
+                                    ></Image>
+                                    Get Started
+                                </Link>
+                            </Button>
+                        )}
 
                         <Button
                             variant="default"

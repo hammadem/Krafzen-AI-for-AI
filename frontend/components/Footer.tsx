@@ -1,6 +1,8 @@
+"use client";
 import { Button } from "./ui/button";
 import Link from "next/link";
 import CompanyLogo from "./CompanyLogo";
+import { useAuth } from "@/context/AuthContext";
 const navigation = [
     { name: 'About', href: '/about', current: false },
     { name: 'Features', href: '/features', current: false },
@@ -15,6 +17,7 @@ function classNames(...classes: string[]) {
 };
 
 export default function Footer() {
+    const { user } = useAuth();
     return (
         <footer className="w-full mt-6 bg-black h-[90vh] md:h-[30vh] flex flex-col items-center justify-evenly md:items-evenly">
 
@@ -57,18 +60,22 @@ export default function Footer() {
 
                 </div>
 
-                <div className="text-white flex items-center md:items-end mx-6 h-[20%] md:h-[100%]">
-                    <div className="flex items-center">
-                        <h1>Let&apos;s do it!&nbsp; — &nbsp;&nbsp;</h1>
-                        <Button
-                            variant="secondary"
-                            className="rounded-full cursor-pointer bg-green-400 hover:bg-green-400"
-
-                        >
-                            Start Free Trial
-                        </Button>
+                {!user && (
+                    <div className="text-white flex items-center md:items-end mx-6 h-[20%] md:h-[100%]">
+                        <div className="flex items-center">
+                            <h1>Let&apos;s do it!&nbsp; — &nbsp;&nbsp;</h1>
+                            <Button
+                                variant="secondary"
+                                className="rounded-full cursor-pointer bg-green-400 hover:bg-green-400"
+                                asChild
+                            >
+                                <Link href="/login">
+                                    Start Free Trial
+                                </Link>
+                            </Button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             <div className="text-white">

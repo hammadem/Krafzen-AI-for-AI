@@ -5,7 +5,6 @@ import { Send, Loader2, Download, Maximize2, FileCode, Mic, ChevronsLeft } from 
 import { sendChatMessage, downloadDxf, transcribeAudio } from "@/lib/api/chat"
 import { createClient } from "@/lib/supabase/supabaseClient"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -47,6 +46,17 @@ export function ChatInterface({
     const [isRecording, setIsRecording] = useState(false)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const chunksRef = useRef<Blob[]>([])
+
+    const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            if (inputValue) {
+                textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+            }
+        }
+    }, [inputValue]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -331,33 +341,38 @@ export function ChatInterface({
 
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/0 to-transparent pt-10">
                 <div className="max-w-3xl mx-auto w-full">
-                    <div className="bg-zinc-900/90 border border-gray-700/50 rounded-full p-2 pl-2 pr-2 flex items-center shadow-2xl backdrop-blur-md">
-                        <Input
+                    <div className="bg-zinc-900/90 border border-gray-700/50 rounded-3xl p-2 pl-4 pr-2 flex items-end shadow-2xl backdrop-blur-md transition-all duration-200">
+                        <textarea
+                            ref={textareaRef}
                             placeholder="Describe your design requirements..."
                             value={inputValue}
                             onChange={(e) => onInputChange(e.target.value)}
                             onKeyDown={handleKeyDown}
                             disabled={isLoading}
-                            className="flex-1 bg-transparent border-none text-gray-100 placeholder:text-gray-500 focus-visible:ring-0 focus-visible:ring-offset-0 h-10"
+                            rows={1}
+                            style={{ resize: 'none' }}
+                            className="flex-1 bg-transparent border-none text-gray-100 placeholder:text-gray-500 focus:ring-0 focus:outline-none min-h-[40px] max-h-[200px] py-3 overflow-y-auto custom-scrollbar"
                         />
-                        <Button
-                            onClick={handleMicClick}
-                            disabled={isLoading}
-                            size="icon"
-                            variant="ghost"
-                            className={`rounded-full w-10 h-10 ${isRecording ? 'bg-red-500 text-white animate-pulse hover:bg-red-600' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}
-                        >
-                            <Mic className="h-5 w-5" />
-                        </Button>
-                        <Button
-                            onClick={onSendMessage}
-                            disabled={isLoading || !inputValue.trim()}
-                            size="icon"
-                            className="ml-2 rounded-full w-10 h-10 bg-green-400 hover:bg-green-500 text-black shadow-[0_0_20px_rgba(74,222,128,0.4)] hover:shadow-[0_0_25px_rgba(74,222,128,0.6)] transition-all duration-300"
-                        >
-                            {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                            <span className="sr-only">Send</span>
-                        </Button>
+                        <div className="flex items-center pb-1 gap-1">
+                            <Button
+                                onClick={handleMicClick}
+                                disabled={isLoading}
+                                size="icon"
+                                variant="ghost"
+                                className={`rounded-full w-10 h-10 ${isRecording ? 'bg-red-500 text-white animate-pulse hover:bg-red-600' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}
+                            >
+                                <Mic className="h-5 w-5" />
+                            </Button>
+                            <Button
+                                onClick={onSendMessage}
+                                disabled={isLoading || !inputValue.trim()}
+                                size="icon"
+                                className="rounded-full w-10 h-10 bg-green-400 hover:bg-green-500 text-black shadow-[0_0_20px_rgba(74,222,128,0.4)] hover:shadow-[0_0_25px_rgba(74,222,128,0.6)] transition-all duration-300"
+                            >
+                                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                                <span className="sr-only">Send</span>
+                            </Button>
+                        </div>
                     </div>
                     <div className="text-center mt-3">
                         <p className="text-xs text-gray-500">

@@ -1,176 +1,28 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Navbar from "@/components/Navbar";
-import { ChatInterface, Message } from "@/components/ChatInterface";
+import { ChatInterface } from "@/components/ChatInterface";
 import { ChatSidebar, ChatSession } from "@/components/ChatSidebar";
-import { sendChatMessage, fetchChatHistory, fetchSessionMessages, deleteChatSession } from "@/lib/api/chat";
-import { useAuth } from "@/context/AuthContext";
+import { useChat } from "@/context/ChatContext";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/supabaseClient";
 
 export default function DashboardPage() {
-    const { user, setUser } = useAuth();
-    // Current session messages
-    const [messages, setMessages] = useState<Message[]>([]);
+    const {
+        messages,
+        sessions,
+        currentSessionId,
+        isLoading,
+        inputValue,
+        setInputValue,
+        setCurrentSessionId,
+        handleSendMessage,
+        createNewChat,
+        deleteSession
+    } = useChat();
 
-    // List of sessions from backend
-    const [sessions, setSessions] = useState<{ id: string, title: string, updated_at: string }[]>([]);
-    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-
-    const [inputValue, setInputValue] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-    // Initial Load: Fetch Sessions
-    useEffect(() => {
-        const loadSessions = async () => {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-            if (token) {
-                try {
-                    const history = await fetchChatHistory(token);
-                    setSessions(history);
-                    if (history.length > 0) {
-                        setCurrentSessionId(history[0].id);
-                    } else {
-                        setCurrentSessionId(null); // No sessions
-                    }
-                } catch (e) {
-                    console.error("Failed to load history", e);
-                }
-            }
-        };
-        loadSessions();
-    }, []);
-
-    // Load Messages when Current Session Updates
-    useEffect(() => {
-        const loadMessages = async () => {
-            if (!currentSessionId) {
-                setMessages([]);
-                return;
-            }
-            // If it's a temp ID (not from backend yet), don't fetch
-            if (currentSessionId === 'new') return;
-
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-            if (token) {
-                try {
-                    const msgs = await fetchSessionMessages(currentSessionId, token);
-                    // Adapt backend messages to frontend format
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const adapted: Message[] = msgs.map((m: any) => ({
-                        id: m.id,
-                        role: m.role,
-                        content: m.content,
-                        imageUrl: m.image_url,
-                        timestamp: new Date(m.created_at)
-                    }));
-                    setMessages(adapted);
-                } catch (e) {
-                    console.error("Failed to load messages", e);
-                    setMessages([]);
-                }
-            }
-        };
-        loadMessages();
-    }, [currentSessionId]);
-
-    const handleSendMessage = async () => {
-        if (!inputValue.trim() || isLoading) return;
-
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        if (!token) return;
-
-        const userMessage: Message = {
-            id: Date.now().toString(),
-            role: 'user',
-            content: inputValue,
-            timestamp: new Date()
-        };
-
-        // Optimistic update
-        setMessages(prev => [...prev, userMessage]);
-        setInputValue("");
-        setIsLoading(true);
-
-        try {
-            // If currentSessionId is 'new' or null, we pass undefined to backend => create new
-            const targetSessionId = (currentSessionId === 'new' || !currentSessionId) ? undefined : currentSessionId;
-
-            const response = await sendChatMessage(userMessage.content!, [], token, targetSessionId);
-
-            const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: response.validated_response, // Use validated response (DSL)
-                imageUrl: response.image_url,
-                timestamp: new Date()
-            };
-
-            setMessages(prev => [...prev, assistantMessage]);
-
-            // Update remaining minutes if provided
-            if (response.remaining_minutes !== undefined && user) {
-                setUser({ ...user, remaining_minutes: response.remaining_minutes });
-            }
-
-            // If we just created a new session, update state
-            if (response.session_id && response.session_id !== currentSessionId) {
-                setCurrentSessionId(response.session_id);
-                // Also refresh session list
-                const history = await fetchChatHistory(token);
-                setSessions(history);
-            }
-
-        } catch (error) {
-            console.error("Chat error:", error);
-            const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: "Sorry, something went wrong. Please try again.",
-                timestamp: new Date()
-            };
-            setMessages(prev => [...prev, errorMessage]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const createNewChat = () => {
-        // Just clear the view. Logic will create session on first message.
-        setCurrentSessionId('new');
-        setMessages([]);
-        setInputValue("");
-        setIsMobileMenuOpen(false);
-    };
-
-    const deleteSession = async (id: string) => {
-        // Implement delete API call
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        if (token) {
-            try {
-                await deleteChatSession(id, token);
-            } catch (e) {
-                console.error("Failed to delete session", e);
-            }
-        }
-
-        setSessions(prev => prev.filter(s => s.id !== id));
-        if (id === currentSessionId) {
-            setCurrentSessionId(null);
-            setMessages([]);
-        }
-    };
 
     // Derived props for Sidebar
     const sidebarSessions: ChatSession[] = sessions.map(s => ({
@@ -178,6 +30,16 @@ export default function DashboardPage() {
         title: s.title || "New Chat",
         date: new Date(s.updated_at)
     }));
+
+    const handleCreateNewChat = () => {
+        createNewChat();
+        setIsMobileMenuOpen(false);
+    };
+
+    const handleSelectSession = (id: string) => {
+        setCurrentSessionId(id);
+        setIsMobileMenuOpen(false);
+    };
 
     return (
         <div className="flex flex-col h-screen bg-black overflow-hidden relative">
@@ -201,8 +63,8 @@ export default function DashboardPage() {
                     <ChatSidebar
                         sessions={sidebarSessions}
                         currentSessionId={currentSessionId}
-                        onNewChat={createNewChat}
-                        onSelectSession={(id) => { setCurrentSessionId(id); setIsMobileMenuOpen(false); }}
+                        onNewChat={handleCreateNewChat}
+                        onSelectSession={handleSelectSession}
                         onDeleteSession={deleteSession}
                     />
                     <div className="flex-1" onClick={() => setIsMobileMenuOpen(false)} />

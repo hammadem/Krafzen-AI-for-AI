@@ -111,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await supabase.auth.signOut();
       setUser(null);
       setSession(null);
-      router.push("/");
+      window.location.href = "/";
     } catch (err) {
       console.log(err)
     } finally {
