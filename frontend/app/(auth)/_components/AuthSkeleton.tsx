@@ -6,7 +6,8 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
         <div className="relative w-full h-screen overflow-hidden bg-black text-white">
 
             {/* Left Side: Hero Image */}
-            <div className="absolute top-0 left-0 w-[60%] h-full z-0">
+            {/* Background Hero Image - Full Screen */}
+            <div className="absolute inset-0 z-0">
                 <Image
                     src="/auth/sideImage.webp"
                     alt="Auth Hero Image"
@@ -14,8 +15,10 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
                     className="object-cover brightness-125 saturate-150 contrast-110"
                     priority
                 />
-                {/* Gradient overlay for blending */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/40 to-black pointer-events-none"></div>
+                {/* Gradient overlay to darken the right side for form readability */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/70 to-black/95 pointer-events-none"></div>
+                {/* Vibrancy tint */}
+                <div className="absolute inset-0 bg-indigo-900/10 mix-blend-overlay pointer-events-none"></div>
             </div>
 
             {/* Right Side: Content Area */}
