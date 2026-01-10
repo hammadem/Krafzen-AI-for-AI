@@ -27,8 +27,8 @@ export default function Login() {
 
     return (
         <div className="w-full h-full flex flex-col items-center justify-center gap-8 max-w-md mx-auto relative z-10">
-            {/* Glassmorphic Container Background with 40% Opacity */}
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl -z-10"></div>
+            {/* Glassmorphic Container Background with 70% Opacity */}
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl -z-10"></div>
 
             <div className="flex flex-col items-center gap-8 w-full p-8">
                 <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400 self-center">Log in</h1>
