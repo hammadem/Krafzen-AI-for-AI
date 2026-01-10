@@ -7,11 +7,9 @@ import StripePaymentModal from "../StripePaymentModal";
 export default function PricingDiv({
   price,
   index,
-  monthly,
 }: {
   price: PricingDetails;
   index: number;
-  monthly: boolean;
 }) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
