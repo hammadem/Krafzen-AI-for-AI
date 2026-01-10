@@ -1,6 +1,5 @@
 "use client";
 import { Check } from "lucide-react";
-import Link from "next/link";
 import { Button } from "../ui/button";
 import { useState } from "react";
 import StripePaymentModal from "../StripePaymentModal";

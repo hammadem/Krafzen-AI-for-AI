@@ -23,19 +23,15 @@ export default function StripeCheckoutModal({
 
     useEffect(() => {
         if (isOpen) {
-            // Auto-redirect after showing the modal briefly
-            setRedirecting(true);
             const timer = setTimeout(() => {
+                setRedirecting(true);
                 window.open(stripeCheckoutUrl, "_blank");
-                // Close modal after redirect
                 setTimeout(() => {
                     onClose();
                 }, 500);
-            }, 1500); // 1.5 second delay to show the plan details
+            }, 1500);
 
             return () => clearTimeout(timer);
-        } else {
-            setRedirecting(false);
         }
     }, [isOpen, stripeCheckoutUrl, onClose]);
 
@@ -81,7 +77,7 @@ export default function StripeCheckoutModal({
                             </div>
                             <div className="text-center space-y-2">
                                 <p className="text-lg font-semibold text-white">Opening secure checkout...</p>
-                                <p className="text-sm text-gray-400">You'll be redirected to Stripe in a moment</p>
+                                <p className="text-sm text-gray-400">You&apos;ll be redirected to Stripe in a moment</p>
                             </div>
                         </div>
                     ) : (

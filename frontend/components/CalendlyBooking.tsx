@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Video, ExternalLink, X, Loader2 } from "lucide-react";
+import { Video, ExternalLink, Loader2 } from "lucide-react";
 
 interface CalendlyBookingProps {
     isOpen: boolean;
@@ -20,7 +20,6 @@ export default function CalendlyBooking({
     useEffect(() => {
         if (isOpen) {
             setLoading(true);
-            // Simulate loading time for iframe
             const timer = setTimeout(() => setLoading(false), 1000);
             return () => clearTimeout(timer);
         }
