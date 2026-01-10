@@ -9,10 +9,10 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
             {/* Background Hero Image - Full Screen */}
             <div className="absolute inset-0 z-0">
                 <Image
-                    src="/auth/sideImage.webp"
+                    src="/hero/image.webp"
                     alt="Auth Hero Image"
                     fill
-                    className="object-cover brightness-125 saturate-150 contrast-110"
+                    className="object-cover brightness-110 contrast-125 saturate-125"
                     priority
                 />
                 {/* Gradient overlay to darken the right side for form readability */}
