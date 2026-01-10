@@ -77,31 +77,34 @@ echo -e "${YELLOW}🌐 [3/3] Vercel Frontend Deployment...${NC}"
 echo -e "${YELLOW}Deploying backend is handled by Render (via git).${NC}"
 echo -e "${YELLOW}Deploying Frontend to Vercel...${NC}"
 
-cd frontend || { echo -e "${RED}frontend directory not found!${NC}"; exit 1; }
-
 # Determine if prod or staging
 VERCEL_ARGS=""
 if [[ "$ENV_NAME" == "Production" ]]; then
     VERCEL_ARGS="--prod"
 fi
 
+# Store root directory
+ROOT_DIR=$(pwd)
+
+# Trap to ensure .git is restored even if script fails/exits
+cleanup() {
+    if [ -d "$ROOT_DIR/.git_temp" ]; then
+        echo -e "${YELLOW}🙈 Restoring .git directory...${NC}"
+        mv "$ROOT_DIR/.git_temp" "$ROOT_DIR/.git"
+    fi
+}
+trap cleanup EXIT
+
 # Workaround for Vercel "Git author must have access" error
 # We temporarily hide the .git directory so Vercel CLI treats it as a manual deployment
 # without trying to link it to the git commit author.
 
-if [ -d "../.git" ]; then
+if [ -d ".git" ]; then
     echo -e "${YELLOW}🙈 Temporarily hiding .git to bypass Vercel author check...${NC}"
-    mv "../.git" "../.git_temp"
+    mv ".git" ".git_temp"
 fi
 
-# Trap to ensure .git is restored even if script fails/exits
-cleanup() {
-    if [ -d "../.git_temp" ]; then
-        echo -e "${YELLOW}🙈 Restoring .git directory...${NC}"
-        mv "../.git_temp" "../.git"
-    fi
-}
-trap cleanup EXIT
+cd frontend || { echo -e "${RED}frontend directory not found!${NC}"; exit 1; }
 
 echo -e "${YELLOW}Running: npx vercel $VERCEL_ARGS${NC}"
 # Use yes string to pipe 'y' to any prompts Vercel might throw (like "Deploy to [Team]?")
