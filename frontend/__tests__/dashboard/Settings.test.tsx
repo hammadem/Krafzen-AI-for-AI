@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react"
-import Settings from "@/app/(dashboard)/dashboard/settings/page";
+import Settings from "@/app/(dashboard)/workspace/settings/page";
 
 vitest.mock('../../context/AuthContext', () => ({
     useAuth: () => ({})

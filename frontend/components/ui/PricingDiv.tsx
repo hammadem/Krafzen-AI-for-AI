@@ -58,7 +58,7 @@ export default function PricingDiv({
           <div className="space-y-3 mb-8">
             {price.features.map((feature, i) => (
               <div key={i} className="flex items-start gap-3">
-                <Check className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+                <Check className="w-5 h-5 text-green-400 shrink-0 mt-0.5" data-testid="check-icon" />
                 <span className="text-sm text-gray-300">{feature}</span>
               </div>
             ))}

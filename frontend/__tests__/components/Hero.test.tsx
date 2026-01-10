@@ -1,20 +1,21 @@
 import { render, screen } from "@testing-library/react"
 import Hero from "@/components/Hero";
+import { vi } from 'vitest';
 
 // Buttons testing needs to be done yet to check if button does the correct thing
 // logging actions form submits and other actions
 
-vitest.mock('../../context/AuthContext', () => ({
-    useAuth: () => ({})
+vi.mock('@/context/AuthContext', () => ({
+    useAuth: () => ({ user: null })
 }));
 
-vitest.mock('../../context/DashboardContex', () => ({
+vi.mock('@/context/DashboardContex', () => ({
     useDashboard: () => ({})
 }));
+
 describe("Hero Component", () => {
     it("renders the Hero section", async () => {
-        const hero = Hero();
-        render(hero);
+        render(<Hero />);
 
         //check if the image has been rendered
         const bgImage = await screen.findByAltText("Hero Image");
@@ -25,9 +26,8 @@ describe("Hero Component", () => {
         expect(screen.getByText(/AI-Powered Precision/i)).toBeInTheDocument();
 
         //check buttons are present
-        expect(screen.getByRole("button", { name: /Get Started/i })).toBeInTheDocument();
+        // Since user is null, Get Started should be a link/button to login
+        expect(screen.getByRole("link", { name: /Get Started/i })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: /Book a Demo/i })).toBeInTheDocument();
-
-
     })
 });

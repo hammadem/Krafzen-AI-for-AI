@@ -1,4 +1,4 @@
-import Projects from "@/app/(dashboard)/dashboard/projects/page";
+import Projects from "@/app/(dashboard)/workspace/projects/page";
 import { render, screen } from "@testing-library/react"
 
 
