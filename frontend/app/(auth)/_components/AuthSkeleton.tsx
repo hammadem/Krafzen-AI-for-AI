@@ -3,26 +3,32 @@ import Image from "next/image";
 
 export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
     return (
-        <div className="relative w-full h-screen overflow-hidden bg-black">
+        <div className="relative w-full h-screen overflow-hidden bg-black text-white">
 
+            {/* Left Side: Hero Image */}
             <div className="absolute top-0 left-0 w-[60%] h-full z-0">
                 <Image
                     src="/auth/sideImage.webp"
                     alt="Auth Hero Image"
                     fill
-                    className="object-cover"
+                    className="object-cover opacity-90"
                     priority
                 />
-                {/* Gradient overlay for seamless blending with right panel */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/40 to-black pointer-events-none"></div>
+                {/* Gradient overlay for blending */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/60 to-black pointer-events-none"></div>
             </div>
 
-            <div className="relative ml-auto w-1/2 h-full flex flex-col text-white items-center justify-center p-10 gap-8 z-10">
-                <div className="flex w-full justify-center">
+            {/* Right Side: Content Area */}
+            <div className="relative ml-auto w-full md:w-1/2 h-full flex flex-col items-center justify-center p-10 gap-8 z-10">
+                {/* Ambient Vibrancy Glows */}
+                <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px] pointer-events-none mix-blend-screen animate-pulse"></div>
+                <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
+
+                <div className="flex w-full justify-center relative z-20">
                     <CompanyLogo />
                 </div>
 
-                <div className="w-full max-w-md">
+                <div className="w-full max-w-md relative z-20">
                     <AuthType />
                 </div>
             </div>
