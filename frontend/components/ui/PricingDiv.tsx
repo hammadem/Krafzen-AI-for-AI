@@ -2,6 +2,8 @@
 import { Check } from "lucide-react";
 import Link from "next/link";
 import { Button } from "../ui/button";
+import { useState } from "react";
+import StripePaymentModal from "../StripePaymentModal";
 
 export default function PricingDiv({
   price,
@@ -12,6 +14,22 @@ export default function PricingDiv({
   index: number;
   monthly: boolean;
 }) {
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const handleGetStarted = () => {
+    if (price.stripeLink) {
+      // Extract price amount from the price string (e.g., "$99" -> 99)
+      const priceMatch = price.price.match(/\$?(\d+)/);
+      const amount = priceMatch ? parseInt(priceMatch[1]) : 0;
+
+      if (amount > 0) {
+        setShowPaymentModal(true);
+      } else {
+        // For custom pricing, redirect to support
+        window.location.href = "/support";
+      }
+    }
+  };
   const glowEffects = [
     "group-hover:shadow-[0_0_40px_-10px_rgba(34,197,94,0.6)] border-zinc-800 hover:border-green-500/50",
     "group-hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.6)] border-zinc-800 hover:border-blue-500/50",
@@ -70,17 +88,22 @@ export default function PricingDiv({
 
       <Button
         variant="secondary"
-        asChild
+        onClick={handleGetStarted}
         className="w-full rounded-full h-12 text-black font-bold text-base bg-green-400 hover:bg-green-500 transition-colors shadow-[0_0_15px_rgba(74,222,128,0.2)] hover:shadow-[0_0_25px_rgba(74,222,128,0.4)]"
       >
-        {price.stripeLink ? (
-          <a href={price.stripeLink} target="_blank" rel="noopener noreferrer">
-            Get Started
-          </a>
-        ) : (
-          <Link href="/support">Contact Us</Link>
-        )}
+        {price.stripeLink ? "Get Started" : "Contact Us"}
       </Button>
+
+      {/* Stripe Checkout Modal */}
+      {price.stripeLink && (
+        <StripePaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          stripeCheckoutUrl={price.stripeLink}
+          planName={price.type}
+          amount={price.price}
+        />
+      )}
     </div>
   );
 }

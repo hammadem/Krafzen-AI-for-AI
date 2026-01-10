@@ -7,6 +7,8 @@ import HeroData from "./HeroData";
 import { useAuth } from "@/context/AuthContext";
 import dynamic from "next/dynamic";
 import { Skeleton } from "./ui/skeleton";
+import { useState } from "react";
+import CalendlyBooking from "./CalendlyBooking";
 
 const Partners = dynamic(() => import("./Partners"), {
     loading: () => (
@@ -67,6 +69,8 @@ const FAQ = dynamic(() => import("./FAQs"), {
 
 export default function Hero() {
     const { user } = useAuth();
+    const [showCalendlyModal, setShowCalendlyModal] = useState(false);
+
     return (
         <>
             <Navbar isRoot={true} />
@@ -127,12 +131,7 @@ export default function Hero() {
                         <Button
                             variant="default"
                             className="rounded-full px-6 py-4 cursor-pointer my-4 bg-transparent border-1 border-green-400 text-green-400 hover:bg-transparent font-normal"
-                            onClick={() =>
-                                window.open(
-                                    "https://calendly.com/khadija-krafzen/30min?month=2026-01",
-                                    "_blank"
-                                )
-                            }
+                            onClick={() => setShowCalendlyModal(true)}
                         >
                             <Image
                                 src="/hero/calendar-outline.svg"
@@ -155,6 +154,13 @@ export default function Hero() {
             <Features />
             <Pricing />
             <FAQ />
+
+            {/* Calendly Booking Modal */}
+            <CalendlyBooking
+                isOpen={showCalendlyModal}
+                onClose={() => setShowCalendlyModal(false)}
+                calendlyUrl="https://calendly.com/khadija-krafzen/30min"
+            />
         </>
     );
 }

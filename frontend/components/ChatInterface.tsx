@@ -259,15 +259,6 @@ export function ChatInterface({
                                                         alt="Full size"
                                                         className="w-full h-auto rounded-md shadow-2xl border border-white/20"
                                                     />
-                                                    <DialogClose asChild>
-                                                        <Button
-                                                            variant="secondary"
-                                                            size="icon"
-                                                            className="absolute -top-4 -right-4 rounded-full w-8 h-8 shadow-lg"
-                                                        >
-                                                            <span className="text-xl font-bold">×</span>
-                                                        </Button>
-                                                    </DialogClose>
                                                     <Button
                                                         size="sm"
                                                         onClick={(e) => {
