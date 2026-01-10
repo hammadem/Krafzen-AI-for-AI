@@ -24,6 +24,7 @@ import {
     InputGroupTextarea,
 } from "@/components/ui/input-group";
 import { formSchema } from "@/lib/validation";
+import { toast } from "react-toastify";
 
 
 export default function SupportForm() {
@@ -39,8 +40,9 @@ export default function SupportForm() {
     })
 
     function onSubmit(data: z.infer<typeof formSchema>) {
-        alert("Form submitted succesfully and see logs for data.");
         console.log(data);
+        toast.success("Thank you! We've received your message and will get back to you soon.");
+        form.reset();
     }
 
     return (
