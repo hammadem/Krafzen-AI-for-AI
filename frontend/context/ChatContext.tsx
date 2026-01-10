@@ -83,7 +83,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                     const hydratedSessions: Record<string, ChatSession> = {};
 
                     // Convert API sessions to Store sessions
-                    historyData.forEach((s: any) => {
+                    historyData.forEach((s: { id: string; title?: string; created_at: string; updated_at: string }) => {
                         hydratedSessions[s.id] = {
                             id: s.id,
                             title: s.title || "Untitled Session",
@@ -103,7 +103,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                         const msgs = await import("@/lib/api/chat").then(mod => mod.fetchSessionMessages(mostRecentSessionId, user.access_token!));
 
                         // Convert API messages to Store messages
-                        const storeMessages: any[] = msgs.map((m: any) => ({
+                        const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string }) => ({
                             id: m.id,
                             role: m.role,
                             content: m.content || "",

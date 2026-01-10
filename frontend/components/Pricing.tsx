@@ -64,7 +64,6 @@ export default function Pricing() {
                   key={price.price}
                   price={price}
                   index={index}
-                  monthly={monthly}
                 />
               )
             )}
