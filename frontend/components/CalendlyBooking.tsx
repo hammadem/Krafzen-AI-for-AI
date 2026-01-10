@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Video, ExternalLink, Loader2 } from "lucide-react";
 
@@ -17,14 +17,18 @@ export default function CalendlyBooking({
 }: CalendlyBookingProps) {
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (isOpen) {
+    // Reset loading when modal opens
+    const handleLoad = () => setLoading(false);
+    const handleDialogChange = (open: boolean) => {
+        if (!open) {
+            onClose();
+        } else {
             setLoading(true);
         }
-    }, [isOpen]);
+    };
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
+        <Dialog open={isOpen} onOpenChange={handleDialogChange}>
             <DialogContent className="max-w-4xl max-h-[90vh] bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden">
                 {/* Glassmorphic background effect */}
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5 rounded-lg -z-10" />
@@ -56,7 +60,7 @@ export default function CalendlyBooking({
                         src={calendlyUrl}
                         className="w-full h-full border-0"
                         title="Calendly Booking"
-                        onLoad={() => setLoading(false)}
+                        onLoad={handleLoad}
                     />
                 </div>
 
