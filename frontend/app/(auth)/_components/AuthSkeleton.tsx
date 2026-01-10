@@ -11,11 +11,11 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
                     src="/auth/sideImage.webp"
                     alt="Auth Hero Image"
                     fill
-                    className="object-cover opacity-90"
+                    className="object-cover brightness-125 saturate-150 contrast-110"
                     priority
                 />
                 {/* Gradient overlay for blending */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/60 to-black pointer-events-none"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/40 to-black pointer-events-none"></div>
             </div>
 
             {/* Right Side: Content Area */}

@@ -56,7 +56,7 @@ export default function Login() {
                         className="h-12 rounded-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-white/30 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-all duration-300"
                         onClick={() => handleLogin('apple')}
                     >
-                        <div className="w-5 h-5 bg-black rounded-full flex items-center justify-center text-white text-xs border border-white/20"></div>
+                        <div className="w-5 h-5 bg-black rounded-full flex items-center justify-center text-white text-[10px] pb-0.5 border border-white/20"></div>
                         Apple
                     </Button>
                     <Button
