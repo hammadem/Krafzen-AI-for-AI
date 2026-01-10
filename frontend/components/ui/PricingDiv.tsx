@@ -17,16 +17,10 @@ export default function PricingDiv({
 
   const handleGetStarted = () => {
     if (price.stripeLink) {
-      // Extract price amount from the price string (e.g., "$99" -> 99)
-      const priceMatch = price.price.match(/\$?(\d+)/);
-      const amount = priceMatch ? parseInt(priceMatch[1]) : 0;
-
-      if (amount > 0) {
-        setShowPaymentModal(true);
-      } else {
-        // For custom pricing, redirect to support
-        window.location.href = "/support";
-      }
+      setShowPaymentModal(true);
+    } else {
+      // For custom pricing (Enterprise Plus), redirect to support
+      window.location.href = "/support";
     }
   };
   const glowEffects = [
