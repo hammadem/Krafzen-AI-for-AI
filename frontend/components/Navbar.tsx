@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from "next/navigation";
 import CompanyLogo from './CompanyLogo';
 import { useAuth } from '@/context/AuthContext';
+import { Settings, LogOut, ShieldCheck, Clock } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -89,10 +90,10 @@ export default function Navbar({ isRoot = false }: {
                                     <>
                                         <Button
                                             asChild
-                                            className="bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-500 hover:to-violet-500 text-white border-0 rounded-full font-semibold shadow-lg shadow-blue-500/20 transition-all duration-300 hover:scale-105"
+                                            className="bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
                                         >
-                                            <Link href="/dashboard">
-                                                Dashboard
+                                            <Link href="/workspace">
+                                                Workspace
                                             </Link>
                                         </Button>
                                         <UserDropdown user={user} logout={logout} />
@@ -189,38 +190,49 @@ function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
                     </Avatar>
                 </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-zinc-900 border-zinc-800 text-white">
-                <div className="flex flex-col space-y-1 p-2">
-                    <p className="text-sm font-medium leading-none">{user.firstname ? `${user.firstname} ${user.lastname || ''}` : "User"}</p>
-                    <p className="text-xs leading-none text-gray-400">{user.email}</p>
+            <DropdownMenuContent align="end" className="w-80 bg-zinc-900 border-zinc-800 text-white shadow-xl rounded-xl mt-2">
+                <div className="flex flex-col space-y-1 p-3">
+                    <p className="text-sm font-bold leading-none text-white">{user.firstname ? `${user.firstname} ${user.lastname || ''}` : "User"}</p>
+                    <p className="text-xs leading-none text-gray-500 font-medium">{user.email}</p>
                 </div>
-                <div className="px-2 py-1.5 text-xs font-semibold text-green-400 bg-green-400/10 rounded-sm mx-2 mb-2">
-                    Plan: {user.subscription_plan || "Free Trial"}
+                <div className="px-3 py-2.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 rounded-lg mx-2 mb-2 border border-emerald-500/20 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4" />
+                        Plan: <span className="uppercase">{user.subscription_plan || "Free Trial"}</span>
+                    </div>
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 </div>
-                <div className="px-2 py-1.5 text-xs font-semibold text-blue-400 bg-blue-400/10 rounded-sm mx-2 mb-2 flex justify-between items-center">
-                    <span>Credits: {user.remaining_minutes ? user.remaining_minutes.toFixed(1) : "0"} mins</span>
-                    <Link href="/pricing" className="bg-blue-500 hover:bg-blue-400 text-white px-3 py-0.5 rounded-full text-[10px] uppercase tracking-wide shadow-sm transition-all hover:shadow-blue-500/20">
+                <div className="px-3 py-2 text-xs font-bold text-blue-400 bg-blue-500/10 rounded-lg mx-2 mb-2 flex justify-between items-center border border-blue-500/20 gap-3">
+                    <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        <span className="whitespace-nowrap">Credits: {user.remaining_minutes ? user.remaining_minutes.toFixed(1) : "0"} min</span>
+                    </div>
+                    <Link href="/pricing" className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-wider shadow-sm transition-all hover:shadow-blue-500/20 whitespace-nowrap flex-shrink-0">
                         Buy more
                     </Link>
                 </div>
 
-                <DropdownMenuSeparator className="bg-zinc-800" />
+                <DropdownMenuSeparator className="bg-zinc-800 my-2" />
 
-                <DropdownMenuItem asChild className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-2 mb-1">
-                    <Link href="/account" className="w-full">
-                        <div className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-indigo-400 bg-indigo-400/10 rounded-sm hover:bg-indigo-400/20 transition-colors">
+                <DropdownMenuItem asChild className="cursor-pointer focus:bg-transparent mt-1 mb-3 p-0">
+                    <Link href="/account" className="block mx-2">
+                        <div className="flex items-center w-full px-3 py-2 text-xs font-semibold text-indigo-400 bg-indigo-400/10 rounded-md border border-indigo-400/20 hover:bg-indigo-400/20 transition-colors gap-2">
+                            <Settings className="w-4 h-4" />
                             Account Settings
                         </div>
                     </Link>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-zinc-800" />
+
                 <DropdownMenuItem
-                    className="cursor-pointer focus:bg-zinc-800 focus:text-white mt-2 mb-1"
+                    className="cursor-pointer focus:bg-transparent mt-1 mb-3 p-0"
                     onClick={logout}
                     asChild
                 >
-                    <div className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-red-500 bg-red-500/10 rounded-sm mx-2 hover:bg-red-500/20 transition-colors">
-                        Log out
+                    <div className="block mx-2">
+                        <div className="flex items-center w-full px-3 py-2 text-xs font-semibold text-red-500 bg-red-500/10 rounded-md border border-red-500/20 hover:bg-red-500/20 transition-colors gap-2">
+                            <LogOut className="w-4 h-4" />
+                            Log out
+                        </div>
                     </div>
                 </DropdownMenuItem>
             </DropdownMenuContent>

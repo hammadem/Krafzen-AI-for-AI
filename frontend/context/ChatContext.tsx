@@ -1,11 +1,14 @@
 "use client";
-import { createContext, useContext, useState, useEffect, ReactNode, useRef } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchChatHistory, fetchSessionMessages, sendChatMessage, deleteChatSession } from "@/lib/api/chat";
+import { fetchChatHistory, sendChatMessage, deleteChatSession } from "@/lib/api/chat";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { Message } from "@/components/ChatInterface";
+import { useChatStore, ChatSession } from "@/components/secure-chat/store";
+import { SecurityProvider } from "@/components/secure-chat/SecurityProvider";
 
-interface ChatSession {
+// Local UI interface for sidebar
+interface SidebarSession {
     id: string;
     title: string;
     updated_at: string;
@@ -13,7 +16,7 @@ interface ChatSession {
 
 interface ChatContextType {
     messages: Message[];
-    sessions: ChatSession[];
+    sessions: SidebarSession[];
     currentSessionId: string | null;
     isLoading: boolean;
     inputValue: string;
@@ -26,196 +29,183 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-export const ChatProvider = ({ children }: { children: ReactNode }) => {
-    const { user, setUser } = useAuth();
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [sessions, setSessions] = useState<ChatSession[]>([]);
-    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
+    const {
+        sessions: storeSessions,
+        activeSessionId,
+        createSession,
+        switchSession,
+        addMessage,
+        deleteSession: removeSession,
+        updateSessionTitle,
+        setGenerating
+    } = useChatStore();
+
     const [inputValue, setInputValue] = useState("");
-    const [loadingSessionIds, setLoadingSessionIds] = useState<string[]>([]);
+    const { user } = useAuth(); // User usage kept if needed for logic later
 
-    // Ref to track current session ID without stale closures in async functions
-    const currentSessionIdRef = useRef(currentSessionId);
+    // Map store sessions to ChatSession interface
+    const sessionsList: SidebarSession[] = Object.values(storeSessions)
+        .sort((a, b) => b.lastActive - a.lastActive)
+        .map(s => ({
+            id: s.id,
+            title: s.title,
+            updated_at: new Date(s.lastActive).toISOString()
+        }));
+
+    // Map active session messages to Message interface
+    const activeSession = activeSessionId ? storeSessions[activeSessionId] : null;
+    const messages: Message[] = activeSession
+        ? activeSession.messages.map(m => ({
+            id: m.id,
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            imageUrl: m.imageUrl,
+            timestamp: new Date(m.timestamp)
+        }))
+        : [];
+
+    // Calculate loading state specifically for the ACTIVE session
+    const isGenerating = activeSession?.isGenerating || false;
+
+
+
+    // --- Persistence & Hydration Logic ---
     useEffect(() => {
-        currentSessionIdRef.current = currentSessionId;
-    }, [currentSessionId]);
+        const loadHistory = async () => {
+            if (!user || !user.access_token) return; // Only load for authenticated users
 
-    // Derived state: is the CURRENT session loading?
-    const isLoading = !!currentSessionId && loadingSessionIds.includes(currentSessionId);
+            try {
+                // 1. Fetch Sessions
+                const historyData = await fetchChatHistory(user.access_token);
 
-    // Initial Load: Fetch Sessions when user is present
-    useEffect(() => {
-        const loadSessions = async () => {
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
+                if (historyData && historyData.length > 0) {
+                    const hydratedSessions: Record<string, ChatSession> = {};
 
-            if (token) {
-                try {
-                    const history = await fetchChatHistory(token);
-                    // Map history to ChatSession structure if needed, or use as is
-                    // The dashboard page used: { id, title, updated_at } which matches fetchChatHistory return
-                    setSessions(history);
+                    // Convert API sessions to Store sessions
+                    historyData.forEach((s: any) => {
+                        hydratedSessions[s.id] = {
+                            id: s.id,
+                            title: s.title || "Untitled Session",
+                            messages: [], // Will load eagerly or lazily
+                            createdAt: new Date(s.created_at).getTime(),
+                            lastActive: new Date(s.updated_at).getTime(),
+                            isBackground: false
+                        };
+                    });
 
-                    // If we have sessions and no current session is selected, select the first one
-                    // Only do this on initial load or if currentSessionId is null
-                    if (history.length > 0 && !currentSessionId) {
-                        setCurrentSessionId(history[0].id);
+                    // Update store with sessions
+                    useChatStore.getState().setSessions(hydratedSessions);
+
+                    // 2. Fetch Messages for the most recent session (Auto-select)
+                    const mostRecentSessionId = historyData[0].id; // API sort is usually desc
+                    if (mostRecentSessionId) {
+                        const msgs = await import("@/lib/api/chat").then(mod => mod.fetchSessionMessages(mostRecentSessionId, user.access_token!));
+
+                        // Convert API messages to Store messages
+                        const storeMessages: any[] = msgs.map((m: any) => ({
+                            id: m.id,
+                            role: m.role,
+                            content: m.content || "",
+                            imageUrl: m.image_url,
+                            timestamp: new Date(m.created_at).getTime()
+                        }));
+
+                        useChatStore.getState().appendMessages(mostRecentSessionId, storeMessages);
+                        useChatStore.getState().switchSession(mostRecentSessionId);
                     }
-                } catch (e) {
-                    console.error("Failed to load history", e);
+
+                } else if (!activeSessionId) {
+                    // Only create new if truly empty
+                    createSession("New Secure Chat");
                 }
+            } catch (err) {
+                console.error("Failed to load chat history:", err);
             }
         };
 
-        if (user) {
-            loadSessions();
-        }
-    }, [user]);
-    // Dependency on user ensures it runs when user logs in (even on Home page)
+        loadHistory();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.access_token]); // Depend on user token to reload on login/switch
 
-    // Load Messages when Current Session Updates
-    useEffect(() => {
-        const loadMessages = async () => {
-            if (!currentSessionId) {
-                setMessages([]);
-                return;
-            }
-            // If it's a temp ID (not from backend yet), don't fetch
-            if (currentSessionId.startsWith('temp-')) {
-                setMessages([]);
-                return;
-            }
-
-            const supabase = createClient();
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
-
-            if (token) {
-                try {
-                    const msgs = await fetchSessionMessages(currentSessionId, token);
-                    // Adapt backend messages to frontend format
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const adapted: Message[] = msgs.map((m: any) => ({
-                        id: m.id,
-                        role: m.role,
-                        content: m.content,
-                        imageUrl: m.image_url,
-                        timestamp: new Date(m.created_at)
-                    }));
-                    setMessages(adapted);
-                } catch (e) {
-                    console.error("Failed to load messages", e);
-                    setMessages([]);
-                }
-            }
-        };
-        loadMessages();
-    }, [currentSessionId]);
+    const handleSwitchSession = (id: string | null) => {
+        if (id) switchSession(id);
+    };
 
     const handleSendMessage = async () => {
-        // If no session is active, generate a temp one right now
-        const activeSessionId = currentSessionIdRef.current || `temp-${Date.now()}`;
+        if (!inputValue.trim() || !activeSessionId) return;
 
-        // Prevent double-sending for the SAME session
-        if (!inputValue.trim() || loadingSessionIds.includes(activeSessionId)) return;
+        const currentId = activeSessionId;
+        const userContent = inputValue;
+        setInputValue("");
 
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        if (!token) return;
+        // Use store action to set per-session generating state
+        setGenerating(currentId, true);
 
-        const userMessage: Message = {
-            id: Date.now().toString(),
+        // 1. Add User Message to Store (RAM)
+        addMessage(currentId, {
             role: 'user',
-            content: inputValue,
-            timestamp: new Date()
-        };
+            content: userContent
+        });
 
-        // Optimistic update - ONLY if we are still looking at this session
-        if (currentSessionIdRef.current === activeSessionId) {
-            setMessages(prev => [...prev, userMessage]);
-            setInputValue("");
+        // 2. Determine title if it's the first message
+        const isFirstMessage = storeSessions[currentId]?.messages.length === 0;
+        if (isFirstMessage) {
+            const newTitle = userContent.slice(0, 30) + (userContent.length > 30 ? "..." : "");
+            updateSessionTitle(currentId, newTitle);
         }
 
-        setLoadingSessionIds(prev => [...prev, activeSessionId]);
-
         try {
-            // If currentSessionId is a temp ID, we pass undefined to backend => create new
-            const targetSessionId = activeSessionId.startsWith('temp-') ? undefined : activeSessionId;
+            // 3. Call Real Backend API
+            const supabase = createClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
 
-            const response = await sendChatMessage(userMessage.content!, [], token, targetSessionId);
+            if (token) {
+                const response = await sendChatMessage(userContent, [], token, undefined);
 
-            const assistantMessage: Message = {
-                id: (Date.now() + 1).toString(),
+                // 4. Add Assistant Response to Store
+                addMessage(currentId, {
+                    role: 'assistant',
+                    content: response.validated_response,
+                    imageUrl: response.image_url
+                });
+            } else {
+                setTimeout(() => {
+                    addMessage(currentId, {
+                        role: 'assistant',
+                        content: "[Secure Demo] Please login to use the AI features. I received: " + userContent
+                    });
+                    setGenerating(currentId, false);
+                }, 1000);
+            }
+        } catch (e) {
+            console.error(e);
+            addMessage(currentId, {
                 role: 'assistant',
-                content: response.validated_response,
-                imageUrl: response.image_url,
-                timestamp: new Date()
-            };
-
-            // Update UI ONLY if 'activeSessionId' is still the 'currentSessionId' (user hasn't switched chats)
-            if (currentSessionIdRef.current === activeSessionId) {
-                setMessages(prev => [...prev, assistantMessage]);
-
-                // If we started as a temp session and got a real ID, switch the view to the real ID
-                if (response.session_id && activeSessionId.startsWith('temp-')) {
-                    setCurrentSessionId(response.session_id);
-                }
-            }
-
-            // Update remaining minutes if provided (Global update, always happens)
-            if (response.remaining_minutes !== undefined && user) {
-                setUser({ ...user, remaining_minutes: response.remaining_minutes });
-            }
-
-            // Refresh session list (Global update, always happens)
-            if (response.session_id) {
-                // If it was a new session, or just to be safe, refresh list
-                const history = await fetchChatHistory(token);
-                setSessions(history);
-            }
-
-        } catch (error) {
-            console.error("Chat error:", error);
-            const errorMessage: Message = {
-                id: (Date.now() + 1).toString(),
-                role: 'assistant',
-                content: "Sorry, something went wrong. Please try again.",
-                timestamp: new Date()
-            };
-            // Only show error if still on the same thread
-            if (currentSessionIdRef.current === activeSessionId) {
-                setMessages(prev => [...prev, errorMessage]);
-            }
+                content: "Error: Could not connect to secure agent."
+            });
         } finally {
-            setLoadingSessionIds(prev => prev.filter(id => id !== activeSessionId));
+            setGenerating(currentId, false);
         }
     };
 
     const createNewChat = () => {
-        const tempId = `temp-${Date.now()}`;
-        setCurrentSessionId(tempId);
-        setMessages([]);
-        setInputValue("");
+        createSession();
     };
 
     const deleteSession = async (id: string) => {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        if (token) {
-            try {
-                await deleteChatSession(id, token);
-            } catch (e) {
-                console.error("Failed to delete session", e);
-            }
-        }
+        try {
+            const supabase = createClient();
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
 
-        setSessions(prev => prev.filter(s => s.id !== id));
-        if (id === currentSessionId) {
-            setCurrentSessionId(null);
-            setMessages([]);
+            if (token) {
+                await deleteChatSession(id, token);
+            }
+            removeSession(id);
+        } catch (error) {
+            console.error("Failed to delete session:", error);
         }
     };
 
@@ -223,12 +213,12 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         <ChatContext.Provider
             value={{
                 messages,
-                sessions,
-                currentSessionId,
-                isLoading,
+                sessions: sessionsList,
+                currentSessionId: activeSessionId,
+                isLoading: isGenerating, // Now correctly scoped to active session
                 inputValue,
                 setInputValue,
-                setCurrentSessionId,
+                setCurrentSessionId: handleSwitchSession,
                 handleSendMessage,
                 createNewChat,
                 deleteSession
@@ -236,6 +226,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         >
             {children}
         </ChatContext.Provider>
+    );
+};
+
+export const ChatProvider = ({ children }: { children: ReactNode }) => {
+    return (
+        <SecurityProvider>
+            <SecureChatProviderInternal>
+                {children}
+            </SecureChatProviderInternal>
+        </SecurityProvider>
     );
 };
 

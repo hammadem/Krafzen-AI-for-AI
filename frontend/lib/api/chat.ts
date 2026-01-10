@@ -91,7 +91,8 @@ export const downloadDxf = async (imageUrl: string, prompt?: string, token?: str
 
 export async function transcribeAudio(audioBlob: Blob, token?: string): Promise<string> {
     const formData = new FormData();
-    formData.append('file', audioBlob, 'rec.webm');
+    const extension = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+    formData.append('file', audioBlob, `rec.${extension}`);
 
     const headers: Record<string, string> = {};
     if (token) {

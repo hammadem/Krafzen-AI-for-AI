@@ -15,7 +15,7 @@ export default function CompanyLogo() {
                         height={40.8}
                         alt="Your Company"
                         src="/navbar/Vector.svg"
-                        className="h-8 p-0 m-0 translate-x-3"
+                        className="h-8 w-auto p-0 m-0 translate-x-3"
                     />
                     <Image
                         width={34}

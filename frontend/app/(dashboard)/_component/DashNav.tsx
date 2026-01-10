@@ -21,7 +21,7 @@ export default function DashNav() {
         try {
             resetDashboardState();
             logout();
-            router.push("/dashboard/id");
+            router.push("/workspace/id");
         } catch (err) {
             console.log(err);
         } finally {

@@ -24,6 +24,15 @@ export function ChatSidebar({
 }: ChatSidebarProps) {
     return (
         <div className="w-72 border-r border-white/10 h-full flex flex-col bg-black/50 backdrop-blur-sm hidden md:flex pt-[100px]">
+            <div className="mx-4 pb-3 mb-2 border-b border-white/5 mt-4">
+                <div className="flex items-center gap-2 text-white/90 font-semibold mb-1">
+                    <span className="text-emerald-400">Design</span><span>Workspace</span>
+                </div>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Private Session
+                </div>
+            </div>
             <div className="p-4">
                 <Button
                     onClick={onNewChat}
@@ -35,7 +44,7 @@ export function ChatSidebar({
                 </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar px-2 space-y-1">
+            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 space-y-1">
                 {sessions.length === 0 && (
                     <div className="text-center text-gray-600 text-xs py-10">
                         No recent chats
@@ -74,7 +83,7 @@ export function ChatSidebar({
 
             <div className="p-4 border-t border-white/5">
                 <div className="text-xs text-gray-600 text-center">
-                    Stored in current session
+                    Active Session History
                 </div>
             </div>
         </div>

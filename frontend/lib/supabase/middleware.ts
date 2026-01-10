@@ -28,7 +28,7 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession()
 
   // Redirect if not logged in
-  if (!session && (req.nextUrl.pathname.startsWith('/dashboard') || req.nextUrl.pathname.startsWith('/chat'))) {
+  if (!session && (req.nextUrl.pathname.startsWith('/workspace') || req.nextUrl.pathname.startsWith('/chat'))) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 

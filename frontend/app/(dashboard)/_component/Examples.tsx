@@ -35,40 +35,40 @@ export function NavLinks({ setCurrentRoute }: { setCurrentRoute: (value: Partial
             <Link
                 onClick={() => setCurrentRoute({ home: "home" })}
                 aria-label="Link to Homepage"
-                href="/dashboard/id"
+                href="/workspace/id"
                 className="flex gap-4 items-center cursor-pointer" >
                 <HomeIcon /> Home
             </Link>
             <Link
                 onClick={() => setCurrentRoute({ projects: "projects" })}
                 aria-label="Link to Projects"
-                href="/dashboard/projects"
+                href="/workspace/projects"
                 className="flex gap-4 items-center cursor-pointer" >
                 <Folder />Projects
             </Link>
             <Link
                 onClick={() => setCurrentRoute({ templates: "templates" })}
                 aria-label="Link to Templates"
-                href="/dashboard/templates"
+                href="/workspace/templates"
                 className="flex gap-4 items-center cursor-pointer" >
                 <LucideLayoutTemplate />Templates
             </Link>
             <Link
                 onClick={() => setCurrentRoute({ exports: "exports" })}
                 aria-label="Link to Exports"
-                href="/dashboard/exports"
+                href="/workspace/exports"
                 className="flex gap-4 items-center cursor-pointer" >
                 <ExpandIcon />Exports
             </Link>
             <Link
                 onClick={() => setCurrentRoute({ billing: "billing" })}
                 aria-label="Link to Billing"
-                href="/dashboard/billings"
+                href="/workspace/billings"
                 className="flex gap-4 items-center cursor-pointer" ><CreditCardIcon />Billing</Link>
             <Link
                 onClick={() => setCurrentRoute({ settings: "settings" })}
                 aria-label="Link to Settings"
-                href="/dashboard/settings"
+                href="/workspace/settings"
                 className="flex gap-4 items-center cursor-pointer" ><Settings />Settings</Link>
 
             <Separator className="bg-[#919191] h-[1px] mt-2" />

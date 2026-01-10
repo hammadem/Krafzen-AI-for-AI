@@ -73,7 +73,19 @@ export function ChatInterface({
             // Start recording
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const recorder = new MediaRecorder(stream);
+
+                let options: MediaRecorderOptions = {};
+                if (typeof MediaRecorder.isTypeSupported === 'function') {
+                    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+                        options = { mimeType: 'audio/webm;codecs=opus' };
+                    } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+                        options = { mimeType: 'audio/webm' };
+                    } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                        options = { mimeType: 'audio/mp4' };
+                    }
+                }
+
+                const recorder = new MediaRecorder(stream, options);
                 mediaRecorderRef.current = recorder;
                 chunksRef.current = [];
 
@@ -84,7 +96,7 @@ export function ChatInterface({
                 };
 
                 recorder.onstop = async () => {
-                    const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                    const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
                     // Provide visual feedback or loading state if needed
                     try {
                         onInputChange("Transcribing...");
@@ -128,19 +140,19 @@ export function ChatInterface({
         try {
             let blob: Blob;
 
-            if (imageUrl.startsWith('data:')) {
-                // Handle Data URL
-                const byteString = atob(imageUrl.split(',')[1]);
-                const mimeString = imageUrl.split(',')[0].split(':')[1].split(';')[0];
-                const ab = new ArrayBuffer(byteString.length);
-                const ia = new Uint8Array(ab);
-                for (let i = 0; i < byteString.length; i++) {
-                    ia[i] = byteString.charCodeAt(i);
-                }
-                blob = new Blob([ab], { type: mimeString });
-            } else {
-                // Handle regular URL (fetch to bypass CORS/browser behavior if possible)
+            // Try fetching directly first (if same origin or CORS allows)
+            try {
                 const response = await fetch(imageUrl);
+                if (response.ok) {
+                    blob = await response.blob();
+                } else {
+                    throw new Error("Direct fetch failed");
+                }
+            } catch (e) {
+                // If direct fetch fails (CORS), use our proxy
+                const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error("Proxy fetch failed");
                 blob = await response.blob();
             }
 
@@ -157,11 +169,11 @@ export function ChatInterface({
 
         } catch (error) {
             console.error("Download failed:", error);
-            // Last resort fallback
+            // Last resort fallback (this will result in UUID filename but better than nothing)
             const link = document.createElement('a');
             link.href = imageUrl;
-            link.download = `generated-image-${new Date().getTime()}.png`;
-            link.target = '_blank';
+            link.target = '_blank'; // Open in new tab if download fails
+            // download attribute usually ignored for cross-origin
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
