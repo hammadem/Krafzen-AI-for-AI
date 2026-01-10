@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "KRAFZEN AI",
   description: "An AI tool that makes things easy for engineers automating CAD and BIM designs.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
