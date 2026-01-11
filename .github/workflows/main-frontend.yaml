@@ -78,7 +78,7 @@ jobs:
           rm -rf .vercel
           rm -rf ../.vercel
           
-          vercel deploy --prod --token=$VERCEL_TOKEN --yes
+          vercel deploy --prod --token=$VERCEL_TOKEN --org=$VERCEL_ORG_ID --project=$VERCEL_PROJECT_ID --yes
           
           mv ../.git_temp ../.git
           echo "✅ Production deployment complete"
