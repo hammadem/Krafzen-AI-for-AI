@@ -66,35 +66,21 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          # Install Vercel CLI globally (or use npx)
+          # Install Vercel CLI globally
           npm install -g vercel
 
-          # Go to frontend directory
-          cd frontend
+          # Hiding .git from the root to bypass author check
+          echo "🙈 Hiding .git directory..."
+          mv .git .git_temp
 
-          # Apply the same workaround as local deploy.sh:
-          # Temporarily rename .git in parent directory to bypass Vercel's git author check
-          # In GitHub Actions, checkout is usually at root.
-          # Note: The checkout action leaves a .git folder in the root.
+          # Clean up any existing Vercel metadata aggressively
+          echo "🧹 Cleaning Vercel metadata..."
+          rm -rf .vercel frontend/.vercel
           
-          echo "🙈 Hiding .git directory to bypass Vercel author check..."
-          mv ../.git ../.git_temp
-
-          # Deploy using Vercel CLI with tokens
-          # We use --yes to skip confirmation (since we are auth'd via token)
-          # We don't use 'vercel login' but pass token via flag/env.
-          # Vercel CLI picks up VERCEL_TOKEN env var automatically.
-          
+          # Deploy from ROOT using the root vercel.json
           echo "🚀 Deploying to Vercel..."
-          # Remove any existing .vercel directories to force use of environment variables
-          # Check both root and current folder
-          rm -rf .vercel
-          rm -rf ../.vercel
+          vercel deploy --token=$VERCEL_TOKEN --org=$VERCEL_ORG_ID --project=$VERCEL_PROJECT_ID --confirm --yes
           
-          # Deploy using Vercel CLI with tokens
-          # We explicitly pass flags to bypass the 'author check' and 'project settings' retrieval
-          vercel deploy --token=$VERCEL_TOKEN --org=$VERCEL_ORG_ID --project=$VERCEL_PROJECT_ID --yes
-          
-          # Restore .git (good practice, though runner cleans up anyway)
-          mv ../.git_temp ../.git
+          # Restore .git
+          mv .git_temp .git
           echo "✅ Deployment complete"

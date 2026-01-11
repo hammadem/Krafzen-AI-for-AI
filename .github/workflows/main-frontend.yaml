@@ -68,19 +68,17 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           npm install -g vercel
-          cd frontend
           
-          echo "🙈 Hiding .git check..."
-          mv ../.git ../.git_temp
+          echo "🙈 Hiding .git directory..."
+          mv .git .git_temp
+          
+          echo "🧹 Cleaning Vercel metadata..."
+          rm -rf .vercel frontend/.vercel
           
           echo "🚀 Deploying to Production..."
-          # Remove any existing .vercel directories to force use of environment variables
-          rm -rf .vercel
-          rm -rf ../.vercel
+          vercel deploy --prod --token=$VERCEL_TOKEN --org=$VERCEL_ORG_ID --project=$VERCEL_PROJECT_ID --confirm --yes
           
-          vercel deploy --prod --token=$VERCEL_TOKEN --org=$VERCEL_ORG_ID --project=$VERCEL_PROJECT_ID --yes
-          
-          mv ../.git_temp ../.git
+          mv .git_temp .git
           echo "✅ Production deployment complete"
 
 
