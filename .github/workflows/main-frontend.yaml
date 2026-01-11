@@ -74,7 +74,10 @@ jobs:
           mv ../.git ../.git_temp
           
           echo "🚀 Deploying to Production..."
-          vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+          # Remove any existing .vercel directory to force use of environment variables
+          rm -rf .vercel
+          
+          vercel deploy --prod --token=$VERCEL_TOKEN --yes
           
           mv ../.git_temp ../.git
           echo "✅ Production deployment complete"

@@ -86,8 +86,13 @@ jobs:
           # Vercel CLI picks up VERCEL_TOKEN env var automatically.
           
           echo "🚀 Deploying to Vercel..."
-          vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --yes
-
+          # Remove any existing .vercel directory to force use of environment variables
+          rm -rf .vercel
+          
+          # Deploy using Vercel CLI with tokens
+          # We explicitly pass the project and org IDs to be extra safe
+          vercel deploy --token=$VERCEL_TOKEN --yes
+          
           # Restore .git (good practice, though runner cleans up anyway)
           mv ../.git_temp ../.git
           echo "✅ Deployment complete"
