@@ -105,6 +105,9 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
                     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
                     "Access-Control-Allow-Headers": "*"
                 })
+            else:
+                # Log CORS failures for debugging
+                logger.warning(f"CORS preflight rejected - Origin: {origin}, Allowed: {getattr(settings, 'ALLOWED_ORIGINS_LIST', [])}")
             return response
 
         # Regular request
@@ -116,6 +119,9 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
                 "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
                 "Access-Control-Allow-Headers": "*"
             })
+        elif origin:
+            # Log CORS failures for debugging
+            logger.warning(f"CORS request rejected - Origin: {origin}, Allowed: {getattr(settings, 'ALLOWED_ORIGINS_LIST', [])}")
         return response
 
 

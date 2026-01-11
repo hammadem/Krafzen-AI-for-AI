@@ -46,6 +46,10 @@ async def detailed_health_check():
         "monitoring": {
             "sentry_enabled": bool(settings.SENTRY_DSN and settings.ENVIRONMENT != "development"),
             "environment": settings.ENVIRONMENT
+        },
+        "cors": {
+            "allowed_origins": getattr(settings, "ALLOWED_ORIGINS_LIST", []),
+            "allowed_origins_raw": getattr(settings, "ALLOWED_ORIGINS", "")
         }
     }
 
