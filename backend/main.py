@@ -72,15 +72,28 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
         is_allowed = False
 
         if origin:
-            for allowed_origin in getattr(settings, "ALLOWED_ORIGINS_LIST", []):
+            allowed_origins = getattr(settings, "ALLOWED_ORIGINS_LIST", [])
+            if settings.DEBUG:
+                logger.debug(f"CORS check - Origin: {origin}, Allowed origins: {allowed_origins}")
+            
+            for allowed_origin in allowed_origins:
                 if allowed_origin == origin:
                     is_allowed = True
+                    if settings.DEBUG:
+                        logger.debug(f"CORS: Exact match found for {origin}")
                     break
                 elif "*" in allowed_origin:
-                    pattern = allowed_origin.replace(".", r"\.").replace("*", ".*")
+                    # Convert wildcard pattern to regex
+                    # https://*.vercel.app -> https://.*\.vercel\.app
+                    # Escape dots and convert * to .* (match any characters)
+                    pattern = "^" + allowed_origin.replace(".", r"\.").replace("*", ".*") + "$"
                     if re.match(pattern, origin):
                         is_allowed = True
+                        if settings.DEBUG:
+                            logger.debug(f"CORS: Wildcard match - pattern '{pattern}' matched origin '{origin}'")
                         break
+                    elif settings.DEBUG:
+                        logger.debug(f"CORS: Wildcard pattern '{pattern}' did not match origin '{origin}'")
 
         # Preflight handling
         if request.method == "OPTIONS":
