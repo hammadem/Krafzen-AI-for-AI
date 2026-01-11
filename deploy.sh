@@ -74,6 +74,11 @@ echo "-----------------------------------"
 # 3. Vercel Deployment
 echo -e "${YELLOW}🌐 [3/3] Vercel Frontend Deployment...${NC}"
 
+# Remove any existing .vercel directories to prevent conflict/incorrect settings
+echo -e "${YELLOW}🧹 Cleaning Vercel metadata...${NC}"
+rm -rf .vercel
+rm -rf frontend/.vercel
+
 echo -e "${YELLOW}Deploying backend is handled by Render (via git).${NC}"
 echo -e "${YELLOW}Deploying Frontend to Vercel...${NC}"
 
