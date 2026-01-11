@@ -349,7 +349,7 @@ Add these in: **Settings** → **Secrets and variables** → **Actions**
 **Staging:**
 
 - Frontend: `https://krafzen-ai-staging.vercel.app`
-- Backend: `https://krafzen-staging.onrender.com`
+- Backend: `https://krafzen-api-staging.onrender.com`
 
 **Production:**
 

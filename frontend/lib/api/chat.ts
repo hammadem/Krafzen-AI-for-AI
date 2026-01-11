@@ -15,8 +15,8 @@ const getApiBaseUrl = (): string => {
                 console.error('NEXT_PUBLIC_API_URL is not set in production environment!');
                 console.error('Current hostname:', window.location.hostname);
                 // Don't throw - let the fetch fail gracefully so we can show a better error
-                // The staging backend should be: https://krafzen-staging.onrender.com
-                return 'https://krafzen-staging.onrender.com';
+                // The staging backend should be: https://krafzen-api-staging.onrender.com
+                return 'https://krafzen-api-staging.onrender.com';
             }
         }
         
