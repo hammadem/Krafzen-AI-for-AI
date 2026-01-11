@@ -96,7 +96,7 @@ if true; then
     echo "🚀 Starting backend server..."
     echo "   (Press Ctrl+C to stop all servers)"
     echo ""
-    uvicorn main:app --reload --port 8000 > /tmp/krafzen-backend.log 2>&1 &
+    uvicorn main:app --reload --host 0.0.0.0 --port 8000 > /tmp/krafzen-backend.log 2>&1 &
     BACKEND_PID=$!
     echo "   Backend started with PID: $BACKEND_PID"
     cd ..

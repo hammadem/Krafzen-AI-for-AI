@@ -41,7 +41,7 @@ export async function apiClient(
                 ok: false,
                 data: null,
                 error: {
-                    type: "CONFIG",
+                    type: "UNKNOWN",
                     message: "API URL not configured. Please set NEXT_PUBLIC_API_URL in environment variables."
                 }
             };
