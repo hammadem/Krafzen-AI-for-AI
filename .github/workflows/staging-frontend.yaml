@@ -64,31 +64,31 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          # Using the specific Project ID found via CLI
+          VERCEL_PROJECT_ID: "prj_Lh6f7yB89nzDQrDrnGWggs7L8yse"
         run: |
           # 1. Install CLI
           npm install -g vercel
 
-          # 2. Verify identity and tokens
-          echo "👤 Verifying Vercel identity..."
-          vercel whoami --token=$VERCEL_TOKEN
-
-          # 3. Clean environment (NO manual .vercel folder)
-          echo "🧹 Ensuring a clean environment..."
+          # 2. Clean environment
+          echo "🧹 Cleaning environment..."
           rm -rf .vercel frontend/.vercel
 
-          # 4. Hiding .git from the root to bypass author check
+          # 3. Hiding .git from the root to bypass author check
           echo "🙈 Hiding .git directory..."
           mv .git .git_temp
 
-          # 5. Deploy to Vercel
-          # We run from the frontend directory as indicated by your previous steps.
-          # The CLI will automatically detect VERCEL_ORG_ID and VERCEL_PROJECT_ID from the environment.
-          cd frontend
+          # 4. Manually trigger a Link (Non-interactive)
+          # We create the project.json manually to force the CLI to use this specific project
+          echo "🔗 Creating Vercel project link..."
+          mkdir -p .vercel
+          echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+
+          # 5. Deploy to Vercel (From ROOT)
+          # We deploy from the root because the dashboard settings say Root Directory: .
           echo "🚀 Deploying to Vercel..."
           vercel deploy --token=$VERCEL_TOKEN --yes
 
           # 6. Restore .git
-          cd ..
           mv .git_temp .git
           echo "✅ Deployment complete"
