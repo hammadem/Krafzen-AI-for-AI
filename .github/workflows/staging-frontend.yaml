@@ -77,10 +77,13 @@ jobs:
           echo "🧹 Cleaning Vercel metadata..."
           rm -rf .vercel frontend/.vercel
           
-          # 5. Deploy to Vercel
+          # Pull project settings (Modern CI way)
+          echo "📥 Pulling Vercel project settings..."
+          vercel pull --yes --environment=preview --token=$VERCEL_TOKEN
+          
+          # Deploy from ROOT
           echo "🚀 Deploying to Vercel..."
-          # The CLI will pick up VERCEL_ORG_ID and VERCEL_PROJECT_ID from the env block
-          vercel deploy --token=$VERCEL_TOKEN --confirm --yes
+          vercel deploy --token=$VERCEL_TOKEN --yes
           
           # Restore .git
           mv .git_temp .git

@@ -75,8 +75,11 @@ jobs:
           echo "🧹 Cleaning Vercel metadata..."
           rm -rf .vercel frontend/.vercel
           
+          echo "📥 Pulling Vercel project settings..."
+          vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+          
           echo "🚀 Deploying to Production..."
-          vercel deploy --prod --token=$VERCEL_TOKEN --confirm --yes
+          vercel deploy --prod --token=$VERCEL_TOKEN --yes
           
           mv .git_temp .git
           echo "✅ Production deployment complete"
