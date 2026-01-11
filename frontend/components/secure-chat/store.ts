@@ -8,7 +8,7 @@ export interface Message {
     content: string // In a real zero-leak env, this could be encryptedString
     imageUrl?: string
     timestamp: number
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
 }
 
 export interface ChatSession {

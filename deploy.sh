@@ -5,6 +5,14 @@
 
 set -e # Exit on error
 
+# Load environment variables from .env file if it exists
+if [ -f ".env" ]; then
+    set -a
+    source .env
+    set +a
+    export VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID
+fi
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -74,6 +82,11 @@ echo "-----------------------------------"
 # 3. Vercel Deployment
 echo -e "${YELLOW}🌐 [3/3] Vercel Frontend Deployment...${NC}"
 
+# Remove any existing .vercel directories to prevent conflict/incorrect settings
+echo -e "${YELLOW}🧹 Cleaning Vercel metadata...${NC}"
+rm -rf .vercel
+rm -rf frontend/.vercel
+
 echo -e "${YELLOW}Deploying backend is handled by Render (via git).${NC}"
 echo -e "${YELLOW}Deploying Frontend to Vercel...${NC}"
 
@@ -106,20 +119,30 @@ fi
 
 cd frontend || { echo -e "${RED}frontend directory not found!${NC}"; exit 1; }
 
-echo -e "${YELLOW}Running: npx vercel $VERCEL_ARGS${NC}"
-# Use yes string to pipe 'y' to any prompts Vercel might throw (like "Deploy to [Team]?")
-# actually 'npx -y vercel' is 'npx --yes', but vercel CLI also asks questions.
-# We append --yes to vercel args if strictly non-interactive, but 'vercel' command doesn't standardly have a -y flag for all prompts in the same way.
-# However, for an already linked project, it is usually silent except for 'Inspect'.
-# We can use 'vercel --confirm' (if available) or rely on previous linking.
-# 'vercel ... --yes' is deprecated or specific.
-# But since we are linked, usually it just goes.
+# Create .vercel directory and project.json manually for CI/CD compatibility
+# This ensures the project is properly linked even in CI environments
+if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+    echo -e "${YELLOW}🔗 Creating Vercel project link...${NC}"
+    mkdir -p .vercel
+    echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+fi
 
-# We allow vercel to fail without exiting the script immediately (set +e is safer here or just capturing status)
-set +e
-npx -y vercel $VERCEL_ARGS
-EXIT_CODE=$?
-set -e
+# Deploy with explicit flags for CI/CD compatibility
+echo -e "${YELLOW}Running: vercel deploy${NC}"
+if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ]; then
+    # Use explicit token and scope for CI/CD environments
+    set +e
+    vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes --scope=$VERCEL_ORG_ID
+    EXIT_CODE=$?
+    set -e
+else
+    # Fallback to npx vercel if env vars not set (local development)
+    echo -e "${YELLOW}⚠️  VERCEL_TOKEN or VERCEL_ORG_ID not set, using npx vercel (may require interactive login)${NC}"
+    set +e
+    npx -y vercel $VERCEL_ARGS
+    EXIT_CODE=$?
+    set -e
+fi
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo -e "${RED}❌ Vercel deployment failed!${NC}"

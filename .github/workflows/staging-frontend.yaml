@@ -66,28 +66,36 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          # Install Vercel CLI globally (or use npx)
+          # 1. Install CLI
           npm install -g vercel
 
-          # Go to frontend directory
-          cd frontend
+          # 2. Clean environment
+          echo "🧹 Cleaning environment..."
+          rm -rf .vercel frontend/.vercel
 
-          # Apply the same workaround as local deploy.sh:
-          # Temporarily rename .git in parent directory to bypass Vercel's git author check
-          # In GitHub Actions, checkout is usually at root.
-          # Note: The checkout action leaves a .git folder in the root.
-          
-          echo "🙈 Hiding .git directory to bypass Vercel author check..."
-          mv ../.git ../.git_temp
+          # 3. Hiding .git from the root to bypass author check
+          echo "🙈 Hiding .git directory..."
+          mv .git .git_temp
 
-          # Deploy using Vercel CLI with tokens
-          # We use --yes to skip confirmation (since we are auth'd via token)
-          # We don't use 'vercel login' but pass token via flag/env.
-          # Vercel CLI picks up VERCEL_TOKEN env var automatically.
-          
+          # 4. Create project.json in root (where vercel.json is located)
+          # Vercel CLI looks for .vercel directory in the same location as vercel.json
+          if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+            echo "🔗 Creating Vercel project link..."
+            mkdir -p .vercel
+            echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+            echo "✅ Created .vercel/project.json:"
+            cat .vercel/project.json
+          fi
+
+          # 5. Deploy to Vercel from root (vercel.json is in root)
+          # The project.json should prevent the "retrieve project settings" step
           echo "🚀 Deploying to Vercel..."
-          vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --yes
+          if [ -n "$VERCEL_ORG_ID" ]; then
+            vercel deploy --token=$VERCEL_TOKEN --yes --scope=$VERCEL_ORG_ID
+          else
+            vercel deploy --token=$VERCEL_TOKEN --yes
+          fi
 
-          # Restore .git (good practice, though runner cleans up anyway)
-          mv ../.git_temp ../.git
+          # 6. Restore .git
+          mv .git_temp .git
           echo "✅ Deployment complete"

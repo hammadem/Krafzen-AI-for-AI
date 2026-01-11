@@ -16,6 +16,7 @@ describe("Pricing Task", () => {
                 "Email support included",
                 "Unlimited Projects"
             ],
+            stripeLink: "https://buy.stripe.com/test_123"
         }
 
         render(<PricingDiv index={1} price={pricing} />);
@@ -30,6 +31,6 @@ describe("Pricing Task", () => {
             expect(screen.getByText(feature)).toBeInTheDocument();
         })
 
-        expect(screen.getByRole("link", { name: /Get Started/i })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: /Get Started/i })).toBeInTheDocument();
     })
 })

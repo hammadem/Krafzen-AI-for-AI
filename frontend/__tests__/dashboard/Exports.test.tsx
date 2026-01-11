@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react"
-import Exports from "@/app/(dashboard)/dashboard/exports/page";
+import Exports from "@/app/(dashboard)/workspace/exports/page";
 
 describe("Exports components", () => {
     it("renders the Exports section", () => {

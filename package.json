@@ -1,12 +1,14 @@
 {
-    "name": "krafzen-ai-root",
-    "version": "1.0.0",
-    "private": true,
-    "scripts": {
-        "dev": "./start-dev.sh",
-        "stop": "pkill -f uvicorn; pkill -f 'next dev'; pkill -f 'next-server'; echo '🛑 Stopped all servers'"
-    },
-    "devDependencies": {
-        "next": "^16.1.1"
-    }
+  "name": "krafzen-ai-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "./start-dev.sh",
+    "stop": "pkill -f uvicorn; pkill -f 'next dev'; pkill -f 'next-server'; echo '🛑 Stopped all servers'",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "next": "^16.1.1"
+  }
 }

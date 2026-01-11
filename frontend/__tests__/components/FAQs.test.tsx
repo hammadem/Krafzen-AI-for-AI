@@ -20,7 +20,7 @@ describe("FAQs components", () => {
             {
                 question: "Is there a free plan?",
                 answer:
-                    "Yes. The Free Plan allows limited projects per month with basic exports (DXF/DWG). It’s a great way to test the platform before upgrading.",
+                    "Yes. The Free Plan allows limited projects per month with basic exports (DXF/DWG). It's a great way to test the platform before upgrading.",
             },
         ];
 

@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react"
-import Billings from "@/app/(dashboard)/dashboard/billings/page";
+import Billings from "@/app/(dashboard)/workspace/billings/page";
 
 describe("Billings components", () => {
     it("renders the Billing section", () => {
