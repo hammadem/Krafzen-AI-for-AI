@@ -28,10 +28,31 @@ export async function apiClient(
         "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     };
 
-    console.log(process.env.NEXT_PUBLIC_API_URL + url);
+    // Get API URL - throw error if missing in production
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!apiUrl) {
+        const isProduction = typeof window !== 'undefined' && 
+            window.location.hostname !== 'localhost' && 
+            !window.location.hostname.includes('127.0.0.1');
+        
+        if (isProduction) {
+            console.error('NEXT_PUBLIC_API_URL is not set!');
+            return {
+                ok: false,
+                data: null,
+                error: {
+                    type: "CONFIG",
+                    message: "API URL not configured. Please set NEXT_PUBLIC_API_URL in environment variables."
+                }
+            };
+        }
+    }
+
+    const baseUrl = apiUrl || 'http://localhost:8000';
+    console.log(baseUrl + url);
 
     try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${url}`, {
+        const response = await fetch(`${baseUrl}${url}`, {
             method,
             headers,
             ...(body && method !== "GET" && method !== "DELETE"

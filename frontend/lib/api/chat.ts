@@ -1,4 +1,31 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Get API URL from environment variable
+// In production/staging, this MUST be set in Vercel environment variables
+// For local development, it defaults to localhost
+const getApiBaseUrl = (): string => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    
+    // If API URL is not set, check if we're in production
+    if (!apiUrl) {
+        // In browser/client-side, check if we're on a production domain
+        if (typeof window !== 'undefined') {
+            const isProduction = window.location.hostname !== 'localhost' && 
+                                !window.location.hostname.includes('127.0.0.1');
+            
+            if (isProduction) {
+                console.error('NEXT_PUBLIC_API_URL is not set in production environment!');
+                console.error('Current hostname:', window.location.hostname);
+                // Don't throw - let the fetch fail gracefully so we can show a better error
+                // The staging backend should be: https://krafzen-staging.onrender.com
+                return 'https://krafzen-staging.onrender.com';
+            }
+        }
+        
+        // Default to localhost for local development
+        return 'http://localhost:8000';
+    }
+    
+    return apiUrl;
+};
 
 export interface ChatResponse {
     session_id: string;
@@ -25,7 +52,7 @@ export async function sendChatMessage(
     const body: Record<string, unknown> = { message, history };
     if (sessionId) body.session_id = sessionId;
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/chat/generate`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/generate`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
@@ -44,7 +71,7 @@ export async function createChatSession(title: string = "New Chat", token: strin
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
     };
-    const res = await fetch(`${API_BASE_URL}/api/v1/chat/session`, {
+    const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/session`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ title })
@@ -55,14 +82,14 @@ export async function createChatSession(title: string = "New Chat", token: strin
 
 export async function fetchChatHistory(token: string) {
     const headers = { 'Authorization': `Bearer ${token}` };
-    const res = await fetch(`${API_BASE_URL}/api/v1/chat/history`, { headers });
+    const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/history`, { headers });
     if (!res.ok) throw new Error("Failed to fetch history");
     return res.json();
 }
 
 export async function fetchSessionMessages(sessionId: string, token: string) {
     const headers = { 'Authorization': `Bearer ${token}` };
-    const res = await fetch(`${API_BASE_URL}/api/v1/chat/history/${sessionId}`, { headers });
+    const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/history/${sessionId}`, { headers });
     if (!res.ok) throw new Error("Failed to fetch messages");
     return res.json();
 }
@@ -72,7 +99,7 @@ export async function updateChatSessionTitle(sessionId: string, title: string, t
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
     };
-    const res = await fetch(`${API_BASE_URL}/api/v1/chat/history/${sessionId}/title`, {
+    const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/history/${sessionId}/title`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ title })
@@ -83,7 +110,7 @@ export async function updateChatSessionTitle(sessionId: string, title: string, t
 
 export async function deleteChatSession(sessionId: string, token: string) {
     const headers = { 'Authorization': `Bearer ${token}` };
-    const res = await fetch(`${API_BASE_URL}/api/v1/chat/history/${sessionId}`, {
+    const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/history/${sessionId}`, {
         method: 'DELETE',
         headers
     });
@@ -100,7 +127,7 @@ export const downloadDxf = async (imageUrl: string, prompt?: string, token?: str
             headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await fetch(`${API_BASE_URL}/api/v1/chat/dxf`, {
+        const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/dxf`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ image_url: imageUrl, prompt }),
@@ -127,7 +154,7 @@ export async function transcribeAudio(audioBlob: Blob, token?: string): Promise<
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/transcribe`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/transcribe`, {
         method: 'POST',
         headers,
         body: formData,

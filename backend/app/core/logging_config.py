@@ -13,6 +13,12 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s" if settings.DEBUG else "%(message)s",
 )
 
+# Suppress verbose logs from third-party libraries
+# httpx/httpcore (used by Supabase client) logs at DEBUG level which is too verbose
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("hpack").setLevel(logging.WARNING)
+
 # Structured logging
 timestamper = structlog.processors.TimeStamper(fmt="iso")
 pre_chain = [

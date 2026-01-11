@@ -70,7 +70,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
         // 3️⃣ Fetch detailed profile from Backend
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/users/profile`, {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        fetch(`${apiUrl}/api/v1/users/profile`, {
           headers: {
             Authorization: `Bearer ${session.access_token}`
           }
