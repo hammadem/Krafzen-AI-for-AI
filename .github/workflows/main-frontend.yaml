@@ -78,11 +78,18 @@ jobs:
           # Navigate to frontend directory for Vercel operations
           cd frontend
           
-          # Deploy directly with project and scope flags (CI/CD approach)
-          # Skip vercel link and vercel pull - deploy directly with explicit project/org
-          echo "🚀 Deploying to Production..."
+          # Create .vercel directory and project.json manually for CI/CD
+          # This links the project without using interactive vercel link
           if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
-            vercel deploy --prod --token=$VERCEL_TOKEN --yes --scope=$VERCEL_ORG_ID --project=$VERCEL_PROJECT_ID
+            echo "🔗 Creating Vercel project link..."
+            mkdir -p .vercel
+            echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+          fi
+          
+          # Deploy with scope flag (if org ID is provided)
+          echo "🚀 Deploying to Production..."
+          if [ -n "$VERCEL_ORG_ID" ]; then
+            vercel deploy --prod --token=$VERCEL_TOKEN --yes --scope=$VERCEL_ORG_ID
           else
             vercel deploy --prod --token=$VERCEL_TOKEN --yes
           fi
