@@ -64,8 +64,7 @@ jobs:
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          # Using the specific Project ID found via CLI
-          VERCEL_PROJECT_ID: "prj_Lh6f7yB89nzDQrDrnGWggs7L8yse"
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           # 1. Install CLI
           npm install -g vercel
@@ -78,16 +77,24 @@ jobs:
           echo "🙈 Hiding .git directory..."
           mv .git .git_temp
 
-          # 4. Manually trigger a Link (Non-interactive)
-          # We create the project.json manually to force the CLI to use this specific project
-          echo "🔗 Creating Vercel project link..."
-          mkdir -p .vercel
-          echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+          # 4. Create project.json in root (where vercel.json is located)
+          # Vercel CLI looks for .vercel directory in the same location as vercel.json
+          if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+            echo "🔗 Creating Vercel project link..."
+            mkdir -p .vercel
+            echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+            echo "✅ Created .vercel/project.json:"
+            cat .vercel/project.json
+          fi
 
-          # 5. Deploy to Vercel (From ROOT)
-          # We deploy from the root because the dashboard settings say Root Directory: .
+          # 5. Deploy to Vercel from root (vercel.json is in root)
+          # The project.json should prevent the "retrieve project settings" step
           echo "🚀 Deploying to Vercel..."
-          vercel deploy --token=$VERCEL_TOKEN --yes
+          if [ -n "$VERCEL_ORG_ID" ]; then
+            vercel deploy --token=$VERCEL_TOKEN --yes --scope=$VERCEL_ORG_ID
+          else
+            vercel deploy --token=$VERCEL_TOKEN --yes
+          fi
 
           # 6. Restore .git
           mv .git_temp .git
