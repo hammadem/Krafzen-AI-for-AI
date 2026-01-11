@@ -75,12 +75,27 @@ jobs:
           echo "🧹 Cleaning Vercel metadata..."
           rm -rf .vercel frontend/.vercel
           
+          # Navigate to frontend directory for Vercel operations
+          cd frontend
+          
+          # Link project first if project ID and org ID are provided
+          # This creates the .vercel directory needed for vercel pull
+          if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+            echo "🔗 Linking Vercel project..."
+            # Try to link - continue even if it fails (project might already be linked)
+            vercel link --yes --token=$VERCEL_TOKEN --project=$VERCEL_PROJECT_ID --team=$VERCEL_ORG_ID || echo "⚠️  Link step completed (may already be linked)"
+          fi
+          
+          # Pull project settings (Modern CI way)
+          # This step is optional - if it fails, we can still deploy
           echo "📥 Pulling Vercel project settings..."
-          vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+          vercel pull --yes --environment=production --token=$VERCEL_TOKEN || echo "⚠️  Pull step failed, continuing with deployment..."
           
           echo "🚀 Deploying to Production..."
           vercel deploy --prod --token=$VERCEL_TOKEN --yes
           
+          # Return to root and restore .git
+          cd ..
           mv .git_temp .git
           echo "✅ Production deployment complete"
 
