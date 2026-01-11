@@ -39,6 +39,20 @@ export async function sendChatMessage(
     return response.json();
 }
 
+export async function createChatSession(title: string = "New Chat", token: string) {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+    const res = await fetch(`${API_BASE_URL}/api/v1/chat/session`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ title })
+    });
+    if (!res.ok) throw new Error("Failed to create session");
+    return res.json();
+}
+
 export async function fetchChatHistory(token: string) {
     const headers = { 'Authorization': `Bearer ${token}` };
     const res = await fetch(`${API_BASE_URL}/api/v1/chat/history`, { headers });
@@ -50,6 +64,20 @@ export async function fetchSessionMessages(sessionId: string, token: string) {
     const headers = { 'Authorization': `Bearer ${token}` };
     const res = await fetch(`${API_BASE_URL}/api/v1/chat/history/${sessionId}`, { headers });
     if (!res.ok) throw new Error("Failed to fetch messages");
+    return res.json();
+}
+
+export async function updateChatSessionTitle(sessionId: string, title: string, token: string) {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
+    const res = await fetch(`${API_BASE_URL}/api/v1/chat/history/${sessionId}/title`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ title })
+    });
+    if (!res.ok) throw new Error("Failed to update session title");
     return res.json();
 }
 

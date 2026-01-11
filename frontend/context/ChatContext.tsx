@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchChatHistory, sendChatMessage, deleteChatSession } from "@/lib/api/chat";
+import { fetchChatHistory, sendChatMessage, deleteChatSession, createChatSession, fetchSessionMessages, updateChatSessionTitle } from "@/lib/api/chat";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { Message } from "@/components/ChatInterface";
 import { useChatStore, ChatSession } from "@/components/secure-chat/store";
@@ -19,6 +19,7 @@ interface ChatContextType {
     sessions: SidebarSession[];
     currentSessionId: string | null;
     isLoading: boolean;
+    isLoadingMessages: boolean;
     inputValue: string;
     setInputValue: (val: string) => void;
     setCurrentSessionId: (id: string | null) => void;
@@ -42,6 +43,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
     } = useChatStore();
 
     const [inputValue, setInputValue] = useState("");
+    const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const { user } = useAuth(); // User usage kept if needed for logic later
 
     // Map store sessions to ChatSession interface
@@ -100,23 +102,52 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                     // 2. Fetch Messages for the most recent session (Auto-select)
                     const mostRecentSessionId = historyData[0].id; // API sort is usually desc
                     if (mostRecentSessionId) {
-                        const msgs = await import("@/lib/api/chat").then(mod => mod.fetchSessionMessages(mostRecentSessionId, user.access_token!));
+                        setIsLoadingMessages(true);
+                        try {
+                            const msgs = await import("@/lib/api/chat").then(mod => mod.fetchSessionMessages(mostRecentSessionId, user.access_token!));
 
-                        // Convert API messages to Store messages
-                        const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string }) => ({
-                            id: m.id,
-                            role: m.role,
-                            content: m.content || "",
-                            imageUrl: m.image_url,
-                            timestamp: new Date(m.created_at).getTime()
-                        }));
+                            // Convert API messages to Store messages
+                            const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string }) => ({
+                                id: m.id,
+                                role: m.role,
+                                content: m.content || "",
+                                imageUrl: m.image_url,
+                                timestamp: new Date(m.created_at).getTime()
+                            }));
 
-                        useChatStore.getState().appendMessages(mostRecentSessionId, storeMessages);
-                        useChatStore.getState().switchSession(mostRecentSessionId);
+                            useChatStore.getState().appendMessages(mostRecentSessionId, storeMessages);
+                            useChatStore.getState().switchSession(mostRecentSessionId);
+                        } catch (err) {
+                            console.error("Failed to load initial session messages:", err);
+                        } finally {
+                            setIsLoadingMessages(false);
+                        }
                     }
 
+                } else if (!activeSessionId && user.access_token) {
+                    // Only create new if truly empty - create in backend
+                    try {
+                        const newSession = await createChatSession("New Secure Chat", user.access_token);
+                        const sessionId = newSession.id;
+                        const hydratedSession: ChatSession = {
+                            id: sessionId,
+                            title: newSession.title || "New Secure Chat",
+                            messages: [],
+                            createdAt: new Date(newSession.created_at).getTime(),
+                            lastActive: new Date(newSession.updated_at).getTime(),
+                            isBackground: false
+                        };
+                        useChatStore.getState().setSessions({
+                            [sessionId]: hydratedSession
+                        });
+                        useChatStore.getState().switchSession(sessionId);
+                    } catch (err) {
+                        console.error("Failed to create initial session:", err);
+                        // Fallback to local session
+                        createSession("New Secure Chat");
+                    }
                 } else if (!activeSessionId) {
-                    // Only create new if truly empty
+                    // Not authenticated, create local session
                     createSession("New Secure Chat");
                 }
             } catch (err) {
@@ -128,8 +159,38 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.access_token]); // Depend on user token to reload on login/switch
 
-    const handleSwitchSession = (id: string | null) => {
-        if (id) switchSession(id);
+    const handleSwitchSession = async (id: string | null) => {
+        if (!id) return;
+        
+        // Switch to the session immediately
+        switchSession(id);
+        
+        // Load messages if not already loaded
+        const session = storeSessions[id];
+        if (session && session.messages.length === 0 && user?.access_token) {
+            setIsLoadingMessages(true);
+            try {
+                const msgs = await fetchSessionMessages(id, user.access_token);
+                
+                // Convert API messages to Store messages
+                const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string }) => ({
+                    id: m.id,
+                    role: m.role,
+                    content: m.content || "",
+                    imageUrl: m.image_url,
+                    timestamp: new Date(m.created_at).getTime()
+                }));
+                
+                useChatStore.getState().appendMessages(id, storeMessages);
+            } catch (err) {
+                console.error("Failed to load session messages:", err);
+            } finally {
+                setIsLoadingMessages(false);
+            }
+        } else {
+            // If messages are already loaded, ensure loading state is false
+            setIsLoadingMessages(false);
+        }
     };
 
     const handleSendMessage = async () => {
@@ -153,6 +214,16 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
         if (isFirstMessage) {
             const newTitle = userContent.slice(0, 30) + (userContent.length > 30 ? "..." : "");
             updateSessionTitle(currentId, newTitle);
+            
+            // Persist title update to backend
+            if (user?.access_token) {
+                try {
+                    await updateChatSessionTitle(currentId, newTitle, user.access_token);
+                } catch (err) {
+                    console.error("Failed to update session title in backend:", err);
+                    // Continue anyway - title is updated locally
+                }
+            }
         }
 
         try {
@@ -162,7 +233,15 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
             const token = session?.access_token;
 
             if (token) {
-                const response = await sendChatMessage(userContent, [], token, undefined);
+                // Pass the sessionId to ensure messages are saved to the correct session
+                const response = await sendChatMessage(userContent, [], token, currentId);
+
+                // Update session ID if backend created a new one (shouldn't happen if we pass sessionId)
+                if (response.session_id && response.session_id !== currentId) {
+                    // If backend returned a different session ID, we need to handle this
+                    // This shouldn't happen if we pass sessionId, but handle it just in case
+                    console.warn("Backend returned different session ID:", response.session_id);
+                }
 
                 // 4. Add Assistant Response to Store
                 addMessage(currentId, {
@@ -190,8 +269,39 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const createNewChat = () => {
-        createSession();
+    const createNewChat = async () => {
+        if (!user?.access_token) {
+            // If not authenticated, create local session only
+            createSession();
+            return;
+        }
+        
+        try {
+            // Create session in backend first
+            const newSession = await createChatSession("New Secure Chat", user.access_token);
+            
+            // Create session in store with backend session ID
+            const sessionId = newSession.id;
+            const hydratedSession: ChatSession = {
+                id: sessionId,
+                title: newSession.title || "New Secure Chat",
+                messages: [],
+                createdAt: new Date(newSession.created_at).getTime(),
+                lastActive: new Date(newSession.updated_at).getTime(),
+                isBackground: false
+            };
+            
+            // Add to store and switch to it
+            useChatStore.getState().setSessions({
+                ...storeSessions,
+                [sessionId]: hydratedSession
+            });
+            switchSession(sessionId);
+        } catch (err) {
+            console.error("Failed to create session in backend, creating local session:", err);
+            // Fallback to local session if backend fails
+            createSession();
+        }
     };
 
     const deleteSession = async (id: string) => {
@@ -216,6 +326,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 sessions: sessionsList,
                 currentSessionId: activeSessionId,
                 isLoading: isGenerating, // Now correctly scoped to active session
+                isLoadingMessages,
                 inputValue,
                 setInputValue,
                 setCurrentSessionId: handleSwitchSession,

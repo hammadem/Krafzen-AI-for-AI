@@ -34,6 +34,12 @@ class DxfRequest(BaseModel):
     image_url: str
     prompt: Optional[str] = None
 
+class CreateSessionRequest(BaseModel):
+    title: Optional[str] = "New Chat"
+
+class UpdateSessionTitleRequest(BaseModel):
+    title: str
+
 @router.post("/chat/dxf")
 async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_auth)):
     """
@@ -90,6 +96,13 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         if not session_id:
             # Create new session
             session_id = await chat_history_service.create_session(user_id, title=request.message[:30] + "...")
+        else:
+            # Validate that the session exists and belongs to the user
+            sessions = await chat_history_service.get_user_sessions(user_id)
+            if not any(s['id'] == session_id for s in sessions):
+                # Session doesn't exist or doesn't belong to user, create a new one
+                logger.warning(f"Session {session_id} not found for user {user_id}, creating new session")
+                session_id = await chat_history_service.create_session(user_id, title=request.message[:30] + "...")
         
         # 2. Persist User Message
         await chat_history_service.add_message(session_id, "user", request.message)
@@ -158,6 +171,24 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         logger.error(f"Chat generation error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/chat/session")
+async def create_chat_session(request: CreateSessionRequest, user_data: dict = Depends(require_auth)):
+    """
+    Create a new chat session.
+    """
+    user_id = user_data["user_id"]
+    try:
+        session_id = await chat_history_service.create_session(user_id, title=request.title or "New Chat")
+        sessions = await chat_history_service.get_user_sessions(user_id)
+        # Return the newly created session
+        new_session = next((s for s in sessions if s["id"] == session_id), None)
+        if new_session:
+            return new_session
+        return {"id": session_id, "title": request.title or "New Chat", "created_at": None, "updated_at": None}
+    except Exception as e:
+        logger.error(f"Error creating session: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/chat/history")
 async def get_chat_history(user_data: dict = Depends(require_auth)):
     """
@@ -184,6 +215,23 @@ async def get_session_history(session_id: str, user_data: dict = Depends(require
         raise HTTPException(status_code=403, detail="Access denied")
 
     return await chat_history_service.get_session_messages(session_id)
+
+@router.patch("/chat/history/{session_id}/title")
+async def update_session_title(session_id: str, request: UpdateSessionTitleRequest, user_data: dict = Depends(require_auth)):
+    """
+    Update the title of a chat session.
+    """
+    user_id = user_data["user_id"]
+    try:
+        success = await chat_history_service.update_session_title(session_id, user_id, request.title)
+        if not success:
+            raise HTTPException(status_code=404, detail="Session not found or access denied")
+        return {"status": "success", "id": session_id, "title": request.title}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating session title: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update session title")
 
 @router.delete("/chat/history/{session_id}")
 async def delete_chat_session(session_id: str, user_data: dict = Depends(require_auth)):

@@ -75,6 +75,27 @@ class ChatHistoryService:
             return sessions[0]["id"]
         return await self.create_session(user_id)
 
+    async def update_session_title(self, session_id: str, user_id: str, title: str) -> bool:
+        """Updates the title of a chat session."""
+        try:
+            # Verify ownership first
+            sessions = await self.get_user_sessions(user_id)
+            if not any(s['id'] == session_id for s in sessions):
+                logger.warning(f"Session {session_id} not found for user {user_id}")
+                return False
+            
+            # Update the title
+            from datetime import datetime
+            response = db.table("chat_sessions").update({
+                "title": title,
+                "updated_at": datetime.now().isoformat()
+            }).eq("id", session_id).execute()
+            
+            return response.data is not None
+        except Exception as e:
+            logger.error(f"Error updating session title: {e}", exc_info=True)
+            raise e
+
     async def delete_session(self, session_id: str, user_id: str) -> bool:
         """Deletes a chat session."""
         try:

@@ -28,6 +28,7 @@ interface ChatInterfaceProps {
     messages: Message[]
     inputValue: string
     isLoading: boolean
+    isLoadingMessages?: boolean
     onInputChange: (value: string) => void
     onSendMessage: () => void
 }
@@ -38,6 +39,7 @@ export function ChatInterface({
     messages,
     inputValue,
     isLoading,
+    isLoadingMessages = false,
     onInputChange,
     onSendMessage
 }: ChatInterfaceProps) {
@@ -184,7 +186,14 @@ export function ChatInterface({
         <div className="flex flex-col h-full w-full mx-auto overflow-hidden relative">
             <div className="flex-1 overflow-y-auto w-full custom-scrollbar">
                 <div className="max-w-3xl mx-auto w-full p-4 pb-32 space-y-8">
-                    {messages.length === 0 && (
+                    {isLoadingMessages && (
+                        <div className="flex flex-col items-center justify-center h-full space-y-4 mt-20">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-gray-400 text-sm">Loading messages...</p>
+                        </div>
+                    )}
+                    
+                    {!isLoadingMessages && messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-full space-y-8 mt-20">
                             <div className="text-center space-y-2">
                                 <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-gray-400">

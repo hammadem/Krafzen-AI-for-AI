@@ -14,6 +14,7 @@ export default function DashboardPage() {
         sessions,
         currentSessionId,
         isLoading,
+        isLoadingMessages,
         inputValue,
         setInputValue,
         setCurrentSessionId,
@@ -103,6 +104,7 @@ export default function DashboardPage() {
                                 messages={messages}
                                 inputValue={inputValue}
                                 isLoading={isLoading}
+                                isLoadingMessages={isLoadingMessages}
                                 onInputChange={setInputValue}
                                 onSendMessage={handleSendMessage}
                             />
