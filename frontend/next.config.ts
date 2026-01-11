@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Configure webpack for module resolution
+  // Configure webpack for module resolution (fallback for non-Turbopack builds)
   webpack: (config, { isServer }) => {
     // Ensure webpack resolves modules from the frontend directory first
     const frontendDir = path.resolve(__dirname);
@@ -42,6 +42,8 @@ const nextConfig: NextConfig = {
     
     return config;
   },
+  // Turbopack configuration (empty - Turbopack handles module resolution automatically)
+  turbopack: {},
 };
 
 export default nextConfig;
