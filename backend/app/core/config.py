@@ -78,7 +78,7 @@ class Settings(BaseSettings):
     API_2_CONVERT_URL: str = "https://api.api2convert.com/v2"
     
     # DXF Generation Strategy
-    DXF_GENERATION_METHOD: str = "API" # Options: "API", "LOCAL"
+    DXF_GENERATION_METHOD: str = "LOCAL" # Options: "API", "LOCAL"
 
     # Stripe
     STRIPE_SECRET_KEY: Optional[str] = None
