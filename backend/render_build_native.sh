@@ -7,10 +7,14 @@ echo "Build script started..."
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-# 2. Install Potrace locally (since we don't have sudo/apt in Native env)
+# 2. Install Potrace locally (force into project dir to ensure persistence)
 POTRACE_VERSION="1.16"
-INSTALL_DIR="$HOME/.local"
+# Use absolute path to project src
+INSTALL_DIR="$(pwd)/bin"
 POTRACE_BIN="$INSTALL_DIR/bin/potrace"
+
+echo "Installing Potrace to: $INSTALL_DIR"
+mkdir -p "$INSTALL_DIR"
 
 if [ ! -f "$POTRACE_BIN" ]; then
     echo "Potrace not found. Compiling from source..."

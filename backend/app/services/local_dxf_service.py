@@ -38,22 +38,30 @@ class LocalDxfService:
             
             # 3. Prepare Environment
             env = os.environ.copy()
-            home = os.environ.get("HOME", "")
-            local_bin = os.path.join(home, ".local", "bin")
+            # Look in project-local bin directory (where render_build_native.sh installs it)
+            # We are in app/services/local_dxf_service.py -> ../../.. -> backend/
+            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            local_bin = os.path.join(base_dir, "bin", "bin") # Make usually adds another /bin/ subdirectory
             
             # Explicitly add to path
             if os.path.isdir(local_bin):
                 env["PATH"] = f"{local_bin}:{env.get('PATH', '')}"
 
-            # DEBUG LOGGING
-            logger.info(f"HOME: {home}")
+            # DEBUG LOGGING 2.0
+            logger.info(f"Base Dir: {base_dir}")
             logger.info(f"Checking for potrace at: {os.path.join(local_bin, 'potrace')}")
             if os.path.exists(os.path.join(local_bin, 'potrace')):
                  logger.info("✅ Potrace binary FOUND at expected location!")
             else:
                  logger.warning("❌ Potrace binary NOT found at expected location.")
             
-            logger.info(f"Current PATH: {env.get('PATH')}")
+            # Fallback check for standard install
+            if not os.path.exists(os.path.join(local_bin, 'potrace')):
+                 # Check $HOME/.local/bin just in case
+                 home_bin = os.path.join(os.environ.get("HOME", ""), ".local", "bin")
+                 if os.path.exists(os.path.join(home_bin, 'potrace')):
+                      logger.info("✅ Potrace binary FOUND at HOME location (fallback)!")
+                      env["PATH"] = f"{home_bin}:{env.get('PATH', '')}"
             
             # Potrace command
             cmd = ["potrace", bmp_path, "-b", "dxf", "-o", dxf_path]
