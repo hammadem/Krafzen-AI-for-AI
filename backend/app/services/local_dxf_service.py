@@ -36,6 +36,14 @@ class LocalDxfService:
             dxf_filename = f"local_plan_{uuid.uuid4().hex}.dxf"
             dxf_path = os.path.join(self.output_dir, dxf_filename)
             
+            # 3. Prepare Environment
+            # If on Render Native, potrace might be in $HOME/.local/bin
+            env = os.environ.copy()
+            home = os.environ.get("HOME", "")
+            local_bin = os.path.join(home, ".local", "bin")
+            if os.path.isdir(local_bin):
+                env["PATH"] = f"{local_bin}:{env.get('PATH', '')}"
+            
             # Potrace command: potrace input.bmp -b dxf -o output.dxf
             # We can add parameters for optimization if needed (e.g., -u for unit 10)
             cmd = ["potrace", bmp_path, "-b", "dxf", "-o", dxf_path]
@@ -43,7 +51,8 @@ class LocalDxfService:
             logger.info(f"Executing potrace: {' '.join(cmd)}")
             
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+                # Pass the updated env with local bin path
+                result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
             except FileNotFoundError:
                 logger.error("Potrace executable not found. Please install potrace (e.g. 'brew install potrace').")
                 raise Exception("Potrace executable not found on the system. Local DXF generation requires 'potrace' to be installed.")
