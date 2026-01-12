@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { Carousel, CarouselContent, CarouselItem } from "./ui/carousel";
-import Autoplay from "embla-carousel-autoplay";
+import AutoScroll from "embla-carousel-auto-scroll";
 
 export default function Partners() {
     return (
@@ -27,10 +27,13 @@ export default function Partners() {
 
             <div className="sm:hidden block w-full">
                 <Carousel
-                    opts={{ loop: true }}
+                    opts={{
+                        loop: true,
+                        align: "start",
+                    }}
                     plugins={[
-                        Autoplay({
-                            delay: 2000,
+                        AutoScroll({
+                            speed: 2,              // ✅ THIS WORKS
                             stopOnInteraction: false,
                             stopOnMouseEnter: false,
                         }),
