@@ -14,9 +14,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Parser module removed
-parser_available = False
-parser = None
+
 
 
 app = FastAPI(
