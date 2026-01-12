@@ -47,16 +47,12 @@ async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_au
     Uses External Service (Api2Convert) for high-fidelity Raster-to-Vector conversion.
     """
     try:
-        user_id = user_data["user_id"] # Just to verify auth
-        if settings.DXF_GENERATION_METHOD == "LOCAL":
-             from app.services.local_dxf_service import local_dxf_service
-             logger.info("Requesting Local DXF Conversion (Potrace)...")
-             file_path = await local_dxf_service.convert_to_dxf(request.image_url)
-        else:
-             from app.services.external_dxf_service import ExternalDxfService
-             dxf_service = ExternalDxfService() 
-             logger.info(f"Requesting External DXF Conversion for image...")
-             file_path = await dxf_service.convert_to_dxf(request.image_url)
+        # Validate auth
+        user_id = user_data["user_id"] 
+        
+        from app.services.local_dxf_service import local_dxf_service
+        logger.info("Requesting Local DXF Conversion (Potrace)...")
+        file_path = await local_dxf_service.convert_to_dxf(request.image_url)
 
         # Check and Return
         if not os.path.exists(file_path):

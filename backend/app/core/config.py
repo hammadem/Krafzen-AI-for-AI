@@ -73,12 +73,10 @@ class Settings(BaseSettings):
     # Stable Diffusion / Image Config
     USE_GEMINI_FOR_IMAGE: bool = True
     
-    # External DXF Service (Api2Convert)
-    API_2_CONVERT_KEY: Optional[str] = None
-    API_2_CONVERT_URL: str = "https://api.api2convert.com/v2"
+    # External DXF Service (Removed in favor of local Potrace)
+    # API_2_CONVERT_KEY / URL removed.
     
-    # DXF Generation Strategy
-    DXF_GENERATION_METHOD: str = "LOCAL" # Options: "API", "LOCAL"
+    # Simple Local DXF Generation is now default and only option.
 
     # Stripe
     STRIPE_SECRET_KEY: Optional[str] = None
