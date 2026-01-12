@@ -37,15 +37,25 @@ class LocalDxfService:
             dxf_path = os.path.join(self.output_dir, dxf_filename)
             
             # 3. Prepare Environment
-            # If on Render Native, potrace might be in $HOME/.local/bin
             env = os.environ.copy()
             home = os.environ.get("HOME", "")
             local_bin = os.path.join(home, ".local", "bin")
+            
+            # Explicitly add to path
             if os.path.isdir(local_bin):
                 env["PATH"] = f"{local_bin}:{env.get('PATH', '')}"
+
+            # DEBUG LOGGING
+            logger.info(f"HOME: {home}")
+            logger.info(f"Checking for potrace at: {os.path.join(local_bin, 'potrace')}")
+            if os.path.exists(os.path.join(local_bin, 'potrace')):
+                 logger.info("✅ Potrace binary FOUND at expected location!")
+            else:
+                 logger.warning("❌ Potrace binary NOT found at expected location.")
             
-            # Potrace command: potrace input.bmp -b dxf -o output.dxf
-            # We can add parameters for optimization if needed (e.g., -u for unit 10)
+            logger.info(f"Current PATH: {env.get('PATH')}")
+            
+            # Potrace command
             cmd = ["potrace", bmp_path, "-b", "dxf", "-o", dxf_path]
             
             logger.info(f"Executing potrace: {' '.join(cmd)}")
