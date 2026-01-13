@@ -18,7 +18,7 @@ function renderWithBold(text: string) {
 
 export default function Faqs() {
     const [currentQues, setQues] = useState<number>(0);
-    const [value, setValue] = useState<string>("");
+    const [value, setValue] = useState<string>(faqs[0]?.type || "General");
 
     return (
         <>
