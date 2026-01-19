@@ -10,5 +10,8 @@
   "devDependencies": {
     "husky": "^9.1.7",
     "next": "^16.1.1"
+  },
+  "dependencies": {
+    "embla-carousel-auto-scroll": "^8.6.0"
   }
 }

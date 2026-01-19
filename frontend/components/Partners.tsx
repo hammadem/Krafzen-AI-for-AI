@@ -1,6 +1,6 @@
 import Image from "next/image";
-import { CarouselContent, CarouselItem } from "./ui/carousel";
-import RotateCarousel from "./ui/RotateCarousel";
+import { Carousel, CarouselContent, CarouselItem } from "./ui/carousel";
+import AutoScroll from "embla-carousel-auto-scroll";
 
 export default function Partners() {
     return (
@@ -25,9 +25,21 @@ export default function Partners() {
                 />
             </div>
 
-            {/* //fix it */}
             <div className="sm:hidden block w-full">
-                <RotateCarousel>
+                <Carousel
+                    opts={{
+                        loop: true,
+                        align: "start",
+                    }}
+                    plugins={[
+                        AutoScroll({
+                            speed: 2,              // ✅ THIS WORKS
+                            stopOnInteraction: false,
+                            stopOnMouseEnter: false,
+                        }),
+                    ]}
+                    className="w-full"
+                >
                     <CarouselContent>
                         <CarouselItem>
                             <div className="h-[10vh] relative w-[80%] mx-auto">
@@ -77,7 +89,7 @@ export default function Partners() {
                         </CarouselItem>
 
                     </CarouselContent>
-                </RotateCarousel>
+                </Carousel>
             </div>
         </div >
     );
