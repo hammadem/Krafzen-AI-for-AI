@@ -3,14 +3,14 @@
 // For local development, it defaults to localhost
 const getApiBaseUrl = (): string => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    
+
     // If API URL is not set, check if we're in production
     if (!apiUrl) {
         // In browser/client-side, check if we're on a production domain
         if (typeof window !== 'undefined') {
-            const isProduction = window.location.hostname !== 'localhost' && 
-                                !window.location.hostname.includes('127.0.0.1');
-            
+            const isProduction = window.location.hostname !== 'localhost' &&
+                !window.location.hostname.includes('127.0.0.1');
+
             if (isProduction) {
                 console.error('NEXT_PUBLIC_API_URL is not set in production environment!');
                 console.error('Current hostname:', window.location.hostname);
@@ -19,11 +19,11 @@ const getApiBaseUrl = (): string => {
                 return 'https://krafzen-api-staging.onrender.com';
             }
         }
-        
+
         // Default to localhost for local development
         return 'http://localhost:8000';
     }
-    
+
     return apiUrl;
 };
 
@@ -132,6 +132,8 @@ export const downloadDxf = async (imageUrl: string, prompt?: string, token?: str
             headers,
             body: JSON.stringify({ image_url: imageUrl, prompt }),
         });
+
+        console.log(await response.json());
 
         if (!response.ok) {
             throw new Error(`Failed to download DXF: ${response.statusText}`);

@@ -76,7 +76,7 @@ export default function LoginWithCred() {
 
     return (
         <div className="w-full flex flex-col items-center gap-8 justify-center h-full">
-            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Log in</h1>
+            <h1 className="text-4xl py-4 font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Log in</h1>
 
             <Card className="w-full max-w-md bg-zinc-900 border border-white/10 text-white shadow-xl">
                 <CardContent className="pt-6">

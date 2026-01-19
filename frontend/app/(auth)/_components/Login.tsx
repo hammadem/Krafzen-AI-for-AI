@@ -1,6 +1,5 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import Image from "next/image";
 import Link from "next/link";
@@ -31,7 +30,7 @@ export default function Login() {
             <div className="absolute inset-0 bg-black/70 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl -z-10"></div>
 
             <div className="flex flex-col items-center gap-8 w-full p-8">
-                <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400 self-center">Log in</h1>
+                <h1 className="text-4xl font-bold py-4 bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400 self-center">Log in</h1>
 
                 <div className="flex flex-col gap-4 w-full">
                     <div className="grid grid-cols-2 gap-4 w-full">

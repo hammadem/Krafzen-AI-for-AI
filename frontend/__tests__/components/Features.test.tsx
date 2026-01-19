@@ -1,14 +1,21 @@
 import { render, screen } from "@testing-library/react"
 import Features from "@/components/Features"
+import { Box } from "@/components/Features"
 
 describe("Features Components", () => {
-    it("renders the Features section", () => {
-        render(<Features />);
+    it("renders Box Components section", () => {
+        render(<Box bgUrl="/bgUrl" img="/img" h1="h1" p="p" />);
 
-        expect(screen.getByAltText(/Voice to DWG/i)).toBeInTheDocument();
-        expect(screen.getByAltText(/Auto MEP As-Builts/i)).toBeInTheDocument();
-        expect(screen.getByAltText(/AI Error Detections/i)).toBeInTheDocument();
-        expect(screen.getByAltText(/CAD\/BIM Integrations/i)).toBeInTheDocument();
+        expect(screen.getByAltText(/Background/)).toBeInTheDocument();
+
+        expect(screen.getByAltText(/\img/i)).toBeInTheDocument();
+        expect(screen.getByText(/h1/i)).toBeInTheDocument();
+        expect(screen.getByText(/p/i)).toBeInTheDocument();
+    })
+
+
+    it("renders the How it works section", () => {
+        render(<Features />);
 
         // How it works tests
         expect(screen.getByText(/How it works/)).toBeInTheDocument();

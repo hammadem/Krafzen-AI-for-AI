@@ -33,9 +33,7 @@ export default function SetNewPassword() {
 
     return (
         <div className="flex flex-col items-center gap-12">
-
             <div className="flex text-white flex-col items-center w-full">
-
                 <h1 className="text-[5vh]">Set new password</h1>
                 <span className="text-[2vh]">
                     <p>Your Password must include:</p>
