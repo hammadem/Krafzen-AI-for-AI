@@ -133,6 +133,8 @@ export const downloadDxf = async (imageUrl: string, prompt?: string, token?: str
             body: JSON.stringify({ image_url: imageUrl, prompt }),
         });
 
+        console.log(await response.json());
+
         if (!response.ok) {
             let errorMessage = response.statusText;
             try {

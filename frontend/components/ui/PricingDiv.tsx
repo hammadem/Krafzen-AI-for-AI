@@ -7,9 +7,11 @@ import StripePaymentModal from "../StripePaymentModal";
 export default function PricingDiv({
   price,
   index,
+  monthly
 }: {
   price: PricingDetails;
   index: number;
+  monthly: boolean;
 }) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
@@ -51,7 +53,11 @@ export default function PricingDiv({
           <div className="flex items-baseline mb-6">
             <span className="text-4xl font-bold text-white">{price.price}</span>
             {price.price !== "Custom" && (
-              <span className="text-gray-400 ml-2">/month</span>
+              monthly
+                ?
+                <span className="text-gray-400 ml-2">/month</span>
+                :
+                <span className="text-gray-400 ml-2">/year</span>
             )}
           </div>
 

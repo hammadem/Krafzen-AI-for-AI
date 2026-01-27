@@ -79,13 +79,13 @@ export default function SignUp() {
 
 
     return (
-        <div className="w-full flex flex-col items-center gap-8 min-h-screen justify-center py-10">
-            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Sign up</h1>
+        <div className="w-full flex flex-col items-center sm:gap-0 gap-8 justify-center">
+            <h1 className="text-4xl font-bold py-4 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Sign up</h1>
 
             <Card className="w-full max-w-md bg-zinc-900 border border-white/10 text-white shadow-xl">
-                <CardContent className="pt-6">
+                <CardContent className="">
                     <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
-                        <FieldGroup className="space-y-4">
+                        <FieldGroup className="sm:space-y-0 space-y-4">
                             <div className="flex gap-4">
                                 <Controller
                                     name="firstname"

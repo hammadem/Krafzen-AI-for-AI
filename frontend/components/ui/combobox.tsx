@@ -73,7 +73,7 @@ export function ComboboxDemo({
           z-[99999]
           overflow-hidden
           transition-all duration-300 ease-in-out
-          ${open ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"}
+          ${open ? "max-h-[520px] opacity-100" : "max-h-0 opacity-0"}
         `}
             >
                 {/* Search input */}
@@ -93,7 +93,7 @@ export function ComboboxDemo({
                 />
 
                 {/* List */}
-                <ul className="max-h-[500px] overflow-y-auto">
+                <ul className="max-h-[700px] overflow-y-auto">
                     {filtered.map((item) => (
                         <li
                             key={item.type}
@@ -105,9 +105,9 @@ export function ComboboxDemo({
                             className="
                 flex items-center
                 gap-5
-                h-[8vh]
+                h-[9vh]
                 px-5
-                my-2
+                my-4
                 text-xl text-white font-normal
                 rounded-md
                 cursor-pointer

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/input-group";
 import { formSchema } from "@/lib/validation";
 import { toast } from "react-toastify";
+import { useState } from "react";
 
 
 export default function SupportForm() {
@@ -37,13 +38,41 @@ export default function SupportForm() {
             phonenumber: "",
             message: ""
         },
-    })
+    });
+    const [loading, setLoading] = useState<boolean>(false);
 
-    function onSubmit(data: z.infer<typeof formSchema>) {
-        console.log(data);
-        toast.success("Thank you! We've received your message and will get back to you soon.");
-        form.reset();
+    async function onSubmit(data: z.infer<typeof formSchema>) {
+        try {
+            setLoading(true);
+            const res = await fetch(
+                process.env.NEXT_PUBLIC_SUPABASE_RESEND_EMAIL_URL! || "",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(data),
+                }
+            );
+
+            const result = await res.json();
+
+            if (!res.ok || !result.success) {
+                throw new Error(result.error || "Failed to send message");
+            }
+
+            toast.success(
+                "Thank you! We've received your message and will get back to you soon."
+            );
+            form.reset();
+        } catch (error) {
+            console.error(error);
+            toast.error("Something went wrong. Please try again later.");
+        } finally {
+            setLoading(false);
+        }
     }
+
 
     return (
         <Card className="w-full sm:max-w-xl bg-zinc-900 border border-white/10 text-white shadow-xl">
@@ -168,8 +197,8 @@ export default function SupportForm() {
             </CardContent>
             <CardFooter>
                 <div className="w-full">
-                    <Button type="submit" form="form-rhf-demo" className="rounded-full w-full h-12 text-black font-semibold bg-green-400 hover:bg-green-500 transition-colors">
-                        Submit
+                    <Button disabled={loading} type="submit" form="form-rhf-demo" className="rounded-full w-full h-12 text-black font-semibold bg-green-400 hover:bg-green-500 transition-colors">
+                        {loading ? "Submitting" : "Submit"}
                     </Button>
                 </div>
             </CardFooter>

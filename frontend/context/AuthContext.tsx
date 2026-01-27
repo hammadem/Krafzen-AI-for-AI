@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
 
 interface AuthContextType {
   user: User | null; // ← from your global types
@@ -18,7 +17,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const supabase = createClient();
-  const router = useRouter();
 
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
