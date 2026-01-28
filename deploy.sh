@@ -117,28 +117,32 @@ if [ -d ".git" ]; then
     mv ".git" ".git_temp"
 fi
 
-# Create .vercel directory and project.json in root (where vercel.json is located)
-# Vercel CLI looks for .vercel directory in the same location as vercel.json
-if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
-    echo -e "${YELLOW}🔗 Creating Vercel project link...${NC}"
-    mkdir -p .vercel
-    echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
-    echo -e "${GREEN}✅ Created .vercel/project.json${NC}"
-fi
-
 # Deploy from root (vercel.json is in root)
-# Note: --scope is not needed when .vercel/project.json exists with orgId and projectId
+# Remove .vercel directory to let Vercel handle project linking properly
+# The error message suggests removing .vercel directory when project settings can't be retrieved
+echo -e "${YELLOW}🧹 Removing .vercel directory to allow fresh project linking...${NC}"
+rm -rf .vercel
+
 echo -e "${YELLOW}Running: vercel deploy${NC}"
-if [ -n "$VERCEL_TOKEN" ]; then
-    # Use explicit token for CI/CD environments
-    # The .vercel/project.json file handles project linking
+if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ]; then
+    # Use explicit token and project flag for CI/CD environments
+    # The --project flag tells Vercel which project to deploy to
     set +e
-    vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+    vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes --project=$VERCEL_PROJECT_ID
     EXIT_CODE=$?
     set -e
+    
+    # If that fails, try without --project flag (Vercel might auto-detect)
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo -e "${YELLOW}⚠️  Deployment with --project flag failed, trying without...${NC}"
+        set +e
+        vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+        EXIT_CODE=$?
+        set -e
+    fi
 else
     # Fallback to npx vercel if env vars not set (local development)
-    echo -e "${YELLOW}⚠️  VERCEL_TOKEN not set, using npx vercel (may require interactive login)${NC}"
+    echo -e "${YELLOW}⚠️  VERCEL_TOKEN or VERCEL_PROJECT_ID not set, using npx vercel (may require interactive login)${NC}"
     set +e
     npx -y vercel $VERCEL_ARGS
     EXIT_CODE=$?
