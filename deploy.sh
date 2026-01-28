@@ -82,10 +82,16 @@ echo "-----------------------------------"
 # 3. Vercel Deployment
 echo -e "${YELLOW}🌐 [3/3] Vercel Frontend Deployment...${NC}"
 
-# Remove any existing .vercel directories to prevent conflict/incorrect settings
-echo -e "${YELLOW}🧹 Cleaning Vercel metadata...${NC}"
-rm -rf .vercel
-rm -rf frontend/.vercel
+# Check if .vercel directory exists and is valid (from vercel link)
+if [ -d ".vercel" ] && [ -f ".vercel/project.json" ]; then
+    echo -e "${GREEN}✅ Found existing .vercel directory (project already linked)${NC}"
+    echo -e "${YELLOW}   Using existing project link...${NC}"
+else
+    # Remove any existing .vercel directories to prevent conflict/incorrect settings
+    echo -e "${YELLOW}🧹 Cleaning Vercel metadata...${NC}"
+    rm -rf .vercel
+    rm -rf frontend/.vercel
+fi
 
 echo -e "${YELLOW}Deploying backend is handled by Render (via git).${NC}"
 echo -e "${YELLOW}Deploying Frontend to Vercel...${NC}"
@@ -119,10 +125,27 @@ fi
 
 # Deploy from root (vercel.json is in root)
 echo -e "${YELLOW}Running: vercel deploy${NC}"
-if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
-    # Remove .vercel directory completely - let Vercel handle project linking
-    # The error message explicitly says to remove .vercel directory
-    echo -e "${YELLOW}🧹 Removing .vercel directory (as per Vercel error message)...${NC}"
+
+# Check if we have a valid .vercel directory from vercel link
+if [ -d ".vercel" ] && [ -f ".vercel/project.json" ]; then
+    # Use existing project link (from vercel link command)
+    echo -e "${GREEN}✅ Using existing project link from .vercel directory${NC}"
+    if [ -n "$VERCEL_TOKEN" ]; then
+        set +e
+        vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+        EXIT_CODE=$?
+        set -e
+    else
+        # Deploy without token (uses local auth from vercel login)
+        echo -e "${YELLOW}⚠️  VERCEL_TOKEN not set, using local authentication...${NC}"
+        set +e
+        vercel deploy $VERCEL_ARGS --yes
+        EXIT_CODE=$?
+        set -e
+    fi
+elif [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+    # No existing .vercel directory, try to create one
+    echo -e "${YELLOW}🧹 No existing .vercel directory found, attempting to create project link...${NC}"
     rm -rf .vercel
     
     # Try deploying without project.json - Vercel should auto-detect or prompt
