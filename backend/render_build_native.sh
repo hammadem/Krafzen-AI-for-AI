@@ -3,6 +3,17 @@ set -e
 
 echo "Build script started..."
 
+# 0. Install system dependencies needed for potrace compilation (if on Linux/Ubuntu)
+if command -v apt-get &> /dev/null; then
+    echo "Installing build dependencies..."
+    apt-get update && apt-get install -y \
+        wget \
+        build-essential \
+        automake \
+        autoconf \
+        || echo "Warning: Some build dependencies may not be installed"
+fi
+
 # 1. Install Python Dependencies
 echo "Installing Python dependencies..."
 pip install -r requirements.txt

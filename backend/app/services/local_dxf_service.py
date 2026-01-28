@@ -43,27 +43,105 @@ class LocalDxfService:
             base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             local_bin = os.path.join(base_dir, "bin", "bin") # Make usually adds another /bin/ subdirectory
             
+            # Platform-specific executable name
+            is_windows = os.name == 'nt'
+            potrace_exe = 'potrace.exe' if is_windows else 'potrace'
+            path_sep = os.pathsep  # ';' on Windows, ':' on Unix
+            
+            # Helper function to check if potrace exists at a path
+            def check_potrace(path_dir):
+                potrace_path = os.path.join(path_dir, potrace_exe)
+                if os.path.exists(potrace_path):
+                    return potrace_path
+                # Also check without .exe extension (for Unix-style installs on Windows)
+                if is_windows:
+                    potrace_path_no_ext = os.path.join(path_dir, 'potrace')
+                    if os.path.exists(potrace_path_no_ext):
+                        return potrace_path_no_ext
+                return None
+
             # Explicitly add to path
             if os.path.isdir(local_bin):
-                env["PATH"] = f"{local_bin}:{env.get('PATH', '')}"
+                env["PATH"] = f"{local_bin}{path_sep}{env.get('PATH', '')}"
 
             # DEBUG LOGGING 2.0
             logger.info(f"Base Dir: {base_dir}")
-            logger.info(f"Checking for potrace at: {os.path.join(local_bin, 'potrace')}")
-            if os.path.exists(os.path.join(local_bin, 'potrace')):
-                 logger.info("✅ Potrace binary FOUND at expected location!")
+            logger.info(f"Platform: {'Windows' if is_windows else 'Unix-like'}")
+            logger.info(f"Checking for potrace at: {os.path.join(local_bin, potrace_exe)}")
+            potrace_found = False
+            potrace_path = check_potrace(local_bin)
+            if potrace_path:
+                 logger.info(f"✅ Potrace binary FOUND at expected location: {potrace_path}")
+                 potrace_found = True
             else:
                  logger.warning("❌ Potrace binary NOT found at expected location.")
             
-            # Fallback check for standard install
-            if not os.path.exists(os.path.join(local_bin, 'potrace')):
-                 # Check $HOME/.local/bin just in case
-                 home_bin = os.path.join(os.environ.get("HOME", ""), ".local", "bin")
-                 if os.path.exists(os.path.join(home_bin, 'potrace')):
-                      logger.info("✅ Potrace binary FOUND at HOME location (fallback)!")
-                      env["PATH"] = f"{home_bin}:{env.get('PATH', '')}"
+            # Fallback checks for standard install locations
+            if not potrace_found:
+                 # Check $HOME/.local/bin (Unix) or %LOCALAPPDATA% (Windows)
+                 if is_windows:
+                     home_bin = os.path.join(os.environ.get("LOCALAPPDATA", ""), "bin")
+                 else:
+                     home_bin = os.path.join(os.environ.get("HOME", ""), ".local", "bin")
+                 
+                 potrace_path = check_potrace(home_bin)
+                 if potrace_path:
+                      logger.info(f"✅ Potrace binary FOUND at HOME location (fallback): {potrace_path}")
+                      env["PATH"] = f"{home_bin}{path_sep}{env.get('PATH', '')}"
+                      potrace_found = True
+                 
+                 # Check platform-specific package manager locations
+                 if not potrace_found:
+                     if is_windows:
+                         # Windows: Check common installation paths
+                         windows_paths = [
+                             os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"), "potrace", "bin"),
+                             os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"), "potrace", "bin"),
+                             os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "potrace", "bin"),
+                             # Chocolatey
+                             os.path.join(os.environ.get("ChocolateyInstall", "C:\\ProgramData\\chocolatey"), "bin"),
+                             # Scoop
+                             os.path.join(os.environ.get("USERPROFILE", ""), "scoop", "apps", "potrace", "current", "bin"),
+                         ]
+                         for win_path in windows_paths:
+                             potrace_path = check_potrace(win_path)
+                             if potrace_path:
+                                 logger.info(f"✅ Potrace binary FOUND at Windows location: {potrace_path}")
+                                 env["PATH"] = f"{win_path}{path_sep}{env.get('PATH', '')}"
+                                 potrace_found = True
+                                 break
+                     else:
+                         # macOS/Linux: Check Homebrew installation paths
+                         # Apple Silicon Homebrew
+                         homebrew_arm = "/opt/homebrew/bin"
+                         potrace_path = check_potrace(homebrew_arm)
+                         if potrace_path:
+                             logger.info(f"✅ Potrace binary FOUND at Homebrew (Apple Silicon) location: {potrace_path}")
+                             env["PATH"] = f"{homebrew_arm}{path_sep}{env.get('PATH', '')}"
+                             potrace_found = True
+                         else:
+                             # Intel Homebrew
+                             homebrew_intel = "/usr/local/bin"
+                             potrace_path = check_potrace(homebrew_intel)
+                             if potrace_path:
+                                 logger.info(f"✅ Potrace binary FOUND at Homebrew (Intel) location: {potrace_path}")
+                                 env["PATH"] = f"{homebrew_intel}{path_sep}{env.get('PATH', '')}"
+                                 potrace_found = True
+                             # Linux: Check /usr/bin and /usr/local/bin
+                             linux_paths = ["/usr/bin", "/usr/local/bin"]
+                             for linux_path in linux_paths:
+                                 potrace_path = check_potrace(linux_path)
+                                 if potrace_path:
+                                     logger.info(f"✅ Potrace binary FOUND at Linux location: {potrace_path}")
+                                     env["PATH"] = f"{linux_path}{path_sep}{env.get('PATH', '')}"
+                                     potrace_found = True
+                                     break
+                 
+                 # If still not found, log that we'll rely on system PATH
+                 if not potrace_found:
+                     logger.info("ℹ️  Potrace not found in common locations, relying on system PATH")
             
-            # Potrace command
+            # Potrace command - use 'potrace' (subprocess will find .exe on Windows automatically)
             cmd = ["potrace", bmp_path, "-b", "dxf", "-o", dxf_path]
             
             logger.info(f"Executing potrace: {' '.join(cmd)}")
@@ -72,8 +150,13 @@ class LocalDxfService:
                 # Pass the updated env with local bin path
                 result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
             except FileNotFoundError:
-                logger.error("Potrace executable not found. Please install potrace (e.g. 'brew install potrace').")
-                raise Exception("Potrace executable not found on the system. Local DXF generation requires 'potrace' to be installed.")
+                install_instructions = (
+                    "Windows: Download from http://potrace.sourceforge.net/ or use Chocolatey: choco install potrace"
+                    if is_windows
+                    else "macOS: brew install potrace | Linux: apt-get install potrace or yum install potrace"
+                )
+                logger.error(f"Potrace executable not found. Please install potrace. {install_instructions}")
+                raise Exception(f"Potrace executable not found on the system. Local DXF generation requires 'potrace' to be installed. {install_instructions}")
 
             if result.returncode != 0:
                 logger.error(f"Potrace execution failed: {result.stderr}")

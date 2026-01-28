@@ -67,6 +67,7 @@ render.yaml.lock  # If generated
 # Misc
 *.bak
 *.tmp
+docs/LAUNCH_LOAD_CAPACITY.md
 
 # Test artifacts
 backend/test_output/
