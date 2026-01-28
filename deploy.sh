@@ -129,19 +129,24 @@ echo -e "${YELLOW}Running: vercel deploy${NC}"
 # Check if we have a valid .vercel directory from vercel link
 if [ -d ".vercel" ] && [ -f ".vercel/project.json" ]; then
     # Use existing project link (from vercel link command)
+    # When using local link, prefer local authentication over token
+    # Token authentication can conflict with local project links
     echo -e "${GREEN}✅ Using existing project link from .vercel directory${NC}"
-    if [ -n "$VERCEL_TOKEN" ]; then
-        set +e
-        vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
-        EXIT_CODE=$?
-        set -e
-    else
-        # Deploy without token (uses local auth from vercel login)
-        echo -e "${YELLOW}⚠️  VERCEL_TOKEN not set, using local authentication...${NC}"
-        set +e
-        vercel deploy $VERCEL_ARGS --yes
-        EXIT_CODE=$?
-        set -e
+    echo -e "${YELLOW}   Using local authentication (from vercel login)...${NC}"
+    set +e
+    vercel deploy $VERCEL_ARGS --yes
+    EXIT_CODE=$?
+    set -e
+    
+    # If local auth fails, try with token as fallback
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo -e "${YELLOW}⚠️  Local authentication failed, trying with token...${NC}"
+        if [ -n "$VERCEL_TOKEN" ]; then
+            set +e
+            vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+            EXIT_CODE=$?
+            set -e
+        fi
     fi
 elif [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
     # No existing .vercel directory, try to create one
