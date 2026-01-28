@@ -117,17 +117,16 @@ if [ -d ".git" ]; then
     mv ".git" ".git_temp"
 fi
 
-cd frontend || { echo -e "${RED}frontend directory not found!${NC}"; exit 1; }
-
-# Create .vercel directory and project.json manually for CI/CD compatibility
-# This ensures the project is properly linked even in CI environments
+# Create .vercel directory and project.json in root (where vercel.json is located)
+# Vercel CLI looks for .vercel directory in the same location as vercel.json
 if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
     echo -e "${YELLOW}🔗 Creating Vercel project link...${NC}"
     mkdir -p .vercel
     echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+    echo -e "${GREEN}✅ Created .vercel/project.json${NC}"
 fi
 
-# Deploy with explicit flags for CI/CD compatibility
+# Deploy from root (vercel.json is in root)
 # Note: --scope is not needed when .vercel/project.json exists with orgId and projectId
 echo -e "${YELLOW}Running: vercel deploy${NC}"
 if [ -n "$VERCEL_TOKEN" ]; then
@@ -150,8 +149,6 @@ if [ $EXIT_CODE -ne 0 ]; then
     echo -e "${RED}❌ Vercel deployment failed!${NC}"
     exit $EXIT_CODE
 fi
-
-cd ..
 
 echo "-----------------------------------"
 echo -e "${GREEN}🎉 Deployment Script Finished!${NC}"
