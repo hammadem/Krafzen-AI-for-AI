@@ -128,16 +128,18 @@ if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
 fi
 
 # Deploy with explicit flags for CI/CD compatibility
+# Note: --scope is not needed when .vercel/project.json exists with orgId and projectId
 echo -e "${YELLOW}Running: vercel deploy${NC}"
-if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ]; then
-    # Use explicit token and scope for CI/CD environments
+if [ -n "$VERCEL_TOKEN" ]; then
+    # Use explicit token for CI/CD environments
+    # The .vercel/project.json file handles project linking
     set +e
-    vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes --scope=$VERCEL_ORG_ID
+    vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
     EXIT_CODE=$?
     set -e
 else
     # Fallback to npx vercel if env vars not set (local development)
-    echo -e "${YELLOW}⚠️  VERCEL_TOKEN or VERCEL_ORG_ID not set, using npx vercel (may require interactive login)${NC}"
+    echo -e "${YELLOW}⚠️  VERCEL_TOKEN not set, using npx vercel (may require interactive login)${NC}"
     set +e
     npx -y vercel $VERCEL_ARGS
     EXIT_CODE=$?
