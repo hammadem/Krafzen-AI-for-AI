@@ -89,12 +89,9 @@ jobs:
 
           # 5. Deploy to Vercel from root (vercel.json is in root)
           # The project.json should prevent the "retrieve project settings" step
+          # Note: --scope is not needed when project.json exists with orgId and projectId
           echo "🚀 Deploying to Vercel..."
-          if [ -n "$VERCEL_ORG_ID" ]; then
-            vercel deploy --token=$VERCEL_TOKEN --yes --scope=$VERCEL_ORG_ID
-          else
-            vercel deploy --token=$VERCEL_TOKEN --yes
-          fi
+          vercel deploy --token=$VERCEL_TOKEN --yes
 
           # 6. Restore .git
           mv .git_temp .git
