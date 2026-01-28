@@ -132,20 +132,42 @@ if [ -d ".vercel" ] && [ -f ".vercel/project.json" ]; then
     # When using local link, prefer local authentication over token
     # Token authentication can conflict with local project links
     echo -e "${GREEN}✅ Using existing project link from .vercel directory${NC}"
+    
+    # If token is provided, it might be for a different account/team
+    # Try local auth first (matches the vercel link)
     echo -e "${YELLOW}   Using local authentication (from vercel login)...${NC}"
     set +e
     vercel deploy $VERCEL_ARGS --yes
     EXIT_CODE=$?
     set -e
     
-    # If local auth fails, try with token as fallback
+    # If local auth fails with "Cannot load project settings", the .vercel might be for wrong team
     if [ $EXIT_CODE -ne 0 ]; then
-        echo -e "${YELLOW}⚠️  Local authentication failed, trying with token...${NC}"
-        if [ -n "$VERCEL_TOKEN" ]; then
-            set +e
-            vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
-            EXIT_CODE=$?
-            set -e
+        ERROR_OUTPUT=$(vercel deploy $VERCEL_ARGS --yes 2>&1 || true)
+        if echo "$ERROR_OUTPUT" | grep -q "Cannot load project settings\|cannot-load-project-settings"; then
+            echo -e "${YELLOW}⚠️  Project settings error detected. Removing .vercel and trying with token...${NC}"
+            echo -e "${YELLOW}   (This can happen if .vercel belongs to a different team/account)${NC}"
+            rm -rf .vercel
+            if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+                mkdir -p .vercel
+                echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+                set +e
+                vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+                EXIT_CODE=$?
+                set -e
+            else
+                echo -e "${RED}❌ Cannot proceed: Need VERCEL_TOKEN, VERCEL_PROJECT_ID, and VERCEL_ORG_ID${NC}"
+                EXIT_CODE=1
+            fi
+        else
+            # Different error, try with token as fallback
+            echo -e "${YELLOW}⚠️  Local authentication failed, trying with token...${NC}"
+            if [ -n "$VERCEL_TOKEN" ]; then
+                set +e
+                vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+                EXIT_CODE=$?
+                set -e
+            fi
         fi
     fi
 elif [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
