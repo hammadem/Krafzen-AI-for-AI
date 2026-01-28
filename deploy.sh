@@ -120,14 +120,28 @@ fi
 # Deploy from root (vercel.json is in root)
 echo -e "${YELLOW}Running: vercel deploy${NC}"
 if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
-    # Link the project first to create .vercel/project.json
+    # Try using vercel link first to properly link the project
     echo -e "${YELLOW}🔗 Linking Vercel project...${NC}"
     rm -rf .vercel
     
-    # Create .vercel/project.json manually with correct format
-    mkdir -p .vercel
-    echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
-    echo -e "${GREEN}✅ Created .vercel/project.json${NC}"
+    # Try to link using vercel link command (non-interactive)
+    # Note: vercel link might prompt, but we'll try with --yes flag
+    set +e
+    echo -e "${YELLOW}Attempting to link project with vercel link...${NC}"
+    # Use printf to pipe answers to vercel link if needed
+    printf "\n\n" | vercel link --yes --token=$VERCEL_TOKEN 2>/dev/null
+    LINK_EXIT=$?
+    set -e
+    
+    # If link didn't work, create project.json manually
+    if [ $LINK_EXIT -ne 0 ] || [ ! -f ".vercel/project.json" ]; then
+        echo -e "${YELLOW}Creating .vercel/project.json manually...${NC}"
+        mkdir -p .vercel
+        echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+        echo -e "${GREEN}✅ Created .vercel/project.json${NC}"
+    else
+        echo -e "${GREEN}✅ Project linked successfully${NC}"
+    fi
     
     # Now deploy with the token
     set +e
@@ -135,14 +149,12 @@ if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID
     EXIT_CODE=$?
     set -e
     
-    # If that fails, try removing .vercel and letting Vercel auto-detect
+    # If that fails, the token might not have access - provide helpful error
     if [ $EXIT_CODE -ne 0 ]; then
-        echo -e "${YELLOW}⚠️  Deployment failed, trying with auto-detection...${NC}"
-        rm -rf .vercel
-        set +e
-        vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
-        EXIT_CODE=$?
-        set -e
+        echo -e "${RED}❌ Deployment failed. Possible issues:${NC}"
+        echo -e "${YELLOW}   1. VERCEL_TOKEN might not have access to project $VERCEL_PROJECT_ID${NC}"
+        echo -e "${YELLOW}   2. VERCEL_PROJECT_ID or VERCEL_ORG_ID might be incorrect${NC}"
+        echo -e "${YELLOW}   3. Token might need to be regenerated with proper scopes${NC}"
     fi
 elif [ -n "$VERCEL_TOKEN" ]; then
     # If we have token but not project/org IDs, try deploying anyway
