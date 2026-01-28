@@ -137,15 +137,18 @@ if [ -d ".vercel" ] && [ -f ".vercel/project.json" ]; then
     # Try local auth first (matches the vercel link)
     echo -e "${YELLOW}   Using local authentication (from vercel login)...${NC}"
     set +e
-    vercel deploy $VERCEL_ARGS --yes
+    ERROR_OUTPUT=$(vercel deploy $VERCEL_ARGS --yes 2>&1)
     EXIT_CODE=$?
     set -e
     
     # If local auth fails with "Cannot load project settings", the .vercel might be for wrong team
     if [ $EXIT_CODE -ne 0 ]; then
-        ERROR_OUTPUT=$(vercel deploy $VERCEL_ARGS --yes 2>&1 || true)
+        # Show the error for debugging
+        echo "$ERROR_OUTPUT" | tail -5
+        
         if echo "$ERROR_OUTPUT" | grep -q "Cannot load project settings\|cannot-load-project-settings"; then
-            echo -e "${YELLOW}⚠️  Project settings error detected. Removing .vercel and trying with token...${NC}"
+            echo -e "${YELLOW}⚠️  'Cannot load project settings' error detected.${NC}"
+            echo -e "${YELLOW}   Removing .vercel directory (as per Vercel docs) and trying with token...${NC}"
             echo -e "${YELLOW}   (This can happen if .vercel belongs to a different team/account)${NC}"
             rm -rf .vercel
             if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
