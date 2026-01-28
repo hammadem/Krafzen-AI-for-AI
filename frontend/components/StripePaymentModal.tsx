@@ -1,5 +1,4 @@
 "use client";
-
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CreditCard, Loader2, Lock, CheckCircle2, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";

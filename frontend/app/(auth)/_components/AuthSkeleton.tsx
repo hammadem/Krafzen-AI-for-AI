@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
     return (
-        <div className="relative w-full h-screen overflow-hidden bg-black text-white">
+        <div className="relative w-full min-h-screen overflow-hidden bg-black text-white">
 
             {/* Left Side: Hero Image */}
             {/* Background Hero Image - Full Screen */}
@@ -22,14 +22,14 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
             </div>
 
             {/* Right Side: Content Area */}
-            <div className="relative ml-auto w-full md:w-1/2 h-full flex flex-col items-center justify-center p-10 gap-8 z-10">
+            <div className="relative ml-auto w-full md:w-1/2 flex flex-col items-center justify-center p-10 gap-8 sm:gap-0 z-10">
                 {/* Ambient Vibrancy Glows */}
                 <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px] pointer-events-none mix-blend-screen animate-pulse"></div>
                 <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
 
-                <div className="flex w-full justify-center relative z-20">
+                <span className="mx-auto relative z-20 -translate-x-[15px]">
                     <CompanyLogo />
-                </div>
+                </span>
 
                 <div className="w-full max-w-md relative z-20">
                     <AuthType />
@@ -38,3 +38,5 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
         </div>
     )
 }
+
+

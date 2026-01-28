@@ -1,5 +1,6 @@
 """FastAPI entry point for KRAFZEN AI backend."""
 import re
+import sys
 import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,6 +12,7 @@ from app.utils.error_handler import add_exception_handlers
 from app.api import health, transcriber
 from app.db.supabase_client import db
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 

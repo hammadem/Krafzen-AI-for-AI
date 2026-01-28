@@ -40,7 +40,7 @@ export default function Pricing() {
               variant="ghost"
               className={classNames(
                 "relative z-20 rounded-full w-32 hover:bg-transparent",
-                monthly ? "text-white" : "text-gray-400"
+                monthly ? "text-white" : "text-gray-400 hover:text-black"
               )}
             >
               Monthly
@@ -50,7 +50,7 @@ export default function Pricing() {
               variant="ghost"
               className={classNames(
                 "relative z-20 rounded-full w-32 hover:bg-transparent",
-                !monthly ? "text-white" : "text-gray-400"
+                !monthly ? "text-white" : "text-gray-400 hover:text-black"
               )}
             >
               Annual
@@ -64,6 +64,7 @@ export default function Pricing() {
                   key={price.price}
                   price={price}
                   index={index}
+                  monthly={monthly}
                 />
               )
             )}
