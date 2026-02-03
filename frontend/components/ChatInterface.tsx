@@ -192,7 +192,7 @@ export function ChatInterface({
                             <p className="text-gray-400 text-sm">Loading messages...</p>
                         </div>
                     )}
-                    
+
                     {!isLoadingMessages && messages.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-full space-y-8 mt-20">
                             <div className="text-center space-y-2">
@@ -282,15 +282,13 @@ export function ChatInterface({
                                             </DialogContent>
                                         </Dialog>
 
-                                        <div className="flex justify-end gap-2">
+                                        <div className="flex flex-row items-center justify-end gap-2 w-full flex-wrap sm:flex-nowrap">
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2"
+                                                className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2 flex-1 sm:flex-none justify-center"
                                                 onClick={async () => {
                                                     try {
-                                                        // Dynamically import to avoid top-level issues if any, or just use the imported one if I add import
-                                                        // Better: use createClient from library
                                                         const supabase = createClient();
                                                         const { data: { session } } = await supabase.auth.getSession();
                                                         const token = session?.access_token;
@@ -310,16 +308,20 @@ export function ChatInterface({
                                                     }
                                                 }}
                                             >
-                                                <FileCode className="w-3 h-3" /> Download DXF
+                                                <FileCode className="w-3 h-3" />
+                                                <span className="hidden sm:inline">Download DXF</span>
+                                                <span className="sm:hidden">DXF</span>
                                             </Button>
 
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                className="text-xs text-gray-400 hover:text-white gap-2"
+                                                className="text-xs text-gray-400 hover:text-white gap-2 flex-1 sm:flex-none justify-center"
                                                 onClick={() => handleDownload(message.imageUrl!)}
                                             >
-                                                <Download className="w-3 h-3" /> Download Image
+                                                <Download className="w-3 h-3" />
+                                                <span className="hidden sm:inline">Download Image</span>
+                                                <span className="sm:hidden">Image</span>
                                             </Button>
                                         </div>
                                     </div>
@@ -356,14 +358,14 @@ export function ChatInterface({
                     <div className="bg-zinc-900/90 border border-gray-700/50 rounded-3xl p-2 pl-4 pr-2 flex items-end shadow-2xl backdrop-blur-md transition-all duration-200">
                         <textarea
                             ref={textareaRef}
-                            placeholder="Describe your design requirements..."
+                            placeholder="Describe your design..."
                             value={inputValue}
                             onChange={(e) => onInputChange(e.target.value)}
                             onKeyDown={handleKeyDown}
                             disabled={isLoading}
                             rows={1}
                             style={{ resize: 'none' }}
-                            className="flex-1 bg-transparent border-none text-gray-100 placeholder:text-gray-500 focus:ring-0 focus:outline-none min-h-[40px] max-h-[200px] py-3 overflow-y-auto custom-scrollbar"
+                            className="flex-1 bg-transparent border-none text-gray-100 placeholder:text-gray-500 focus:ring-0 focus:outline-none min-h-[40px] max-h-[200px] py-3 overflow-y-auto custom-scrollbar text-sm md:text-base"
                         />
                         <div className="flex items-center pb-1 gap-1">
                             <Button

@@ -82,10 +82,16 @@ echo "-----------------------------------"
 # 3. Vercel Deployment
 echo -e "${YELLOW}🌐 [3/3] Vercel Frontend Deployment...${NC}"
 
-# Remove any existing .vercel directories to prevent conflict/incorrect settings
-echo -e "${YELLOW}🧹 Cleaning Vercel metadata...${NC}"
-rm -rf .vercel
-rm -rf frontend/.vercel
+# Check if .vercel directory exists and is valid (from vercel link)
+if [ -d ".vercel" ] && [ -f ".vercel/project.json" ]; then
+    echo -e "${GREEN}✅ Found existing .vercel directory (project already linked)${NC}"
+    echo -e "${YELLOW}   Using existing project link...${NC}"
+else
+    # Remove any existing .vercel directories to prevent conflict/incorrect settings
+    echo -e "${YELLOW}🧹 Cleaning Vercel metadata...${NC}"
+    rm -rf .vercel
+    rm -rf frontend/.vercel
+fi
 
 echo -e "${YELLOW}Deploying backend is handled by Render (via git).${NC}"
 echo -e "${YELLOW}Deploying Frontend to Vercel...${NC}"
@@ -108,36 +114,115 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Deploy from root (vercel.json is in root)
+echo -e "${YELLOW}Running: vercel deploy${NC}"
+
 # Workaround for Vercel "Git author must have access" error
 # We temporarily hide the .git directory so Vercel CLI treats it as a manual deployment
 # without trying to link it to the git commit author.
-
 if [ -d ".git" ]; then
     echo -e "${YELLOW}🙈 Temporarily hiding .git to bypass Vercel author check...${NC}"
     mv ".git" ".git_temp"
 fi
 
-cd frontend || { echo -e "${RED}frontend directory not found!${NC}"; exit 1; }
-
-# Create .vercel directory and project.json manually for CI/CD compatibility
-# This ensures the project is properly linked even in CI environments
-if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
-    echo -e "${YELLOW}🔗 Creating Vercel project link...${NC}"
-    mkdir -p .vercel
-    echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
-fi
-
-# Deploy with explicit flags for CI/CD compatibility
-echo -e "${YELLOW}Running: vercel deploy${NC}"
-if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_ORG_ID" ]; then
-    # Use explicit token and scope for CI/CD environments
+# Check if we have a valid .vercel directory from vercel link
+if [ -d ".vercel" ] && [ -f ".vercel/project.json" ]; then
+    # Use existing project link (from vercel link command)
+    # When using local link, prefer local authentication over token
+    # Token authentication can conflict with local project links
+    echo -e "${GREEN}✅ Using existing project link from .vercel directory${NC}"
+    
+    echo -e "${YELLOW}   Using local authentication (from vercel login)...${NC}"
+    echo -e "${YELLOW}   (This may take a moment - Vercel is building and deploying...)${NC}"
     set +e
-    vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes --scope=$VERCEL_ORG_ID
+    # Run normally first to see progress, capture output only if it fails
+    vercel deploy $VERCEL_ARGS --yes
+    EXIT_CODE=$?
+    set -e
+    
+    # If local auth fails with "Cannot load project settings", the .vercel might be for wrong team
+    if [ $EXIT_CODE -ne 0 ]; then
+        # Try to capture error output for analysis
+        set +e
+        ERROR_OUTPUT=$(vercel deploy $VERCEL_ARGS --yes 2>&1)
+        set -e
+        
+        # Show the error for debugging
+        echo "$ERROR_OUTPUT" | tail -10
+        
+        if echo "$ERROR_OUTPUT" | grep -q "Cannot load project settings\|cannot-load-project-settings"; then
+            echo -e "${YELLOW}⚠️  'Cannot load project settings' error detected.${NC}"
+            echo -e "${YELLOW}   Removing .vercel directory (as per Vercel docs) and trying with token...${NC}"
+            echo -e "${YELLOW}   (This can happen if .vercel belongs to a different team/account)${NC}"
+            rm -rf .vercel
+            if [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+                mkdir -p .vercel
+                echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+                set +e
+                vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+                EXIT_CODE=$?
+                set -e
+            else
+                echo -e "${RED}❌ Cannot proceed: Need VERCEL_TOKEN, VERCEL_PROJECT_ID, and VERCEL_ORG_ID${NC}"
+                EXIT_CODE=1
+            fi
+        else
+            # Different error, try with token as fallback
+            echo -e "${YELLOW}⚠️  Local authentication failed, trying with token...${NC}"
+            if [ -n "$VERCEL_TOKEN" ]; then
+                set +e
+                vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+                EXIT_CODE=$?
+                set -e
+            fi
+        fi
+    fi
+elif [ -n "$VERCEL_TOKEN" ] && [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
+    # No existing .vercel directory, try to create one
+    # .git is already hidden above if it exists
+    
+    echo -e "${YELLOW}🧹 No existing .vercel directory found, attempting to create project link...${NC}"
+    rm -rf .vercel
+    
+    # Try deploying without project.json - Vercel should auto-detect or prompt
+    # Use --yes to auto-confirm any prompts
+    echo -e "${YELLOW}Deploying without pre-created project.json (let Vercel handle linking)...${NC}"
+    set +e
+    vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+    EXIT_CODE=$?
+    set -e
+    
+    # If that fails, try with project.json created after first attempt
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo -e "${YELLOW}⚠️  First deployment attempt failed, trying with project.json...${NC}"
+        mkdir -p .vercel
+        echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
+        set +e
+        vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
+        EXIT_CODE=$?
+        set -e
+    fi
+    
+    # If still failing, provide helpful diagnostics
+    if [ $EXIT_CODE -ne 0 ]; then
+        echo -e "${RED}❌ Deployment failed. Possible issues:${NC}"
+        echo -e "${YELLOW}   1. VERCEL_TOKEN might not have access to project $VERCEL_PROJECT_ID${NC}"
+        echo -e "${YELLOW}   2. VERCEL_PROJECT_ID or VERCEL_ORG_ID might be incorrect${NC}"
+        echo -e "${YELLOW}   3. Token might need to be regenerated with proper scopes${NC}"
+        echo -e "${YELLOW}   4. Try running: vercel login (to authenticate locally)${NC}"
+        echo -e "${YELLOW}   5. Then run: vercel link (to link the project)${NC}"
+    fi
+elif [ -n "$VERCEL_TOKEN" ]; then
+    # If we have token but not project/org IDs, try deploying anyway
+    echo -e "${YELLOW}⚠️  VERCEL_PROJECT_ID or VERCEL_ORG_ID not set, deploying with token only...${NC}"
+    rm -rf .vercel
+    set +e
+    vercel deploy $VERCEL_ARGS --token=$VERCEL_TOKEN --yes
     EXIT_CODE=$?
     set -e
 else
     # Fallback to npx vercel if env vars not set (local development)
-    echo -e "${YELLOW}⚠️  VERCEL_TOKEN or VERCEL_ORG_ID not set, using npx vercel (may require interactive login)${NC}"
+    echo -e "${YELLOW}⚠️  VERCEL_TOKEN not set, using npx vercel (may require interactive login)${NC}"
     set +e
     npx -y vercel $VERCEL_ARGS
     EXIT_CODE=$?
@@ -146,10 +231,19 @@ fi
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo -e "${RED}❌ Vercel deployment failed!${NC}"
+    # Restore .git if it was hidden
+    if [ -d ".git_temp" ]; then
+        echo -e "${YELLOW}🙈 Restoring .git directory...${NC}"
+        mv ".git_temp" ".git"
+    fi
     exit $EXIT_CODE
 fi
 
-cd ..
+# Restore .git if it was hidden (only for token-based deployments)
+if [ -d ".git_temp" ]; then
+    echo -e "${YELLOW}🙈 Restoring .git directory...${NC}"
+    mv ".git_temp" ".git"
+fi
 
 echo "-----------------------------------"
 echo -e "${GREEN}🎉 Deployment Script Finished!${NC}"

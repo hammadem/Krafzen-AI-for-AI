@@ -1,4 +1,5 @@
-import { Plus, MessageSquare, Trash2 } from "lucide-react"
+import { Plus, MessageSquare, Trash2, Home } from "lucide-react"
+import Link from "next/link";
 import { Button } from "@/components/ui/button"
 
 export interface ChatSession {
@@ -13,6 +14,7 @@ interface ChatSidebarProps {
     onNewChat: () => void
     onSelectSession: (id: string) => void
     onDeleteSession: (id: string) => void
+    className?: string
 }
 
 export function ChatSidebar({
@@ -20,11 +22,12 @@ export function ChatSidebar({
     currentSessionId,
     onNewChat,
     onSelectSession,
-    onDeleteSession
+    onDeleteSession,
+    className
 }: ChatSidebarProps) {
     return (
-        <div className="w-72 border-r border-white/10 h-full flex flex-col bg-black/50 backdrop-blur-sm hidden md:flex pt-[100px]">
-            <div className="mx-4 pb-3 mb-2 border-b border-white/5 mt-4">
+        <div className={`w-72 border-r border-white/10 h-full flex flex-col bg-black/50 backdrop-blur-sm pt-0 md:pt-[100px] ${className || 'hidden md:flex'}`}>
+            <div className="mx-4 pb-3 mb-2 border-b border-white/5 md:mt-4">
                 <div className="flex items-center gap-2 text-white/90 font-semibold mb-1">
                     <span className="text-emerald-400">Design</span><span>Workspace</span>
                 </div>
@@ -33,7 +36,18 @@ export function ChatSidebar({
                     Private Session
                 </div>
             </div>
-            <div className="p-4">
+            <div className="p-4 space-y-2">
+                {/* Mobile-only Home Link (visible if sidebar is generic, but good to have) or just always show */}
+                <Link href="/" className="md:hidden w-full">
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-2 text-gray-400 hover:text-white border border-transparent hover:border-white/10 mb-2"
+                    >
+                        <Home className="w-4 h-4" />
+                        <span className="text-sm">Back to Home</span>
+                    </Button>
+                </Link>
+
                 <Button
                     onClick={onNewChat}
                     className="w-full rounded-lg bg-zinc-900 hover:bg-zinc-800 text-gray-300 border border-white/10 justify-start gap-2 h-10"

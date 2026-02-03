@@ -114,62 +114,93 @@ export default function Navbar({ isRoot = false }: {
                     </div>
                 </div>
 
-                {/** This is for mobile view */}
+                {/** Mobile Menu Overlay Background */}
+                <div
+                    className={classNames(
+                        "sm:hidden fixed inset-0 z-[99998] bg-black/60 backdrop-blur-sm transition-opacity duration-300",
+                        open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+                    )}
+                    onClick={() => setOpen(false)}
+                />
+
+                {/** Mobile Menu Drawer (Right Side) */}
                 <div
                     // this is to test mobile view
                     data-testid="mobile-menu"
                     className={classNames(
-                        "sm:hidden absolute w-full mx-auto z-99999 bg-black flex flex-col items-center overflow-hidden transition-all duration-500 ease-in-out transform",
+                        "sm:hidden fixed top-0 right-0 z-[99999] h-full w-[280px] bg-black border-l border-white/10 flex flex-col pt-[100px] items-start px-6 overflow-y-auto transition-transform duration-300 ease-in-out shadow-2xl",
                         open
-                            ? "max-h-96 opacity-100 translate-y-0"
-                            : "max-h-0 opacity-0 -translate-y-4"
+                            ? "translate-x-0"
+                            : "translate-x-full"
                     )}
                 >
-                    {navigation.map((item) => {
-                        const isActive = pathname === item.href;
+                    <div className="flex flex-col w-full gap-2">
+                        {navigation.map((item) => {
+                            const isActive = pathname === item.href;
 
-                        return (
-                            <Link
-                                key={item.name}
-                                href={item.href}
-                                className={classNames(
-                                    'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
-                                )}
-                                aria-label={`Link to ${item.name} section`}
-                            >
-                                <h1 className={isActive ? "font-bold text-white inline" : "text-white inline font-semibold hover:text-gray-300 cursor-pointer"}>{item.name}</h1>
-                            </Link>
-                        )
-                    })}
+                            return (
+                                <Link
+                                    key={item.name}
+                                    href={item.href}
+                                    onClick={() => setOpen(false)}
+                                    className={classNames(
+                                        'rounded-md py-3 text-base font-medium w-full border-b border-white/5',
+                                    )}
+                                    aria-label={`Link to ${item.name} section`}
+                                >
+                                    <h1 className={isActive ? "font-bold text-green-400" : "text-gray-300 hover:text-white"}>{item.name}</h1>
+                                </Link>
+                            )
+                        })}
+                    </div>
 
                     {user ? (
-                        <div className="my-4 flex flex-col items-center gap-4">
-                            <div className="flex items-center gap-2">
+                        <div className="mt-8 flex flex-col items-start w-full gap-4">
+                            <div className="flex items-center gap-3 w-full p-2 bg-white/5 rounded-lg border border-white/10">
                                 <Avatar className="h-8 w-8">
                                     <AvatarImage src={user.avatar_url || ""} />
                                     <AvatarFallback className="bg-green-400 text-black font-bold">
                                         {user.firstname?.[0] || user.email?.[0]?.toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
-                                <span className="text-white font-medium">{user.firstname || user.email}</span>
+                                <div className="flex flex-col overflow-hidden">
+                                    <span className="text-white text-sm font-medium truncate">{user.firstname || user.email}</span>
+                                    <span className="text-gray-500 text-xs truncate">{user.email}</span>
+                                </div>
                             </div>
-                            <Link href="/account" className="text-gray-300 hover:text-white text-sm">Account Settings</Link>
+
                             <Button
-                                variant="ghost"
-                                className="text-red-400 hover:text-red-300 hover:bg-transparent p-0 h-auto"
-                                onClick={logout}
+                                asChild
+                                className="w-full bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 transform active:scale-95"
                             >
-                                Sign Out
+                                <Link href="/workspace">
+                                    Workspace
+                                </Link>
                             </Button>
+
+                            <Link href="/account" className="text-gray-300 hover:text-white text-sm flex items-center gap-2 mt-2" onClick={() => setOpen(false)}>
+                                <Settings className="w-4 h-4" />
+                                Account Settings
+                            </Link>
+
+                            <div
+                                className="text-red-400 hover:text-red-300 text-sm flex items-center gap-2 cursor-pointer mt-2"
+                                onClick={() => { logout(); setOpen(false); }}
+                            >
+                                <LogOut className="w-4 h-4" />
+                                Sign Out
+                            </div>
                         </div>
                     ) : (
-                        <Button
-                            variant="secondary"
-                            className="z-9999 cursor-pointer rounded-full bg-green-400 hover:bg-green-400 my-2"
-                            asChild
-                        >
-                            <Link href="/login">Start Free Trial</Link>
-                        </Button>
+                        <div className="mt-8 w-full">
+                            <Button
+                                variant="secondary"
+                                className="w-full cursor-pointer rounded-full bg-green-400 hover:bg-green-400 text-black font-bold h-12"
+                                asChild
+                            >
+                                <Link href="/login">Start Free Trial</Link>
+                            </Button>
+                        </div>
                     )}
                 </div>
             </nav>

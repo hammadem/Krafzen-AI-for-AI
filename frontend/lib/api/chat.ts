@@ -133,12 +133,21 @@ export const downloadDxf = async (imageUrl: string, prompt?: string, token?: str
             body: JSON.stringify({ image_url: imageUrl, prompt }),
         });
 
-        console.log(await response.json());
-
         if (!response.ok) {
-            throw new Error(`Failed to download DXF: ${response.statusText}`);
+            let errorMessage = response.statusText;
+            try {
+                // Only try to parse JSON for error responses
+                const errorData = await response.json();
+                if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                }
+            } catch (e) {
+                // Ignore json parse error, use statusText
+            }
+            throw new Error(`Failed to download DXF: ${errorMessage}`);
         }
 
+        // For successful responses, return the binary blob directly
         return await response.blob();
     } catch (error) {
         console.error('Error downloading DXF:', error);

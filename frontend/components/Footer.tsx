@@ -19,37 +19,42 @@ function classNames(...classes: string[]) {
 export default function Footer() {
     const { user } = useAuth();
     return (
-        <footer className="w-full mt-6 bg-black h-[90vh] md:h-[30vh] flex flex-col items-center justify-evenly md:items-evenly">
+        <footer className="w-full mt-6 bg-black h-auto min-h-[50vh] md:min-h-[30vh] py-12 md:py-0 flex flex-col items-center justify-center gap-8 md:gap-0 md:justify-evenly">
 
-            <div className="w-full h-[90%] md:h-[50%] flex flex-col md:flex-row items-center md:items-end justify-evenly">
+            <div className="w-full flex flex-col md:flex-row items-center md:items-end justify-evenly gap-8 md:gap-0">
 
-                <div className="h-[100%] sm:gap-8 flex flex-col md:flex-row justify-evenly md:items-end items-center">
+                <div className="flex flex-col md:flex-row justify-center items-center gap-6 md:gap-8 w-full md:w-auto">
 
-                    <CompanyLogo />
-                    { /** Desktop and Medium Screen View Navbar */}
-                    {navigation.map((item) => (
-                        <Link
-                            key={item.name}
-                            href={item.href}
-                            className={classNames(
-                                'text-white hover:text-gray-300 cursor-pointer hidden md:block',
-                                'rounded-md sm:px-0 py-2 text-sm font-medium',
-                            )}
-                            aria-label={`Link to ${item.name} section`}
-                        >
-                            {item.name}
-                        </Link>
-                    ))}
+                    <div className="mb-4 md:mb-0">
+                        <CompanyLogo />
+                    </div>
 
-                    { /** Mobile View Navbar */}
-                    <div className="md:hidden flex flex-col h-[100%] items-evenly justify-evenly">
+                    { /** Desktop Navbar */}
+                    <div className="hidden md:flex gap-8">
                         {navigation.map((item) => (
                             <Link
                                 key={item.name}
                                 href={item.href}
                                 className={classNames(
                                     'text-white hover:text-gray-300 cursor-pointer',
-                                    'rounded-md md:px-0 py-2 text-md font-medium',
+                                    'text-sm font-medium',
+                                )}
+                                aria-label={`Link to ${item.name} section`}
+                            >
+                                {item.name}
+                            </Link>
+                        ))}
+                    </div>
+
+                    { /** Mobile View Navbar - Grid Layout */}
+                    <div className="md:hidden grid grid-cols-2 gap-x-12 gap-y-4 text-center">
+                        {navigation.map((item) => (
+                            <Link
+                                key={item.name}
+                                href={item.href}
+                                className={classNames(
+                                    'text-gray-300 hover:text-white cursor-pointer',
+                                    'text-sm font-medium',
                                 )}
                                 aria-label={`Link to ${item.name} section`}
                             >

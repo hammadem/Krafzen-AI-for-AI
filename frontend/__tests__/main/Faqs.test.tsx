@@ -7,25 +7,23 @@ describe("FAQs Page", () => {
         render(<Faqs />);
 
         const buttons = faqs.map(faq => {
-            expect(screen.getByRole("button", { name: faq.type })).toBeInTheDocument();
-
-            return (
-                screen.getByRole("button", { name: faq.type })
-            );
+            const foundButtons = screen.getAllByRole("button", { name: faq.type });
+            expect(foundButtons[0]).toBeInTheDocument();
+            return foundButtons[0];
         });
 
         buttons.map((button, ind) => {
             fireEvent.click(button);
 
-            expect(screen.getByRole("button", { name: faqs[ind].type })).toBeInTheDocument();
+            const activeHeaders = screen.getAllByRole("button", { name: faqs[ind].type });
+            expect(activeHeaders[0]).toBeInTheDocument();
 
             faqs[ind].QandA.map(qanda => {
-                expect(screen.getByText(qanda.question)).toBeInTheDocument();
+                expect(screen.getAllByText(qanda.question)[0]).toBeInTheDocument();
                 qanda.answer.map(ans => {
-                    expect(screen.getByText(ans)).toBeInTheDocument();
+                    expect(screen.getAllByText(ans)[0]).toBeInTheDocument();
                 })
             })
         })
-
     });
 })

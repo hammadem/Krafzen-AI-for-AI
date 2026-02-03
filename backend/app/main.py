@@ -1,5 +1,6 @@
 """FastAPI entry point for KRAFZEN AI backend."""
 import re
+import sys
 import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,30 +12,11 @@ from app.utils.error_handler import add_exception_handlers
 from app.api import health, transcriber
 from app.db.supabase_client import db
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 
-# Import parser with error handling to ensure app starts even if parser fails
-parser_available = False
-parser = None
-try:
-    import sys
-    sys.stdout.write("🔍 Attempting to import parser module...\n")
-    sys.stdout.flush()
-    from app.api import parser
-    parser_available = True
-    sys.stdout.write("✅ Parser module imported successfully\n")
-    sys.stdout.flush()
-    logger.info("Parser module imported successfully")
-except Exception as e:
-    import traceback
-    error_msg = f"⚠️ Failed to import parser module: {e}"
-    sys.stdout.write(error_msg + "\n")
-    sys.stdout.flush()
-    traceback.print_exc()
-    logger.error(f"Failed to import parser module: {e}", exc_info=True)
-    parser_available = False
-    parser = None
+
 
 
 app = FastAPI(
@@ -118,30 +100,8 @@ app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 
-# Include parser router if available
-import sys
-sys.stdout.write(f"🔍 Parser status: available={parser_available}, parser={parser is not None}\n")
-sys.stdout.flush()
-if parser_available and parser:
-    try:
-        sys.stdout.write("🔍 Attempting to register parser router...\n")
-        sys.stdout.flush()
-        app.include_router(parser.router, prefix="/api/v1", tags=["Parser"])
-        sys.stdout.write("✅ Parser router registered successfully\n")
-        sys.stdout.flush()
-        logger.info("Parser router registered successfully")
-    except Exception as e:
-        import traceback
-        error_msg = f"❌ Failed to register parser router: {e}"
-        sys.stdout.write(error_msg + "\n")
-        sys.stdout.flush()
-        traceback.print_exc()
-        logger.error(f"Failed to register parser router: {e}", exc_info=True)
-else:
-    reason = "Parser module import failed" if not parser_available else "Parser is None"
-    sys.stdout.write(f"⚠️ Parser router not available - {reason}\n")
-    sys.stdout.flush()
-    logger.warning(f"Parser router not available - {reason}")
+# Parser module removed from build system as requested
+# (Previously imported app.api.parser here)
 
 # Include DXF generator router
 dxf_generator_available = False

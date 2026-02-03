@@ -38,15 +38,15 @@ describe("Navbar Component", () => {
     const desktopMenu = screen.getByTestId("desktop-menu");
     expect(desktopMenu).toHaveClass("hidden");
 
-    // Initially menu should be closed (opacity-0 class)
+    // Initially menu should be closed (translate-x-full class)
     const mobileMenu = screen.getByTestId("mobile-menu");
-    expect(mobileMenu).toHaveClass("opacity-0");
+    expect(mobileMenu).toHaveClass("translate-x-full");
 
     // // Click the mobile toggle button
     const toggleBtn = await screen.findByAltText("Toggle Button");
     fireEvent.click(toggleBtn);
 
-    // // After click, it should now have 'opacity-100' class
-    expect(mobileMenu).toHaveClass("opacity-100");
+    // // After click, it should now have 'translate-x-0' class
+    expect(mobileMenu).toHaveClass("translate-x-0");
   });
 });

@@ -7,6 +7,7 @@ import { useChat } from "@/context/ChatContext";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import CompanyLogo from "@/components/CompanyLogo";
 
 export default function DashboardPage() {
     const {
@@ -44,29 +45,37 @@ export default function DashboardPage() {
 
     return (
         <div className="flex flex-col h-screen bg-black overflow-hidden relative">
-            <Navbar />
+            <div className="hidden md:block">
+                <Navbar />
+            </div>
 
-            {/* Mobile Sidebar Toggle */}
-            <div className="md:hidden absolute top-[70px] left-4 z-50">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-gray-400 border border-white/10 bg-black/50 backdrop-blur-md"
-                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                >
-                    {isMobileMenuOpen ? <X /> : <Menu />}
-                </Button>
+            {/* Mobile Workspace Header & Sidebar Toggle */}
+            <div className="md:hidden absolute top-0 left-0 right-0 z-50 h-16 bg-black/90 backdrop-blur-md border-b border-white/10 flex items-center px-4 justify-between transition-all duration-300">
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-gray-400 hover:text-white"
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    >
+                        {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                    </Button>
+                    <div className="scale-75 origin-left">
+                        <CompanyLogo />
+                    </div>
+                </div>
             </div>
 
             {/* Mobile Sidebar Overlay */}
             {isMobileMenuOpen && (
-                <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-sm md:hidden flex pt-[60px]">
+                <div className="absolute inset-x-0 bottom-0 top-[64px] z-40 bg-black/80 backdrop-blur-sm md:hidden flex">
                     <ChatSidebar
                         sessions={sidebarSessions}
                         currentSessionId={currentSessionId}
                         onNewChat={handleCreateNewChat}
                         onSelectSession={handleSelectSession}
                         onDeleteSession={deleteSession}
+                        className="flex shadow-2xl h-full border-t border-white/10 pt-0"
                     />
                     <div className="flex-1" onClick={() => setIsMobileMenuOpen(false)} />
                 </div>
@@ -82,7 +91,7 @@ export default function DashboardPage() {
                     onDeleteSession={deleteSession}
                 />
 
-                <main className="flex-1 flex flex-col items-center p-2 min-h-0 w-full relative pt-[100px]">
+                <main className="flex-1 flex flex-col items-center p-2 min-h-0 w-full relative pt-[64px] md:pt-[100px]">
                     {/* Background CAD Image */}
                     <div className="absolute right-0 bottom-0 top-0 w-full md:w-2/3 lg:w-1/2 opacity-100 pointer-events-none mix-blend-screen z-0">
                         <Image
