@@ -31,7 +31,7 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
                     <CompanyLogo />
                 </span>
 
-                <div className="w-full max-w-md relative z-20">
+                <div className="w-full max-w-md relative z-20 mt-2">
                     <AuthType />
                 </div>
             </div>

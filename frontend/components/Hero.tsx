@@ -10,6 +10,7 @@ import { Skeleton } from "./ui/skeleton";
 import { useState } from "react";
 import CalendlyBooking from "./CalendlyBooking";
 
+//CAN REMOVE SSR:TRUE
 const Partners = dynamic(() => import("./Partners"), {
     loading: () => (
         <div className="h-[200px] bg-black flex items-center justify-center">
