@@ -62,9 +62,29 @@ CREATE POLICY "Users insert own files" ON files FOR INSERT WITH CHECK (auth.uid(
 CREATE TABLE IF NOT EXISTS user_subscriptions (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     stripe_customer_id TEXT,
-    plan_tier TEXT DEFAULT 'free', -- 'free', 'pro'
-    remaining_minutes FLOAT DEFAULT 100.0,
+    stripe_subscription_id TEXT,
+    
+    -- Plan details
+    plan_name TEXT DEFAULT 'free', -- 'free', 'starter', 'professional', 'enterprise', 'enterprise_plus'
+    plan_tier TEXT DEFAULT 'free', -- Kept for backward compatibility
+    billing_cycle TEXT, -- 'monthly', 'annual', null for free
+    subscription_status TEXT DEFAULT 'inactive', -- 'inactive', 'trial', 'active', 'canceled', 'past_due'
+    
+    -- Free trial tracking (14 days)
+    trial_start_date TIMESTAMPTZ,
+    trial_end_date TIMESTAMPTZ,
+    trial_requests_total INT DEFAULT 0, -- Total free requests allocated for trial
+    trial_requests_remaining INT DEFAULT 0, -- Remaining free trial requests
+    
+    -- Subscription plan requests
+    plan_requests_total INT DEFAULT 0, -- Total requests included in subscription plan per billing cycle
+    plan_requests_remaining INT DEFAULT 0, -- Remaining requests from subscription plan
+    plan_requests_reset_date TIMESTAMPTZ, -- When the plan requests reset (monthly/annual)
+    
+    -- Legacy fields (kept for backward compatibility, will be deprecated)
+    remaining_minutes FLOAT DEFAULT 0.0,
     total_minutes_purchased FLOAT DEFAULT 0.0,
+    
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -74,8 +94,28 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.user_subscriptions (user_id, remaining_minutes)
-  VALUES (new.id, 100.0)
+  INSERT INTO public.user_subscriptions (
+    user_id, 
+    plan_name,
+    plan_tier,
+    subscription_status,
+    remaining_minutes,
+    trial_requests_total,
+    trial_requests_remaining,
+    plan_requests_total,
+    plan_requests_remaining
+  )
+  VALUES (
+    new.id, 
+    'free',
+    'free',
+    'inactive',
+    0.0,
+    0,
+    0,
+    0,
+    0
+  )
   ON CONFLICT (user_id) DO NOTHING; -- Idempotency
   RETURN new;
 END;

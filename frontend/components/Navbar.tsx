@@ -88,14 +88,25 @@ export default function Navbar({ isRoot = false }: {
 
                                 {user ? (
                                     <>
-                                        <Button
-                                            asChild
-                                            className="bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
-                                        >
-                                            <Link href="/workspace">
-                                                Workspace
-                                            </Link>
-                                        </Button>
+                                        {user.has_active_subscription ? (
+                                            <Button
+                                                asChild
+                                                className="bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
+                                            >
+                                                <Link href="/workspace">
+                                                    Workspace
+                                                </Link>
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                asChild
+                                                className="bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
+                                            >
+                                                <Link href="/pricing">
+                                                    Get Started
+                                                </Link>
+                                            </Button>
+                                        )}
                                         <UserDropdown user={user} logout={logout} />
                                     </>
                                 ) : (
@@ -169,14 +180,25 @@ export default function Navbar({ isRoot = false }: {
                                 </div>
                             </div>
 
-                            <Button
-                                asChild
-                                className="w-full bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 transform active:scale-95"
-                            >
-                                <Link href="/workspace">
-                                    Workspace
-                                </Link>
-                            </Button>
+                            {user.has_active_subscription ? (
+                                <Button
+                                    asChild
+                                    className="w-full bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 transform active:scale-95"
+                                >
+                                    <Link href="/workspace">
+                                        Workspace
+                                    </Link>
+                                </Button>
+                            ) : (
+                                <Button
+                                    asChild
+                                    className="w-full bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 transform active:scale-95"
+                                >
+                                    <Link href="/pricing">
+                                        Get Started
+                                    </Link>
+                                </Button>
+                            )}
 
                             <Link href="/account" className="text-gray-300 hover:text-white text-sm flex items-center gap-2 mt-2" onClick={() => setOpen(false)}>
                                 <Settings className="w-4 h-4" />
@@ -208,6 +230,17 @@ export default function Navbar({ isRoot = false }: {
     )
 }
 
+function trialDaysLeft(trialEndDate: string): number {
+    try {
+        const end = new Date(trialEndDate);
+        const now = new Date();
+        const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        return Math.max(0, diff);
+    } catch {
+        return 0;
+    }
+}
+
 function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
     return (
         <DropdownMenu>
@@ -233,13 +266,38 @@ function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
                     </div>
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 </div>
-                <div className="px-3 py-2 text-xs font-bold text-blue-400 bg-blue-500/10 rounded-lg mx-2 mb-2 flex justify-between items-center border border-blue-500/20 gap-3">
-                    <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        <span className="whitespace-nowrap">Credits: {user.remaining_minutes ? user.remaining_minutes.toFixed(1) : "0"} min</span>
+                {user.subscription_status === "trial" && user.trial_end_date && (
+                    <div className="px-3 py-1.5 text-xs text-amber-400 bg-amber-500/10 rounded-lg mx-2 mb-1.5 border border-amber-500/20">
+                        Trial: {trialDaysLeft(user.trial_end_date)} days left
                     </div>
-                    <Link href="/pricing" className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md text-[10px] uppercase font-bold tracking-wider shadow-sm transition-all hover:shadow-blue-500/20 whitespace-nowrap flex-shrink-0">
-                        Buy more
+                )}
+                <div className="px-3 py-2 text-xs font-bold text-blue-400 bg-blue-500/10 rounded-lg mx-2 mb-1.5 border border-blue-500/20 flex justify-between items-center gap-3">
+                    <div className="flex flex-col gap-0.5">
+                        <span className="whitespace-nowrap flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            Trial requests: {user.trial_requests_remaining ?? 0}
+                        </span>
+                        {(user.trial_requests_remaining ?? 0) === 0 && user.subscription_status === "trial" && (
+                            <span className="text-[10px] text-amber-400 font-normal">
+                                Exhausted; package requests unlock after trial ends
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <div className="px-3 py-2 text-xs font-bold text-blue-400 bg-blue-500/10 rounded-lg mx-2 mb-1.5 border border-blue-500/20 flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    <span className="whitespace-nowrap">
+                        Package requests: {user.subscription_status === "trial"
+                            ? (user.plan_requests_total ?? 0).toLocaleString()
+                            : (user.plan_requests_remaining ?? 0).toLocaleString()}
+                        {user.subscription_status === "trial" && (
+                            <span className="text-gray-500 font-normal ml-1">(after payment)</span>
+                        )}
+                    </span>
+                </div>
+                <div className="mx-2 mb-2">
+                    <Link href="/pricing" className="flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500/30 shadow-sm transition-all hover:shadow-blue-500/20 uppercase tracking-wider">
+                        {user.has_active_subscription ? "Upgrade" : "Get Started"}
                     </Link>
                 </div>
 

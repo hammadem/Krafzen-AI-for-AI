@@ -135,8 +135,9 @@ app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
 
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"])
-from app.routes import chat_routes
+from app.routes import chat_routes, payment_routes
 app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"])
+app.include_router(payment_routes.router, prefix="/api/v1", tags=["Payments"])
 app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
 
 # Include parser router if available

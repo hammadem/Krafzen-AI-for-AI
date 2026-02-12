@@ -50,6 +50,13 @@ export global {
         subscription_plan: string | undefined?;
         remaining_minutes: number | undefined;
         total_minutes_purchased: number | undefined;
+        // Subscription status fields
+        has_active_subscription?: boolean;
+        subscription_status?: string;
+        trial_requests_remaining?: number;
+        plan_requests_remaining?: number;
+        plan_requests_total?: number;  // plan's included requests (e.g. 10000 for Enterprise)
+        trial_end_date?: string | null;  // ISO date; used for "Trial: X days left"
     }
 
     interface Settings {

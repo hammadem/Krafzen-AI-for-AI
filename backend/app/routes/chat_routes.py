@@ -28,7 +28,8 @@ class ChatResponse(BaseModel):
     ollama_response: str
     validated_response: str
     image_url: str
-    remaining_minutes: float
+    remaining_minutes: float  # Legacy field
+    request_balance: Optional[Dict[str, Any]] = None  # New request-based balance
 
 class DxfRequest(BaseModel):
     image_url: str
@@ -82,10 +83,18 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
     """
     user_id = user_data["user_id"]
 
-    # 1. Check Balance
-    balance = await subscription_service.check_balance(user_id)
-    if balance <= 0:
-        raise HTTPException(status_code=402, detail="Insufficient minutes. Please top up.")
+    # 1. Check Request Balance
+    balance_info = await subscription_service.check_request_balance(user_id)
+    if not balance_info.get("can_make_request"):
+        if balance_info.get("in_trial_period") and balance_info.get("trial_requests", 0) == 0:
+            trial_end = balance_info.get("trial_end_date", "")[:10] if balance_info.get("trial_end_date") else ""
+            detail = (
+                "Trial requests exhausted. Package requests unlock after your trial ends."
+                + (f" Trial ends: {trial_end}." if trial_end else "")
+            )
+        else:
+            detail = "Insufficient requests. Please upgrade your plan or wait for your trial/plan to renew."
+        raise HTTPException(status_code=402, detail=detail)
 
     try:
         session_id = request.session_id
@@ -149,10 +158,18 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             image_url=image_url
         )
 
-        # 6. Deduct Minutes
-        # Assuming 1 request = 0.5 minutes (30 seconds) cost for now, since it's a fixed interaction
-        cost = 0.5 
-        new_balance = await subscription_service.deduct_minutes(user_id, cost)
+        # 6. Deduct Request - ONLY AFTER SUCCESSFUL COMPLETION
+        # This ensures users are not charged if any error occurred above
+        # Each chat generation counts as 1 request (question + response + image)
+        try:
+            new_balance_info = await subscription_service.deduct_request(user_id)
+        except ValueError as e:
+            raise HTTPException(status_code=402, detail=str(e))
+        
+        # Also deduct from legacy minutes for backward compatibility
+        legacy_balance = await subscription_service.deduct_minutes(user_id, 0.5)
+
+        logger.info(f"Successfully completed request for user {user_id}. Remaining requests: {new_balance_info.get('total_requests', 0)}")
 
         return ChatResponse(
             session_id=session_id,
@@ -160,11 +177,17 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             ollama_response=cad_dsl,
             validated_response=cad_dsl,
             image_url=image_url,
-            remaining_minutes=new_balance
+            remaining_minutes=legacy_balance,  # Legacy field
+            request_balance=new_balance_info  # New request-based balance
         )
 
+    except HTTPException:
+        # Re-raise HTTP exceptions without charging the user
+        logger.warning(f"HTTP exception occurred for user {user_id}, no charge applied")
+        raise
     except Exception as e:
-        logger.error(f"Chat generation error: {str(e)}", exc_info=True)
+        # Log error and raise without charging the user
+        logger.error(f"Chat generation error for user {user_id}: {str(e)}, no charge applied", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat/session")

@@ -63,7 +63,7 @@ export default function LoginWithCred() {
                 total_minutes_purchased: 0
             })
 
-            router.push("/");
+            router.push("/auth/callback");
         } catch (err) {
             console.log(err);
             toast.error("Server Error");

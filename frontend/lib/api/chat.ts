@@ -80,11 +80,36 @@ export async function createChatSession(title: string = "New Chat", token: strin
     return res.json();
 }
 
-export async function fetchChatHistory(token: string) {
+export async function fetchChatHistory(token: string): Promise<Array<{ id: string; title?: string; created_at: string; updated_at: string }>> {
     const headers = { 'Authorization': `Bearer ${token}` };
-    const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/history`, { headers });
-    if (!res.ok) throw new Error("Failed to fetch history");
-    return res.json();
+    const url = `${getApiBaseUrl()}/api/v1/chat/history`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+        // 401: token invalid/expired or backend auth mismatch — return empty so chat still works with a new session
+        if (res.status === 401) {
+            if (typeof window !== "undefined") {
+                console.warn("Chat history: unauthorized (401). Using empty history. Check backend Supabase JWT config if this persists.");
+            }
+            return [];
+        }
+        let detail = `Failed to fetch history (${res.status})`;
+        try {
+            const body = await res.json();
+            if (body?.detail) {
+                const d = body.detail;
+                detail += typeof d === 'string' ? `: ${d}` : `: ${d?.error ?? JSON.stringify(d)}`;
+            }
+        } catch {
+            try {
+                detail += `: ${await res.text()}`;
+            } catch {
+                // ignore
+            }
+        }
+        throw new Error(detail);
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
 }
 
 export async function fetchSessionMessages(sessionId: string, token: string) {

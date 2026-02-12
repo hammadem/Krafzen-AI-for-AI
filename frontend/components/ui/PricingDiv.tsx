@@ -1,28 +1,30 @@
 "use client";
 import { Check } from "lucide-react";
 import { Button } from "../ui/button";
-import { useState } from "react";
-import StripePaymentModal from "../StripePaymentModal";
 
 export default function PricingDiv({
   price,
   index,
-  monthly
+  monthly,
+  onGetStarted,
 }: {
   price: PricingDetails;
   index: number;
   monthly: boolean;
+  onGetStarted?: (price: PricingDetails, index: number, monthly: boolean) => void;
 }) {
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-
   const handleGetStarted = () => {
-    if (price.stripeLink) {
-      setShowPaymentModal(true);
-    } else {
-      // For custom pricing (Enterprise Plus), redirect to support
-      window.location.href = "/support";
+    if (price.price === "Custom" || !price.stripeLink) {
+      window.open("/support", "_blank", "noopener,noreferrer");
+      return;
     }
+    if (onGetStarted) {
+      onGetStarted(price, index, monthly);
+      return;
+    }
+    window.open(price.stripeLink, "_blank", "noopener,noreferrer");
   };
+
   const glowEffects = [
     "group-hover:shadow-[0_0_40px_-10px_rgba(34,197,94,0.6)] border-zinc-800 hover:border-green-500/50",
     "group-hover:shadow-[0_0_40px_-10px_rgba(59,130,246,0.6)] border-zinc-800 hover:border-blue-500/50",
@@ -39,9 +41,6 @@ export default function PricingDiv({
 
   const glowClass = glowEffects[index % glowEffects.length];
   const bgClass = bgColors[index % bgColors.length];
-
-  const colorThemes = ["green", "blue", "yellow", "pink"];
-  const colorTheme = colorThemes[index % colorThemes.length];
 
   return (
     <div
@@ -76,20 +75,8 @@ export default function PricingDiv({
           onClick={handleGetStarted}
           className="w-full rounded-full h-12 text-black font-bold text-base bg-green-400 hover:bg-green-500 transition-colors shadow-[0_0_15px_rgba(74,222,128,0.2)] hover:shadow-[0_0_25px_rgba(74,222,128,0.4)]"
         >
-          {price.stripeLink ? "Get Started" : "Contact Us"}
+          {price.price === "Custom" ? "Contact Us" : "Get Started"}
         </Button>
-
-        {/* Stripe Checkout Modal */}
-        {price.stripeLink && (
-          <StripePaymentModal
-            isOpen={showPaymentModal}
-            onClose={() => setShowPaymentModal(false)}
-            stripeCheckoutUrl={price.stripeLink}
-            planName={price.type}
-            amount={price.price}
-            colorTheme={colorTheme}
-          />
-        )}
       </div>
     </div>
   );

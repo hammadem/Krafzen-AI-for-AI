@@ -1,8 +1,15 @@
 "use client";
+import { useState } from "react";
 import { Button } from "./ui/button";
 import PricingDiv from "./ui/PricingDiv";
+import StripePaymentModal from "./StripePaymentModal";
 import { PricingPlans } from "@/lib/data";
 import { useDashboard } from "@/context/DashboardContex";
+
+const COLOR_THEMES = ["green", "blue", "yellow", "pink"] as const;
+function planTypeToName(type: string): string {
+  return type.toLowerCase().replace(/\s+/g, "_");
+}
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ')
@@ -12,6 +19,26 @@ function classNames(...classes: string[]) {
 
 export default function Pricing() {
   const { monthly, setMonthly } = useDashboard();
+  const [paymentModal, setPaymentModal] = useState<{
+    open: boolean;
+    planName: string;
+    planDisplayName: string;
+    amount: string;
+    billingCycle: "monthly" | "annual";
+    colorTheme: string;
+  } | null>(null);
+
+  const handleGetStarted = (price: PricingDetails, index: number, isMonthly: boolean) => {
+    if (price.price === "Custom" || !price.stripeLink) return;
+    setPaymentModal({
+      open: true,
+      planName: planTypeToName(price.type),
+      planDisplayName: price.type,
+      amount: price.price,
+      billingCycle: isMonthly ? "monthly" : "annual",
+      colorTheme: COLOR_THEMES[index % COLOR_THEMES.length],
+    });
+  };
 
   return (
     <section>
@@ -65,12 +92,24 @@ export default function Pricing() {
                   price={price}
                   index={index}
                   monthly={monthly}
+                  onGetStarted={handleGetStarted}
                 />
               )
             )}
           </div>
         </div>
       </div>
+      {paymentModal != null && (
+        <StripePaymentModal
+          isOpen={paymentModal.open}
+          onClose={() => setPaymentModal(null)}
+          planName={paymentModal.planName}
+          planDisplayName={paymentModal.planDisplayName}
+          amount={paymentModal.amount}
+          billingCycle={paymentModal.billingCycle}
+          colorTheme={paymentModal.colorTheme}
+        />
+      )}
     </section>
   );
 }

@@ -1,152 +1,285 @@
 "use client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CreditCard, Loader2, Lock, CheckCircle2, ExternalLink } from "lucide-react";
-import { useEffect, useState } from "react";
 
-interface StripeCheckoutModalProps {
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CreditCard, Loader2, Lock, CheckCircle2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { loadStripe } from "@stripe/stripe-js";
+import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
+import { createEmbeddedCheckoutSession, mockSubscribe, mockActivatePlan } from "@/lib/api/payment";
+import { useAuth } from "@/context/AuthContext";
+
+const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
+function isMockStripe(): boolean {
+    if (typeof window === "undefined") return false;
+    const host = window.location.hostname;
+    return host === "localhost" || host === "127.0.0.1" || !stripePublishableKey;
+}
+
+interface StripePaymentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    stripeCheckoutUrl: string;
-    planName: string;
+    planName: string;       // starter, professional, enterprise
+    planDisplayName: string;
     amount: string;
+    billingCycle: "monthly" | "annual";
     colorTheme?: string;
 }
 
-export default function StripeCheckoutModal({
+const colorClasses: Record<string, { gradient: string; border: string; bg: string; text: string; glow: string }> = {
+    green: {
+        gradient: "from-green-500/5 via-transparent to-emerald-500/5",
+        border: "border-green-500/20",
+        bg: "from-green-500/10 to-emerald-500/10",
+        text: "text-green-400",
+        glow: "bg-green-500/20",
+    },
+    blue: {
+        gradient: "from-blue-500/5 via-transparent to-cyan-500/5",
+        border: "border-blue-500/20",
+        bg: "from-blue-500/10 to-cyan-500/10",
+        text: "text-blue-400",
+        glow: "bg-blue-500/20",
+    },
+    yellow: {
+        gradient: "from-yellow-500/5 via-transparent to-amber-500/5",
+        border: "border-yellow-500/20",
+        bg: "from-yellow-500/10 to-amber-500/10",
+        text: "text-yellow-400",
+        glow: "bg-yellow-500/20",
+    },
+    pink: {
+        gradient: "from-pink-500/5 via-transparent to-rose-500/5",
+        border: "border-pink-500/20",
+        bg: "from-pink-500/10 to-rose-500/10",
+        text: "text-pink-400",
+        glow: "bg-pink-500/20",
+    },
+};
+
+export default function StripePaymentModal({
     isOpen,
     onClose,
-    stripeCheckoutUrl,
     planName,
+    planDisplayName,
     amount,
+    billingCycle,
     colorTheme = "green",
-}: StripeCheckoutModalProps) {
-    const [redirecting, setRedirecting] = useState(false);
+}: StripePaymentModalProps) {
+    const { user, refreshSubscription } = useAuth();
+    const [clientSecret, setClientSecret] = useState<string | null>(null);
+    const [fetchError, setFetchError] = useState<string | null>(null);
+    const [mockState, setMockState] = useState<"idle" | "processing" | "success">("idle");
 
-    // Color theme mappings
-    const colorClasses = {
-        green: {
-            gradient: "from-green-500/5 via-transparent to-emerald-500/5",
-            border: "border-green-500/20",
-            bg: "from-green-500/10 to-emerald-500/10",
-            text: "text-green-400",
-            glow: "bg-green-500/20",
-        },
-        blue: {
-            gradient: "from-blue-500/5 via-transparent to-cyan-500/5",
-            border: "border-blue-500/20",
-            bg: "from-blue-500/10 to-cyan-500/10",
-            text: "text-blue-400",
-            glow: "bg-blue-500/20",
-        },
-        yellow: {
-            gradient: "from-yellow-500/5 via-transparent to-amber-500/5",
-            border: "border-yellow-500/20",
-            bg: "from-yellow-500/10 to-amber-500/10",
-            text: "text-yellow-400",
-            glow: "bg-yellow-500/20",
-        },
-        pink: {
-            gradient: "from-pink-500/5 via-transparent to-rose-500/5",
-            border: "border-pink-500/20",
-            bg: "from-pink-500/10 to-rose-500/10",
-            text: "text-pink-400",
-            glow: "bg-pink-500/20",
-        },
-    };
+    const colors = colorClasses[colorTheme] ?? colorClasses.green;
+    const mock = isMockStripe();
 
-    const colors = colorClasses[colorTheme as keyof typeof colorClasses] || colorClasses.green;
+    const returnUrl = typeof window !== "undefined"
+        ? `${window.location.origin}/dashboard?subscription_success=true`
+        : "";
+
+    const fetchClientSecret = useCallback(async () => {
+        if (!user || !isOpen || !returnUrl) return;
+        setFetchError(null);
+        setClientSecret(null);
+        try {
+            const { client_secret } = await createEmbeddedCheckoutSession(
+                user,
+                planName,
+                billingCycle,
+                returnUrl
+            );
+            setClientSecret(client_secret);
+        } catch (e) {
+            setFetchError(e instanceof Error ? e.message : "Failed to start checkout");
+        }
+    }, [user, isOpen, planName, billingCycle, returnUrl]);
 
     useEffect(() => {
-        if (isOpen) {
-            const timer = setTimeout(() => {
-                setRedirecting(true);
-                window.open(stripeCheckoutUrl, "_blank");
-                setTimeout(() => {
-                    onClose();
-                }, 500);
-            }, 1500);
-
-            return () => clearTimeout(timer);
+        if (!isOpen) return;
+        if (mock) {
+            if (user) {
+                void mockSubscribe(user, planName, billingCycle, false)
+                    .then(() => refreshSubscription())
+                    .catch((e) => setFetchError(e instanceof Error ? e.message : "Failed to start trial"));
+            }
+            return;
         }
-    }, [isOpen, stripeCheckoutUrl, onClose]);
+        const tid = setTimeout(() => fetchClientSecret(), 0);
+        return () => clearTimeout(tid);
+    }, [isOpen, mock, fetchClientSecret, user, planName, billingCycle, refreshSubscription]);
 
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl bg-black/95 border border-white/10 backdrop-blur-xl text-white">
-                {/* Glassmorphic background effect */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} rounded-lg -z-10`} />
+    const handleMockPay = async () => {
+        if (!user) return;
+        setMockState("processing");
+        try {
+            await mockActivatePlan(user);
+            await refreshSubscription();
+            setMockState("success");
+            setTimeout(() => onClose(), 1500);
+        } catch (e) {
+            setFetchError(e instanceof Error ? e.message : "Payment failed");
+            setMockState("idle");
+        }
+    };
 
-                <DialogHeader>
-                    <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400 flex items-center gap-2">
-                        <CreditCard className={`w-6 h-6 ${colors.text}`} />
-                        {redirecting ? "Redirecting to Secure Checkout..." : "Complete Your Purchase"}
-                    </DialogTitle>
-                </DialogHeader>
+    const handleDialogChange = (open: boolean) => {
+        if (!open) {
+            setClientSecret(null);
+            setFetchError(null);
+            setMockState("idle");
+            onClose();
+        } else {
+            setFetchError(null);
+        }
+    };
 
-                <div className="mt-6 space-y-6">
-                    {/* Plan Summary */}
-                    <div className={`bg-gradient-to-br ${colors.bg} border ${colors.border} rounded-xl p-6`}>
-                        <div className="flex justify-between items-center mb-4">
-                            <div>
-                                <p className="text-sm text-gray-400">Selected Plan</p>
-                                <p className="text-2xl font-bold text-white">{planName}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-sm text-gray-400">Total Amount</p>
-                                <p className={`text-3xl font-bold ${colors.text}`}>{amount}</p>
-                            </div>
-                        </div>
+    const stripePromise = useMemo(
+        () => (stripePublishableKey ? loadStripe(stripePublishableKey) : null),
+        []
+    );
 
-                        <div className="flex items-center gap-2 text-xs text-gray-500 pt-4 border-t border-white/10">
-                            <Lock className="w-3 h-3" />
-                            <span>Secured by Stripe • PCI DSS Compliant</span>
-                        </div>
-                    </div>
-
-                    {/* Redirecting State */}
-                    {redirecting ? (
-                        <div className="flex flex-col items-center justify-center py-8 gap-4">
-                            <div className="relative">
-                                <div className={`absolute inset-0 ${colors.glow} blur-xl rounded-full animate-pulse`} />
-                                <Loader2 className={`w-16 h-16 animate-spin ${colors.text} relative z-10`} />
-                            </div>
-                            <div className="text-center space-y-2">
-                                <p className="text-lg font-semibold text-white">Opening secure checkout...</p>
-                                <p className="text-sm text-gray-400">You&apos;ll be redirected to Stripe in a moment</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Features */}
-                            <div className="space-y-3">
-                                <p className="text-sm font-semibold text-gray-300">What happens next:</p>
-                                <div className="space-y-2">
-                                    {[
-                                        "Secure checkout page will open in a new tab",
-                                        "Complete payment with your preferred method",
-                                        "Instant access to your plan features",
-                                        "Email confirmation sent immediately"
-                                    ].map((feature, i) => (
-                                        <div key={i} className="flex items-start gap-3">
-                                            <CheckCircle2 className={`w-4 h-4 ${colors.text} mt-0.5 flex-shrink-0`} />
-                                            <span className="text-sm text-gray-400">{feature}</span>
-                                        </div>
-                                    ))}
+    if (mock) {
+        return (
+            <Dialog open={isOpen} onOpenChange={handleDialogChange}>
+                <DialogContent className="max-w-4xl max-h-[90vh] bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} rounded-lg -z-10`} />
+                    <DialogHeader className="p-6 pb-4 border-b border-white/10">
+                        <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400 flex items-center gap-2">
+                            <CreditCard className={`w-6 h-6 ${colors.text}`} />
+                            {mockState === "success" ? "Payment complete" : "Complete your purchase"}
+                        </DialogTitle>
+                        <p className="text-sm text-gray-400 mt-1">
+                            {planDisplayName} — {amount}/{billingCycle === "monthly" ? "month" : "year"}
+                            {mock && <span className="block mt-0.5 text-gray-500">Development mode — no charge</span>}
+                        </p>
+                    </DialogHeader>
+                    <div className="p-6 space-y-6">
+                        <div className={`bg-gradient-to-br ${colors.bg} border ${colors.border} rounded-xl p-6`}>
+                            <div className="flex justify-between items-center mb-4">
+                                <div>
+                                    <p className="text-sm text-gray-400">Selected plan</p>
+                                    <p className="text-2xl font-bold text-white">{planDisplayName}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm text-gray-400">Amount</p>
+                                    <p className={`text-3xl font-bold ${colors.text}`}>{amount}</p>
                                 </div>
                             </div>
-                        </>
-                    )}
+                            <div className="flex items-center gap-2 text-xs text-gray-500 pt-4 border-t border-white/10">
+                                <Lock className="w-3 h-3" />
+                                <span>{mock ? "Development mode — no card required" : "Secured by Stripe • PCI DSS Compliant"}</span>
+                            </div>
+                        </div>
+                        {fetchError && (
+                            <p className="text-sm text-red-400 text-center">{fetchError}</p>
+                        )}
+                        {mockState === "idle" && !fetchError && (
+                            <div className="flex flex-col items-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={handleMockPay}
+                                    className="px-6 py-3 rounded-full font-semibold bg-green-500 hover:bg-green-600 text-black transition-colors"
+                                >
+                                    Pay now
+                                </button>
+                            </div>
+                        )}
+                        {mockState === "processing" && (
+                            <div className="flex flex-col items-center justify-center py-8 gap-4">
+                                <div className={`absolute inset-0 ${colors.glow} blur-xl rounded-full animate-pulse`} />
+                                <Loader2 className={`w-16 h-16 animate-spin ${colors.text} relative z-10`} />
+                                <p className="text-gray-400">Processing payment...</p>
+                            </div>
+                        )}
+                        {mockState === "success" && (
+                            <div className="flex flex-col items-center justify-center py-8 gap-4">
+                                <CheckCircle2 className={`w-16 h-16 ${colors.text}`} />
+                                <p className="text-lg font-semibold text-white">Thank you!</p>
+                                <p className="text-sm text-gray-400">Redirecting...</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="p-4 border-t border-white/10 bg-black/50">
+                        <p className="text-xs text-gray-500">Secured by Stripe</p>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        );
+    }
 
-                    {/* Manual Link (if popup blocked) */}
-                    <div className="text-center pt-2 border-t border-white/10">
-                        <p className="text-xs text-gray-500 mb-2">Popup blocked?</p>
-                        <button
-                            onClick={() => window.open(stripeCheckoutUrl, "_blank")}
-                            className="text-sm text-green-400 hover:text-green-300 transition-colors flex items-center gap-1 mx-auto font-medium"
+    if (!user) {
+        return (
+            <Dialog open={isOpen} onOpenChange={handleDialogChange}>
+                <DialogContent className="max-w-2xl bg-black/95 border border-white/10 backdrop-blur-xl text-white">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} rounded-lg -z-10`} />
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                            <CreditCard className={colors.text} />
+                            Sign in to subscribe
+                        </DialogTitle>
+                    </DialogHeader>
+                    <p className="text-gray-400">
+                        Please sign in to continue with your purchase.
+                    </p>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={handleDialogChange}>
+            <DialogContent className="max-w-4xl max-h-[90vh] bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden">
+                <div className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} rounded-lg -z-10`} />
+                <DialogHeader className="p-6 pb-4 border-b border-white/10">
+                    <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400 flex items-center gap-2">
+                        <CreditCard className={`w-6 h-6 ${colors.text}`} />
+                        Complete your purchase
+                    </DialogTitle>
+                    <p className="text-sm text-gray-400 mt-1">
+                        {planDisplayName} — {amount}/{billingCycle === "monthly" ? "month" : "year"}
+                    </p>
+                </DialogHeader>
+                <div className="relative w-full min-h-[400px] bg-white/5">
+                    {fetchError && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
+                            <p className="text-red-400">{fetchError}</p>
+                            <button
+                                type="button"
+                                onClick={fetchClientSecret}
+                                className="text-sm text-green-400 hover:text-green-300"
+                            >
+                                Try again
+                            </button>
+                        </div>
+                    )}
+                    {!fetchError && !clientSecret && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/50 backdrop-blur-sm z-10">
+                            <div className={`absolute inset-0 ${colors.glow} blur-xl rounded-full animate-pulse`} />
+                            <Loader2 className={`w-12 h-12 animate-spin ${colors.text} relative z-10`} />
+                            <p className="text-gray-400">Loading checkout...</p>
+                        </div>
+                    )}
+                    {!fetchError && clientSecret && stripePromise && (
+                        <EmbeddedCheckoutProvider
+                            stripe={stripePromise}
+                            options={{
+                                clientSecret,
+                                onComplete: () => {
+                                    onClose();
+                                },
+                            }}
                         >
-                            <ExternalLink className="w-4 h-4" />
-                            Click here to open checkout manually
-                        </button>
+                            <div className="min-h-[400px] p-4">
+                                <EmbeddedCheckout className="min-h-[380px]" />
+                            </div>
+                        </EmbeddedCheckoutProvider>
+                    )}
+                </div>
+                <div className="p-4 border-t border-white/10 bg-black/50">
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <Lock className="w-3 h-3" />
+                        <span>Secured by Stripe • PCI DSS Compliant</span>
                     </div>
                 </div>
             </DialogContent>

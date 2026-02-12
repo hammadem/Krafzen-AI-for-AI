@@ -152,6 +152,10 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 }
             } catch (err) {
                 console.error("Failed to load chat history:", err);
+                // Allow chat to work with a local session when history fetch fails (e.g. 401, network)
+                if (!activeSessionId && user?.access_token) {
+                    createSession("New Secure Chat");
+                }
             }
         };
 

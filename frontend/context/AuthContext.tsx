@@ -11,6 +11,8 @@ interface AuthContextType {
   currentProject: ProjectDetails | false | null;
   setCurrentProject: (value: ProjectDetails | false | null) => void;
   setUser: (value: User) => void;
+  /** Refetch subscription/balance from backend and update user (plan, requests). */
+  refreshSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +24,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentProject, setCurrentProject] = useState<ProjectDetails | false | null>(null);
+
+  const updateUserFromSubscriptionStatus = (data: {
+    subscription?: { plan_name?: string; status?: string; trial_end_date?: string | null; plan_requests_total?: number };
+    balance?: { trial_requests?: number; plan_requests?: number; subscription_status?: string; plan_name?: string };
+  }) => {
+    const sub = data.subscription || {};
+    const balance = data.balance || {};
+    const planName = sub.plan_name || balance.plan_name || "free";
+    const status = sub.status || balance.subscription_status || "inactive";
+    const trialReq = balance.trial_requests ?? 0;
+    const planReq = balance.plan_requests ?? 0;
+    const planTotal = sub.plan_requests_total ?? 0;
+    const displayPlan = planName === "free" ? "Free Trial" : planName.charAt(0).toUpperCase() + planName.slice(1);
+    setUser((prev) =>
+      prev
+        ? {
+            ...prev,
+            subscription_plan: displayPlan,
+            has_active_subscription: status === "trial" || status === "active",
+            subscription_status: status,
+            trial_requests_remaining: trialReq,
+            plan_requests_remaining: planReq,
+            plan_requests_total: planTotal,
+            trial_end_date: sub.trial_end_date ?? undefined,
+          }
+        : null
+    );
+  };
 
   useEffect(() => {
     // 1️⃣ Load session on mount
@@ -41,6 +71,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           remaining_minutes: 0,
           total_minutes_purchased: 0
         });
+        // Fetch subscription so profile dropdown shows current plan/requests on first load
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
+          headers: { Authorization: `Bearer ${data.session.access_token}` },
+        })
+          .then((res) => res.json())
+          .then(updateUserFromSubscriptionStatus)
+          .catch((err) => console.error("Failed to fetch subscription status:", err));
       } else {
         setUser(null);
       }
@@ -67,8 +105,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           total_minutes_purchased: 0
         });
 
-        // 3️⃣ Fetch detailed profile from Backend
+        // 3️⃣ Fetch detailed profile and subscription status from Backend
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+        // Fetch user profile
         fetch(`${apiUrl}/api/v1/users/profile`, {
           headers: {
             Authorization: `Bearer ${session.access_token}`
@@ -84,6 +124,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             } : null);
           })
           .catch(err => console.error("Failed to fetch profile:", err));
+
+        // Fetch subscription status (backend returns { subscription, balance })
+        fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`
+          }
+        })
+          .then(res => res.json())
+          .then(updateUserFromSubscriptionStatus)
+          .catch(err => console.error("Failed to fetch subscription status:", err));
 
       } else {
 
@@ -101,7 +151,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const resetAuthState = () => {
     setLoading(false);
     setCurrentProject(null);
-  }
+  };
+
+  const refreshSubscription = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData?.session;
+    if (!session?.access_token) return;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      updateUserFromSubscriptionStatus(data);
+    } catch (err) {
+      console.error("Failed to refresh subscription:", err);
+    }
+  };
 
   const logout = async () => {
     setLoading(true);
@@ -127,7 +193,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logout,
         currentProject,
         setCurrentProject,
-        setUser
+        setUser,
+        refreshSubscription,
       }}
     >
       {children}
