@@ -127,7 +127,11 @@ class MockSubscribeRequest(BaseModel):
 
 
 def _is_mock_payments_allowed() -> bool:
-    """Allow mock subscribe only in local/dev (e.g. FRONTEND_URL has localhost)."""
+    """Allow mock subscribe only when not in production (local/dev, no real Stripe). Never in Vercel Production."""
+    if getattr(settings, "STRIPE_LIVE_MODE", False):
+        return False
+    if settings.ENVIRONMENT and settings.ENVIRONMENT.lower() == "production":
+        return False
     url = (settings.FRONTEND_URL or "").strip().lower()
     return "localhost" in url or "127.0.0.1" in url or settings.ENVIRONMENT == "development"
 

@@ -60,14 +60,26 @@ This integration wraps your **existing Stripe checkout links** and **Calendly bo
 - **Text**: White with gray variations
 - **Borders**: White with 10% opacity
 
+## 🔐 Stripe Environments (Test vs Live)
+
+- **Local, Vercel Preview, Vercel Development:** Use **test** keys (`pk_test_...`, `sk_test_...`). The app uses embedded Stripe checkout in test mode; use [Stripe test cards](https://docs.stripe.com/testing) (e.g. **4242 4242 4242 4242**, any future expiry, any CVC). The payment modal shows a “Test mode” hint when test keys are set.
+- **Vercel Production only:** Use **live** keys (`pk_live_...`, `sk_live_...`) for real payments. Set `STRIPE_LIVE_MODE=true` on the backend in production so mock subscribe/activate endpoints are disabled.
+
+| Environment        | Keys    | Behavior                    |
+|--------------------|--------|-----------------------------|
+| Local / Preview / Dev | Test   | Test cards, no real charges |
+| Vercel Production  | Live   | Real payments               |
+
+If **no** Stripe publishable key is set, the app uses a **mock** flow (no Stripe; for first-time setup or demos).
+
 ## 📱 Testing
 
 ### Test Stripe Checkout
 
 1. Go to `/pricing`
 2. Click "Get Started" on any plan
-3. Modal opens with Stripe checkout embedded
-4. Complete test payment or close modal
+3. Modal opens with Stripe checkout embedded (or mock flow if no key)
+4. Use test card **4242 4242 4242 4242** when in test mode, or complete mock “Pay now”
 
 ### Test Calendly Booking
 

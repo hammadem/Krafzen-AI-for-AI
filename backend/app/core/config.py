@@ -81,7 +81,8 @@ class Settings(BaseSettings):
     # Stripe
     STRIPE_SECRET_KEY: Optional[str] = None
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
-    STRIPE_PRICE_ID_100_MINS: Optional[str] = None # Price ID for purchasing minutes
+    STRIPE_PRICE_ID_100_MINS: Optional[str] = None  # Price ID for purchasing minutes
+    STRIPE_LIVE_MODE: bool = False  # True only in Vercel Production; disables mock payments
 
     # External Links
     CALENDLY_URL: str = "https://calendly.com/" # Default or empty

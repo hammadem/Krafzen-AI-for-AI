@@ -10,10 +10,14 @@ import { useAuth } from "@/context/AuthContext";
 
 const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
+/** Mock flow only when no Stripe key is set (e.g. first-time setup). Otherwise use Stripe (test or live). */
 function isMockStripe(): boolean {
-    if (typeof window === "undefined") return false;
-    const host = window.location.hostname;
-    return host === "localhost" || host === "127.0.0.1" || !stripePublishableKey;
+    return !stripePublishableKey;
+}
+
+/** True when using Stripe test keys (local, Vercel Preview, Vercel Development). Show test card hint. */
+function isStripeTestMode(): boolean {
+    return typeof stripePublishableKey === "string" && stripePublishableKey.startsWith("pk_test_");
 }
 
 interface StripePaymentModalProps {
@@ -276,7 +280,15 @@ export default function StripePaymentModal({
                         </EmbeddedCheckoutProvider>
                     )}
                 </div>
-                <div className="p-4 border-t border-white/10 bg-black/50">
+                <div className="p-4 border-t border-white/10 bg-black/50 space-y-2">
+                    {isStripeTestMode() && (
+                        <div className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                            <span className="font-medium">Test mode:</span> Use card <code className="bg-black/30 px-1 rounded">4242 4242 4242 4242</code>, any future expiry, any CVC.{" "}
+                            <a href="https://docs.stripe.com/testing" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-300">
+                                More test cards
+                            </a>
+                        </div>
+                    )}
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                         <Lock className="w-3 h-3" />
                         <span>Secured by Stripe • PCI DSS Compliant</span>
