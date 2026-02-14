@@ -1,0 +1,97 @@
+# Python (Backend)
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.pyd
+backend/venv/
+backend/.env
+backend/.env.backup
+backend/.pytest_cache/
+backend/.coverage
+backend/coverage.xml
+backend/htmlcov/
+backend/build/
+backend/dist/
+backend/*.egg-info/
+backend/pip-wheel-metadata/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Frontend (Next.js)
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+build/
+dist/
+next-env.d.ts
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+.env
+.env.local
+.env.*.local
+
+# Database/Logs
+*.log
+*.sql.backup
+supabase/  # Local Supabase mocks if any
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Deploy Artifacts
+.Dockerfile.cache
+render.yaml.lock  # If generated
+
+# Misc
+*.bak
+*.tmp
+docs/LAUNCH_LOAD_CAPACITY.md
+
+# Test artifacts
+backend/test_output/
+backend/test_audio.wav
+backend/tests/*.wav
+backend/tests/*.mp3
+backend/tests/*.m4a
+
+# AI/ML datasets (too large for git)
+ai-ml/**/dataset/cadllm_raw/
+ai-ml/**/dataset/jsonl/
+ai-ml/**/cadllm_raw/
+ai-ml/**/*.jsonl
+ai-ml/**/cad-agent-qwen-*/
+ai-ml/**/logs/
+ai-ml/**/*.tar.gz
+ai-ml/**/cadllm-workspace.tar.gz
+ai-ml/cadllm/NVIDIA-H200-NVL/workspace/space/cad-llm-api/
+scripts/test_output.txt
+
+# Temp folders
+backend/temp/
+.vercel
+.env*.local
+
+# Google Client Secret
+client_secret_*.json

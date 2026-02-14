@@ -1,0 +1,5 @@
+echo "🔍 Running Frontend Lint..."
+cd frontend && npm run lint
+
+echo "🧪 Running Frontend Tests..."
+npm run test -- --run

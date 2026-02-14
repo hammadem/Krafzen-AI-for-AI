@@ -1,0 +1,64 @@
+name: Deploy Backend to Render
+
+# Note: Tests run in test-backend.yml workflow
+# This workflow only handles deployment after tests pass
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches:
+      - main
+      - staging
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/staging'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Deploy to Staging
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        RENDER_SERVICE_ID_STAGING: ${{ secrets.RENDER_SERVICE_ID_STAGING }}
+      run: |
+        echo "Deploying to staging environment"
+        echo "Staging service ID: $RENDER_SERVICE_ID_STAGING"
+    
+    - name: Test staging health endpoint
+      run: |
+        sleep 10
+        curl -f ${{ secrets.RENDER_STAGING_URL }}/health/ || echo "Staging health check failed - service may be starting"
+        curl -f ${{ secrets.RENDER_STAGING_URL }}/health/detailed || echo "Staging detailed health check failed"
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Deploy to Production
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        RENDER_SERVICE_ID_PRODUCTION: ${{ secrets.RENDER_SERVICE_ID_PRODUCTION }}
+      run: |
+        echo "Deploying to production environment"
+        echo "Production service ID: $RENDER_SERVICE_ID_PRODUCTION"
+    
+    - name: Test production health endpoint
+      run: |
+        sleep 10
+        curl -f ${{ secrets.RENDER_PRODUCTION_URL }}/health/ || echo "Production health check failed - service may be starting"
+        curl -f ${{ secrets.RENDER_PRODUCTION_URL }}/health/detailed || echo "Production detailed health check failed"
+

@@ -1,0 +1,38 @@
+Kitchen CAD Drawing – Optimized Instructions for DXF Generator
+
+Draw the following geometric entities. Use exact coordinates in millimeters. Origin (0,0) is bottom-left corner.
+
+1. ROOM WALLS (Layer: Walls):
+   - Draw rectangle: corner (0, 0), width 3657.6mm, height 3048mm
+   - Draw rectangle: corner (127, 127), width 3403.6mm, height 2794mm
+
+2. DOOR ON RIGHT WALL (Layer: Doors):
+   - Draw line: start (1828.8, 2921), end (1828.8, 2895.6)
+   - Draw arc: center (1828.8, 2895.6), radius 914.4mm, start angle 270, end angle 90
+
+3. BASE CABINETS ON TOP WALL (Layer: Cabinets):
+   - Draw rectangle: corner (177.8, 2311.4), width 1193.8mm, height 609.6mm
+   - Draw rectangle: corner (2286, 2311.4), width 1244.6mm, height 609.6mm
+   - Draw rectangle: corner (1371.6, 2311.4), width 914.4mm, height 609.6mm
+
+4. BASE CABINETS ON LEFT WALL (Layer: Cabinets):
+   - Draw rectangle: corner (127, 127), width 609.6mm, height 1016mm
+   - Draw rectangle: corner (127, 1905), width 609.6mm, height 1016mm
+   - Draw rectangle: corner (127, 1143), width 609.6mm, height 762mm
+
+5. REFRIGERATOR (Layer: Appliances):
+   - Draw rectangle: corner (2616.2, 127), width 914.4mm, height 762mm
+
+6. OVERHEAD CABINETS (Layer: Cabinets, use dashed linetype):
+   - Draw rectangle: corner (1371.6, 2702), width 914.4mm, height 381mm
+   - Draw rectangle: corner (127, 1524), width 381mm, height 762mm
+
+7. DIMENSIONS (Layer: Dimensions):
+   - Draw dimension: points [(0, 3148), (3657.6, 3148)], value 3657.6
+   - Draw dimension: points [(3757.6, 0), (3757.6, 3048)], value 3048
+   - Draw dimension: points [(177.8, 3000), (3530.6, 3000)], value 3352.8
+   - Draw dimension: points [(1371.6, 3000), (2286, 3000)], value 914.4
+   - Draw dimension: points [(1828.8, 3000), (2743.2, 3000)], value 914.4
+   - Draw dimension: points [(736.6, 100), (1498.6, 100)], value 762
+   - Draw dimension: points [(2616.2, 100), (3530.6, 100)], value 914.4
+
