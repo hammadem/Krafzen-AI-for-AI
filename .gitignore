@@ -44,6 +44,8 @@ frontend/.env.production.local
 .env
 .env.local
 .env.*.local
+.env.staging
+.env.production
 
 # Database/Logs
 *.log

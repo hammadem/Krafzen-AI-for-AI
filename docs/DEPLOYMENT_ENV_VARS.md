@@ -24,6 +24,18 @@ Go to **Vercel Dashboard** > **Settings** > **Environment Variables** and add th
 
 > **Note:** Variables starting with `NEXT_PUBLIC_` are exposed to the browser.
 
+### Supabase Auth (redirects for production & staging)
+
+If login redirects to **localhost** on production or staging, fix it in **Supabase Dashboard**:
+
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard) → your project → **Authentication** → **URL Configuration**.
+2. **Site URL:** Set to your primary app URL (e.g. `https://www.krafzen.com` for production, or leave as-is if you use Redirect URLs for each env).
+3. Under **Redirect URLs**, add **all** environments (one per line):
+   - Production: `https://www.krafzen.com/**`, `https://krafzen.com/**`
+   - Staging: `https://staging.krafzen.com/**`
+   - Local: `http://localhost:3000/**`
+4. Save. OAuth and magic-link redirects will then go back to the correct origin (the app uses `window.location.origin`, so staging.krafzen.com → staging, www.krafzen.com → production).
+
 ### 2. Backend Variables (Render / Cloud)
 
 Go to **Render Dashboard** > **Settings** > **Environment** and add the following:

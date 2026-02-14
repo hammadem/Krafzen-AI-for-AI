@@ -5,7 +5,7 @@ export async function apiClient(
     method: REQTYPE,
     url: string,
     user: User | null,
-    body?: JobReqType | string | FileDetails | CreateFileReq | InputData | GPT_PARSE_REQ | FormData,
+    body?: JobReqType | string | FileDetails | CreateFileReq | InputData | GPT_PARSE_REQ | FormData | Record<string, unknown>,
     contentType: string = "application/json",
     controller?: AbortController
 ): Promise<ApiRes> {

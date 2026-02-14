@@ -95,7 +95,7 @@ Stripe sends events to your **backend** API, not the frontend. Use this URL as t
 
 #### Step 1: Get your backend base URL
 
-- **Render:** Dashboard → your backend service (e.g. `krafzen-api-prod`) → the URL at the top is your base URL (e.g. `https://krafzen-api-prod.onrender.com`). No path, no trailing slash.
+- **Render (custom domain):** Your backend base URL (e.g. `https://backend.krafzen.com` for production, `https://backend.staging.krafzen.com` for staging). No path, no trailing slash.
 - Or use the same URL you set as `NEXT_PUBLIC_API_URL` in the frontend (without any path).
 
 #### Step 2: Build the endpoint URL
@@ -110,8 +110,8 @@ Examples:
 
 | Backend base URL | Webhook endpoint URL |
 |------------------|----------------------|
-| `https://krafzen-api-prod.onrender.com` | `https://krafzen-api-prod.onrender.com/api/v1/payments/webhook` |
-| `https://krafzen-staging.onrender.com` | `https://krafzen-staging.onrender.com/api/v1/payments/webhook` |
+| `https://backend.krafzen.com` | `https://backend.krafzen.com/api/v1/payments/webhook` |
+| `https://backend.staging.krafzen.com` | `https://backend.staging.krafzen.com/api/v1/payments/webhook` |
 
 Rules:
 - Use **https**

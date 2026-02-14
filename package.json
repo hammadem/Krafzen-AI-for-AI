@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "./start-dev.sh",
-    "stop": "pkill -f uvicorn; pkill -f 'next dev'; pkill -f 'next-server'; echo '🛑 Stopped all servers'",
-    "prepare": "husky"
+    "stop": "pkill -f uvicorn; pkill -f 'next dev'; pkill -f 'next-server'; echo '\ud83d\uded1 Stopped all servers'",
+    "prepare": "node scripts/prepare.js",
+    "deploy:production": "./scripts/deploy-to-production.sh"
   },
   "devDependencies": {
     "husky": "^9.1.7",

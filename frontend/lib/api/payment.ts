@@ -45,7 +45,7 @@ export async function createCheckoutSession(
         billing_cycle: billingCycle,
     };
 
-    const response = await apiClient("POST", PAYMENT_URLS.CREATE_CHECKOUT(), user, body as CreateCheckoutRequest);
+    const response = await apiClient("POST", PAYMENT_URLS.CREATE_CHECKOUT(), user, body as unknown as Record<string, unknown>);
 
     if (response.ok && response.data) {
         return response.data as unknown as { url: string };
@@ -76,7 +76,7 @@ export async function createEmbeddedCheckoutSession(
         return_url: returnUrl,
     };
 
-    const response = await apiClient("POST", PAYMENT_URLS.CREATE_EMBEDDED_CHECKOUT(), user, body as CreateEmbeddedCheckoutRequest);
+    const response = await apiClient("POST", PAYMENT_URLS.CREATE_EMBEDDED_CHECKOUT(), user, body as unknown as Record<string, unknown>);
 
     if (response.ok && response.data) {
         return response.data as unknown as { client_secret: string };
@@ -97,7 +97,7 @@ export async function mockSubscribe(
     paymentCompleted: boolean = false
 ): Promise<{ ok: boolean }> {
     const body = { plan_name: planName, billing_cycle: billingCycle, payment_completed: paymentCompleted };
-    const response = await apiClient("POST", PAYMENT_URLS.MOCK_SUBSCRIBE(), user, body as Record<string, unknown>);
+    const response = await apiClient("POST", PAYMENT_URLS.MOCK_SUBSCRIBE(), user, body);
     if (response.ok && response.data) {
         return response.data as unknown as { ok: boolean };
     }
@@ -108,7 +108,7 @@ export async function mockSubscribe(
  * Local dev only: grant package requests after "payment" (user was on trial).
  */
 export async function mockActivatePlan(user: User | null): Promise<{ ok: boolean }> {
-    const response = await apiClient("POST", PAYMENT_URLS.MOCK_ACTIVATE_PLAN(), user, undefined as unknown);
+    const response = await apiClient("POST", PAYMENT_URLS.MOCK_ACTIVATE_PLAN(), user, undefined);
     if (response.ok && response.data) {
         return response.data as unknown as { ok: boolean };
     }

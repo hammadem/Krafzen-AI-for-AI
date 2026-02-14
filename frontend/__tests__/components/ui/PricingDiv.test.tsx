@@ -19,7 +19,7 @@ describe("Pricing Task", () => {
             stripeLink: "https://buy.stripe.com/test_123"
         }
 
-        render(<PricingDiv index={1} price={pricing} />);
+        render(<PricingDiv index={1} price={pricing} monthly={true} />);
 
         expect(screen.getByText(/Starter/i)).toBeInTheDocument();
         expect(screen.getByText(/\$249/i)).toBeInTheDocument();
