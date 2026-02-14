@@ -19,7 +19,7 @@ describe("Example components", () => {
     });
 
     it("renders the NavLinks", () => {
-        render(<NavLinks />);
+        render(<NavLinks setCurrentRoute={() => {}} />);
 
         expect(screen.getByRole("link", { name: /Home/i })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /Projects/i })).toBeInTheDocument();
