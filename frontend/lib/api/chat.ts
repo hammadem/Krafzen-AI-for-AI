@@ -59,8 +59,16 @@ export async function sendChatMessage(
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to generate response');
+        const errorData = await response.json().catch(() => ({}));
+        const detail = errorData?.detail;
+        const message = typeof detail === 'string'
+            ? detail
+            : Array.isArray(detail) && detail[0]?.msg
+                ? detail[0].msg
+                : response.status === 402
+                    ? 'No chat requests remaining. Upgrade your plan or wait for your trial to end.'
+                    : 'Failed to generate response';
+        throw new Error(message);
     }
 
     return response.json();

@@ -72,6 +72,59 @@ This integration wraps your **existing Stripe checkout links** and **Calendly bo
 
 If **no** Stripe publishable key is set, the app uses a **mock** flow (no Stripe; for first-time setup or demos).
 
+## 🔧 Production setup (live keys)
+
+**Do not commit secret keys or webhook secrets.** Set them only in:
+
+1. **Local:** `.env` (gitignored) for testing.
+2. **Production backend** (e.g. Render): Environment variables in the dashboard.
+3. **Production frontend** (Vercel Production): Environment variables in the Vercel project.
+
+### Checklist
+
+| Where | Variable | Value |
+|-------|----------|--------|
+| **Backend** (Production) | `STRIPE_SECRET_KEY` | Your live secret key (`sk_live_...`) from [Stripe Dashboard → Developers → API keys](https://dashboard.stripe.com/apikeys). |
+| **Backend** (Production) | `STRIPE_WEBHOOK_SECRET` | Signing secret from Stripe Dashboard → [Webhooks](https://dashboard.stripe.com/webhooks) → your destination → **Signing secret** (`whsec_...`). |
+| **Backend** (Production) | `STRIPE_LIVE_MODE` | `true` (disables mock subscribe/activate). |
+| **Frontend** (Vercel Production) | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Your live publishable key (`pk_live_...`). |
+
+### Webhook endpoint URL in Stripe
+
+Stripe sends events to your **backend** API, not the frontend. Use this URL as the webhook endpoint.
+
+#### Step 1: Get your backend base URL
+
+- **Render:** Dashboard → your backend service (e.g. `krafzen-api-prod`) → the URL at the top is your base URL (e.g. `https://krafzen-api-prod.onrender.com`). No path, no trailing slash.
+- Or use the same URL you set as `NEXT_PUBLIC_API_URL` in the frontend (without any path).
+
+#### Step 2: Build the endpoint URL
+
+Use this pattern:
+
+```
+<BACKEND_BASE_URL>/api/v1/payments/webhook
+```
+
+Examples:
+
+| Backend base URL | Webhook endpoint URL |
+|------------------|----------------------|
+| `https://krafzen-api-prod.onrender.com` | `https://krafzen-api-prod.onrender.com/api/v1/payments/webhook` |
+| `https://krafzen-staging.onrender.com` | `https://krafzen-staging.onrender.com/api/v1/payments/webhook` |
+
+Rules:
+- Use **https**
+- No trailing slash after `webhook`
+- Path is exactly: `/api/v1/payments/webhook`
+
+#### Step 3: Set it in Stripe
+
+1. Go to [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/webhooks).
+2. Open your existing destination (or add endpoint).
+3. Set **Endpoint URL** to the URL from Step 2.
+4. Copy the **Signing secret** (`whsec_...`) and set it as `STRIPE_WEBHOOK_SECRET` in your backend env.
+
 ## 📱 Testing
 
 ### Test Stripe Checkout

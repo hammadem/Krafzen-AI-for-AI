@@ -16,6 +16,7 @@ export default function CompanyLogo() {
                         alt="Your Company"
                         src="/navbar/Vector.svg"
                         className="h-8 w-auto p-0 m-0 translate-x-3"
+                        style={{ width: "auto", height: "2rem" }}
                     />
                     <Image
                         width={34}
@@ -23,6 +24,7 @@ export default function CompanyLogo() {
                         alt="Your Company"
                         src="/navbar/Vector1.svg"
                         className="h-8 w-auto p-0 m-0"
+                        style={{ width: "auto", height: "2rem" }}
                     />
                     <p className='z-99999 text-white text-[22px] font-semibold hidden sm:block -translate-x-[1px]'>
                         KRAFZEN AI

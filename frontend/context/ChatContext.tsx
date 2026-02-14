@@ -6,6 +6,15 @@ import { createClient } from "@/lib/supabase/supabaseClient";
 import { Message } from "@/components/ChatInterface";
 import { useChatStore, ChatSession } from "@/components/secure-chat/store";
 import { SecurityProvider } from "@/components/secure-chat/SecurityProvider";
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 
 // Local UI interface for sidebar
 interface SidebarSession {
@@ -44,6 +53,8 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
 
     const [inputValue, setInputValue] = useState("");
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+    const [errorModalOpen, setErrorModalOpen] = useState(false);
+    const [errorModalMessage, setErrorModalMessage] = useState("");
     const { user } = useAuth(); // User usage kept if needed for logic later
 
     // Map store sessions to ChatSession interface
@@ -264,10 +275,14 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
             }
         } catch (e) {
             console.error(e);
+            const message = e instanceof Error ? e.message : "Could not connect to secure agent.";
+            const displayMessage = message.startsWith("Error:") ? message : `Error: ${message}`;
             addMessage(currentId, {
                 role: 'assistant',
-                content: "Error: Could not connect to secure agent."
+                content: displayMessage
             });
+            setErrorModalMessage(message.replace(/^Error:\s*/i, ""));
+            setErrorModalOpen(true);
         } finally {
             setGenerating(currentId, false);
         }
@@ -340,6 +355,24 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
             }}
         >
             {children}
+            <AlertDialog open={errorModalOpen} onOpenChange={setErrorModalOpen}>
+                <AlertDialogContent className="bg-gray-900 border-white/10 text-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-red-400">Chat error</AlertDialogTitle>
+                        <AlertDialogDescription className="text-gray-300">
+                            {errorModalMessage}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogAction
+                            onClick={() => setErrorModalOpen(false)}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                            OK
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </ChatContext.Provider>
     );
 };

@@ -33,6 +33,8 @@ export default function ContactCTA() {
                     src="/contact/tilt.webp"
                     alt="CAD Background"
                     fill
+                    loading="lazy"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 66vw, 50vw"
                     className="object-contain object-right-bottom brightness-150 contrast-125 saturate-150"
                 />
             </div>

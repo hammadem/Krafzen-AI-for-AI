@@ -50,6 +50,7 @@ export default function Sidebar() {
                         alt="Your Company"
                         src="/navbar/Vector.svg"
                         className="h-8 p-0 m-0"
+                        style={{ width: "auto", height: "2rem" }}
                     />
                     <Image
                         width={34}
@@ -57,6 +58,7 @@ export default function Sidebar() {
                         alt="Your Company"
                         src="/navbar/Vector1.svg"
                         className="h-8 w-auto p-0 m-0 -translate-x-3"
+                        style={{ width: "auto", height: "2rem" }}
                     />
                 </div>
 
