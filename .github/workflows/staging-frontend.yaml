@@ -1,14 +1,8 @@
 name: Lint, Test, Build & Deploy Frontend (Staging)
 
+# Deploy only on push to staging (includes when a PR is merged into staging)
 on:
   push:
-    branches:
-      - staging
-      - feature/*
-    paths:
-      - 'frontend/**'
-      - 'vercel.json'
-  pull_request:
     branches:
       - staging
     paths:
@@ -16,8 +10,9 @@ on:
       - 'vercel.json'
 
 jobs:
-  staging-preview:
+  staging-deploy:
     runs-on: ubuntu-latest
+    environment: staging
 
     steps:
       - name: Checkout repository
@@ -69,30 +64,19 @@ jobs:
           # 1. Install CLI
           npm install -g vercel
 
-          # 2. Clean environment
-          echo "🧹 Cleaning environment..."
+          # 2. No .vercel directory – use VERCEL_ORG_ID and VERCEL_PROJECT_ID env vars
+          # so the CLI skips "retrieve project settings" and avoids the CI error
+          echo "🧹 Ensuring no .vercel link (CLI will use env vars)..."
           rm -rf .vercel frontend/.vercel
 
           # 3. Hiding .git from the root to bypass author check
           echo "🙈 Hiding .git directory..."
           mv .git .git_temp
 
-          # 4. Create project.json in root (where vercel.json is located)
-          # Vercel CLI looks for .vercel directory in the same location as vercel.json
-          if [ -n "$VERCEL_PROJECT_ID" ] && [ -n "$VERCEL_ORG_ID" ]; then
-            echo "🔗 Creating Vercel project link..."
-            mkdir -p .vercel
-            echo "{\"projectId\":\"$VERCEL_PROJECT_ID\",\"orgId\":\"$VERCEL_ORG_ID\"}" > .vercel/project.json
-            echo "✅ Created .vercel/project.json:"
-            cat .vercel/project.json
-          fi
-
-          # 5. Deploy to Vercel from root (vercel.json is in root)
-          # The project.json should prevent the "retrieve project settings" step
-          # Note: --scope is not needed when project.json exists with orgId and projectId
+          # 4. Deploy from root (vercel.json is in root); env vars link the project
           echo "🚀 Deploying to Vercel..."
           vercel deploy --token=$VERCEL_TOKEN --yes
 
-          # 6. Restore .git
+          # 5. Restore .git
           mv .git_temp .git
           echo "✅ Deployment complete"
