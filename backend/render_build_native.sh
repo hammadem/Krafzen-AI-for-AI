@@ -3,15 +3,10 @@ set -e
 
 echo "Build script started..."
 
-# 0. Install system dependencies needed for potrace compilation (if on Linux/Ubuntu)
+# 0. Install system dependencies for potrace (optional; skip on read-only FS e.g. Render)
 if command -v apt-get &> /dev/null; then
-    echo "Installing build dependencies..."
-    apt-get update && apt-get install -y \
-        wget \
-        build-essential \
-        automake \
-        autoconf \
-        || echo "Warning: Some build dependencies may not be installed"
+    echo "Installing build dependencies (optional)..."
+    (apt-get update && apt-get install -y wget build-essential automake autoconf) || echo "Warning: Skipping apt (e.g. read-only filesystem); continuing without system deps."
 fi
 
 # 1. Install Python Dependencies

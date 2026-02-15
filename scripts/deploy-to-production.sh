@@ -22,11 +22,16 @@ git merge origin/staging -m "chore: deploy to production — sync staging into m
 echo "📤 Pushing main to origin (this triggers production deploys)..."
 git push origin main
 
-echo "↩️  Switching back to staging..."
+echo "🔄 Syncing staging with main (so staging is not behind)..."
 git checkout staging
+git pull origin staging
+git merge main -m "chore: sync staging with main after production deploy"
+echo "📤 Pushing staging to origin..."
+git push origin staging
 
 echo ""
-echo "✅ Production deploy triggered:"
+echo "✅ Production deploy triggered and staging synced with main:"
 echo "   • Backend: push to main → Render production (deploy-backend.yml)"
 echo "   • Frontend: push to main → Vercel production (main-frontend.yaml)"
+echo "   • Staging branch updated to match main."
 echo "   Check GitHub Actions for status."
