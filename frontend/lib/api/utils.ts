@@ -1,6 +1,17 @@
 // modifying code creating requests
 import { apiCache, getCache } from "./cache";
 
+/** Prefer NEXT_PUBLIC_API_URL; otherwise infer from hostname so production never calls staging API. */
+export function getApiBaseUrl(): string {
+    const env = process.env.NEXT_PUBLIC_API_URL;
+    if (env) return env;
+    if (typeof window === "undefined") return "http://localhost:8000";
+    const h = window.location.hostname;
+    if (h === "krafzen.com" || h === "www.krafzen.com") return "https://backend.krafzen.com";
+    if (h === "staging.krafzen.com") return "https://backend.staging.krafzen.com";
+    return "http://localhost:8000";
+}
+
 export async function apiClient(
     method: REQTYPE,
     url: string,
@@ -28,27 +39,7 @@ export async function apiClient(
         "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     };
 
-    // Get API URL - throw error if missing in production
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-    if (!apiUrl) {
-        const isProduction = typeof window !== 'undefined' && 
-            window.location.hostname !== 'localhost' && 
-            !window.location.hostname.includes('127.0.0.1');
-        
-        if (isProduction) {
-            console.error('NEXT_PUBLIC_API_URL is not set!');
-            return {
-                ok: false,
-                data: null,
-                error: {
-                    type: "UNKNOWN",
-                    message: "API URL not configured. Please set NEXT_PUBLIC_API_URL in environment variables."
-                }
-            };
-        }
-    }
-
-    const baseUrl = apiUrl || 'http://localhost:8000';
+    const baseUrl = getApiBaseUrl();
     console.log(baseUrl + url);
 
     try {

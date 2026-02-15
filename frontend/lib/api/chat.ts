@@ -1,31 +1,4 @@
-// Get API URL from environment variable
-// In production/staging, this MUST be set in Vercel environment variables
-// For local development, it defaults to localhost
-const getApiBaseUrl = (): string => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-
-    // If API URL is not set, check if we're in production
-    if (!apiUrl) {
-        // In browser/client-side, check if we're on a production domain
-        if (typeof window !== 'undefined') {
-            const isProduction = window.location.hostname !== 'localhost' &&
-                !window.location.hostname.includes('127.0.0.1');
-
-            if (isProduction) {
-                console.error('NEXT_PUBLIC_API_URL is not set in production environment!');
-                console.error('Current hostname:', window.location.hostname);
-                // Don't throw - let the fetch fail gracefully so we can show a better error
-                // The staging backend should be: https://krafzen-api-staging.onrender.com
-                return 'https://krafzen-api-staging.onrender.com';
-            }
-        }
-
-        // Default to localhost for local development
-        return 'http://localhost:8000';
-    }
-
-    return apiUrl;
-};
+import { getApiBaseUrl } from "./utils";
 
 export interface ChatResponse {
     session_id: string;

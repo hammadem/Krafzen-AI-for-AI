@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # CORS - Store as string to avoid JSON parsing issues with List[str]
     # Access via ALLOWED_ORIGINS_LIST property which converts to list
     # Includes wildcard for Vercel preview deployments (e.g., krafzen-ai-staging-*.vercel.app)
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,https://krafzen-ai-staging.vercel.app,https://*.vercel.app,https://staging.krafzen.com,https://app.krafzen.com"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,https://krafzen-ai-staging.vercel.app,https://*.vercel.app,https://staging.krafzen.com,https://krafzen.com,https://www.krafzen.com,https://app.krafzen.com"
     
     @property
     def ALLOWED_ORIGINS_LIST(self) -> List[str]:
@@ -30,9 +30,11 @@ class Settings(BaseSettings):
                 "http://localhost:3000",
                 "http://localhost:3001",
                 "https://krafzen-ai-staging.vercel.app",
-                "https://*.vercel.app",  # Allow all Vercel preview/staging deployments
+                "https://*.vercel.app",
                 "https://staging.krafzen.com",
-                "https://app.krafzen.com"
+                "https://krafzen.com",
+                "https://www.krafzen.com",
+                "https://app.krafzen.com",
             ]
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',') if origin.strip()]
     

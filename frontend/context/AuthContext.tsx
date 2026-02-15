@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { getApiBaseUrl } from "@/lib/api/utils";
 
 interface AuthContextType {
   user: User | null; // ← from your global types
@@ -72,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           total_minutes_purchased: 0
         });
         // Fetch subscription so profile dropdown shows current plan/requests on first load
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const apiUrl = getApiBaseUrl();
         fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
           headers: { Authorization: `Bearer ${data.session.access_token}` },
         })
@@ -106,7 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
 
         // 3️⃣ Fetch detailed profile and subscription status from Backend
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const apiUrl = getApiBaseUrl();
 
         // Fetch user profile
         fetch(`${apiUrl}/api/v1/users/profile`, {
@@ -157,7 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: sessionData } = await supabase.auth.getSession();
     const session = sessionData?.session;
     if (!session?.access_token) return;
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const apiUrl = getApiBaseUrl();
     try {
       const res = await fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
         headers: { Authorization: `Bearer ${session.access_token}` },

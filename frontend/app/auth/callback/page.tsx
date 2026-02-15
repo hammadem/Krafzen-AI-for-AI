@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/supabaseClient";
+import { getApiBaseUrl } from "@/lib/api/utils";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function AuthCallbackPage() {
       }
 
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") ? "http://localhost:8000" : "https://krafzen-api-staging.onrender.com");
+        const apiUrl = getApiBaseUrl();
         const res = await fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
           headers: { Authorization: `Bearer ${token}` },
         });
