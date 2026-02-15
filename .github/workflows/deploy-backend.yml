@@ -3,14 +3,9 @@ name: Deploy Backend to Render
 # Note: Tests run in test-backend.yml workflow
 # This workflow only handles deployment after tests pass
 
+# Deploy only on push to main/staging (includes when a PR is merged into those branches)
 on:
   push:
-    branches:
-      - main
-      - staging
-    paths:
-      - 'backend/**'
-  pull_request:
     branches:
       - main
       - staging
@@ -21,7 +16,8 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/staging'
-    
+    environment: staging
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -43,7 +39,8 @@ jobs:
   deploy-production:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+    environment: Production
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
