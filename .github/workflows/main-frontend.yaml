@@ -66,11 +66,16 @@ jobs:
         run: |
           # Run from repo root (vercel.json lives here)
           cd "$GITHUB_WORKSPACE"
+
+          if [ -z "$VERCEL_PROJECT_ID" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_PROJECT_ID, VERCEL_ORG_ID, and VERCEL_TOKEN must be set in GitHub Settings → Environments → Production → Environment secrets"
+            exit 1
+          fi
+
           # 1. Install CLI
           npm install -g vercel
 
-          # 2. Do NOT create .vercel – CLI uses VERCEL_ORG_ID + VERCEL_PROJECT_ID env vars
-          # Creating .vercel/project.json causes "Could not retrieve Project Settings" in CI
+          # 2. No .vercel – use env vars + --project so CLI does not call "retrieve project settings"
           echo "🧹 Removing any .vercel link..."
           rm -rf .vercel frontend/.vercel
 
@@ -78,9 +83,10 @@ jobs:
           echo "🙈 Hiding .git directory..."
           mv .git .git_temp
 
-          # 4. Deploy; pass env vars so CLI links project without reading .vercel
+          # 4. Export so vercel subprocess sees them; --project skips project lookup
+          export VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN
           echo "🚀 Deploying to Production..."
-          VERCEL_ORG_ID="$VERCEL_ORG_ID" VERCEL_PROJECT_ID="$VERCEL_PROJECT_ID" vercel deploy --prod --token="$VERCEL_TOKEN" --yes
+          vercel deploy --prod --token="$VERCEL_TOKEN" --yes --project="$VERCEL_PROJECT_ID"
 
           # 5. Restore .git
           mv .git_temp .git
