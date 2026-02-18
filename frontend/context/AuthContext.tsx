@@ -175,13 +175,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       await supabase.auth.signOut();
+    } catch (err) {
+      console.warn("Supabase signOut failed (clearing local state anyway):", err);
+    } finally {
+      // Always clear local state and redirect so logout works even if signOut() fails (e.g. staging backend/network)
       setUser(null);
       setSession(null);
-      window.location.href = "/";
-    } catch (err) {
-      console.log(err)
-    } finally {
       resetAuthState();
+      window.location.href = "/";
     }
   };
 

@@ -21,12 +21,22 @@ def decode_supabase_token(token: str):
         return payload
     except Exception as e:
         logger.error(f"JWT decode error: {e}", exc_info=True)
-        # Debug: try unverified decode to see what's inside
-        try:
-             unverified = jwt.decode(token, options={"verify_signature": False})
-             logger.debug(f"Unverified token payload: {unverified}")
-        except:
-             pass
+        # Hint when signature verification fails: secret must match the Supabase project that issued the token
+        if "Signature verification failed" in str(e) or "signature" in str(e).lower():
+            try:
+                unverified = jwt.decode(token, options={"verify_signature": False})
+                iss = unverified.get("iss", "")
+                logger.warning(
+                    "JWT signature verification failed. Ensure SUPABASE_JWT_SECRET on this service "
+                    "matches the JWT Secret of the Supabase project that issued the token (same project "
+                    "as the frontend's NEXT_PUBLIC_SUPABASE_URL). Token iss=%s",
+                    iss,
+                )
+            except Exception:
+                logger.warning(
+                    "JWT signature verification failed. Set SUPABASE_JWT_SECRET on this service "
+                    "to the JWT Secret from Supabase Dashboard → Project Settings → API.",
+                )
         return None
 
 

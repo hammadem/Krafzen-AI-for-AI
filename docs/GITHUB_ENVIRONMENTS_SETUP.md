@@ -93,4 +93,6 @@ If the frontend gets **401 (Unauthorized)** on all API calls (e.g. `/api/v1/user
 - **Staging backend:** Use the same Supabase project as your staging frontend (same `NEXT_PUBLIC_SUPABASE_URL` / project ref). Copy **JWT Secret** and **Project ID** from that Supabase project.
 - **Production backend:** Use the same Supabase project as your production frontend.
 
-If either is missing or wrong on Render, every authenticated request will return 401.
+If either is missing or wrong on Render, every authenticated request will return 401. Until these are set on the staging backend, users may also be unable to log out in staging; the frontend now clears local state and redirects even if Supabase `signOut()` fails, but setting **SUPABASE_JWT_SECRET** and **SUPABASE_PROJECT_ID** on Render is required for full auth and logout behavior.
+
+**If Render logs show "JWT decode error: Signature verification failed":** The value of **SUPABASE_JWT_SECRET** on that Render service does not match the Supabase project that issued the token. For the **staging** backend, use the JWT Secret from the **same** Supabase project your **staging** frontend uses (the one in `NEXT_PUBLIC_SUPABASE_URL` for staging). Do not use the production Supabase JWT Secret on the staging backend. In Supabase Dashboard: open that project → Project Settings → API → copy **JWT Secret** (not the anon key), paste into Render with no extra spaces, then redeploy.

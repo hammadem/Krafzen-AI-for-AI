@@ -8,7 +8,7 @@ export function getApiBaseUrl(): string {
     if (typeof window === "undefined") return "http://localhost:8000";
     const h = window.location.hostname;
     if (h === "krafzen.com" || h === "www.krafzen.com") return "https://backend.krafzen.com";
-    if (h === "staging.krafzen.com") return "https://backend.staging.krafzen.com";
+    if (h === "staging.krafzen.com" || h === "www.staging.krafzen.com") return "https://backend.staging.krafzen.com";
     return "http://localhost:8000";
 }
 

@@ -29,7 +29,7 @@ export default function CalendlyBooking({
 
     return (
         <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden">
+            <DialogContent className="max-w-4xl max-h-[90vh] bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden" aria-describedby={undefined}>
                 {/* Glassmorphic background effect */}
                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5 rounded-lg -z-10" />
 

@@ -260,7 +260,7 @@ export function ChatInterface({
                                                     </div>
                                                 </div>
                                             </DialogTrigger>
-                                            <DialogContent className="sm:max-w-[60vw] w-[60vw] p-0 bg-transparent border-none shadow-none flex items-center justify-center">
+                                            <DialogContent className="sm:max-w-[60vw] w-[60vw] p-0 bg-transparent border-none shadow-none flex items-center justify-center" aria-describedby={undefined}>
                                                 <DialogTitle className="sr-only">Expanded Image</DialogTitle>
                                                 <div className="relative w-full">
                                                     <img
