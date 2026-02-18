@@ -233,9 +233,9 @@ export default function StripePaymentModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden">
+            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden">
                 <div className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} rounded-lg -z-10`} />
-                <DialogHeader className="p-6 pb-4 border-b border-white/10">
+                <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-white/10">
                     <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400 flex items-center gap-2">
                         <CreditCard className={`w-6 h-6 ${colors.text}`} />
                         Complete your purchase
@@ -244,7 +244,7 @@ export default function StripePaymentModal({
                         {planDisplayName} — {amount}/{billingCycle === "monthly" ? "month" : "year"}
                     </p>
                 </DialogHeader>
-                <div className="relative w-full min-h-[400px] bg-white/5">
+                <div className="relative flex-1 min-h-0 overflow-y-auto bg-white/5">
                     {fetchError && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
                             <p className="text-red-400">{fetchError}</p>
@@ -280,7 +280,7 @@ export default function StripePaymentModal({
                         </EmbeddedCheckoutProvider>
                     )}
                 </div>
-                <div className="p-4 border-t border-white/10 bg-black/50 space-y-2">
+                <div className="flex-shrink-0 p-4 border-t border-white/10 bg-black/50 space-y-2">
                     {isStripeTestMode() && (
                         <div className="text-xs text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
                             <span className="font-medium">Test mode:</span> Use card <code className="bg-black/30 px-1 rounded">4242 4242 4242 4242</code>, any future expiry, any CVC.{" "}
@@ -289,9 +289,14 @@ export default function StripePaymentModal({
                             </a>
                         </div>
                     )}
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <Lock className="w-3 h-3" />
-                        <span>Secured by Stripe • PCI DSS Compliant</span>
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <Lock className="w-3 h-3" />
+                            <span>Secured by Stripe • PCI DSS Compliant</span>
+                        </div>
+                        <p className="text-xs text-gray-500/80">
+                            If the checkout form doesn’t load, try disabling ad blockers or privacy extensions for this site.
+                        </p>
                     </div>
                 </div>
             </DialogContent>

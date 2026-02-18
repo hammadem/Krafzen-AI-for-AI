@@ -72,6 +72,16 @@ This integration wraps your **existing Stripe checkout links** and **Calendly bo
 
 If **no** Stripe publishable key is set, the app uses a **mock** flow (no Stripe; for first-time setup or demos).
 
+## ⚠️ Console errors: `net::ERR_BLOCKED_BY_CLIENT` (e.g. `collector-pxvl48pwoc.px-cloud.net`)
+
+Stripe’s embedded checkout loads **Human Security / PerimeterX** scripts for fraud detection. You may see failed POSTs in the console to domains like `px-cloud.net`, `px-cdn.net`, `pxchk.net` with **`net::ERR_BLOCKED_BY_CLIENT`**.
+
+- **Cause:** The **browser or an extension** (ad blocker, privacy extension, tracking protection) is blocking those requests. This is client-side blocking, not a bug in your app.
+- **What to do when testing:** Disable ad blockers or privacy extensions for `localhost` / your app’s domain, or add the site to the extension’s allowlist.
+- **For real users:** Some users will always have these blocked. Checkout can still complete in many cases. If the form doesn’t load, suggest trying without an ad blocker or in a different browser.
+
+No code change in your repo can “fix” this; the block happens in the browser/extension.
+
 ## 🔧 Production setup (live keys)
 
 **Do not commit secret keys or webhook secrets.** Set them only in:

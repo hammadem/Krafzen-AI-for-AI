@@ -72,7 +72,11 @@ Configure under **Settings → Environments → Production → Protection rules*
 
 | Environment | Frontend | Backend |
 |-------------|----------|---------|
-| Staging     | https://staging.krafzen.com | https://backend.staging.krafzen.com |
+| Staging     | https://staging.krafzen.com, https://www.staging.krafzen.com | https://backend.staging.krafzen.com |
 | Production  | https://krafzen.com         | https://backend.krafzen.com         |
 
 See **docs/ENV_DOMAINS.md** for env files and Supabase redirect URLs.
+
+## CORS (backend)
+
+The backend allows origins from `ALLOWED_ORIGINS` (env) or its default list, which includes `https://staging.krafzen.com`, `https://www.staging.krafzen.com`, and production domains. If your frontend uses a different URL (e.g. a Vercel preview), set **ALLOWED_ORIGINS** on the Render service to a comma-separated list including that origin, or the CORS preflight will fail and API calls from the browser will be blocked.
