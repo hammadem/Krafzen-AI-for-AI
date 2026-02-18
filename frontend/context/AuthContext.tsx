@@ -57,10 +57,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // 1️⃣ Load session on mount
     const loadSession = async () => {
+      // Refresh session so we have a valid access_token (avoids 401 from expired token)
+      try {
+        await supabase.auth.refreshSession();
+      } catch {
+        // No session or refresh failed — getSession() below will still run
+      }
       const { data } = await supabase.auth.getSession();
       setSession(data.session || null);
 
-      if (data.session?.user) {
+      if (data.session?.user && data.session?.access_token) {
         setUser({
           userId: data.session.user.id,
           email: data.session.user.email || undefined,
@@ -90,10 +96,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loadSession();
 
     // 2️⃣ Listen to auth changes (login, logout, refresh)
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session || null);
 
-      if (session?.user) {
+      if (session?.user && session?.access_token) {
         setUser({
           userId: session.user.id,
           email: session.user.email || undefined,
@@ -106,38 +112,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           total_minutes_purchased: 0
         });
 
-        // 3️⃣ Fetch detailed profile and subscription status from Backend
+        // 3️⃣ Fetch detailed profile and subscription status from Backend (only with valid token)
         const apiUrl = getApiBaseUrl();
+        const token = session.access_token;
 
         // Fetch user profile
         fetch(`${apiUrl}/api/v1/users/profile`, {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          }
+          headers: { Authorization: `Bearer ${token}` },
         })
-          .then(res => res.json())
+          .then(res => (res.status === 401 ? null : res.json()))
           .then(data => {
-            setUser(prev => prev ? {
-              ...prev,
-              remaining_minutes: data.remaining_minutes,
-              total_minutes_purchased: data.total_minutes_purchased,
-              subscription_plan: data.plan_tier || prev.subscription_plan
-            } : null);
+            if (data && typeof data === "object")
+              setUser(prev => prev ? {
+                ...prev,
+                remaining_minutes: data.remaining_minutes,
+                total_minutes_purchased: data.total_minutes_purchased,
+                subscription_plan: data.plan_tier || prev.subscription_plan
+              } : null);
           })
-          .catch(err => console.error("Failed to fetch profile:", err));
+          .catch(() => {});
 
         // Fetch subscription status (backend returns { subscription, balance })
         fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`
-          }
+          headers: { Authorization: `Bearer ${token}` },
         })
-          .then(res => res.json())
-          .then(updateUserFromSubscriptionStatus)
-          .catch(err => console.error("Failed to fetch subscription status:", err));
+          .then(res => (res.status === 401 ? null : res.json()))
+          .then(data => data && typeof data === "object" ? updateUserFromSubscriptionStatus(data) : undefined)
+          .catch(() => {});
 
       } else {
-
         setUser(null);
       }
 
