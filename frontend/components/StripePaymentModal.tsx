@@ -146,7 +146,7 @@ export default function StripePaymentModal({
     if (mock) {
         return (
             <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-                <DialogContent className="max-w-4xl max-h-[90vh] bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden">
+                <DialogContent className="max-w-4xl max-h-[90vh] bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden" aria-describedby={undefined}>
                     <div className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} rounded-lg -z-10`} />
                     <DialogHeader className="p-6 pb-4 border-b border-white/10">
                         <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400 flex items-center gap-2">
@@ -215,7 +215,7 @@ export default function StripePaymentModal({
     if (!user) {
         return (
             <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-                <DialogContent className="max-w-2xl bg-black/95 border border-white/10 backdrop-blur-xl text-white">
+                <DialogContent className="max-w-2xl bg-black/95 border border-white/10 backdrop-blur-xl text-white" aria-describedby={undefined}>
                     <div className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} rounded-lg -z-10`} />
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-bold flex items-center gap-2">
@@ -233,7 +233,7 @@ export default function StripePaymentModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={handleDialogChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden">
+            <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col bg-black/95 border border-white/10 backdrop-blur-xl text-white p-0 overflow-hidden" aria-describedby={undefined}>
                 <div className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} rounded-lg -z-10`} />
                 <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-white/10">
                     <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white via-white to-gray-400 flex items-center gap-2">

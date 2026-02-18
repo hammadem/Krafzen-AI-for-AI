@@ -80,3 +80,17 @@ See **docs/ENV_DOMAINS.md** for env files and Supabase redirect URLs.
 ## CORS (backend)
 
 The backend allows origins from `ALLOWED_ORIGINS` (env) or its default list, which includes `https://staging.krafzen.com`, `https://www.staging.krafzen.com`, and production domains. If your frontend uses a different URL (e.g. a Vercel preview), set **ALLOWED_ORIGINS** on the Render service to a comma-separated list including that origin, or the CORS preflight will fail and API calls from the browser will be blocked.
+
+## Backend 401 Unauthorized (Render)
+
+If the frontend gets **401 (Unauthorized)** on all API calls (e.g. `/api/v1/users/profile`, `/api/v1/payments/subscription-status`, `/api/v1/chat/history`), the backend cannot validate the Supabase JWT. Set these on the **Render** service (Dashboard → Service → Environment) so they match the **same Supabase project** the frontend uses:
+
+| Variable | Where to get it | Required for |
+|----------|-----------------|--------------|
+| **SUPABASE_JWT_SECRET** | Supabase Dashboard → Project Settings → API → **JWT Secret** | Verifying the Bearer token signature |
+| **SUPABASE_PROJECT_ID** | Supabase project ref (e.g. from URL `https://<project_ref>.supabase.co`) | Verifying the token issuer |
+
+- **Staging backend:** Use the same Supabase project as your staging frontend (same `NEXT_PUBLIC_SUPABASE_URL` / project ref). Copy **JWT Secret** and **Project ID** from that Supabase project.
+- **Production backend:** Use the same Supabase project as your production frontend.
+
+If either is missing or wrong on Render, every authenticated request will return 401.

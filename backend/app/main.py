@@ -163,6 +163,17 @@ async def rebuild_openapi_schema():
     app.openapi_schema = None
     app.openapi()
     print("🔁 OpenAPI schema rebuilt successfully — all routes loaded.")
+
+    if not (getattr(settings, "SUPABASE_JWT_SECRET", None) or "").strip():
+        logger.warning(
+            "SUPABASE_JWT_SECRET is not set. Authenticated API calls will return 401. "
+            "Set SUPABASE_JWT_SECRET (and SUPABASE_PROJECT_ID) on Render to match your Supabase project."
+        )
+    if not (getattr(settings, "SUPABASE_PROJECT_ID", None) or "").strip():
+        logger.warning(
+            "SUPABASE_PROJECT_ID is not set. JWT issuer check will fail; authenticated calls may return 401. "
+            "Set SUPABASE_PROJECT_ID on Render to match your Supabase project ref."
+        )
     
     print("\n🔍 Registered Routes:")
     for route in app.routes:
