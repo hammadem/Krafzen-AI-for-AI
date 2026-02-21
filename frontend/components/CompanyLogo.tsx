@@ -26,11 +26,15 @@ export default function CompanyLogo() {
                         className="h-8 w-auto p-0 m-0"
                         style={{ width: "auto", height: "2rem" }}
                     />
-                    <p className='z-99999 text-white text-[22px] font-semibold hidden sm:block -translate-x-[1px]'>
+                    {/* <p className='z-99999 text-white text-[22px] font-semibold hidden sm:block -translate-x-[1px]'>
                         KRAFZEN AI
                     </p>
                     <p className='z-99999 text-white text-[22px] font-semibold block sm:hidden -translate-x-[1px]'>
                         KRAFZEN
+                    </p> */}
+
+                    <p className='z-99999 text-white text-[22px] font-semibold -translate-x-[1px]'>
+                        KRAFZEN AI
                     </p>
                 </div>
             </Link>
