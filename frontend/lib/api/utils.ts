@@ -61,12 +61,22 @@ export async function apiClient(
             result = { ok: response.ok, data, error: data?.message }
             if (method === "GET") apiCache.set(cacheKey, result);
         } else {
+            // FastAPI returns 401/4xx with { detail: string | { error: string } }
+            const detail = data?.detail;
+            const message =
+                typeof detail === "string"
+                    ? detail
+                    : detail && typeof detail === "object" && "error" in detail
+                        ? (detail as { error?: string }).error
+                        : data?.message;
             result = {
-                ok: response.ok, data: null, error: {
+                ok: response.ok,
+                data: null,
+                error: {
                     type: "APIERROR",
-                    message: data?.message
-                }
-            }
+                    message: message || `Request failed (${response.status})`,
+                },
+            };
         }
 
         return result;

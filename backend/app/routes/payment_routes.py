@@ -38,7 +38,7 @@ async def create_checkout_session(
             raise HTTPException(status_code=400, detail=f"Invalid billing cycle. Must be one of: {', '.join(valid_cycles)}")
         
         # Define success/cancel URLs based on frontend URL
-        success_url = f"{settings.FRONTEND_URL}/dashboard?subscription_success=true"
+        success_url = f"{settings.FRONTEND_URL}/workspace?subscription_success=true"
         cancel_url = f"{settings.FRONTEND_URL}/pricing?subscription_canceled=true"
         
         url = await payment_service.create_checkout_session(

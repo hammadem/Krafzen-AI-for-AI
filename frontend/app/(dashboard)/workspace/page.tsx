@@ -1,15 +1,21 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { toast } from "react-toastify";
 import Navbar from "@/components/Navbar";
 import { ChatInterface } from "@/components/ChatInterface";
 import { ChatSidebar, ChatSession } from "@/components/ChatSidebar";
 import { useChat } from "@/context/ChatContext";
+import { useAuth } from "@/context/AuthContext";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import CompanyLogo from "@/components/CompanyLogo";
 
 export default function DashboardPage() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const { refreshSubscription } = useAuth();
     const {
         messages,
         sessions,
@@ -25,6 +31,17 @@ export default function DashboardPage() {
     } = useChat();
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    // After Stripe redirect: refresh subscription and show success, then clean URL
+    useEffect(() => {
+        if (searchParams.get("subscription_success") !== "true") return;
+        const run = async () => {
+            await refreshSubscription();
+            toast.success("Subscription activated successfully. Your plan is now active.");
+            router.replace("/workspace", { scroll: false });
+        };
+        void run();
+    }, [searchParams, refreshSubscription, router]);
 
     // Derived props for Sidebar
     const sidebarSessions: ChatSession[] = sessions.map(s => ({
