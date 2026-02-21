@@ -83,6 +83,8 @@ The backend allows origins from `ALLOWED_ORIGINS` (env) or its default list, whi
 
 ## Backend 401 Unauthorized (Render)
 
+**Staging “Get started” / subscription:** If in staging you click “Get started” on a plan and see 401s in the console (subscription-status, users/profile, chat/history, mock-subscribe) and “Development mode — no card required” doesn’t complete, the staging backend cannot verify the Supabase JWT. Fix it by setting the staging backend env vars below; no code change is required.
+
 If the frontend gets **401 (Unauthorized)** on all API calls (e.g. `/api/v1/users/profile`, `/api/v1/payments/subscription-status`, `/api/v1/chat/history`), the backend cannot validate the Supabase JWT. Set these on the **Render** service (Dashboard → Service → Environment) so they match the **same Supabase project** the frontend uses:
 
 | Variable | Where to get it | Required for |

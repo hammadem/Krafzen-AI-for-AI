@@ -79,7 +79,7 @@ export default function StripePaymentModal({
     const mock = isMockStripe();
 
     const returnUrl = typeof window !== "undefined"
-        ? `${window.location.origin}/dashboard?subscription_success=true`
+        ? `${window.location.origin}/workspace?subscription_success=true`
         : "";
 
     const fetchClientSecret = useCallback(async () => {
@@ -95,7 +95,8 @@ export default function StripePaymentModal({
             );
             setClientSecret(client_secret);
         } catch (e) {
-            setFetchError(e instanceof Error ? e.message : "Failed to start checkout");
+            const msg = e instanceof Error ? e.message : "Failed to start checkout";
+            setFetchError(typeof msg === "string" ? msg : String(msg));
         }
     }, [user, isOpen, planName, billingCycle, returnUrl]);
 
@@ -105,7 +106,10 @@ export default function StripePaymentModal({
             if (user) {
                 void mockSubscribe(user, planName, billingCycle, false)
                     .then(() => refreshSubscription())
-                    .catch((e) => setFetchError(e instanceof Error ? e.message : "Failed to start trial"));
+                    .catch((e) => {
+                                    const msg = e instanceof Error ? e.message : "Failed to start trial";
+                                    setFetchError(typeof msg === "string" ? msg : String(msg));
+                                });
             }
             return;
         }
@@ -122,7 +126,8 @@ export default function StripePaymentModal({
             setMockState("success");
             setTimeout(() => onClose(), 1500);
         } catch (e) {
-            setFetchError(e instanceof Error ? e.message : "Payment failed");
+            const msg = e instanceof Error ? e.message : "Payment failed";
+            setFetchError(typeof msg === "string" ? msg : String(msg));
             setMockState("idle");
         }
     };
@@ -176,7 +181,7 @@ export default function StripePaymentModal({
                             </div>
                         </div>
                         {fetchError && (
-                            <p className="text-sm text-red-400 text-center">{fetchError}</p>
+                            <p className="text-sm text-red-400 text-center">{String(fetchError)}</p>
                         )}
                         {mockState === "idle" && !fetchError && (
                             <div className="flex flex-col items-center gap-4">
@@ -247,7 +252,7 @@ export default function StripePaymentModal({
                 <div className="relative flex-1 min-h-0 overflow-y-auto bg-white/5">
                     {fetchError && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6">
-                            <p className="text-red-400">{fetchError}</p>
+                            <p className="text-red-400">{String(fetchError)}</p>
                             <button
                                 type="button"
                                 onClick={fetchClientSecret}
