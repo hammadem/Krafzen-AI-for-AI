@@ -1,0 +1,71 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+
+const COOKIE_NAME = "krafzen_site_unlock";
+const SALT = "krafzen-site";
+const PRODUCTION_HOST = "krafzen.com";
+
+function isProduction(req: NextRequest): boolean {
+  const host = req.nextUrl.hostname ?? req.headers.get("host") ?? "";
+  return host === PRODUCTION_HOST;
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next();
+  const path = req.nextUrl.pathname;
+  const sitePassword = process.env.SITE_PASSWORD;
+
+  // Site password protection: only on production (krafzen.com), not staging or localhost
+  if (
+    isProduction(req) &&
+    sitePassword &&
+    path !== "/site-unlock" &&
+    !path.startsWith("/api/site-unlock")
+  ) {
+    const cookieToken = req.cookies.get(COOKIE_NAME)?.value;
+    const expectedToken = await sha256Hex(sitePassword + SALT);
+    if (cookieToken !== expectedToken) {
+      return NextResponse.redirect(new URL("/site-unlock", req.url));
+    }
+  }
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name) {
+          return req.cookies.get(name)?.value;
+        },
+        set(name, value, options) {
+          res.cookies.set(name, value, options);
+        },
+        remove(name) {
+          res.cookies.delete(name);
+        },
+      },
+    }
+  );
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (
+    !session &&
+    (path.startsWith("/workspace") || path.startsWith("/chat"))
+  ) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  return res;
+}
