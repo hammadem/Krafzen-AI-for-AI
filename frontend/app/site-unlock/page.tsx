@@ -2,40 +2,14 @@
 
 import CompanyLogo from "@/components/CompanyLogo";
 import { Button } from "@/components/ui/button";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { toast } from "react-toastify";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function SiteUnlockPage() {
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password.trim()) {
-      toast.error("Please enter the password.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/site-unlock", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: password.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(data.error || "Incorrect password.");
-        return;
-      }
-      toast.success("Access granted.");
-      window.location.href = "/";
-    } catch {
-      toast.error("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6">
@@ -51,23 +25,45 @@ export default function SiteUnlockPage() {
           <p className="text-sm text-white/60 text-center mb-6">
             Enter the password to access KRAFZEN.
           </p>
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              autoComplete="current-password"
-              className="w-full h-12 px-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/20 transition-colors"
-              disabled={loading}
-              autoFocus
-            />
+          {error === "incorrect" && (
+            <p className="text-sm text-red-400 text-center mb-4">
+              Incorrect password. Please try again.
+            </p>
+          )}
+          <form
+            method="POST"
+            action="/api/site-unlock"
+            className="flex flex-col gap-4"
+          >
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="Password"
+                autoComplete="current-password"
+                className="w-full h-12 pl-4 pr-12 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/20 focus:border-white/20 transition-colors"
+                required
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                tabIndex={0}
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
             <Button
               type="submit"
               className="w-full h-12 rounded-xl bg-white text-black font-medium hover:bg-white/90 transition-colors"
-              disabled={loading}
             >
-              {loading ? "Checking…" : "Unlock"}
+              Unlock
             </Button>
           </form>
         </div>

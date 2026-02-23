@@ -22,6 +22,22 @@ export async function GET() {
   });
 }
 
+function getSubmittedPassword(req: NextRequest): Promise<string | null> {
+  const contentType = req.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    return req.json().then((body: { password?: string }) =>
+      typeof body?.password === "string" ? body.password : null
+    );
+  }
+  if (contentType.includes("application/x-www-form-urlencoded")) {
+    return req.formData().then((form) => {
+      const p = form.get("password");
+      return typeof p === "string" ? p : null;
+    });
+  }
+  return Promise.resolve(null);
+}
+
 export async function POST(req: NextRequest) {
   const expected = getExpectedToken();
   if (!expected) {
@@ -31,29 +47,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { password?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid request body." },
-      { status: 400 }
-    );
-  }
+  const rawPassword = await getSubmittedPassword(req);
+  const submitted = normalizePassword(rawPassword ?? "");
 
-  const submitted = normalizePassword(
-    typeof body.password === "string" ? body.password : ""
-  );
   const token = createHash("sha256")
     .update(submitted + SALT)
     .digest("hex");
 
   if (token !== expected) {
-    return NextResponse.json({ error: "Incorrect password." }, { status: 401 });
+    const redirectUrl = new URL("/site-unlock", req.url);
+    redirectUrl.searchParams.set("error", "incorrect");
+    return NextResponse.redirect(redirectUrl, 302);
   }
 
-  const res = NextResponse.json({ success: true });
   const isProduction = process.env.VERCEL_ENV === "production";
+  const redirectUrl = new URL("/", req.url);
+  const res = NextResponse.redirect(redirectUrl, 302);
   res.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: isProduction,
