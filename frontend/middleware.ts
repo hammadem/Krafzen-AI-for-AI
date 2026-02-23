@@ -24,10 +24,19 @@ export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const sitePassword = process.env.SITE_PASSWORD;
 
+  // Never redirect static assets or Next.js internals (would break CSS/JS/fonts and cause blank page)
+  const isStaticAsset =
+    path.startsWith("/_next/") ||
+    path.startsWith("/favicon") ||
+    path.startsWith("/icon") ||
+    path.startsWith("/apple-icon") ||
+    path.includes("."); // e.g. /robots.txt, /sitemap.xml, .ico, .png
+
   // Site password protection: only on production (krafzen.com), not staging or localhost
   if (
     isProduction(req) &&
     sitePassword &&
+    !isStaticAsset &&
     path !== "/site-unlock" &&
     !path.startsWith("/api/site-unlock")
   ) {
