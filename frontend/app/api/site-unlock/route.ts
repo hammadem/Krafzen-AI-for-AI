@@ -5,10 +5,21 @@ const COOKIE_NAME = "krafzen_site_unlock";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const SALT = "krafzen-site";
 
+function normalizePassword(s: string): string {
+  return s.replace(/\r\n|\r|\n/g, "").trim();
+}
+
 function getExpectedToken(): string | null {
-  const password = (process.env.SITE_PASSWORD ?? "").trim();
+  const password = normalizePassword(process.env.SITE_PASSWORD ?? "");
   if (!password) return null;
   return createHash("sha256").update(password + SALT).digest("hex");
+}
+
+/** GET: returns whether site password is configured (for debugging). */
+export async function GET() {
+  return NextResponse.json({
+    configured: !!getExpectedToken(),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -30,7 +41,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const submitted = (typeof body.password === "string" ? body.password : "").trim();
+  const submitted = normalizePassword(
+    typeof body.password === "string" ? body.password : ""
+  );
   const token = createHash("sha256")
     .update(submitted + SALT)
     .digest("hex");
@@ -47,7 +60,6 @@ export async function POST(req: NextRequest) {
     sameSite: "lax",
     path: "/",
     maxAge: COOKIE_MAX_AGE,
-    ...(isProduction && { domain: ".krafzen.com" }),
   });
   return res;
 }

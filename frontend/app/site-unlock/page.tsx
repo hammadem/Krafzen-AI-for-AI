@@ -19,6 +19,7 @@ export default function SiteUnlockPage() {
     try {
       const res = await fetch("/api/site-unlock", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: password.trim() }),
       });
