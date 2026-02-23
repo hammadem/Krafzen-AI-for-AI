@@ -4,11 +4,11 @@ import type { NextRequest } from "next/server";
 
 const COOKIE_NAME = "krafzen_site_unlock";
 const SALT = "krafzen-site";
-const PRODUCTION_HOST = "krafzen.com";
+const PRODUCTION_HOSTS = ["krafzen.com", "www.krafzen.com"];
 
 function isProduction(req: NextRequest): boolean {
-  const host = req.nextUrl.hostname ?? req.headers.get("host") ?? "";
-  return host === PRODUCTION_HOST;
+  const host = (req.nextUrl.hostname ?? req.headers.get("host") ?? "").split(":")[0];
+  return PRODUCTION_HOSTS.includes(host);
 }
 
 async function sha256Hex(text: string): Promise<string> {
