@@ -6,7 +6,7 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const SALT = "krafzen-site";
 
 function getExpectedToken(): string | null {
-  const password = process.env.SITE_PASSWORD;
+  const password = (process.env.SITE_PASSWORD ?? "").trim();
   if (!password) return null;
   return createHash("sha256").update(password + SALT).digest("hex");
 }
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const submitted = typeof body.password === "string" ? body.password : "";
+  const submitted = (typeof body.password === "string" ? body.password : "").trim();
   const token = createHash("sha256")
     .update(submitted + SALT)
     .digest("hex");
@@ -40,12 +40,14 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ success: true });
+  const isProduction = process.env.VERCEL_ENV === "production";
   res.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction,
     sameSite: "lax",
     path: "/",
     maxAge: COOKIE_MAX_AGE,
+    ...(isProduction && { domain: ".krafzen.com" }),
   });
   return res;
 }

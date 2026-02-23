@@ -32,7 +32,7 @@ export async function middleware(req: NextRequest) {
     !path.startsWith("/api/site-unlock")
   ) {
     const cookieToken = req.cookies.get(COOKIE_NAME)?.value;
-    const expectedToken = await sha256Hex(sitePassword + SALT);
+    const expectedToken = await sha256Hex((sitePassword || "").trim() + SALT);
     if (cookieToken !== expectedToken) {
       return NextResponse.redirect(new URL("/site-unlock", req.url));
     }
