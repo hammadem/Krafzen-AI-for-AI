@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import Navbar from "@/components/Navbar";
@@ -16,6 +16,7 @@ export default function DashboardPage() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { refreshSubscription } = useAuth();
+    const subscriptionSuccessHandled = useRef(false);
     const {
         messages,
         sessions,
@@ -32,9 +33,11 @@ export default function DashboardPage() {
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    // After Stripe redirect: refresh subscription and show success, then clean URL
+    // After Stripe redirect: refresh subscription and show success once, then clean URL
     useEffect(() => {
         if (searchParams.get("subscription_success") !== "true") return;
+        if (subscriptionSuccessHandled.current) return;
+        subscriptionSuccessHandled.current = true;
         const run = async () => {
             await refreshSubscription();
             toast.success("Subscription activated successfully. Your plan is now active.");
