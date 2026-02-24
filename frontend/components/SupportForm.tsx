@@ -27,7 +27,6 @@ import { formSchema } from "@/lib/validation";
 import { toast } from "react-toastify";
 import { useState } from "react";
 
-
 export default function SupportForm() {
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -44,21 +43,28 @@ export default function SupportForm() {
     async function onSubmit(data: z.infer<typeof formSchema>) {
         try {
             setLoading(true);
-            const res = await fetch(
-                process.env.NEXT_PUBLIC_SUPABASE_RESEND_EMAIL_URL! || "",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(data),
-                }
-            );
+            const res = await fetch("/api/support", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(data),
+            });
 
-            const result = await res.json();
+            let result: { success?: boolean; error?: string; message?: string } | undefined;
+            try {
+                result = await res.json();
+            } catch {
+                result = undefined;
+            }
 
-            if (!res.ok || !result.success) {
-                throw new Error(result.error || "Failed to send message");
+            if (!res.ok || result?.success === false) {
+                const message =
+                    result?.error ||
+                    result?.message ||
+                    res.statusText ||
+                    "Failed to send message";
+                throw new Error(message);
             }
 
             toast.success(
@@ -66,8 +72,9 @@ export default function SupportForm() {
             );
             form.reset();
         } catch (error) {
-            console.error(error);
-            toast.error("Something went wrong. Please try again later.");
+            console.error("Support form error:", error);
+            const message = error instanceof Error ? error.message : "Something went wrong. Please try again later.";
+            toast.error(message);
         } finally {
             setLoading(false);
         }
