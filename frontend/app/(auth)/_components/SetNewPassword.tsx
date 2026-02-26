@@ -11,13 +11,36 @@ import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import PassworStrengthBar from "react-password-strength-bar";
 import { toast } from "react-toastify";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import z from "zod";
 
 export default function SetNewPassword() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState<boolean | null>(null);
+
+  // Establish session from recovery link (code in URL or hash)
+  useEffect(() => {
+    const supabase = createClient();
+    const run = async () => {
+      const code = searchParams.get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error("Code exchange error:", error);
+          setSessionReady(false);
+          return;
+        }
+        // Remove code from URL without full navigation
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+      const { data } = await supabase.auth.getSession();
+      setSessionReady(!!data.session);
+    };
+    run();
+  }, [searchParams]);
 
   const form = useForm<z.infer<typeof changePassword>>({
     resolver: zodResolver(changePassword),
@@ -46,6 +69,38 @@ export default function SetNewPassword() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (sessionReady === null) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 text-white min-h-[40vh]">
+        <p className="text-lg">Checking your link...</p>
+      </div>
+    );
+  }
+
+  if (sessionReady === false) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 text-white min-h-[40vh]">
+        <h1 className="text-[5vh]">Invalid or expired link</h1>
+        <p className="text-[2vh] text-gray-400 text-center max-w-md">
+          This password reset link is invalid or has expired. Please request a new one from the login page.
+        </p>
+        <Link
+          href="/forgot"
+          className="text-green-400 hover:underline font-semibold"
+        >
+          Request new reset link
+        </Link>
+        <Link
+          className="text-[#696969] hover:underline"
+          href="/login"
+          aria-label="Link to Login Page"
+        >
+          Back to log in
+        </Link>
+      </div>
+    );
   }
 
   return (
