@@ -4,7 +4,6 @@ import Link from "next/link";
 import CompanyLogo from "./CompanyLogo";
 import { useAuth } from "@/context/AuthContext";
 const navigation = [
-    { name: 'About', href: '/about', current: false },
     { name: 'Features', href: '/features', current: false },
     { name: 'Pricing', href: '/pricing', current: false },
     { name: 'FAQs', href: '/faqs', current: false },
