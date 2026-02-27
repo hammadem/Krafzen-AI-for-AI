@@ -23,6 +23,8 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const path = req.nextUrl.pathname;
   const sitePassword = process.env.SITE_PASSWORD;
+  const sitePasswordEnabled =
+    process.env.ENABLE_SITE_PASSWORD?.toLowerCase() === "true";
 
   // Never redirect static assets or Next.js internals (would break CSS/JS/fonts and cause blank page)
   const isStaticAsset =
@@ -32,9 +34,11 @@ export async function middleware(req: NextRequest) {
     path.startsWith("/apple-icon") ||
     path.includes("."); // e.g. /robots.txt, /sitemap.xml, .ico, .png
 
-  // Site password protection: only on production (krafzen.com), not staging or localhost.
+  // Site password protection: only when ENABLE_SITE_PASSWORD=true and on production (krafzen.com).
+  // When ENABLE_SITE_PASSWORD is false/unset, production is not password protected.
   // Allow /set-new-password and /forgot so password reset links from email are not redirected (and lose the ?code=).
   if (
+    sitePasswordEnabled &&
     isProduction(req) &&
     sitePassword &&
     !isStaticAsset &&
