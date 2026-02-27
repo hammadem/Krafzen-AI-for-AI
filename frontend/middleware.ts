@@ -32,12 +32,15 @@ export async function middleware(req: NextRequest) {
     path.startsWith("/apple-icon") ||
     path.includes("."); // e.g. /robots.txt, /sitemap.xml, .ico, .png
 
-  // Site password protection: only on production (krafzen.com), not staging or localhost
+  // Site password protection: only on production (krafzen.com), not staging or localhost.
+  // Allow /set-new-password and /forgot so password reset links from email are not redirected (and lose the ?code=).
   if (
     isProduction(req) &&
     sitePassword &&
     !isStaticAsset &&
     path !== "/site-unlock" &&
+    path !== "/set-new-password" &&
+    path !== "/forgot" &&
     !path.startsWith("/api/site-unlock")
   ) {
     const cookieToken = req.cookies.get(COOKIE_NAME)?.value;
