@@ -34,7 +34,7 @@ interface ChatState {
     // Actions
     createSession: (title?: string) => string
     switchSession: (sessionId: string) => void
-    addMessage: (sessionId: string, message: Omit<Message, 'timestamp'> & { id?: string }) => void
+    addMessage: (sessionId: string, message: Omit<Message, 'timestamp' | 'id'> & { id?: string }) => void
     deleteSession: (sessionId: string) => void
     updateSessionTitle: (sessionId: string, title: string) => void
     setGenerating: (sessionId: string, isGenerating: boolean) => void
