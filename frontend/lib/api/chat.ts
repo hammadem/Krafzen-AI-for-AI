@@ -2,6 +2,7 @@ import { getApiBaseUrl } from "./utils";
 
 export interface ChatResponse {
     session_id: string;
+    message_id?: string; // ID of created assistant message (for feedback)
     original_prompt: string;
     ollama_response: string;
     validated_response: string;
@@ -93,11 +94,41 @@ export async function fetchChatHistory(token: string): Promise<Array<{ id: strin
     return Array.isArray(data) ? data : [];
 }
 
-export async function fetchSessionMessages(sessionId: string, token: string) {
+export interface SessionMessageFromApi {
+    id: string;
+    role: string;
+    content?: string;
+    image_url?: string;
+    created_at: string;
+    feedback?: { reaction: 'up' | 'down'; reason?: string };
+}
+
+export async function fetchSessionMessages(sessionId: string, token: string): Promise<SessionMessageFromApi[]> {
     const headers = { 'Authorization': `Bearer ${token}` };
     const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/history/${sessionId}`, { headers });
     if (!res.ok) throw new Error("Failed to fetch messages");
     return res.json();
+}
+
+export async function submitMessageFeedback(
+    messageId: string,
+    reaction: 'up' | 'down',
+    reason: string | undefined,
+    token: string
+): Promise<void> {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+    };
+    const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/message/${messageId}/feedback`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ reaction, reason: reason || null }),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.detail || 'Failed to submit feedback');
+    }
 }
 
 export async function updateChatSessionTitle(sessionId: string, title: string, token: string) {

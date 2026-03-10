@@ -35,13 +35,60 @@ class ChatHistoryService:
             return []
 
     async def get_session_messages(self, session_id: str) -> List[Dict[str, Any]]:
-        """Retrieves all messages for a specific session."""
+        """Retrieves all messages for a specific session, with feedback attached."""
         try:
             response = db.table("chat_messages").select("*").eq("session_id", session_id).order("created_at").execute()
-            return response.data
+            messages = response.data or []
+            if not messages:
+                return []
+            message_ids = [m["id"] for m in messages]
+            feedback_map = await self._get_feedback_for_message_ids(message_ids)
+            for m in messages:
+                m["feedback"] = feedback_map.get(m["id"])
+            return messages
         except Exception as e:
             logger.error(f"Error fetching messages: {e}")
             return []
+
+    async def _get_feedback_for_message_ids(self, message_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Returns a map of message_id -> { reaction, reason } for the given message IDs."""
+        if not message_ids:
+            return {}
+        try:
+            response = db.table("message_feedback").select("message_id, reaction, reason").in_("message_id", message_ids).execute()
+            return {row["message_id"]: {"reaction": row["reaction"], "reason": row.get("reason")} for row in (response.data or [])}
+        except Exception as e:
+            logger.error(f"Error fetching feedback: {e}")
+            return {}
+
+    async def message_belongs_to_user(self, message_id: str, user_id: str) -> bool:
+        """Check that the message exists and its session belongs to the user."""
+        try:
+            msg = db.table("chat_messages").select("session_id").eq("id", message_id).limit(1).execute()
+            if not msg.data:
+                return False
+            session_id = msg.data[0]["session_id"]
+            sessions = await self.get_user_sessions(user_id)
+            return any(s["id"] == session_id for s in sessions)
+        except Exception as e:
+            logger.error(f"Error checking message ownership: {e}")
+            return False
+
+    async def upsert_feedback(self, message_id: str, user_id: str, reaction: str, reason: Optional[str] = None) -> bool:
+        """Set or update feedback for a message. Returns True on success."""
+        if reaction not in ("up", "down"):
+            return False
+        if not await self.message_belongs_to_user(message_id, user_id):
+            return False
+        try:
+            from datetime import datetime
+            now = datetime.now().isoformat()
+            row = {"message_id": message_id, "reaction": reaction, "reason": reason, "updated_at": now}
+            db.table("message_feedback").upsert(row, on_conflict="message_id").execute()
+            return True
+        except Exception as e:
+            logger.error(f"Error upserting feedback: {e}", exc_info=True)
+            return False
 
     async def add_message(self, session_id: str, role: str, content: str, image_url: Optional[str] = None) -> Dict[str, Any]:
         """Adds a message to a session."""

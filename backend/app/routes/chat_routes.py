@@ -24,6 +24,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     session_id: str
+    message_id: Optional[str] = None  # ID of the created assistant message (for feedback)
     original_prompt: str
     ollama_response: str
     validated_response: str
@@ -40,6 +41,11 @@ class CreateSessionRequest(BaseModel):
 
 class UpdateSessionTitleRequest(BaseModel):
     title: str
+
+
+class MessageFeedbackRequest(BaseModel):
+    reaction: str  # 'up' | 'down'
+    reason: Optional[str] = None
 
 @router.post("/chat/dxf")
 async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_auth)):
@@ -151,12 +157,13 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         logger.info(f"Generated Image URL: {image_url[:50]}...")
 
         # 5. Persist Assistant Response
-        await chat_history_service.add_message(
+        assistant_msg = await chat_history_service.add_message(
             session_id, 
             "assistant", 
             cad_dsl, 
             image_url=image_url
         )
+        message_id = assistant_msg.get("id") if assistant_msg else None
 
         # 6. Deduct Request - ONLY AFTER SUCCESSFUL COMPLETION
         # This ensures users are not charged if any error occurred above
@@ -173,6 +180,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
 
         return ChatResponse(
             session_id=session_id,
+            message_id=message_id,
             original_prompt=request.message,
             ollama_response=cad_dsl,
             validated_response=cad_dsl,
@@ -251,6 +259,25 @@ async def update_session_title(session_id: str, request: UpdateSessionTitleReque
     except Exception as e:
         logger.error(f"Error updating session title: {e}")
         raise HTTPException(status_code=500, detail="Failed to update session title")
+
+@router.post("/chat/message/{message_id}/feedback")
+async def submit_message_feedback(message_id: str, request: MessageFeedbackRequest, user_data: dict = Depends(require_auth)):
+    """
+    Submit thumbs up/down feedback for a generated image message. For thumbs down, optional reason can be provided.
+    """
+    user_id = user_data["user_id"]
+    if request.reaction not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="reaction must be 'up' or 'down'")
+    success = await chat_history_service.upsert_feedback(
+        message_id=message_id,
+        user_id=user_id,
+        reaction=request.reaction,
+        reason=(request.reason or "").strip() or None,
+    )
+    if not success:
+        raise HTTPException(status_code=403, detail="Message not found or access denied")
+    return {"status": "success", "message_id": message_id, "reaction": request.reaction}
+
 
 @router.delete("/chat/history/{session_id}")
 async def delete_chat_session(session_id: str, user_data: dict = Depends(require_auth)):

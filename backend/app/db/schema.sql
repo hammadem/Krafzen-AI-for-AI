@@ -147,6 +147,17 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Message feedback (thumbs up/down per generated image)
+CREATE TABLE IF NOT EXISTS message_feedback (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    message_id UUID NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    reaction TEXT NOT NULL CHECK (reaction IN ('up', 'down')),
+    reason TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(message_id)
+);
+
 -- Payment History
 CREATE TABLE IF NOT EXISTS payment_history (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -179,6 +190,14 @@ DROP POLICY IF EXISTS "Users view own messages" ON chat_messages;
 CREATE POLICY "Users view own messages" ON chat_messages FOR SELECT USING (auth.uid() = (SELECT user_id FROM chat_sessions WHERE id = session_id));
 DROP POLICY IF EXISTS "Users insert own messages" ON chat_messages;
 CREATE POLICY "Users insert own messages" ON chat_messages FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM chat_sessions WHERE id = session_id));
+
+ALTER TABLE message_feedback ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own message feedback" ON message_feedback;
+CREATE POLICY "Users view own message feedback" ON message_feedback FOR SELECT USING (auth.uid() = (SELECT user_id FROM chat_sessions WHERE id = (SELECT session_id FROM chat_messages WHERE id = message_id)));
+DROP POLICY IF EXISTS "Users insert own message feedback" ON message_feedback;
+CREATE POLICY "Users insert own message feedback" ON message_feedback FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM chat_sessions WHERE id = (SELECT session_id FROM chat_messages WHERE id = message_id)));
+DROP POLICY IF EXISTS "Users update own message feedback" ON message_feedback;
+CREATE POLICY "Users update own message feedback" ON message_feedback FOR UPDATE USING (auth.uid() = (SELECT user_id FROM chat_sessions WHERE id = (SELECT session_id FROM chat_messages WHERE id = message_id)));
 
 ALTER TABLE payment_history ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users view own payments" ON payment_history;

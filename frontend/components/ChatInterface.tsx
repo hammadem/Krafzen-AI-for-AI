@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Loader2, Download, Maximize2, FileCode, Mic, ChevronsLeft } from "lucide-react"
+import { Send, Loader2, Download, Maximize2, FileCode, Mic, ChevronsLeft, ThumbsUp, ThumbsDown } from "lucide-react"
 import { sendChatMessage, downloadDxf, transcribeAudio } from "@/lib/api/chat"
 import { createClient } from "@/lib/supabase/supabaseClient"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,16 @@ import {
     DialogTitle,
     DialogClose
 } from "@/components/ui/dialog"
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+
+export interface MessageFeedback {
+    reaction: 'up' | 'down'
+    reason?: string
+}
 
 export interface Message {
     id: string
@@ -22,6 +32,7 @@ export interface Message {
     content?: string
     imageUrl?: string
     timestamp: Date
+    feedback?: MessageFeedback
 }
 
 interface ChatInterfaceProps {
@@ -31,6 +42,7 @@ interface ChatInterfaceProps {
     isLoadingMessages?: boolean
     onInputChange: (value: string) => void
     onSendMessage: () => void
+    onMessageFeedback?: (messageId: string, reaction: 'up' | 'down', reason?: string) => Promise<void>
 }
 
 import { useAuth } from "@/context/AuthContext"
@@ -41,11 +53,14 @@ export function ChatInterface({
     isLoading,
     isLoadingMessages = false,
     onInputChange,
-    onSendMessage
+    onSendMessage,
+    onMessageFeedback
 }: ChatInterfaceProps) {
     const { user, session } = useAuth()
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const [isRecording, setIsRecording] = useState(false)
+    const [feedbackPopoverMessageId, setFeedbackPopoverMessageId] = useState<string | null>(null)
+    const [feedbackReason, setFeedbackReason] = useState("")
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const chunksRef = useRef<Blob[]>([])
 
@@ -323,6 +338,53 @@ export function ChatInterface({
                                                 <span className="hidden sm:inline">Download Image</span>
                                                 <span className="sm:hidden">Image</span>
                                             </Button>
+
+                                            {onMessageFeedback && (
+                                                <div className="flex items-center gap-1 ml-auto">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className={`text-xs gap-1.5 h-8 w-8 p-0 ${message.feedback?.reaction === 'up' ? 'text-emerald-400 hover:text-emerald-300' : 'text-gray-400 hover:text-white'}`}
+                                                        onClick={() => onMessageFeedback(message.id, 'up')}
+                                                        title="Good result"
+                                                    >
+                                                        <ThumbsUp className="w-3.5 h-3.5" />
+                                                    </Button>
+                                                    <Popover open={feedbackPopoverMessageId === message.id} onOpenChange={(open) => { if (open) setFeedbackPopoverMessageId(message.id); else { setFeedbackPopoverMessageId(null); setFeedbackReason(""); } }}>
+                                                        <PopoverTrigger asChild>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className={`text-xs gap-1.5 h-8 w-8 p-0 ${message.feedback?.reaction === 'down' ? 'text-amber-400 hover:text-amber-300' : 'text-gray-400 hover:text-white'}`}
+                                                                title="Poor result"
+                                                            >
+                                                                <ThumbsDown className="w-3.5 h-3.5" />
+                                                            </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-72 bg-zinc-900 border-white/10 text-gray-100 p-3" align="end">
+                                                            <p className="text-xs text-gray-400 mb-2">Optional: why wasn’t this helpful?</p>
+                                                            <textarea
+                                                                placeholder="e.g. wrong layout, missing elements..."
+                                                                value={feedbackReason}
+                                                                onChange={(e) => setFeedbackReason(e.target.value)}
+                                                                className="w-full min-h-[72px] rounded-md bg-black/40 border border-white/10 text-sm text-gray-100 placeholder:text-gray-500 p-2 resize-none focus:outline-none focus:ring-1 focus:ring-white/20"
+                                                                rows={3}
+                                                            />
+                                                            <Button
+                                                                size="sm"
+                                                                className="w-full mt-2 bg-white/10 hover:bg-white/20 text-gray-100"
+                                                                onClick={async () => {
+                                                                    await onMessageFeedback(message.id, 'down', feedbackReason.trim() || undefined);
+                                                                    setFeedbackPopoverMessageId(null);
+                                                                    setFeedbackReason("");
+                                                                }}
+                                                            >
+                                                                Submit feedback
+                                                            </Button>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

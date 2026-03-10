@@ -1,7 +1,7 @@
 "use client";
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchChatHistory, sendChatMessage, deleteChatSession, createChatSession, fetchSessionMessages, updateChatSessionTitle } from "@/lib/api/chat";
+import { fetchChatHistory, sendChatMessage, deleteChatSession, createChatSession, fetchSessionMessages, updateChatSessionTitle, submitMessageFeedback } from "@/lib/api/chat";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { Message } from "@/components/ChatInterface";
 import { useChatStore, ChatSession } from "@/components/secure-chat/store";
@@ -35,6 +35,7 @@ interface ChatContextType {
     handleSendMessage: () => Promise<void>;
     createNewChat: () => void;
     deleteSession: (id: string) => Promise<void>;
+    onMessageFeedback: (messageId: string, reaction: 'up' | 'down', reason?: string) => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -48,14 +49,16 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
         addMessage,
         deleteSession: removeSession,
         updateSessionTitle,
-        setGenerating
+        setGenerating,
+        setMessageFeedback
     } = useChatStore();
 
     const [inputValue, setInputValue] = useState("");
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [errorModalOpen, setErrorModalOpen] = useState(false);
     const [errorModalMessage, setErrorModalMessage] = useState("");
-    const { user } = useAuth(); // User usage kept if needed for logic later
+    const { user } = useAuth();
+    const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Map store sessions to ChatSession interface
     const sessionsList: SidebarSession[] = Object.values(storeSessions)
@@ -74,7 +77,8 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
             role: m.role as 'user' | 'assistant',
             content: m.content,
             imageUrl: m.imageUrl,
-            timestamp: new Date(m.timestamp)
+            timestamp: new Date(m.timestamp),
+            feedback: m.feedback
         }))
         : [];
 
@@ -85,11 +89,18 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
 
     // --- Persistence & Hydration Logic ---
     useEffect(() => {
-        const loadHistory = async () => {
-            if (!user || !user.access_token) return; // Only load for authenticated users
+        if (!user?.access_token) return;
+
+        // Clear store when user/token changes so we don't show previous user's sessions
+        useChatStore.getState().clearAllSessions();
+
+        const RETRY_DELAY_MS = 600;
+        const MAX_ATTEMPTS = 3; // initial + 2 retries so history has time to be available after login
+
+        const loadHistory = async (attempt = 0) => {
+            if (!user?.access_token) return;
 
             try {
-                // 1. Fetch Sessions
                 const historyData = await fetchChatHistory(user.access_token);
 
                 if (historyData && historyData.length > 0) {
@@ -117,13 +128,14 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                         try {
                             const msgs = await import("@/lib/api/chat").then(mod => mod.fetchSessionMessages(mostRecentSessionId, user.access_token!));
 
-                            // Convert API messages to Store messages
-                            const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string }) => ({
+                            // Convert API messages to Store messages (include feedback)
+                            const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string } }) => ({
                                 id: m.id,
                                 role: m.role,
                                 content: m.content || "",
                                 imageUrl: m.image_url,
-                                timestamp: new Date(m.created_at).getTime()
+                                timestamp: new Date(m.created_at).getTime(),
+                                feedback: m.feedback
                             }));
 
                             useChatStore.getState().appendMessages(mostRecentSessionId, storeMessages);
@@ -135,42 +147,53 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                         }
                     }
 
-                } else if (!activeSessionId && user.access_token) {
-                    // Only create new if truly empty - create in backend
-                    try {
-                        const newSession = await createChatSession("New Secure Chat", user.access_token);
-                        const sessionId = newSession.id;
-                        const hydratedSession: ChatSession = {
-                            id: sessionId,
-                            title: newSession.title || "New Secure Chat",
-                            messages: [],
-                            createdAt: new Date(newSession.created_at).getTime(),
-                            lastActive: new Date(newSession.updated_at).getTime(),
-                            isBackground: false
-                        };
-                        useChatStore.getState().setSessions({
-                            [sessionId]: hydratedSession
-                        });
-                        useChatStore.getState().switchSession(sessionId);
-                    } catch (err) {
-                        console.error("Failed to create initial session:", err);
-                        // Fallback to local session
+                } else if (!historyData || historyData.length === 0) {
+                    // Empty: retry a few times before showing a new session (avoids showing empty while token propagates)
+                    if (attempt < MAX_ATTEMPTS - 1 && user?.access_token) {
+                        const delay = attempt === 0 ? RETRY_DELAY_MS : RETRY_DELAY_MS * 2;
+                        retryTimeoutRef.current = setTimeout(() => loadHistory(attempt + 1), delay);
+                    } else if (!activeSessionId && user?.access_token) {
+                        try {
+                            const newSession = await createChatSession("New Secure Chat", user.access_token);
+                            const sessionId = newSession.id;
+                            const hydratedSession: ChatSession = {
+                                id: sessionId,
+                                title: newSession.title || "New Secure Chat",
+                                messages: [],
+                                createdAt: new Date(newSession.created_at).getTime(),
+                                lastActive: new Date(newSession.updated_at).getTime(),
+                                isBackground: false
+                            };
+                            useChatStore.getState().setSessions({
+                                [sessionId]: hydratedSession
+                            });
+                            useChatStore.getState().switchSession(sessionId);
+                        } catch (err) {
+                            console.error("Failed to create initial session:", err);
+                            createSession("New Secure Chat");
+                        }
+                    } else if (!activeSessionId) {
                         createSession("New Secure Chat");
                     }
-                } else if (!activeSessionId) {
-                    // Not authenticated, create local session
-                    createSession("New Secure Chat");
                 }
             } catch (err) {
                 console.error("Failed to load chat history:", err);
-                // Allow chat to work with a local session when history fetch fails (e.g. 401, network)
-                if (!activeSessionId && user?.access_token) {
+                if (attempt < MAX_ATTEMPTS - 1 && user?.access_token) {
+                    const delay = attempt === 0 ? RETRY_DELAY_MS : RETRY_DELAY_MS * 2;
+                    retryTimeoutRef.current = setTimeout(() => loadHistory(attempt + 1), delay);
+                } else if (!activeSessionId && user?.access_token) {
                     createSession("New Secure Chat");
                 }
             }
         };
 
-        loadHistory();
+        loadHistory(0);
+        return () => {
+            if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current);
+                retryTimeoutRef.current = null;
+            }
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.access_token]); // Depend on user token to reload on login/switch
 
@@ -187,13 +210,14 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
             try {
                 const msgs = await fetchSessionMessages(id, user.access_token);
                 
-                // Convert API messages to Store messages
-                const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string }) => ({
+                // Convert API messages to Store messages (include feedback)
+                const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string } }) => ({
                     id: m.id,
                     role: m.role,
                     content: m.content || "",
                     imageUrl: m.image_url,
-                    timestamp: new Date(m.created_at).getTime()
+                    timestamp: new Date(m.created_at).getTime(),
+                    feedback: m.feedback
                 }));
                 
                 useChatStore.getState().appendMessages(id, storeMessages);
@@ -258,8 +282,9 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                     console.warn("Backend returned different session ID:", response.session_id);
                 }
 
-                // 4. Add Assistant Response to Store
+                // 4. Add Assistant Response to Store (use backend message_id so feedback targets correct row)
                 addMessage(currentId, {
+                    id: response.message_id,
                     role: 'assistant',
                     content: response.validated_response,
                     imageUrl: response.image_url
@@ -338,6 +363,16 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const handleMessageFeedback = async (messageId: string, reaction: 'up' | 'down', reason?: string) => {
+        if (!activeSessionId || !user?.access_token) return;
+        try {
+            await submitMessageFeedback(messageId, reaction, reason, user.access_token);
+            setMessageFeedback(activeSessionId, messageId, { reaction, reason });
+        } catch (err) {
+            console.error("Failed to submit feedback:", err);
+        }
+    };
+
     return (
         <ChatContext.Provider
             value={{
@@ -351,7 +386,8 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 setCurrentSessionId: handleSwitchSession,
                 handleSendMessage,
                 createNewChat,
-                deleteSession
+                deleteSession,
+                onMessageFeedback: handleMessageFeedback
             }}
         >
             {children}

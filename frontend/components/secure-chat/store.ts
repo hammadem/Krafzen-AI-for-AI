@@ -2,6 +2,11 @@
 import { create } from 'zustand'
 import { generateSessionId } from '@/lib/security/crypto'
 
+export interface MessageFeedback {
+    reaction: 'up' | 'down'
+    reason?: string
+}
+
 export interface Message {
     id: string
     role: 'user' | 'assistant' | 'system'
@@ -9,6 +14,7 @@ export interface Message {
     imageUrl?: string
     timestamp: number
     metadata?: Record<string, unknown>
+    feedback?: MessageFeedback
 }
 
 export interface ChatSession {
@@ -28,7 +34,7 @@ interface ChatState {
     // Actions
     createSession: (title?: string) => string
     switchSession: (sessionId: string) => void
-    addMessage: (sessionId: string, message: Omit<Message, 'timestamp' | 'id'>) => void
+    addMessage: (sessionId: string, message: Omit<Message, 'timestamp'> & { id?: string }) => void
     deleteSession: (sessionId: string) => void
     updateSessionTitle: (sessionId: string, title: string) => void
     setGenerating: (sessionId: string, isGenerating: boolean) => void
@@ -39,6 +45,7 @@ interface ChatState {
     // Persist Hydration
     setSessions: (sessions: Record<string, ChatSession>) => void
     appendMessages: (sessionId: string, messages: Message[]) => void
+    setMessageFeedback: (sessionId: string, messageId: string, feedback: MessageFeedback) => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -85,7 +92,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ...session.messages,
                     {
                         ...message,
-                        id: crypto.randomUUID(), // distinct from session ID
+                        id: message.id ?? crypto.randomUUID(),
                         timestamp: Date.now()
                     }
                 ]
@@ -159,6 +166,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     }
                 }
             }
+        })
+    },
+
+    setMessageFeedback: (sessionId, messageId, feedback) => {
+        set((state) => {
+            const session = state.sessions[sessionId];
+            if (!session) return state;
+            const messages = session.messages.map((m) =>
+                m.id === messageId ? { ...m, feedback } : m
+            );
+            return {
+                sessions: {
+                    ...state.sessions,
+                    [sessionId]: { ...session, messages }
+                }
+            };
         })
     }
 }))

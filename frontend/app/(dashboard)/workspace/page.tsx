@@ -28,7 +28,8 @@ export default function DashboardPage() {
         setCurrentSessionId,
         handleSendMessage,
         createNewChat,
-        deleteSession
+        deleteSession,
+        onMessageFeedback
     } = useChat();
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -136,6 +137,7 @@ export default function DashboardPage() {
                                 isLoadingMessages={isLoadingMessages}
                                 onInputChange={setInputValue}
                                 onSendMessage={handleSendMessage}
+                                onMessageFeedback={onMessageFeedback}
                             />
                         </div>
                     </div>
