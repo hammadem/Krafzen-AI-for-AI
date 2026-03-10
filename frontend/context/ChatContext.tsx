@@ -131,7 +131,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                             // Convert API messages to Store messages (include feedback)
                             const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string } }) => ({
                                 id: m.id,
-                                role: m.role,
+                                role: m.role as 'user' | 'assistant' | 'system',
                                 content: m.content || "",
                                 imageUrl: m.image_url,
                                 timestamp: new Date(m.created_at).getTime(),
@@ -213,7 +213,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 // Convert API messages to Store messages (include feedback)
                 const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string } }) => ({
                     id: m.id,
-                    role: m.role,
+                    role: m.role as 'user' | 'assistant' | 'system',
                     content: m.content || "",
                     imageUrl: m.image_url,
                     timestamp: new Date(m.created_at).getTime(),
