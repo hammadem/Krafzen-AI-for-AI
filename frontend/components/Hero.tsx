@@ -100,11 +100,11 @@ export default function Hero() {
                     />
 
                     <p className="text-white text-[2vh] sm:hidden">From Voice commands to</p>
-                    <p className="text-white text-[2vh] sm:hidden"><b>DWG, DXF & MEP</b> as-builts</p>
+                    <p className="text-white text-[2vh] sm:hidden"><b>DWG, DXF & MEP</b> CAD drawings</p>
                     <p className="text-white text-[2vh] sm:hidden">in seconds.</p>
 
                     <p className="text-white text-[2vh] hidden sm:block">From Voice commands to</p>
-                    <p className="text-white text-[2vh] hidden sm:block"><b>DWG, DXF & MEP</b> as-builts in seconds.</p>
+                    <p className="text-white text-[2vh] hidden sm:block"><b>DWG, DXF & MEP</b> CAD drawings in seconds.</p>
 
                     <span
                         className="h-[1vh]"
