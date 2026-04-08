@@ -70,11 +70,11 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
     billing_cycle TEXT, -- 'monthly', 'annual', null for free
     subscription_status TEXT DEFAULT 'inactive', -- 'inactive', 'trial', 'active', 'canceled', 'past_due'
     
-    -- Free trial tracking (14 days)
+    -- Signup free requests (no card); legacy trial_* dates optional
     trial_start_date TIMESTAMPTZ,
     trial_end_date TIMESTAMPTZ,
-    trial_requests_total INT DEFAULT 0, -- Total free requests allocated for trial
-    trial_requests_remaining INT DEFAULT 0, -- Remaining free trial requests
+    trial_requests_total INT DEFAULT 0, -- Signup free tier total (e.g. 30)
+    trial_requests_remaining INT DEFAULT 0, -- Remaining signup free requests
     
     -- Subscription plan requests
     plan_requests_total INT DEFAULT 0, -- Total requests included in subscription plan per billing cycle
@@ -111,8 +111,8 @@ BEGIN
     'free',
     'inactive',
     0.0,
-    0,
-    0,
+    30,
+    30,
     0,
     0
   )

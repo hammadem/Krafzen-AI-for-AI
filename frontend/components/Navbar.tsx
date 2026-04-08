@@ -87,7 +87,7 @@ export default function Navbar({ isRoot = false }: {
 
                                 {user ? (
                                     <>
-                                        {user.has_active_subscription ? (
+                                        {user.can_access_workspace ? (
                                             <Button
                                                 asChild
                                                 className="bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
@@ -179,7 +179,7 @@ export default function Navbar({ isRoot = false }: {
                                 </div>
                             </div>
 
-                            {user.has_active_subscription ? (
+                            {user.can_access_workspace ? (
                                 <Button
                                     asChild
                                     className="w-full bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 transform active:scale-95"
@@ -274,11 +274,11 @@ function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
                     <div className="flex flex-col gap-0.5">
                         <span className="whitespace-nowrap flex items-center gap-2">
                             <Clock className="w-4 h-4" />
-                            Trial requests: {user.trial_requests_remaining ?? 0}
+                            Free requests: {user.trial_requests_remaining ?? 0}
                         </span>
-                        {(user.trial_requests_remaining ?? 0) === 0 && user.subscription_status === "trial" && (
+                        {(user.trial_requests_remaining ?? 0) === 0 && user.in_free_signup_tier && (
                             <span className="text-[10px] text-amber-400 font-normal">
-                                Exhausted; package requests unlock after trial ends
+                                Used up — subscribe to continue
                             </span>
                         )}
                     </div>
@@ -286,12 +286,7 @@ function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
                 <div className="px-3 py-2 text-xs font-bold text-blue-400 bg-blue-500/10 rounded-lg mx-2 mb-1.5 border border-blue-500/20 flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     <span className="whitespace-nowrap">
-                        Package requests: {user.subscription_status === "trial"
-                            ? (user.plan_requests_total ?? 0).toLocaleString()
-                            : (user.plan_requests_remaining ?? 0).toLocaleString()}
-                        {user.subscription_status === "trial" && (
-                            <span className="text-gray-500 font-normal ml-1">(after payment)</span>
-                        )}
+                        Package requests: {(user.plan_requests_remaining ?? 0).toLocaleString()}
                     </span>
                 </div>
                 <div className="mx-2 mb-2">

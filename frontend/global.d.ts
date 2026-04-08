@@ -52,6 +52,10 @@ export global {
         total_minutes_purchased: number | undefined;
         // Subscription status fields
         has_active_subscription?: boolean;
+        /** True if user may open workspace (paid plan or has free/package request balance). */
+        can_access_workspace?: boolean;
+        /** Backend: using signup free pool before first subscription. */
+        in_free_signup_tier?: boolean;
         subscription_status?: string;
         trial_requests_remaining?: number;
         plan_requests_remaining?: number;

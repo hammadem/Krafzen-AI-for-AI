@@ -28,27 +28,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updateUserFromSubscriptionStatus = (data: {
     subscription?: { plan_name?: string; status?: string; trial_end_date?: string | null; plan_requests_total?: number };
-    balance?: { trial_requests?: number; plan_requests?: number; subscription_status?: string; plan_name?: string };
+    balance?: {
+      trial_requests?: number;
+      plan_requests?: number;
+      subscription_status?: string;
+      plan_name?: string;
+      can_make_request?: boolean;
+      in_free_signup_tier?: boolean;
+    };
   }) => {
     const sub = data.subscription || {};
     const balance = data.balance || {};
-    const planName = sub.plan_name || balance.plan_name || "free";
+    const planNameRaw = sub.plan_name || balance.plan_name || "free";
+    const planName = typeof planNameRaw === "string" ? planNameRaw.toLowerCase() : "free";
     const status = sub.status || balance.subscription_status || "inactive";
     const trialReq = balance.trial_requests ?? 0;
     const planReq = balance.plan_requests ?? 0;
     const planTotal = sub.plan_requests_total ?? 0;
-    const displayPlan = planName === "free" ? "Free Trial" : planName.charAt(0).toUpperCase() + planName.slice(1);
+    const paidStatuses = ["active", "trial", "past_due"];
+    const hasPaidSubscription = planName !== "free" && paidStatuses.includes(status);
+    const canAccessWorkspace =
+      hasPaidSubscription || trialReq > 0 || planReq > 0;
+    const displayPlan =
+      planName === "free" ? "Free" : planName.charAt(0).toUpperCase() + planName.slice(1);
     setUser((prev) =>
       prev
         ? {
             ...prev,
             subscription_plan: displayPlan,
-            has_active_subscription: status === "trial" || status === "active",
+            has_active_subscription: hasPaidSubscription,
+            can_access_workspace: canAccessWorkspace,
             subscription_status: status,
             trial_requests_remaining: trialReq,
             plan_requests_remaining: planReq,
             plan_requests_total: planTotal,
             trial_end_date: sub.trial_end_date ?? undefined,
+            in_free_signup_tier: balance.in_free_signup_tier ?? planName === "free",
           }
         : null
     );
@@ -74,18 +89,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           firstname: data?.session?.user?.user_metadata?.firstname || data?.session?.user?.user_metadata?.full_name?.split(' ')[0],
           lastname: data?.session?.user?.user_metadata?.lastname || data?.session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
           avatar_url: data?.session?.user?.user_metadata?.avatar_url || data?.session?.user?.user_metadata?.picture,
-          subscription_plan: data?.session?.user?.user_metadata?.subscription_plan || "Free Trial",
+          subscription_plan: data?.session?.user?.user_metadata?.subscription_plan || "Free",
           remaining_minutes: 0,
           total_minutes_purchased: 0
         });
-        // Fetch subscription so profile dropdown shows current plan/requests on first load
         const apiUrl = getApiBaseUrl();
-        fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
-          headers: { Authorization: `Bearer ${data.session.access_token}` },
-        })
-          .then((res) => res.json())
-          .then(updateUserFromSubscriptionStatus)
-          .catch((err) => console.error("Failed to fetch subscription status:", err));
+        try {
+          const subRes = await fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
+            headers: { Authorization: `Bearer ${data.session.access_token}` },
+          });
+          if (subRes.ok) {
+            const subJson = await subRes.json();
+            updateUserFromSubscriptionStatus(subJson);
+          }
+        } catch (err) {
+          console.error("Failed to fetch subscription status:", err);
+        }
       } else {
         setUser(null);
       }
@@ -107,7 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           firstname: session?.user?.user_metadata?.firstname || session?.user?.user_metadata?.full_name?.split(' ')[0],
           lastname: session?.user?.user_metadata?.lastname || session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
           avatar_url: session?.user?.user_metadata?.avatar_url || session?.user?.user_metadata?.picture,
-          subscription_plan: session?.user?.user_metadata?.subscription_plan || "Free Trial",
+          subscription_plan: session?.user?.user_metadata?.subscription_plan || "Free",
           remaining_minutes: 0,
           total_minutes_purchased: 0
         });

@@ -92,14 +92,10 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
     # 1. Check Request Balance
     balance_info = await subscription_service.check_request_balance(user_id)
     if not balance_info.get("can_make_request"):
-        if balance_info.get("in_trial_period") and balance_info.get("trial_requests", 0) == 0:
-            trial_end = balance_info.get("trial_end_date", "")[:10] if balance_info.get("trial_end_date") else ""
-            detail = (
-                "Trial requests exhausted. Package requests unlock after your trial ends."
-                + (f" Trial ends: {trial_end}." if trial_end else "")
-            )
+        if balance_info.get("in_free_signup_tier") and balance_info.get("trial_requests", 0) == 0:
+            detail = "You have used all free requests. Subscribe to a plan to continue using the workspace."
         else:
-            detail = "Insufficient requests. Please upgrade your plan or wait for your trial/plan to renew."
+            detail = "Insufficient requests. Upgrade your plan or wait for your billing cycle to renew."
         raise HTTPException(status_code=402, detail=detail)
 
     try:
