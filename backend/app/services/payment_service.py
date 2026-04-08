@@ -107,7 +107,7 @@ class PaymentService:
                 raise ValueError("This plan requires custom pricing. Please contact sales.")
 
             checkout_session = stripe.checkout.Session.create(
-                ui_mode="embedded",
+                ui_mode="embedded_page",
                 return_url=return_url,
                 payment_method_types=["card"],
                 line_items=[{
