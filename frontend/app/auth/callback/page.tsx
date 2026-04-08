@@ -35,14 +35,19 @@ export default function AuthCallbackPage() {
         });
         if (res.ok) {
           const json = await res.json();
-          const status = json.subscription?.status ?? json.balance?.subscription_status ?? "";
-          if (status === "trial" || status === "active") {
-            router.replace("/");
+          const balance = json.balance || {};
+          const planName = (json.subscription?.plan_name || balance.plan_name || "free").toLowerCase();
+          const status = json.subscription?.status ?? balance.subscription_status ?? "";
+          const paid = planName !== "free" && ["active", "trial", "past_due"].includes(status);
+          const hasRequests =
+            (balance.trial_requests ?? 0) > 0 || (balance.plan_requests ?? 0) > 0;
+          if (paid || hasRequests || balance.can_make_request) {
+            router.replace("/workspace");
             return;
           }
         }
       } catch {
-        // If subscription check fails, send to pricing (safe default)
+        // If subscription check fails, still land on app home (session is valid)
       }
       router.replace("/pricing");
     };

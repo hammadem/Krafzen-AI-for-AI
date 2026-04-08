@@ -40,7 +40,7 @@ export async function sendChatMessage(
             : Array.isArray(detail) && detail[0]?.msg
                 ? detail[0].msg
                 : response.status === 402
-                    ? 'No chat requests remaining. Upgrade your plan or wait for your trial to end.'
+                    ? 'No chat requests remaining. Subscribe to a plan to continue, or wait for your billing cycle to renew.'
                     : 'Failed to generate response';
         throw new Error(message);
     }

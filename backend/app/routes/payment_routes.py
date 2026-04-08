@@ -19,8 +19,8 @@ async def create_checkout_session(
     user_data: dict = Depends(require_auth)
 ):
     """
-    Creates a Stripe Checkout session for a subscription plan.
-    Includes 14-day free trial with trial requests.
+    Creates a Stripe Checkout session for a paid subscription (package requests).
+    Signup free requests are separate and do not require a card.
     """
     try:
         user_id = user_data["user_id"]
@@ -161,8 +161,8 @@ async def mock_subscribe(
             user_id=user_id,
             plan_name=plan_name,
             billing_cycle=billing_cycle,
-            stripe_customer_id=None,
-            stripe_subscription_id=None,
+            stripe_customer_id="mock_customer",
+            stripe_subscription_id="mock_subscription",
             payment_completed=request_data.payment_completed,
         )
         return {"ok": True, "message": "Subscription started (mock)"}

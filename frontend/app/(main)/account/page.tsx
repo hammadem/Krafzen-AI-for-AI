@@ -198,7 +198,7 @@ export default function AccountPage() {
                                 <Label>Subscription Plan</Label>
                                 <div className="p-4 rounded-lg border border-green-400/20 bg-green-400/5 flex items-center justify-between">
                                     <div>
-                                        <p className="font-semibold text-green-400">{user.subscription_plan || "Free Trial"}</p>
+                                        <p className="font-semibold text-green-400">{user.subscription_plan || "Free"}</p>
                                         <p className="text-xs text-gray-400">Current active plan</p>
                                         {user.subscription_status === "trial" && user.trial_end_date && (
                                             <p className="text-xs text-amber-400 mt-1">
@@ -216,25 +216,21 @@ export default function AccountPage() {
                                 <Label>Requests</Label>
                                 <div className="space-y-2">
                                     <div className="p-3 rounded-lg border border-blue-400/20 bg-blue-400/5 flex justify-between items-center">
-                                        <span className="text-sm text-blue-400">Trial requests (free trial)</span>
+                                        <span className="text-sm text-blue-400">Free requests (signup, no card)</span>
                                         <span className="font-semibold text-white">{user.trial_requests_remaining ?? 0}</span>
                                     </div>
                                     <div className="p-3 rounded-lg border border-blue-400/20 bg-blue-400/5 flex justify-between items-center">
-                                        <span className="text-sm text-blue-400">
-                                            Package requests {user.subscription_status === "trial" && "(after payment)"}
-                                        </span>
+                                        <span className="text-sm text-blue-400">Package requests (paid plan)</span>
                                         <span className="font-semibold text-white">
-                                            {user.subscription_status === "trial"
-                                                ? (user.plan_requests_total ?? 0).toLocaleString()
-                                                : (user.plan_requests_remaining ?? 0).toLocaleString()}
+                                            {(user.plan_requests_remaining ?? 0).toLocaleString()}
                                         </span>
                                     </div>
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                    You use trial requests during your 14-day trial. Package requests are available after successful payment.
-                                    {(user.trial_requests_remaining ?? 0) === 0 && user.subscription_status === "trial" && (
+                                    New accounts get 30 free workspace requests. After you subscribe, only your plan package requests apply.
+                                    {(user.trial_requests_remaining ?? 0) === 0 && user.in_free_signup_tier && (
                                         <span className="block mt-1 text-amber-400">
-                                            Trial requests exhausted; package requests unlock after your trial ends.
+                                            Free requests used — subscribe to keep using the workspace.
                                         </span>
                                     )}
                                 </p>

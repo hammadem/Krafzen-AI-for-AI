@@ -45,10 +45,6 @@ class PaymentService:
                 # Custom pricing - redirect to contact/calendly
                 raise ValueError("This plan requires custom pricing. Please contact sales.")
             
-            # For now, we'll use mode='payment' for one-time payment
-            # In production, you'd use mode='subscription' with Stripe Price IDs
-            # This is a simplified implementation
-            
             checkout_session = stripe.checkout.Session.create(
                 payment_method_types=['card'],
                 line_items=[{
@@ -57,7 +53,7 @@ class PaymentService:
                         'unit_amount': int(price * 100),  # Convert to cents
                         'product_data': {
                             'name': f'{plan_name.title()} Plan - {billing_cycle.title()}',
-                            'description': f'Includes {plan_config["requests"]} requests per {"month" if billing_cycle == "monthly" else "year"} + {plan_config["trial_requests"]} free trial requests for 14 days',
+                            'description': f'{plan_config["requests"]} workspace requests per {"month" if billing_cycle == "monthly" else "year"}',
                         },
                         'recurring': {
                             'interval': 'month' if billing_cycle == 'monthly' else 'year',
@@ -73,11 +69,9 @@ class PaymentService:
                     "type": "subscription",
                     "plan_name": plan_name.lower(),
                     "billing_cycle": billing_cycle.lower(),
-                    "trial_requests": str(plan_config["trial_requests"]),
                     "plan_requests": str(plan_config["requests"])
                 },
                 subscription_data={
-                    'trial_period_days': 14,  # 14-day free trial
                     'metadata': {
                         'user_id': user_id,
                         'plan_name': plan_name.lower(),
@@ -122,7 +116,7 @@ class PaymentService:
                         "unit_amount": int(price * 100),
                         "product_data": {
                             "name": f"{plan_name.title()} Plan - {billing_cycle.title()}",
-                            "description": f'Includes {plan_config["requests"]} requests per {"month" if billing_cycle == "monthly" else "year"} + {plan_config["trial_requests"]} free trial requests for 14 days',
+                            "description": f'{plan_config["requests"]} workspace requests per {"month" if billing_cycle == "monthly" else "year"}',
                         },
                         "recurring": {
                             "interval": "month" if billing_cycle == "monthly" else "year",
@@ -136,11 +130,9 @@ class PaymentService:
                     "type": "subscription",
                     "plan_name": plan_name.lower(),
                     "billing_cycle": billing_cycle.lower(),
-                    "trial_requests": str(plan_config["trial_requests"]),
                     "plan_requests": str(plan_config["requests"]),
                 },
                 subscription_data={
-                    "trial_period_days": 14,
                     "metadata": {
                         "user_id": user_id,
                         "plan_name": plan_name.lower(),
