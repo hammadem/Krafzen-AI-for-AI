@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
     -- Signup free requests (no card); legacy trial_* dates optional
     trial_start_date TIMESTAMPTZ,
     trial_end_date TIMESTAMPTZ,
-    trial_requests_total INT DEFAULT 0, -- Signup free tier total (e.g. 30)
+    trial_requests_total INT DEFAULT 0, -- Signup free tier total (e.g. 15)
     trial_requests_remaining INT DEFAULT 0, -- Remaining signup free requests
     
     -- Subscription plan requests
@@ -111,8 +111,8 @@ BEGIN
     'free',
     'inactive',
     0.0,
-    30,
-    30,
+    15,
+    15,
     0,
     0
   )

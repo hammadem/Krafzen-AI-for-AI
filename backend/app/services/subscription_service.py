@@ -50,7 +50,7 @@ PLAN_CONFIG = {
 }
 
 # Granted on account creation (no card). Stored in trial_requests_* columns for DB compatibility.
-SIGNUP_FREE_REQUESTS = 30
+SIGNUP_FREE_REQUESTS = 15
 
 
 class SubscriptionService:

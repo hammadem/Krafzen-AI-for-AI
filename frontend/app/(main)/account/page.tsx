@@ -227,7 +227,7 @@ export default function AccountPage() {
                                     </div>
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                    New accounts get 30 free workspace requests. After you subscribe, only your plan package requests apply.
+                                    New accounts get 15 free workspace requests. After you subscribe, only your plan package requests apply.
                                     {(user.trial_requests_remaining ?? 0) === 0 && user.in_free_signup_tier && (
                                         <span className="block mt-1 text-amber-400">
                                             Free requests used — subscribe to keep using the workspace.
