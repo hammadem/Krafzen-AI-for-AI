@@ -151,7 +151,7 @@ export const PricingPlans: PricingPlans = {
       stripeLink: "https://buy.stripe.com/aFa9ATd2b1dr6b71zQ4wM01",
       features: [
         "Includes 500 requests per month",
-        "30 free workspace requests when you sign up (no card)",
+        "15 free workspace requests when you sign up (no card)",
         "Up to 3 team seats",
         "Access to transcript view",
         "Built-in JSON editor",
@@ -166,7 +166,7 @@ export const PricingPlans: PricingPlans = {
       stripeLink: "https://buy.stripe.com/8x2eVdbY709n1URemC4wM02",
       features: [
         "Includes 3,000 requests per month",
-        "30 free workspace requests when you sign up (no card)",
+        "15 free workspace requests when you sign up (no card)",
         "Up to 10 team seats",
         "Batch uploads for faster workflows",
         "Google Drive & Dropbox connectors",
@@ -181,7 +181,7 @@ export const PricingPlans: PricingPlans = {
       stripeLink: "https://buy.stripe.com/6oUdR94vF09n7fb1zQ4wM04",
       features: [
         "Includes 10,000 requests per month",
-        "30 free workspace requests when you sign up (no card)",
+        "15 free workspace requests when you sign up (no card)",
         "Up to 25 team seats",
         "API access & webhooks integration",
         "Single Sign-On (SSO) & role management",
@@ -196,7 +196,7 @@ export const PricingPlans: PricingPlans = {
       stripeLink: undefined, // Contact Us
       features: [
         "Includes 25,000-100,000 requests per month",
-        "30 free workspace requests when you sign up (no card)",
+        "15 free workspace requests when you sign up (no card)",
         "25+ team seats",
         "Dedicated workers for faster performance",
         "Private storage for enhanced security",
@@ -214,7 +214,7 @@ export const PricingPlans: PricingPlans = {
       stripeLink: "https://buy.stripe.com/fZu7sL4vFcW9dDz7Ye4wM05",
       features: [
         "Includes 500 requests per month",
-        "30 free workspace requests when you sign up (no card)",
+        "15 free workspace requests when you sign up (no card)",
         "Up to 3 team seats",
         "Access to transcript view",
         "Built-in JSON editor",
@@ -229,7 +229,7 @@ export const PricingPlans: PricingPlans = {
       stripeLink: "https://buy.stripe.com/5kQaEX8LVe0d9njdiy4wM07",
       features: [
         "Includes 3,000 requests per month",
-        "30 free workspace requests when you sign up (no card)",
+        "15 free workspace requests when you sign up (no card)",
         "Up to 10 team seats",
         "Batch uploads for faster workflows",
         "Google Drive & Dropbox connectors",
@@ -244,7 +244,7 @@ export const PricingPlans: PricingPlans = {
       stripeLink: "https://buy.stripe.com/5kQdR92nx09n8jfceu4wM08",
       features: [
         "Includes 10,000 requests per month",
-        "30 free workspace requests when you sign up (no card)",
+        "15 free workspace requests when you sign up (no card)",
         "Up to 25 team seats",
         "API access & webhooks integration",
         "Single Sign-On (SSO) & role management",
@@ -259,7 +259,7 @@ export const PricingPlans: PricingPlans = {
       stripeLink: undefined, // Contact Us
       features: [
         "Includes 25,000-100,000 requests per month",
-        "30 free workspace requests when you sign up (no card)",
+        "15 free workspace requests when you sign up (no card)",
         "25+ team seats",
         "Dedicated workers for faster performance",
         "Private storage for enhanced security",
