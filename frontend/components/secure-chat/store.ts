@@ -1,6 +1,7 @@
 
 import { create } from 'zustand'
 import { generateSessionId } from '@/lib/security/crypto'
+import type { CompliancePayload } from '@/lib/api/chat'
 
 export interface MessageFeedback {
     reaction: 'up' | 'down'
@@ -15,6 +16,7 @@ export interface Message {
     timestamp: number
     metadata?: Record<string, unknown>
     feedback?: MessageFeedback
+    compliance?: CompliancePayload
 }
 
 export interface ChatSession {

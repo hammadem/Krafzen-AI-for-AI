@@ -26,11 +26,16 @@ export default function DashboardPage() {
         inputValue,
         setInputValue,
         setCurrentSessionId,
+        chatJurisdiction,
+        setChatJurisdiction,
         handleSendMessage,
         createNewChat,
         deleteSession,
         onMessageFeedback
     } = useChat();
+
+    const complianceReportProjectName =
+        sessions.find((s) => s.id === currentSessionId)?.title?.trim() || "Workspace";
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -138,6 +143,9 @@ export default function DashboardPage() {
                                 onInputChange={setInputValue}
                                 onSendMessage={handleSendMessage}
                                 onMessageFeedback={onMessageFeedback}
+                                chatJurisdiction={chatJurisdiction}
+                                onChatJurisdictionChange={setChatJurisdiction}
+                                complianceReportProjectName={complianceReportProjectName}
                             />
                         </div>
                     </div>

@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-2.0-flash-exp" # Keep the smart tex model
     GEMINI_IMAGE_MODEL: str = "models/nano-banana-pro-preview" # Restoring the working image model
+
+    # USA IRC baseline screening (LLM JSON + rule engine). Disabled entirely when False.
+    COMPLIANCE_US_IRC_ENABLED: bool = True
     
     # Stable Diffusion / Image Config
     USE_GEMINI_FOR_IMAGE: bool = True

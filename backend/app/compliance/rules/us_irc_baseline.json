@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "jurisdiction_id": "US_IRC_BASELINE",
+  "label": "USA (IRC baseline screening)",
+  "thresholds": {
+    "bedroom_min_area_sqft": 70,
+    "min_ceiling_height_ft": 7,
+    "door_min_width_in": 32,
+    "stair_max_rise_in": 7.75,
+    "stair_min_tread_in": 10,
+    "egress_window_min_area_sqft": 5.7
+  }
+}

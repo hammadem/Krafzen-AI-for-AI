@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     role TEXT CHECK (role IN ('user', 'assistant', 'system')),
     content TEXT NOT NULL,
     image_url TEXT, -- For user uploaded images
+    compliance JSONB, -- USA IRC screening snapshot when jurisdiction requests it
     tokens_used INT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

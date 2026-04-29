@@ -1,5 +1,25 @@
 import { getApiBaseUrl } from "./utils";
 
+export interface ComplianceViolation {
+    rule_id: string;
+    message: string;
+    suggestion: string;
+}
+
+/** USA IRC baseline screening payload from POST /chat/generate when jurisdiction is US_IRC_BASELINE */
+export interface CompliancePayload {
+    jurisdiction_id: string;
+    jurisdiction_label: string;
+    score_percent: number | null;
+    status_label: string;
+    passed_rules: number;
+    applicable_rules: number;
+    violations: ComplianceViolation[];
+    suggestions: string[];
+    disclaimer: string;
+    layout_extract?: Record<string, unknown>;
+}
+
 export interface ChatResponse {
     session_id: string;
     message_id?: string; // ID of created assistant message (for feedback)
@@ -8,13 +28,17 @@ export interface ChatResponse {
     validated_response: string;
     image_url: string;
     remaining_minutes?: number;
+    compliance?: CompliancePayload | null;
 }
+
+export type ChatJurisdiction = "standard" | "US_IRC_BASELINE";
 
 export async function sendChatMessage(
     message: string,
     history: { role: string, content: string, imageUrl?: string }[] = [],
     token?: string,
-    sessionId?: string
+    sessionId?: string,
+    jurisdiction?: ChatJurisdiction
 ): Promise<ChatResponse> {
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -25,6 +49,7 @@ export async function sendChatMessage(
 
     const body: Record<string, unknown> = { message, history };
     if (sessionId) body.session_id = sessionId;
+    if (jurisdiction === "US_IRC_BASELINE") body.jurisdiction = "US_IRC_BASELINE";
 
     const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/generate`, {
         method: 'POST',
@@ -101,6 +126,7 @@ export interface SessionMessageFromApi {
     image_url?: string;
     created_at: string;
     feedback?: { reaction: 'up' | 'down'; reason?: string };
+    compliance?: CompliancePayload | null;
 }
 
 export async function fetchSessionMessages(sessionId: string, token: string): Promise<SessionMessageFromApi[]> {

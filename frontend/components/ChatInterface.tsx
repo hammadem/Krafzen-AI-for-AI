@@ -1,8 +1,9 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Send, Loader2, Download, Maximize2, FileCode, Mic, ChevronsLeft, ThumbsUp, ThumbsDown } from "lucide-react"
-import { sendChatMessage, downloadDxf, transcribeAudio } from "@/lib/api/chat"
+import { Send, Loader2, Download, Maximize2, FileCode, FileText, Mic, ChevronsLeft, ThumbsUp, ThumbsDown } from "lucide-react"
+import { downloadDxf, transcribeAudio, type ChatJurisdiction, type CompliancePayload } from "@/lib/api/chat"
+import { downloadComplianceReportTxt } from "@/lib/complianceReport"
 import { createClient } from "@/lib/supabase/supabaseClient"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -20,6 +21,13 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 export interface MessageFeedback {
     reaction: 'up' | 'down'
@@ -33,6 +41,63 @@ export interface Message {
     imageUrl?: string
     timestamp: Date
     feedback?: MessageFeedback
+    compliance?: CompliancePayload
+}
+
+function ComplianceStrip({ data, projectName }: { data: CompliancePayload; projectName: string }) {
+    const band =
+        data.status_label === "good"
+            ? "border-emerald-500/40 bg-emerald-950/30"
+            : data.status_label === "needs_review"
+                ? "border-amber-500/40 bg-amber-950/20"
+                : data.status_label === "not_compliant"
+                    ? "border-red-500/40 bg-red-950/25"
+                    : "border-white/15 bg-black/30";
+
+    const label =
+        data.status_label === "good"
+            ? "Good"
+            : data.status_label === "needs_review"
+                ? "Needs review"
+                : data.status_label === "not_compliant"
+                    ? "Not compliant"
+                    : "Insufficient data";
+
+    return (
+        <div className={`mt-3 rounded-lg border p-3 text-xs space-y-2 ${band}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium text-gray-200">{data.jurisdiction_label}</span>
+                {data.score_percent != null ? (
+                    <span className="text-gray-100 tabular-nums">
+                        Score: <strong>{data.score_percent}%</strong>
+                        <span className="text-gray-400"> · {label}</span>
+                    </span>
+                ) : (
+                    <span className="text-gray-400">{label}</span>
+                )}
+            </div>
+            {data.violations.length > 0 && (
+                <ul className="list-disc pl-4 space-y-1 text-gray-400">
+                    {data.violations.map((v, i) => (
+                        <li key={`${v.rule_id}-${i}`}>{v.message}</li>
+                    ))}
+                </ul>
+            )}
+            <div className="flex flex-wrap gap-2 pt-1 border-t border-white/10">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-8 border-white/15 text-gray-200 hover:bg-white/10"
+                    onClick={() => downloadComplianceReportTxt(projectName, data)}
+                >
+                    <FileText className="w-3 h-3 mr-1.5 shrink-0" />
+                    Download report (.txt)
+                </Button>
+            </div>
+            <p className="text-[10px] leading-snug text-gray-500">{data.disclaimer}</p>
+        </div>
+    );
 }
 
 interface ChatInterfaceProps {
@@ -43,6 +108,10 @@ interface ChatInterfaceProps {
     onInputChange: (value: string) => void
     onSendMessage: () => void
     onMessageFeedback?: (messageId: string, reaction: 'up' | 'down', reason?: string) => Promise<void>
+    chatJurisdiction: ChatJurisdiction
+    onChatJurisdictionChange: (j: ChatJurisdiction) => void
+    /** Used as “Project:” line in downloadable IRC screening reports */
+    complianceReportProjectName?: string
 }
 
 import { useAuth } from "@/context/AuthContext"
@@ -54,7 +123,10 @@ export function ChatInterface({
     isLoadingMessages = false,
     onInputChange,
     onSendMessage,
-    onMessageFeedback
+    onMessageFeedback,
+    chatJurisdiction,
+    onChatJurisdictionChange,
+    complianceReportProjectName = "Workspace",
 }: ChatInterfaceProps) {
     const { user, session } = useAuth()
     const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -386,6 +458,9 @@ export function ChatInterface({
                                                 </div>
                                             )}
                                         </div>
+                                        {message.compliance && (
+                                            <ComplianceStrip data={message.compliance} projectName={complianceReportProjectName} />
+                                        )}
                                     </div>
                                 )}
                                 <span className="text-[10px] opacity-70 mt-2 block text-right font-mono">
@@ -417,6 +492,21 @@ export function ChatInterface({
 
             <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black via-black/0 to-transparent pt-10">
                 <div className="max-w-3xl mx-auto w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-2 px-1">
+                        <span className="text-xs text-gray-500 shrink-0">Jurisdiction</span>
+                        <Select
+                            value={chatJurisdiction}
+                            onValueChange={(v) => onChatJurisdictionChange(v as ChatJurisdiction)}
+                        >
+                            <SelectTrigger className="w-full sm:w-[280px] h-9 text-xs bg-zinc-800/90 border-white/10 text-gray-200">
+                                <SelectValue placeholder="Select jurisdiction" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-white/10 text-gray-100">
+                                <SelectItem value="standard">Standard (no IRC screening)</SelectItem>
+                                <SelectItem value="US_IRC_BASELINE">USA — IRC baseline screening</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div className="bg-zinc-900/90 border border-gray-700/50 rounded-3xl p-2 pl-4 pr-2 flex items-end shadow-2xl backdrop-blur-md transition-all duration-200">
                         <textarea
                             ref={textareaRef}

@@ -4,11 +4,43 @@ import uuid
 import base64
 import logging
 import httpx
-from PIL import Image
+from PIL import Image, ImageOps, ImageStat
 from io import BytesIO
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Raster tracing targets (Gemini floor plans are often ~1–2k px; thin strokes need more pixels for Potrace.)
+_TRACE_LONG_SIDE_MIN_PX = 2560
+_TRACE_LONG_SIDE_MAX_PX = 8192
+
+
+def _otsu_threshold_u8(hist_256: list) -> int:
+    """Classic Otsu threshold from a 256-bin grayscale histogram (PIL-compatible)."""
+    total = sum(hist_256)
+    if total <= 0:
+        return 128
+    sum_all = sum(i * hist_256[i] for i in range(256))
+    sum_b = 0
+    w_b = 0
+    best_var = 0.0
+    threshold = 128
+    for t in range(256):
+        w_b += hist_256[t]
+        if w_b == 0:
+            continue
+        w_f = total - w_b
+        if w_f == 0:
+            break
+        sum_b += t * hist_256[t]
+        m_b = sum_b / w_b
+        m_f = (sum_all - sum_b) / w_f
+        var_between = float(w_b) * float(w_f) * (m_b - m_f) ** 2
+        if var_between > best_var:
+            best_var = var_between
+            threshold = t
+    return threshold
+
 
 class LocalDxfService:
     def __init__(self, output_dir: str = "temp"):
@@ -141,8 +173,21 @@ class LocalDxfService:
                  if not potrace_found:
                      logger.info("ℹ️  Potrace not found in common locations, relying on system PATH")
             
-            # Potrace command - use 'potrace' (subprocess will find .exe on Windows automatically)
-            cmd = ["potrace", bmp_path, "-b", "dxf", "-o", dxf_path]
+            # Potrace: finer coordinate quantization (-u) and tighter optimization (-O) track thin CAD strokes better.
+            cmd = [
+                "potrace",
+                bmp_path,
+                "-b",
+                "dxf",
+                "-o",
+                dxf_path,
+                "-u",
+                "25",
+                "-t",
+                "2",
+                "-O",
+                "0.12",
+            ]
             
             logger.info(f"Executing potrace: {' '.join(cmd)}")
             
@@ -195,9 +240,9 @@ class LocalDxfService:
                 return Image.open(BytesIO(response.content))
 
     def _save_as_bmp(self, image: Image.Image) -> str:
-        # Potrace needs a bitmap (BMP). 
-        # Convert to 'L' (grayscale) then point operation or threshold to '1' if not already.
-        
+        # Potrace needs a BMP bitmap (black linework on white). PNG previews often look sharper than DXF
+        # because Potrace vectorizes a thresholded raster — preprocessing reduces broken strokes / missing text.
+
         filename = f"temp_{uuid.uuid4().hex}.bmp"
         path = os.path.join(self.output_dir, filename)
 
@@ -211,11 +256,41 @@ class LocalDxfService:
 
             # Convert to grayscale
             gray = image.convert("L")
-            
-            # Threshold to black and white (1-bit)
-            # Adjust threshold as needed, 128 is standard mid-point
-            bw = gray.point(lambda x: 0 if x < 128 else 255, '1')
-            
+
+            # Gemini sometimes returns white-on-black "CAD viewport" style; Potrace expects black strokes on white.
+            mean_lum = ImageStat.Stat(gray).mean[0]
+            if mean_lum < 105:
+                logger.info(
+                    "Raster looks dark-first (mean luminance %.1f); inverting before Potrace trace",
+                    mean_lum,
+                )
+                gray = ImageOps.invert(gray)
+
+            # Upscale small rasters so thin dimensions / door swings survive threshold + tracing.
+            w, h = gray.size
+            long_side = max(w, h)
+            if long_side > 0 and long_side < _TRACE_LONG_SIDE_MIN_PX:
+                scale = _TRACE_LONG_SIDE_MIN_PX / float(long_side)
+                nw = min(_TRACE_LONG_SIDE_MAX_PX, max(1, int(round(w * scale))))
+                nh = min(_TRACE_LONG_SIDE_MAX_PX, max(1, int(round(h * scale))))
+                if nw != w or nh != h:
+                    logger.info(
+                        "Scaling raster for Potrace: %sx%s → %sx%s",
+                        w,
+                        h,
+                        nw,
+                        nh,
+                    )
+                    gray = gray.resize((nw, nh), Image.Resampling.LANCZOS)
+
+            hist = gray.histogram()
+            th = _otsu_threshold_u8(hist)
+            # Avoid pathological thresholds on flat noise (fallback toward mid-gray).
+            if th < 60 or th > 200:
+                th = max(70, min(180, int(mean_lum)))
+
+            bw = gray.point(lambda x: 0 if x < th else 255, mode="1")
+
             bw.save(path, format="BMP")
             return path
         except Exception as e:

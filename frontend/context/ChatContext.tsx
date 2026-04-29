@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { fetchChatHistory, sendChatMessage, deleteChatSession, createChatSession, fetchSessionMessages, updateChatSessionTitle, submitMessageFeedback } from "@/lib/api/chat";
+import { fetchChatHistory, sendChatMessage, deleteChatSession, createChatSession, fetchSessionMessages, updateChatSessionTitle, submitMessageFeedback, type ChatJurisdiction, type CompliancePayload } from "@/lib/api/chat";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { Message } from "@/components/ChatInterface";
 import { useChatStore, ChatSession } from "@/components/secure-chat/store";
@@ -32,6 +32,8 @@ interface ChatContextType {
     inputValue: string;
     setInputValue: (val: string) => void;
     setCurrentSessionId: (id: string | null) => void;
+    chatJurisdiction: ChatJurisdiction;
+    setChatJurisdiction: (j: ChatJurisdiction) => void;
     handleSendMessage: () => Promise<void>;
     createNewChat: () => void;
     deleteSession: (id: string) => Promise<void>;
@@ -54,6 +56,12 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
     } = useChatStore();
 
     const [inputValue, setInputValue] = useState("");
+    const [chatJurisdiction, setChatJurisdiction] = useState<ChatJurisdiction>(() => {
+        if (typeof window === "undefined") return "standard";
+        return localStorage.getItem("krafzen_chat_jurisdiction") === "US_IRC_BASELINE"
+            ? "US_IRC_BASELINE"
+            : "standard";
+    });
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [errorModalOpen, setErrorModalOpen] = useState(false);
     const [errorModalMessage, setErrorModalMessage] = useState("");
@@ -71,6 +79,15 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
 
     // Map active session messages to Message interface
     const activeSession = activeSessionId ? storeSessions[activeSessionId] : null;
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            localStorage.setItem(
+                "krafzen_chat_jurisdiction",
+                chatJurisdiction === "US_IRC_BASELINE" ? "US_IRC_BASELINE" : "standard"
+            );
+        }
+    }, [chatJurisdiction]);
+
     const messages: Message[] = activeSession
         ? activeSession.messages.map(m => ({
             id: m.id,
@@ -78,7 +95,8 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
             content: m.content,
             imageUrl: m.imageUrl,
             timestamp: new Date(m.timestamp),
-            feedback: m.feedback
+            feedback: m.feedback,
+            compliance: m.compliance,
         }))
         : [];
 
@@ -129,13 +147,14 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                             const msgs = await import("@/lib/api/chat").then(mod => mod.fetchSessionMessages(mostRecentSessionId, user.access_token!));
 
                             // Convert API messages to Store messages (include feedback)
-                            const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string } }) => ({
+                            const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string }; compliance?: CompliancePayload | null }) => ({
                                 id: m.id,
                                 role: m.role as 'user' | 'assistant' | 'system',
                                 content: m.content || "",
                                 imageUrl: m.image_url,
                                 timestamp: new Date(m.created_at).getTime(),
-                                feedback: m.feedback
+                                feedback: m.feedback,
+                                compliance: m.compliance ?? undefined,
                             }));
 
                             useChatStore.getState().appendMessages(mostRecentSessionId, storeMessages);
@@ -211,13 +230,14 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 const msgs = await fetchSessionMessages(id, user.access_token);
                 
                 // Convert API messages to Store messages (include feedback)
-                const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string } }) => ({
+                const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string }; compliance?: CompliancePayload | null }) => ({
                     id: m.id,
                     role: m.role as 'user' | 'assistant' | 'system',
                     content: m.content || "",
                     imageUrl: m.image_url,
                     timestamp: new Date(m.created_at).getTime(),
-                    feedback: m.feedback
+                    feedback: m.feedback,
+                    compliance: m.compliance ?? undefined,
                 }));
                 
                 useChatStore.getState().appendMessages(id, storeMessages);
@@ -273,7 +293,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
 
             if (token) {
                 // Pass the sessionId to ensure messages are saved to the correct session
-                const response = await sendChatMessage(userContent, [], token, currentId);
+                const response = await sendChatMessage(userContent, [], token, currentId, chatJurisdiction);
 
                 // Update session ID if backend created a new one (shouldn't happen if we pass sessionId)
                 if (response.session_id && response.session_id !== currentId) {
@@ -287,7 +307,8 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                     id: response.message_id,
                     role: 'assistant',
                     content: response.validated_response,
-                    imageUrl: response.image_url
+                    imageUrl: response.image_url,
+                    compliance: response.compliance ?? undefined,
                 });
             } else {
                 setTimeout(() => {
@@ -384,6 +405,8 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 inputValue,
                 setInputValue,
                 setCurrentSessionId: handleSwitchSession,
+                chatJurisdiction,
+                setChatJurisdiction,
                 handleSendMessage,
                 createNewChat,
                 deleteSession,

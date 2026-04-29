@@ -1,7 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import FileResponse
 from typing import List, Dict, Optional, Any
+import asyncio
+
 from pydantic import BaseModel
+
+from app.compliance.models import LayoutExtract
+from app.compliance.extraction_fallback import merge_heuristic_layout
+from app.compliance.validator import parse_layout_from_llm_dict, validate_us_irc_baseline
 from app.services.cadllm_service import cadllm_service
 from app.services.gemini_service import gemini_service
 from app.services.chat_history_service import chat_history_service
@@ -21,6 +27,8 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = None
     # maintained for backward compatibility but ignored if session_id is used for persistence
     history: List[Dict[str, Any]] = []
+    # When "US_IRC_BASELINE", runs parallel Gemini JSON extraction + IRC baseline screening (see compliance in response).
+    jurisdiction: Optional[str] = None
 
 class ChatResponse(BaseModel):
     session_id: str
@@ -31,6 +39,7 @@ class ChatResponse(BaseModel):
     image_url: str
     remaining_minutes: float  # Legacy field
     request_balance: Optional[Dict[str, Any]] = None  # New request-based balance
+    compliance: Optional[Dict[str, Any]] = None  # Present when jurisdiction requests US IRC screening
 
 class DxfRequest(BaseModel):
     image_url: str
@@ -129,6 +138,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         if not cad_dsl:
             raise HTTPException(status_code=500, detail="CADLLM returned empty response")
 
+        drawing_standard = "US_RESIDENTIAL" if request.jurisdiction == "US_IRC_BASELINE" else None
+
         # 4. Image Generation (Gemini) with Context
         logger.info("Generating Image with Gemini")
         
@@ -144,20 +155,56 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         if previous_image_url:
             logger.info("Found previous image in history.")
 
-        image_url = await gemini_service.generate_image(
-            cad_dsl, 
-            original_prompt=request.message,
-            previous_image_url=previous_image_url
+        compliance_payload: Optional[Dict[str, Any]] = None
+        run_compliance = (
+            settings.COMPLIANCE_US_IRC_ENABLED
+            and request.jurisdiction == "US_IRC_BASELINE"
+            and gemini_service is not None
         )
-            
+
+        if run_compliance:
+
+            async def extract_layout_safe() -> dict:
+                try:
+                    return await gemini_service.extract_layout_metrics_json(request.message, cad_dsl)
+                except Exception as ex:
+                    logger.error(f"Layout extraction failed: {ex}", exc_info=True)
+                    return {}
+
+            layout_raw, image_url = await asyncio.gather(
+                extract_layout_safe(),
+                gemini_service.generate_image(
+                    cad_dsl,
+                    original_prompt=request.message,
+                    previous_image_url=previous_image_url,
+                    drawing_standard=drawing_standard,
+                ),
+            )
+            try:
+                merged_raw = merge_heuristic_layout(layout_raw, request.message, cad_dsl)
+                layout = parse_layout_from_llm_dict(merged_raw)
+            except Exception as parse_err:
+                logger.warning(f"Layout JSON did not match schema, using empty extract: {parse_err}")
+                layout = LayoutExtract()
+            compliance_result = validate_us_irc_baseline(layout)
+            compliance_payload = compliance_result.model_dump()
+        else:
+            image_url = await gemini_service.generate_image(
+                cad_dsl,
+                original_prompt=request.message,
+                previous_image_url=previous_image_url,
+                drawing_standard=drawing_standard,
+            )
+
         logger.info(f"Generated Image URL: {image_url[:50]}...")
 
         # 5. Persist Assistant Response
         assistant_msg = await chat_history_service.add_message(
-            session_id, 
-            "assistant", 
-            cad_dsl, 
-            image_url=image_url
+            session_id,
+            "assistant",
+            cad_dsl,
+            image_url=image_url,
+            compliance=compliance_payload,
         )
         message_id = assistant_msg.get("id") if assistant_msg else None
 
@@ -182,7 +229,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             validated_response=cad_dsl,
             image_url=image_url,
             remaining_minutes=legacy_balance,  # Legacy field
-            request_balance=new_balance_info  # New request-based balance
+            request_balance=new_balance_info,  # New request-based balance
+            compliance=compliance_payload,
         )
 
     except HTTPException:

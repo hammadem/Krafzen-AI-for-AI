@@ -90,15 +90,24 @@ class ChatHistoryService:
             logger.error(f"Error upserting feedback: {e}", exc_info=True)
             return False
 
-    async def add_message(self, session_id: str, role: str, content: str, image_url: Optional[str] = None) -> Dict[str, Any]:
-        """Adds a message to a session."""
+    async def add_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        image_url: Optional[str] = None,
+        compliance: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Adds a message to a session. Optional ``compliance`` stores IRC screening JSON on assistant rows."""
         try:
             data = {
                 "session_id": session_id,
                 "role": role,
                 "content": content,
-                "image_url": image_url
+                "image_url": image_url,
             }
+            if compliance is not None:
+                data["compliance"] = compliance
             response = db.table("chat_messages").insert(data).execute()
             
             # Update session's updated_at timestamp
