@@ -52,6 +52,12 @@ export default function RootLayout({
                 gtag('config', 'G-X04TFTSM32');
               `}
             </Script>
+            <Script
+              async
+              src="https://assets.endorsely.com/endorsely.js"
+              data-endorsely="6546fb55-6ca1-4057-831d-c550a9da4cc0"
+              strategy="afterInteractive"
+            />
           </>
         )}
         <ToastContainer position="top-center" className="z-999999" />
