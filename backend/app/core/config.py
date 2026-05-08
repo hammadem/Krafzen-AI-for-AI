@@ -75,11 +75,17 @@ class Settings(BaseSettings):
     
     # Stable Diffusion / Image Config
     USE_GEMINI_FOR_IMAGE: bool = True
+
+    # DWG export (DXF → DWG conversion)
+    # Recommended local converter: ODA File Converter (command often: ODAFileConverter)
+    DWG_CONVERTER_TYPE: str = "ODA"
+    DWG_CONVERTER_CMD: str = ""  # e.g. "ODAFileConverter"
     
     # External DXF Service (Removed in favor of local Potrace)
     # API_2_CONVERT_KEY / URL removed.
     
     # Simple Local DXF Generation is now default and only option.
+    DXF_GENERATION_METHOD: str = "LOCAL"  # LOCAL | API (legacy)
 
     # Stripe
     STRIPE_SECRET_KEY: Optional[str] = None

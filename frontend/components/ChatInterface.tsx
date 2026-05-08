@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { Send, Loader2, Download, Maximize2, FileCode, FileText, Mic, ChevronsLeft, ThumbsUp, ThumbsDown } from "lucide-react"
-import { downloadDxf, transcribeAudio, type ChatJurisdiction, type CompliancePayload } from "@/lib/api/chat"
+import { downloadDesignFile, downloadDxf, transcribeAudio, type ChatJurisdiction, type CompliancePayload } from "@/lib/api/chat"
 import { downloadComplianceReportTxt } from "@/lib/complianceReport"
 import { createClient } from "@/lib/supabase/supabaseClient"
 import { Button } from "@/components/ui/button"
@@ -398,6 +398,36 @@ export function ChatInterface({
                                                 <FileCode className="w-3 h-3" />
                                                 <span className="hidden sm:inline">Download DXF</span>
                                                 <span className="sm:hidden">DXF</span>
+                                            </Button>
+
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2 flex-1 sm:flex-none justify-center"
+                                                onClick={async () => {
+                                                    try {
+                                                        const supabase = createClient();
+                                                        const { data: { session } } = await supabase.auth.getSession();
+                                                        const token = session?.access_token;
+
+                                                        const blob = await downloadDesignFile(message.imageUrl!, 'dwg', message.content, token);
+                                                        const url = window.URL.createObjectURL(blob);
+                                                        const link = document.createElement('a');
+                                                        link.href = url;
+                                                        link.download = `plan-${new Date().getTime()}.dwg`;
+                                                        document.body.appendChild(link);
+                                                        link.click();
+                                                        document.body.removeChild(link);
+                                                        window.URL.revokeObjectURL(url);
+                                                    } catch (e) {
+                                                        console.error("DWG Download error:", e);
+                                                        alert("Failed to download DWG. If you’re running locally, ensure the DWG converter is installed/configured.");
+                                                    }
+                                                }}
+                                            >
+                                                <FileCode className="w-3 h-3" />
+                                                <span className="hidden sm:inline">Download DWG</span>
+                                                <span className="sm:hidden">DWG</span>
                                             </Button>
 
                                             <Button

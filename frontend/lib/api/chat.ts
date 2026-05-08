@@ -218,6 +218,39 @@ export const downloadDxf = async (imageUrl: string, prompt?: string, token?: str
     }
 };
 
+export const downloadDesignFile = async (
+    imageUrl: string,
+    fileType: 'dxf' | 'dwg',
+    prompt?: string,
+    token?: string
+) => {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/design-file`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ image_url: imageUrl, prompt, file_type: fileType }),
+    });
+
+    if (!response.ok) {
+        let errorMessage = response.statusText;
+        try {
+            const errorData = await response.json();
+            if (errorData.detail) errorMessage = errorData.detail;
+        } catch {
+            // ignore
+        }
+        throw new Error(`Failed to download ${fileType.toUpperCase()}: ${errorMessage}`);
+    }
+
+    return await response.blob();
+};
+
 export async function transcribeAudio(audioBlob: Blob, token?: string): Promise<string> {
     const formData = new FormData();
     const extension = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';

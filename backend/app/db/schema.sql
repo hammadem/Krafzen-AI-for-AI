@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS projects (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     input_text TEXT NOT NULL,
     parsed_json JSONB,
+    image_url TEXT,
     dxf_url TEXT,
+    dwg_url TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
