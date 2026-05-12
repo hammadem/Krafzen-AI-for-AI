@@ -70,12 +70,12 @@ export default function Navbar({ isHome = false, onBookDemo }: NavbarProps) {
           {user ? (
             <UserDropdown user={user} logout={logout} />
           ) : (
-            <button 
-              onClick={onBookDemo}
+            <Link 
+              href="/login"
               className="px-6 py-2.5 bg-gradient-to-br from-[#3fc89c] to-[#54e3b5] text-white rounded-lg font-semibold text-[13px] uppercase tracking-wider shadow-[0_0_20px_rgba(84,227,181,0.2)] hover:shadow-[0_0_40px_rgba(84,227,181,0.35)] transition-all hover:-translate-y-0.5"
             >
               Get Started
-            </button>
+            </Link>
           )}
         </div>
 
@@ -103,12 +103,13 @@ export default function Navbar({ isHome = false, onBookDemo }: NavbarProps) {
               </Link>
             ))}
             {!user && (
-              <button 
-                onClick={() => { onBookDemo?.(); setMobileMenuOpen(false); }}
-                className="w-full py-4 bg-gradient-to-br from-[#3fc89c] to-[#54e3b5] text-white rounded-xl font-bold"
+              <Link 
+                href="/login"
+                className="w-full py-4 bg-gradient-to-br from-[#3fc89c] to-[#54e3b5] text-white rounded-xl font-bold text-center block"
+                onClick={() => setMobileMenuOpen(false)}
               >
                 Get Started
-              </button>
+              </Link>
             )}
           </div>
         </div>
