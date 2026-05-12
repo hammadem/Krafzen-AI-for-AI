@@ -42,3 +42,6 @@ test -x /Applications/ODAFileConverter.app/Contents/MacOS/ODAFileConverter && ec
 - `GET /api/v1/dxf/download?project_id=<id>&file_type=dxf`
 - `GET /api/v1/dxf/download?project_id=<id>&file_type=dwg`
 
+## 6) Docker & Render (staging / production)
+
+See [docker/README.md](../docker/README.md) for installing ODA in container images and on Render (build-time `DWG_ODA_DEB_URL`, Linux x64 `.deb`, optional `docker/oda-file-converter.deb` for local Docker builds).

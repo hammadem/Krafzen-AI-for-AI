@@ -48,5 +48,16 @@ else
     echo "Potrace already installed at $POTRACE_BIN"
 fi
 
+# 3. Optional ODA File Converter for DWG export (Render Linux builds)
+# Set DWG_ODA_DEB_URL in the Render service to a direct HTTPS URL of the official Linux x64 .deb
+# (obtain from https://www.opendesign.com/guestfiles/oda_file_converter — do not commit the .deb).
+INSTALL_ODA_SH="$(pwd)/docker/install_oda_file_converter.sh"
+if [ -n "${DWG_ODA_DEB_URL:-}" ] && [ -f "$INSTALL_ODA_SH" ] && command -v apt-get &> /dev/null; then
+    echo "Installing ODA File Converter from DWG_ODA_DEB_URL..."
+    bash "$INSTALL_ODA_SH" from-url "$DWG_ODA_DEB_URL"
+elif [ -n "${DWG_ODA_DEB_URL:-}" ]; then
+    echo "Warning: DWG_ODA_DEB_URL is set but $INSTALL_ODA_SH not found or apt-get unavailable; skipping ODA install."
+fi
+
 # Summary
 echo "Build complete."

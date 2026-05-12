@@ -40,6 +40,11 @@ class DwgConverterService:
                 return resolved
             return self._converter_cmd if os.path.exists(self._converter_cmd) else None
 
+        # Linux (Docker / Render): ODA .deb usually installs ODAFileConverter on PATH.
+        for p in ("/usr/bin/ODAFileConverter", "/usr/local/bin/ODAFileConverter"):
+            if os.path.isfile(p) and os.access(p, os.X_OK):
+                return p
+
         # macOS default install path for ODA app bundle.
         mac_app_bin = "/Applications/ODAFileConverter.app/Contents/MacOS/ODAFileConverter"
         if os.path.exists(mac_app_bin):
