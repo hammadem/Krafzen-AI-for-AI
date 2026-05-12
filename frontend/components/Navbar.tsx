@@ -128,7 +128,7 @@ function trialDaysLeft(trialEndDate: string): number {
   }
 }
 
-function UserDropdown({ user, logout }: { user: { avatar_url?: string; firstname?: string; email?: string }, logout: () => void }) {
+function UserDropdown({ user, logout }: { user: { avatar_url?: string | null; firstname?: string | null; lastname?: string | null; email?: string | null; subscription_plan?: string | null }, logout: () => void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
