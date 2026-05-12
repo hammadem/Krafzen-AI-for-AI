@@ -64,7 +64,7 @@ export default function NewLanding() {
   }, []);
 
   const handlePlanSelect = (plan: string, amount: string, theme: string) => {
-    if (plan === 'enterprise_plus' || plan === 'enterprise') {
+    if (plan === 'enterprise_plus') {
       setShowCalendly(true);
       return;
     }
@@ -336,10 +336,10 @@ export default function NewLanding() {
                   ))}
                 </ul>
                 <button 
-                  onClick={() => setShowCalendly(true)}
+                  onClick={() => handlePlanSelect('enterprise', monthly ? '$1,499' : '$14,990', 'yellow')}
                   className="w-full py-3 bg-white/5 text-white border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 transition-all"
                 >
-                  Contact Us
+                  Get Started
                 </button>
               </div>
 

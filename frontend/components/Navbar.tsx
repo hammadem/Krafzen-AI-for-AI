@@ -37,7 +37,7 @@ export default function Navbar({ isHome = false, onBookDemo }: NavbarProps) {
     { name: 'Pricing', href: isHome ? '#pricing' : '/pricing' },
     { name: 'FAQs', href: isHome ? '#faq' : '/faqs' },
     { name: 'Affiliates', href: '/affiliates' },
-    { name: 'Workspace', href: '/workspace' },
+    ...(user ? [{ name: 'Workspace', href: '/workspace' }] : []),
   ];
 
   return (
@@ -74,7 +74,7 @@ export default function Navbar({ isHome = false, onBookDemo }: NavbarProps) {
               onClick={onBookDemo}
               className="px-6 py-2.5 bg-gradient-to-br from-[#3fc89c] to-[#54e3b5] text-white rounded-lg font-semibold text-[13px] uppercase tracking-wider shadow-[0_0_20px_rgba(84,227,181,0.2)] hover:shadow-[0_0_40px_rgba(84,227,181,0.35)] transition-all hover:-translate-y-0.5"
             >
-              Book a Demo
+              Get Started
             </button>
           )}
         </div>
@@ -107,7 +107,7 @@ export default function Navbar({ isHome = false, onBookDemo }: NavbarProps) {
                 onClick={() => { onBookDemo?.(); setMobileMenuOpen(false); }}
                 className="w-full py-4 bg-gradient-to-br from-[#3fc89c] to-[#54e3b5] text-white rounded-xl font-bold"
               >
-                Book a Demo
+                Get Started
               </button>
             )}
           </div>
