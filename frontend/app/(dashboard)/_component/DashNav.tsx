@@ -2,7 +2,7 @@
 import CompanyLogo from "@/components/CompanyLogo";
 import { Button } from "@/components/ui/button";
 import { classNames } from "@/lib/utils";
-import { useDashboard } from "@/context/DashboardContex";
+import { useDashboard } from "@/context/DashboardContext";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

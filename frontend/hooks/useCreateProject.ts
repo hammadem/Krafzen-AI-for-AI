@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { createAProject } from '@/lib/api/api';
-import { useDashboard } from '@/context/DashboardContex';
+import { useDashboard } from '@/context/DashboardContext';
 import { useFetchProjects } from './useFetchProjects';
 
 export function useCreateProject(

@@ -31,8 +31,17 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: '/affiliates',
+        destination: 'https://krafzencom-f6be.endorsely.com/',
+        permanent: true,
+      },
+    ];
+  },
   // Configure webpack for module resolution (fallback for non-Turbopack builds)
-  webpack: (config, { isServer }) => {
+  webpack: (config) => {
     // Ensure webpack resolves modules from the frontend directory first
     const frontendDir = path.resolve(__dirname);
     config.resolve.modules = [

@@ -1,7 +1,7 @@
 "use client"
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
-import { useDashboard } from "@/context/DashboardContex";
+import { useDashboard } from "@/context/DashboardContext";
 import { getAProject } from "@/lib/api/api";
 import { Check, Copy, Mic } from "lucide-react";
 import { useEffect, useState } from "react";

@@ -1,0 +1,31 @@
+# Krafzen AI
+
+> Voice-to-CAD AI that converts spoken design briefs into production-ready DWG, DXF, and Revit drawings in seconds.
+
+Krafzen AI is an AI-powered design automation platform for engineering teams. It transcribes spoken descriptions of building plans, mechanical/electrical/plumbing systems, and other CAD requirements, then produces fully editable, code-compliant CAD files. The platform integrates with AutoCAD, Revit, and BIM 360.
+
+## Core capabilities
+
+- **Voice-to-DWG**: Describe designs in plain language; AI generates production-ready DWG files.
+- **Auto MEP As-Builts**: Automatic generation of mechanical, electrical, and plumbing documentation.
+- **AI Error Detection**: Catches design conflicts, code violations, and spatial errors before construction.
+- **Universal Export**: Native integration with AutoCAD, Revit, and BIM 360. Exports to DWG, DXF.
+
+## Pricing
+
+- Starter: $149/mo, 500 requests, 3 seats
+- Professional: $499/mo, 3,000 requests, 10 seats
+- Enterprise: $1,499/mo, 10,000 requests, 25 seats, API + SSO
+- Enterprise Plus: Custom, 25k-100k requests, dedicated workers, white-label
+
+All plans include a 14-day free trial (20-150 requests depending on tier).
+
+## Contact
+
+- Demos: khadija@krafzeninc.com
+- LinkedIn: https://www.linkedin.com/company/krafzen/
+- Parent company (consulting): https://www.krafzeninc.com/
+
+## Pages
+
+- [Homepage](https://www.krafzen.com/): product overview, features, pricing, FAQs

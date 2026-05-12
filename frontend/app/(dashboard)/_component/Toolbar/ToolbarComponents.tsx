@@ -8,7 +8,7 @@ import { InputGroupCustom } from "./ChatInput";
 import FilePreview from "./FilePreview";
 import { toast } from "react-toastify";
 import { transcribeAudio } from "@/lib/api/api";
-import { useDashboard } from "@/context/DashboardContex";
+import { useDashboard } from "@/context/DashboardContext";
 import { useAuth } from "@/context/AuthContext";
 
 // Simple Toolbar

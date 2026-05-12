@@ -1,14 +1,8 @@
 "use client";
-import Footer from "@/components/Footer";
-import ContactCTA from "@/components/ContactCTA";
-import Hero from "@/components/Hero";
+import NewLanding from "@/components/NewLanding";
 
 export default function Home() {
     return (
-        <>
-            <Hero />
-            <ContactCTA />
-            <Footer />
-        </>
+        <NewLanding />
     );
-}
+}

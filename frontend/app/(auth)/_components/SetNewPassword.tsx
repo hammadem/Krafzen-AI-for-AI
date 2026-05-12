@@ -14,12 +14,15 @@ import { toast } from "react-toastify";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import z from "zod";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function SetNewPassword() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [sessionReady, setSessionReady] = useState<boolean | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Establish session from recovery link (code in URL or hash)
   useEffect(() => {
@@ -128,15 +131,24 @@ export default function SetNewPassword() {
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <Input
-                        {...field}
-                        id="form-rhf-demo-title"
-                        aria-invalid={fieldState.invalid}
-                        placeholder="Password"
-                        autoComplete="new-password"
-                        type="password"
-                        className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4"
-                      />
+                      <div className="relative">
+                        <Input
+                          {...field}
+                          id="form-rhf-demo-title"
+                          aria-invalid={fieldState.invalid}
+                          placeholder="Password"
+                          autoComplete="new-password"
+                          type={showPassword ? "text" : "password"}
+                          className="border-2 border-[#1F1F1F] bg-[#0F0F0F] p-4 pr-12 w-full"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
+                      </div>
                       {fieldState.invalid && (
                         <FieldError errors={[fieldState.error]} />
                       )}
@@ -151,15 +163,24 @@ export default function SetNewPassword() {
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <Input
-                        {...field}
-                        id="form-rhf-demo-confirm"
-                        aria-invalid={fieldState.invalid}
-                        placeholder="Confirm Password"
-                        autoComplete="new-password"
-                        type="password"
-                        className="border-1 border-[#1F1F1F] bg-[#0F0F0F] p-4"
-                      />
+                      <div className="relative">
+                        <Input
+                          {...field}
+                          id="form-rhf-demo-confirm"
+                          aria-invalid={fieldState.invalid}
+                          placeholder="Confirm Password"
+                          autoComplete="new-password"
+                          type={showConfirmPassword ? "text" : "password"}
+                          className="border-1 border-[#1F1F1F] bg-[#0F0F0F] p-4 pr-12 w-full"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                        >
+                          {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
+                      </div>
                       {fieldState.invalid && (
                         <FieldError errors={[fieldState.error]} />
                       )}
