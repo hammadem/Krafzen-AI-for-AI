@@ -13,8 +13,12 @@ export function createClient() {
         onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
         refreshSession: async () => ({ data: { session: null }, error: null }),
         signOut: async () => ({ error: null }),
+        signInWithPassword: async () => ({ data: { user: null, session: null }, error: new Error("Supabase keys missing") }),
+        signUp: async () => ({ data: { user: null, session: null }, error: new Error("Supabase keys missing") }),
+        signInWithOAuth: async () => ({ data: { provider: "", url: "" }, error: new Error("Supabase keys missing") }),
       },
-    } as ReturnType<typeof createBrowserClient>;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
   }
 
   return createBrowserClient(url, anonKey, {

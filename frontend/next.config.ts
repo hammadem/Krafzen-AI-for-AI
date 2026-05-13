@@ -32,13 +32,7 @@ const nextConfig: NextConfig = {
     ];
   },
   async redirects() {
-    return [
-      {
-        source: '/affiliates',
-        destination: 'https://krafzencom-f6be.endorsely.com/',
-        permanent: true,
-      },
-    ];
+    return [];
   },
   // Configure webpack for module resolution (fallback for non-Turbopack builds)
   webpack: (config) => {
