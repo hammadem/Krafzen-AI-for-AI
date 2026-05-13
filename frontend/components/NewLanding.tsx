@@ -81,7 +81,7 @@ export default function NewLanding() {
 
   return (
     <div className="landing-container min-h-screen bg-[#06080d] text-[#f0f4f8] selection:bg-[#54e3b5]/30">
-      <a href="#main-content" className="skip-link">Skip to main content</a>
+
 
       <Navbar isHome={true} onBookDemo={() => setShowCalendly(true)} />
 
