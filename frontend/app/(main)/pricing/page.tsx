@@ -13,15 +13,14 @@ const pricingPlans = [
         name: "Starter",
         monthlyPrice: "$149",
         annualPrice: "$1,490",
-        description: "Perfect for individual engineers and small firms.",
+        description: "For individuals testing AI-powered CAD workflows",
         features: [
-            "500 requests per month",
-            "Up to 3 team seats",
-            "Transcript view access",
-            "Built-in JSON editor",
-            "DXF export support",
-            "Email support",
-            "Unlimited projects"
+            "Up to 50 drawings per month",
+            "Basic CAD (DXF) exports",
+            "Standard generation speed",
+            "1–3 team members",
+            "Project workspace",
+            "Email support"
         ],
         trial: "15 free requests · no card required",
         cta: "Get Started",
@@ -32,15 +31,15 @@ const pricingPlans = [
         name: "Professional",
         monthlyPrice: "$499",
         annualPrice: "$4,990",
-        description: "Advanced automation for growing teams.",
+        description: "For growing teams producing drawings on a weekly basis",
         features: [
-            "3,000 requests per month",
-            "Up to 10 team seats",
-            "Batch uploads for faster workflows",
-            "Google Drive & Dropbox connectors",
-            "Priority processing queue",
-            "CSV export support",
-            "Unlimited projects"
+            "Up to 300 drawings per month",
+            "Priority processing for faster output",
+            "Batch uploads for bulk workflows",
+            "Google Drive and Dropbox integrations",
+            "Advanced export formats (including CSV)",
+            "Up to 10 team members",
+            "Priority email support"
         ],
         trial: "15 free requests · no card required",
         cta: "Get Started",
@@ -52,15 +51,16 @@ const pricingPlans = [
         name: "Enterprise",
         monthlyPrice: "$1,499",
         annualPrice: "$14,990",
-        description: "Scale your design production with full control.",
+        description: "For firms scaling high-volume production workflows",
         features: [
-            "10,000 requests per month",
-            "Up to 25 team seats",
-            "API access & webhooks",
-            "SSO & role management",
-            "Region pinning for data control",
-            "White-label reports",
-            "Unlimited projects"
+            "Up to 2,000 drawings per month",
+            "API access for automation workflows",
+            "Dedicated processing for improved performance",
+            "Single Sign-On (SSO) and role-based access",
+            "Region-based data control",
+            "White-label reporting",
+            "Up to 25 team members",
+            "Dedicated support"
         ],
         trial: "15 free requests · no card required",
         cta: "Get Started",
@@ -69,20 +69,21 @@ const pricingPlans = [
     {
         id: "enterprise_plus",
         name: "Enterprise Plus",
-        monthlyPrice: "Custom",
-        annualPrice: "Custom",
-        description: "Bespoke AI solutions for massive operations.",
+        monthlyPrice: "Custom Pricing",
+        annualPrice: "Custom Pricing",
+        description: "Custom infrastructure for large-scale AEC organizations",
         features: [
-            "25,000-100,000 requests/mo",
-            "25+ team seats",
-            "Dedicated workers",
-            "Private storage & security",
-            "Custom data retention",
-            "Quarterly model review",
-            "Full white-label branding"
+            "10,000+ drawings per month",
+            "Dedicated infrastructure and performance optimization",
+            "Custom integrations (BIM and internal systems)",
+            "Private model deployment options",
+            "Advanced compliance configurations",
+            "Custom data retention policies",
+            "25+ team members",
+            "Quarterly workflow optimization reviews"
         ],
         trial: "Contact us for a custom quote",
-        cta: "Contact Us",
+        cta: "Contact Sales",
         featured: false
     }
 ];
@@ -171,7 +172,7 @@ export default function PricingPage() {
                         >
                             {plan.popular && (
                                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#54e3b5] to-[#3fc89c] text-zinc-950 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">
-                                    Most Popular
+                                    Recommended Plan
                                 </div>
                             )}
                             <div className="text-sm font-semibold text-white/50 mb-4">{plan.name}</div>

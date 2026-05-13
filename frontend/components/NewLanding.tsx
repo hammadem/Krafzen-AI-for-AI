@@ -276,13 +276,14 @@ export default function NewLanding() {
               {/* Starter */}
               <div className="p-8 bg-[#0c111c]/70 border border-[#54e3b5]/10 rounded-2xl reveal flex flex-col">
                 <div className="text-xs font-bold text-[#94a3b8]/50 uppercase tracking-[0.2em] mb-4">Starter</div>
-                <div className="flex items-baseline gap-1 mb-6">
+                <div className="flex items-baseline gap-1 mb-2">
                   <span className="text-4xl font-bold">{monthly ? '$149' : '$1,490'}</span>
                   <span className="text-[#94a3b8]/60 text-xs">{monthly ? '/mo' : '/yr'}</span>
                 </div>
+                <p className="text-[11px] text-[#cbd5e1]/60 mb-6 leading-relaxed">For individuals testing AI-powered CAD workflows</p>
                 <div className="text-[10px] font-bold text-[#54e3b5]/60 uppercase tracking-widest mb-6">15 free workspace requests &middot; no card required</div>
                 <ul className="space-y-3 mb-8 flex-1">
-                  {[ "500 requests per month", "Up to 3 team seats", "Transcript view access", "Built-in JSON editor", "DXF export support", "Email support", "Unlimited projects" ].map((feat, i) => (
+                  {[ "Up to 50 drawings per month", "Basic CAD (DXF) exports", "Standard generation speed", "1–3 team members", "Project workspace", "Email support" ].map((feat, i) => (
                     <li key={i} className="flex items-start gap-2 text-[11px] text-[#cbd5e1]/80">
                       <Check className="w-3 h-3 text-[#54e3b5] mt-0.5 shrink-0" /> {feat}
                     </li>
@@ -298,15 +299,16 @@ export default function NewLanding() {
 
               {/* Professional */}
               <div className="p-8 bg-[#0c111c]/80 border border-[#54e3b5]/30 rounded-2xl reveal flex flex-col relative scale-105 z-10 shadow-[0_0_60px_rgba(84,227,181,0.1)]">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-[#54e3b5] text-[#06080d] text-[8px] font-bold uppercase rounded-full tracking-widest whitespace-nowrap">Most Popular</div>
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-[#54e3b5] text-[#06080d] text-[8px] font-bold uppercase rounded-full tracking-widest whitespace-nowrap">Recommended Plan</div>
                 <div className="text-xs font-bold text-[#54e3b5] uppercase tracking-[0.2em] mb-4">Professional</div>
-                <div className="flex items-baseline gap-1 mb-6">
+                <div className="flex items-baseline gap-1 mb-2">
                   <span className="text-4xl font-bold">{monthly ? '$499' : '$4,990'}</span>
                   <span className="text-[#94a3b8]/60 text-xs">{monthly ? '/mo' : '/yr'}</span>
                 </div>
+                <p className="text-[11px] text-[#cbd5e1]/60 mb-6 leading-relaxed">For growing teams producing drawings on a weekly basis</p>
                 <div className="text-[10px] font-bold text-[#54e3b5]/60 uppercase tracking-widest mb-6">15 free workspace requests &middot; no card required</div>
                 <ul className="space-y-3 mb-8 flex-1">
-                  {[ "3,000 requests per month", "Up to 10 team seats", "Batch uploads for faster workflows", "Google Drive & Dropbox connectors", "Priority processing queue", "CSV export support", "Unlimited projects" ].map((feat, i) => (
+                  {[ "Up to 300 drawings per month", "Priority processing for faster output", "Batch uploads for bulk workflows", "Google Drive and Dropbox integrations", "Advanced export formats (including CSV)", "Up to 10 team members", "Priority email support" ].map((feat, i) => (
                     <li key={i} className="flex items-start gap-2 text-[11px] text-[#cbd5e1]/80">
                       <Check className="w-3 h-3 text-[#54e3b5] mt-0.5 shrink-0" /> {feat}
                     </li>
@@ -323,13 +325,14 @@ export default function NewLanding() {
               {/* Enterprise */}
               <div className="p-8 bg-[#0c111c]/70 border border-[#54e3b5]/10 rounded-2xl reveal flex flex-col">
                 <div className="text-xs font-bold text-[#94a3b8]/50 uppercase tracking-[0.2em] mb-4">Enterprise</div>
-                <div className="flex items-baseline gap-1 mb-6">
+                <div className="flex items-baseline gap-1 mb-2">
                   <span className="text-4xl font-bold">{monthly ? '$1,499' : '$14,990'}</span>
                   <span className="text-[#94a3b8]/60 text-xs">{monthly ? '/mo' : '/yr'}</span>
                 </div>
+                <p className="text-[11px] text-[#cbd5e1]/60 mb-6 leading-relaxed">For firms scaling high-volume production workflows</p>
                 <div className="text-[10px] font-bold text-[#54e3b5]/60 uppercase tracking-widest mb-6">15 free workspace requests &middot; no card required</div>
                 <ul className="space-y-3 mb-8 flex-1">
-                  {[ "10,000 requests per month", "Up to 25 team seats", "API access & webhooks", "SSO & role management", "Region pinning for data control", "White-label reports", "Unlimited projects" ].map((feat, i) => (
+                  {[ "Up to 2,000 drawings per month", "API access for automation workflows", "Dedicated processing for improved performance", "Single Sign-On (SSO) and role-based access", "Region-based data control", "White-label reporting", "Up to 25 team members", "Dedicated support" ].map((feat, i) => (
                     <li key={i} className="flex items-start gap-2 text-[11px] text-[#cbd5e1]/80">
                       <Check className="w-3 h-3 text-[#54e3b5] mt-0.5 shrink-0" /> {feat}
                     </li>
@@ -346,12 +349,13 @@ export default function NewLanding() {
               {/* Enterprise Plus */}
               <div className="p-8 bg-[#0c111c]/70 border border-[#54e3b5]/10 rounded-2xl reveal flex flex-col">
                 <div className="text-xs font-bold text-[#94a3b8]/50 uppercase tracking-[0.2em] mb-4">Enterprise Plus</div>
-                <div className="flex items-baseline gap-1 mb-6">
-                  <span className="text-3xl font-bold">Custom</span>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-3xl font-bold">Custom Pricing</span>
                 </div>
+                <p className="text-[11px] text-[#cbd5e1]/60 mb-6 leading-relaxed">Custom infrastructure for large-scale AEC organizations</p>
                 <div className="text-[10px] font-bold text-[#54e3b5]/60 uppercase tracking-widest mb-6">15 free workspace requests &middot; no card required</div>
                 <ul className="space-y-3 mb-8 flex-1">
-                  {[ "25,000-100,000 requests/mo", "25+ team seats", "Dedicated workers", "Private storage & security", "Custom data retention", "Quarterly model review with experts", "Full white-label branding" ].map((feat, i) => (
+                  {[ "10,000+ drawings per month", "Dedicated infrastructure and performance optimization", "Custom integrations (BIM and internal systems)", "Private model deployment options", "Advanced compliance configurations", "Custom data retention policies", "25+ team members", "Quarterly workflow optimization reviews" ].map((feat, i) => (
                     <li key={i} className="flex items-start gap-2 text-[11px] text-[#cbd5e1]/80">
                       <Check className="w-3 h-3 text-[#54e3b5] mt-0.5 shrink-0" /> {feat}
                     </li>
@@ -361,7 +365,7 @@ export default function NewLanding() {
                   onClick={() => setShowCalendly(true)}
                   className="w-full py-3 bg-white/5 text-white border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 transition-all"
                 >
-                  Contact Us
+                  Contact Sales
                 </button>
               </div>
             </div>
