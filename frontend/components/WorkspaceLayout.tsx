@@ -68,34 +68,34 @@ function ComplianceStrip({ data, projectName }: { data: CompliancePayload; proje
                     : "Insufficient data";
 
     return (
-        <div className={`mt-3 rounded-lg border p-3 text-[11px] space-y-2 ${band}`}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="font-medium text-gray-200">{data.jurisdiction_label}</span>
+        <div className={`mt-2 rounded-lg border p-2.5 text-[10px] space-y-2 ${band}`}>
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <span className="font-semibold text-gray-200 uppercase tracking-tight">{data.jurisdiction_label}</span>
                 {data.score_percent != null ? (
                     <span className="text-gray-100 tabular-nums">
                         Score: <strong>{data.score_percent}%</strong>
                         <span className="text-gray-400"> · {label}</span>
                     </span>
                 ) : (
-                    <span className="text-gray-400">{label}</span>
+                    <span className="text-gray-400 font-medium">{label}</span>
                 )}
             </div>
             {data.violations.length > 0 && (
-                <ul className="list-disc pl-4 space-y-1 text-gray-400">
+                <ul className="list-disc pl-4 space-y-1 text-gray-400 leading-tight">
                     {data.violations.map((v, i) => (
                         <li key={`${v.rule_id}-${i}`}>{v.message}</li>
                     ))}
                 </ul>
             )}
-            <div className="flex flex-wrap gap-2 pt-1 border-t border-white/10">
+            <div className="flex flex-wrap gap-2 pt-1.5 border-t border-white/5">
                 <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="text-[10px] h-7 border-white/15 text-gray-200 hover:bg-white/10 px-2"
+                    className="text-[9px] h-6 border-white/10 text-gray-300 hover:bg-white/10 px-2 rounded-md"
                     onClick={() => downloadComplianceReportTxt(projectName, data)}
                 >
-                    <FileText className="w-3 h-3 mr-1.5 shrink-0" />
+                    <FileText className="w-2.5 h-2.5 mr-1 shrink-0" />
                     Download report
                 </Button>
             </div>
@@ -129,6 +129,32 @@ export default function WorkspaceLayout() {
   const chunksRef = useRef<Blob[]>([]);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  
+  // Project Metadata state
+  const [isAutoProject, setIsAutoProject] = useState(true);
+  const [projectMetadata, setProjectMetadata] = useState({
+    projectName: 'Default Project',
+    location: 'Casper, WY',
+    climateZone: '6B'
+  });
+
+  // Units & Format state
+  const [units, setUnits] = useState<'Imperial' | 'Metric'>('Imperial');
+  const [outputFormat, setOutputFormat] = useState<'DWG' | 'DXF' | 'RVT'>('DWG');
+  const [drawingScale, setDrawingScale] = useState('1/4" = 1\'-0"');
+
+  // Canvas View Mode state
+  const [canvasViewMode, setCanvasViewMode] = useState<'2d' | '3d' | 'code'>('2d');
+
+  // Compliance & Generation toggles
+  const [complianceToggles, setComplianceToggles] = useState({
+    adaRadius: true,
+    energyCode: true,
+    egressCheck: true,
+    autoDimension: true,
+    layerSeparation: true
+  });
+  const [generationQuality, setGenerationQuality] = useState<'Draft' | 'Production' | 'Iterate'>('Production');
 
   // Close account menu on outside click
   useEffect(() => {
@@ -447,18 +473,38 @@ export default function WorkspaceLayout() {
         <div className="workspace-canvas-toolbar" role="toolbar" aria-label="Canvas tools">
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div className="workspace-tool-group" role="group" aria-label="View modes">
-              <button className="workspace-tool-btn active" title="2D Floorplan" aria-label="2D Floorplan">
+              <button 
+                className={`workspace-tool-btn ${canvasViewMode === '2d' ? 'active' : ''}`} 
+                onClick={() => setCanvasViewMode('2d')}
+                title="2D Floorplan" 
+                aria-label="2D Floorplan"
+              >
                 <LayoutGrid className="w-4 h-4" />
               </button>
-              <button className="workspace-tool-btn" title="3D Isometric" aria-label="3D Isometric">
+              <button 
+                className={`workspace-tool-btn ${canvasViewMode === '3d' ? 'active' : ''}`} 
+                onClick={() => setCanvasViewMode('3d')}
+                title="3D Isometric" 
+                aria-label="3D Isometric"
+              >
                 <Box className="w-4 h-4" />
               </button>
-              <button className="workspace-tool-btn" title="Code overlay" aria-label="Code overlay">
+              <button 
+                className={`workspace-tool-btn ${canvasViewMode === 'code' ? 'active' : ''}`} 
+                onClick={() => setCanvasViewMode('code')}
+                title="Code overlay" 
+                aria-label="Code overlay"
+              >
                 <Code2 className="w-4 h-4" />
               </button>
             </div>
             <div className="workspace-tool-group" role="group" aria-label="Tools">
-              <button className="workspace-tool-btn" title="Toggle Layers" aria-label="Toggle Layers">
+              <button 
+                className={`workspace-tool-btn ${activeTab === 'layers' ? 'active' : ''}`} 
+                onClick={() => setActiveTab('layers')}
+                title="Toggle Layers" 
+                aria-label="Toggle Layers"
+              >
                 <LayoutGrid className="w-4 h-4 opacity-70" />
               </button>
               <button className="workspace-tool-btn" title="Download Image" aria-label="Download Image" onClick={handleDownloadImage} disabled={!lastImage}>
@@ -467,7 +513,12 @@ export default function WorkspaceLayout() {
               <button className="workspace-tool-btn" title="Export DXF" aria-label="Export DXF" onClick={handleExport} disabled={!lastImage}>
                 <Download className="w-4 h-4" />
               </button>
-              <button className="workspace-tool-btn" title="Edit Design" aria-label="Edit Design">
+              <button 
+                className="workspace-tool-btn" 
+                title="Edit Design" 
+                aria-label="Edit Design"
+                onClick={() => promptInputRef.current?.focus()}
+              >
                 <FileEdit className="w-4 h-4" />
               </button>
             </div>
@@ -510,9 +561,50 @@ export default function WorkspaceLayout() {
               </div>
             </div>
           ) : (
-            <div className="workspace-drawing-frame" id="drawingFrame">
+            <div className={`workspace-drawing-frame ${canvasViewMode}`} id="drawingFrame">
               {lastImage ? (
-                <img src={lastImage} alt="Generated Design" className="workspace-drawing-svg" style={{ objectFit: 'contain' }} />
+                <>
+                  {canvasViewMode === '2d' && (
+                    <img src={lastImage} alt="Generated Design" className="workspace-drawing-svg" style={{ objectFit: 'contain' }} />
+                  )}
+                  {canvasViewMode === '3d' && (
+                    <div style={{ perspective: '1000px', width: '100%', height: '100%', display: 'grid', placeItems: 'center' }}>
+                      <img 
+                        src={lastImage} 
+                        alt="3D Perspective" 
+                        className="workspace-drawing-svg" 
+                        style={{ 
+                          objectFit: 'contain', 
+                          transform: 'rotateX(45deg) rotateZ(-45deg) scale(0.8)',
+                          boxShadow: '20px 20px 50px rgba(0,0,0,0.5)',
+                          transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                        }} 
+                      />
+                    </div>
+                  )}
+                  {canvasViewMode === 'code' && (
+                    <div className="w-full h-full p-6 flex flex-col font-mono text-[10px] text-cyan-400/80 overflow-hidden">
+                      <div className="mb-4 border-b border-cyan-400/20 pb-2 flex justify-between">
+                        <span>// DESIGN_ENTITY_DATA_STREAM</span>
+                        <span className="animate-pulse">REC</span>
+                      </div>
+                      <div className="flex-1 space-y-1">
+                        <p>OBJECT: FLOOR_PLAN_V2</p>
+                        <p>BOUNDS: {projectMetadata.location || "12'x10'"}</p>
+                        <p>ENTITIES: 24</p>
+                        <p>LAYERS: WALLS, WINDOWS, DOORS, APPLIANCES</p>
+                        <p className="mt-4 text-white/40">Fetching geometric primitives...</p>
+                        <div className="grid grid-cols-2 gap-2 mt-2 opacity-50">
+                          <div className="border border-white/5 p-2 rounded">LINE (0,0) (12,0)</div>
+                          <div className="border border-white/5 p-2 rounded">LINE (12,0) (12,10)</div>
+                          <div className="border border-white/5 p-2 rounded">LINE (12,10) (0,10)</div>
+                          <div className="border border-white/5 p-2 rounded">LINE (0,10) (0,0)</div>
+                        </div>
+                        <p className="mt-4 text-cyan-400">READY FOR DXF EXPORT</p>
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="flex flex-col items-center gap-4 text-white/40">
                   <LayoutGrid className="w-12 h-12" />
@@ -604,11 +696,53 @@ export default function WorkspaceLayout() {
               <div className="workspace-param-group">
                 <div className="workspace-param-group-head">
                   <span className="workspace-param-group-title">Project</span>
-                  <span className="workspace-param-group-tag">AUTO</span>
+                  <span 
+                    className="workspace-param-group-tag"
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setIsAutoProject(!isAutoProject)}
+                  >
+                    {isAutoProject ? 'AUTO' : 'MANUAL'}
+                  </span>
                 </div>
-                <div className="workspace-param-row"><span className="workspace-param-label">Project</span><span className="workspace-param-value">Default Project</span></div>
-                <div className="workspace-param-row"><span className="workspace-param-label">Location</span><span className="workspace-param-value">Casper, WY</span></div>
-                <div className="workspace-param-row"><span className="workspace-param-label">Climate zone</span><span className="workspace-param-value">6B</span></div>
+                <div className="workspace-param-row">
+                  <span className="workspace-param-label">Project</span>
+                  <input 
+                    type="text"
+                    className="workspace-param-input"
+                    value={projectMetadata.projectName}
+                    onChange={(e) => {
+                      setProjectMetadata({ ...projectMetadata, projectName: e.target.value });
+                      setIsAutoProject(false);
+                    }}
+                    placeholder="Enter name..."
+                  />
+                </div>
+                <div className="workspace-param-row">
+                  <span className="workspace-param-label">Location</span>
+                  <input 
+                    type="text"
+                    className="workspace-param-input"
+                    value={projectMetadata.location}
+                    onChange={(e) => {
+                      setProjectMetadata({ ...projectMetadata, location: e.target.value });
+                      setIsAutoProject(false);
+                    }}
+                    placeholder="Enter location..."
+                  />
+                </div>
+                <div className="workspace-param-row">
+                  <span className="workspace-param-label">Climate zone</span>
+                  <input 
+                    type="text"
+                    className="workspace-param-input"
+                    value={projectMetadata.climateZone}
+                    onChange={(e) => {
+                      setProjectMetadata({ ...projectMetadata, climateZone: e.target.value });
+                      setIsAutoProject(false);
+                    }}
+                    placeholder="Enter zone..."
+                  />
+                </div>
               </div>
 
               <div className="workspace-param-group">
@@ -617,25 +751,55 @@ export default function WorkspaceLayout() {
                   <div>
                     <div className="workspace-param-label" style={{ marginBottom: '6px' }}>Units</div>
                     <div className="workspace-seg" role="group">
-                      <button className="workspace-seg-btn active">Imperial</button>
-                      <button className="workspace-seg-btn">Metric</button>
+                      <button 
+                        className={`workspace-seg-btn ${units === 'Imperial' ? 'active' : ''}`}
+                        onClick={() => setUnits('Imperial')}
+                      >
+                        Imperial
+                      </button>
+                      <button 
+                        className={`workspace-seg-btn ${units === 'Metric' ? 'active' : ''}`}
+                        onClick={() => setUnits('Metric')}
+                      >
+                        Metric
+                      </button>
                     </div>
                   </div>
                   <div>
                     <div className="workspace-param-label" style={{ marginBottom: '6px' }}>Output format</div>
                     <div className="workspace-seg" role="group">
-                      <button className="workspace-seg-btn active">DWG</button>
-                      <button className="workspace-seg-btn">DXF</button>
-                      <button className="workspace-seg-btn">RVT</button>
+                      <button 
+                        className={`workspace-seg-btn ${outputFormat === 'DWG' ? 'active' : ''}`}
+                        onClick={() => setOutputFormat('DWG')}
+                      >
+                        DWG
+                      </button>
+                      <button 
+                        className={`workspace-seg-btn ${outputFormat === 'DXF' ? 'active' : ''}`}
+                        onClick={() => setOutputFormat('DXF')}
+                      >
+                        DXF
+                      </button>
+                      <button 
+                        className={`workspace-seg-btn ${outputFormat === 'RVT' ? 'active' : ''}`}
+                        onClick={() => setOutputFormat('RVT')}
+                      >
+                        RVT
+                      </button>
                     </div>
                   </div>
                   <div className="workspace-param-row">
                     <span className="workspace-param-label">Drawing scale</span>
-                    <select className="workspace-param-control" style={{ width: 'auto', padding: '6px 10px' }}>
-                      <option>1/4&quot; = 1&apos;-0&quot;</option>
-                      <option>1/2&quot; = 1&apos;-0&quot;</option>
-                      <option>1/8&quot; = 1&apos;-0&quot;</option>
-                    </select>
+                    <Select value={drawingScale} onValueChange={setDrawingScale}>
+                      <SelectTrigger className="w-[140px] h-8 bg-zinc-900/50 border-white/10 text-gray-200 font-mono text-[11px] rounded-md focus:ring-1 focus:ring-cyan-400/50">
+                        <SelectValue placeholder="Select scale" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-gray-100">
+                        <SelectItem value="1/4&quot; = 1&apos;-0&quot;" className="text-[11px] font-mono">1/4&quot; = 1&apos;-0&quot;</SelectItem>
+                        <SelectItem value="1/2&quot; = 1&apos;-0&quot;" className="text-[11px] font-mono">1/2&quot; = 1&apos;-0&quot;</SelectItem>
+                        <SelectItem value="1/8&quot; = 1&apos;-0&quot;" className="text-[11px] font-mono">1/8&quot; = 1&apos;-0&quot;</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -647,27 +811,45 @@ export default function WorkspaceLayout() {
                 </div>
                 <div className="workspace-param-row">
                   <span className="workspace-param-label">IRC edition</span>
-                  <select
-                    className="workspace-param-control"
-                    style={{ width: 'auto', padding: '6px 10px' }}
-                    value={chatJurisdiction}
-                    onChange={(e) => setChatJurisdiction(e.target.value as 'standard' | 'US_IRC_BASELINE')}
+                  <Select 
+                    value={chatJurisdiction} 
+                    onValueChange={(v) => setChatJurisdiction(v as 'standard' | 'US_IRC_BASELINE')}
                   >
-                    <option value="standard">Standard</option>
-                    <option value="US_IRC_BASELINE">IRC 2024</option>
-                  </select>
+                    <SelectTrigger className="w-[140px] h-8 bg-zinc-900/50 border-white/10 text-gray-200 font-mono text-[11px] rounded-md focus:ring-1 focus:ring-cyan-400/50">
+                      <SelectValue placeholder="Select edition" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-white/10 text-gray-100">
+                      <SelectItem value="standard" className="text-[11px] font-mono">Standard</SelectItem>
+                      <SelectItem value="US_IRC_BASELINE" className="text-[11px] font-mono">IRC 2024</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="workspace-param-row">
                   <span className="workspace-param-label">ADA turning radius</span>
-                  <button className="workspace-toggle on" aria-pressed="true" aria-label="ADA turning radius"></button>
+                  <button 
+                    className={`workspace-toggle ${complianceToggles.adaRadius ? 'on' : ''}`} 
+                    onClick={() => setComplianceToggles({ ...complianceToggles, adaRadius: !complianceToggles.adaRadius })}
+                    aria-pressed={complianceToggles.adaRadius} 
+                    aria-label="ADA turning radius"
+                  ></button>
                 </div>
                 <div className="workspace-param-row">
                   <span className="workspace-param-label">Energy code (IECC)</span>
-                  <button className="workspace-toggle on" aria-pressed="true" aria-label="IECC energy code"></button>
+                  <button 
+                    className={`workspace-toggle ${complianceToggles.energyCode ? 'on' : ''}`} 
+                    onClick={() => setComplianceToggles({ ...complianceToggles, energyCode: !complianceToggles.energyCode })}
+                    aria-pressed={complianceToggles.energyCode} 
+                    aria-label="IECC energy code"
+                  ></button>
                 </div>
                 <div className="workspace-param-row">
                   <span className="workspace-param-label">Egress check</span>
-                  <button className="workspace-toggle on" aria-pressed="true" aria-label="Egress check"></button>
+                  <button 
+                    className={`workspace-toggle ${complianceToggles.egressCheck ? 'on' : ''}`} 
+                    onClick={() => setComplianceToggles({ ...complianceToggles, egressCheck: !complianceToggles.egressCheck })}
+                    aria-pressed={complianceToggles.egressCheck} 
+                    aria-label="Egress check"
+                  ></button>
                 </div>
               </div>
 
@@ -676,18 +858,34 @@ export default function WorkspaceLayout() {
                 <div>
                   <div className="workspace-param-label" style={{ marginBottom: '6px' }}>Quality</div>
                   <div className="workspace-seg" role="group" aria-label="Generation quality">
-                    <button className="workspace-seg-btn">Draft</button>
-                    <button className="workspace-seg-btn active">Production</button>
-                    <button className="workspace-seg-btn">Iterate</button>
+                    {(['Draft', 'Production', 'Iterate'] as const).map((q) => (
+                      <button 
+                        key={q}
+                        className={`workspace-seg-btn ${generationQuality === q ? 'active' : ''}`}
+                        onClick={() => setGenerationQuality(q)}
+                      >
+                        {q}
+                      </button>
+                    ))}
                   </div>
                 </div>
                 <div className="workspace-param-row" style={{ marginTop: '10px' }}>
                   <span className="workspace-param-label">Auto-dimension</span>
-                  <button className="workspace-toggle on" aria-pressed="true" aria-label="Auto-dimension"></button>
+                  <button 
+                    className={`workspace-toggle ${complianceToggles.autoDimension ? 'on' : ''}`} 
+                    onClick={() => setComplianceToggles({ ...complianceToggles, autoDimension: !complianceToggles.autoDimension })}
+                    aria-pressed={complianceToggles.autoDimension} 
+                    aria-label="Auto-dimension"
+                  ></button>
                 </div>
                 <div className="workspace-param-row">
                   <span className="workspace-param-label">Layer separation</span>
-                  <button className="workspace-toggle on" aria-pressed="true" aria-label="Layer separation"></button>
+                  <button 
+                    className={`workspace-toggle ${complianceToggles.layerSeparation ? 'on' : ''}`} 
+                    onClick={() => setComplianceToggles({ ...complianceToggles, layerSeparation: !complianceToggles.layerSeparation })}
+                    aria-pressed={complianceToggles.layerSeparation} 
+                    aria-label="Layer separation"
+                  ></button>
                 </div>
               </div>
             </>
@@ -699,12 +897,53 @@ export default function WorkspaceLayout() {
                 <span className="workspace-param-group-title">Layers</span>
                 <span className="workspace-param-group-tag">7</span>
               </div>
-              <div className="workspace-layer-row"><span className="workspace-layer-swatch" style={{ background: '#54e3b5' }}></span>Walls · A-WALL</div>
-              <div className="workspace-layer-row"><span className="workspace-layer-swatch" style={{ background: '#7eecc7' }}></span>Doors · A-DOOR</div>
-              <div className="workspace-layer-row"><span className="workspace-layer-swatch" style={{ background: '#9ff2d6' }}></span>Windows · A-GLAZ</div>
-              <div className="workspace-layer-row"><span className="workspace-layer-swatch" style={{ background: '#fbbf24' }}></span>Fixtures · A-FIXT</div>
-              <div className="workspace-layer-row"><span className="workspace-layer-swatch" style={{ background: '#a78bfa' }}></span>Dimensions · A-ANNO-DIMS</div>
-              <div className="workspace-layer-row"><span className="workspace-layer-swatch" style={{ background: '#94a3b8' }}></span>Grid · A-GRID</div>
+              <div className="space-y-1">
+                {[
+                  { name: 'Walls · A-WALL', color: '#54e3b5' },
+                  { name: 'Doors · A-DOOR', color: '#7eecc7' },
+                  { name: 'Windows · A-GLAZ', color: '#9ff2d6' },
+                  { name: 'Fixtures · A-FIXT', color: '#fbbf24' },
+                  { name: 'Dimensions · A-ANNO-DIMS', color: '#a78bfa' },
+                  { name: 'Grid · A-GRID', color: '#94a3b8' },
+                  { name: 'Text · A-TEXT', color: '#ffffff' },
+                ].map((layer, i) => (
+                  <div key={i} className="workspace-layer-row hover:bg-white/5 px-2 rounded-md transition-colors cursor-pointer group">
+                    <span className="workspace-layer-swatch" style={{ background: layer.color }}></span>
+                    <span className="flex-1">{layer.name}</span>
+                    <div className="w-2 h-2 rounded-full bg-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div className="workspace-param-group">
+              <div className="workspace-param-group-head">
+                <span className="workspace-param-group-title">Design History</span>
+                <span className="workspace-param-group-tag">{messages.filter(m => m.imageUrl).length}</span>
+              </div>
+              <div className="space-y-3">
+                {messages.filter(m => m.imageUrl).length === 0 ? (
+                  <p className="text-[11px] text-gray-500 italic px-2">No iterations yet.</p>
+                ) : (
+                  messages.filter(m => m.imageUrl).reverse().map((msg, i) => (
+                    <div key={i} className="p-2 rounded-lg bg-white/5 border border-white/5 hover:border-cyan-400/30 transition-all cursor-pointer group">
+                      <div className="flex justify-between items-start mb-1.5">
+                        <span className="text-[10px] font-mono text-cyan-400/70">v{messages.filter(m => m.imageUrl).length - i}.0</span>
+                        <span className="text-[9px] text-gray-500">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}</span>
+                      </div>
+                      <p className="text-[11px] text-gray-300 line-clamp-2 leading-relaxed mb-2">
+                        {messages.find((m, idx) => idx === messages.indexOf(msg) - 1)?.content || "Initial design"}
+                      </p>
+                      <div className="flex gap-2">
+                        <button className="text-[9px] px-2 py-1 rounded bg-cyan-400/10 text-cyan-400 hover:bg-cyan-400/20 transition-colors">Restore</button>
+                        <button className="text-[9px] px-2 py-1 rounded bg-white/5 text-gray-400 hover:bg-white/10 transition-colors">View Data</button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           )}
         </div>

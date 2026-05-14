@@ -617,6 +617,30 @@
   font-size: 12px;
   color: var(--text-primary);
 }
+.workspace-param-input {
+  background: transparent;
+  border: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  text-align: right;
+  width: 160px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  cursor: text;
+  border: 1px solid transparent;
+}
+.workspace-param-input:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.workspace-param-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--cyan-400);
+  box-shadow: 0 0 12px rgba(84, 227, 181, 0.15);
+}
 .workspace-param-control {
   width: 100%;
   background: var(--bg-input);
@@ -781,28 +805,36 @@
   background: var(--bg-input);
 }
 
-/* ===================== CHAT THREAD (above prompt) ===================== */
+/* ===================== CHAT THREAD (floating overlay) ===================== */
 .workspace-thread {
   position: absolute;
   bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(780px, 92%);
+  right: 24px;
+  width: min(420px, 40%);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   pointer-events: none;
   z-index: 20;
+  max-height: calc(100% - 100px);
+  overflow-y: hidden;
+  justify-content: flex-end;
 }
 .workspace-msg {
   pointer-events: auto;
-  max-width: 85%;
+  max-width: 95%;
   padding: 14px 18px;
   border-radius: 12px;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.6;
   position: relative;
-  transition: transform 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0.8;
+}
+.workspace-msg:hover {
+  opacity: 1;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 .workspace-msg.user {
   align-self: flex-end;
