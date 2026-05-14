@@ -9,41 +9,41 @@ logger = logging.getLogger(__name__)
 PLAN_CONFIG = {
     "starter": {
         "monthly": {
-            "requests": 500,
-            "price": 249,
+            "requests": 50,
+            "price": 149,
         },
         "annual": {
-            "requests": 500,
-            "price": 2490,
+            "requests": 600,
+            "price": 1490,
         }
     },
     "professional": {
         "monthly": {
-            "requests": 3000,
-            "price": 649,
+            "requests": 300,
+            "price": 499,
         },
         "annual": {
-            "requests": 3000,
-            "price": 6490,
+            "requests": 3600,
+            "price": 4990,
         }
     },
     "enterprise": {
         "monthly": {
-            "requests": 10000,
-            "price": 1799,
+            "requests": 2000,
+            "price": 1499,
         },
         "annual": {
-            "requests": 10000,
-            "price": 18190,
+            "requests": 24000,
+            "price": 14990,
         }
     },
     "enterprise_plus": {
         "monthly": {
-            "requests": 50000,
+            "requests": 10000,
             "price": None,
         },
         "annual": {
-            "requests": 50000,
+            "requests": 120000,
             "price": None,
         }
     }

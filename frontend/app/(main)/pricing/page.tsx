@@ -7,7 +7,24 @@ import { useRouter } from 'next/navigation';
 import { createCheckoutSession } from '@/lib/api/payment';
 import { toast } from 'react-toastify';
 
-const pricingPlans = [
+interface PricingPlan {
+    id: string;
+    name: string;
+    monthlyPrice: string;
+    annualPrice: string;
+    description: string;
+    features: string[];
+    trial: string;
+    cta: string;
+    featured: boolean;
+    popular?: boolean;
+    links?: {
+        monthly: string;
+        annual: string;
+    };
+}
+
+const pricingPlans: PricingPlan[] = [
     {
         id: "starter",
         name: "Starter",
@@ -107,7 +124,7 @@ export default function PricingPage() {
     const [isCalendlyOpen, setIsCalendlyOpen] = useState(false);
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
-    const handlePlanAction = async (plan: typeof pricingPlans[0]) => {
+    const handlePlanAction = async (plan: PricingPlan) => {
         if (plan.id === 'enterprise_plus') {
             setIsCalendlyOpen(true);
             return;
@@ -121,7 +138,7 @@ export default function PricingPage() {
         try {
             setLoadingPlan(plan.id);
             // Use the specific Stripe Payment Link provided by the user
-            const links = (plan as any).links;
+            const links = plan.links;
             if (links) {
                 const baseUrl = billingCycle === 'monthly' ? links.monthly : links.annual;
                 // Append client_reference_id so the webhook can identify the user
