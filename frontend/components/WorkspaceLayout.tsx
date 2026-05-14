@@ -6,24 +6,16 @@ import {
   Plus, 
   Trash2, 
   Search,
-  Maximize2,
   Download,
   Share2,
   Mic,
   Send,
-  CheckCircle2,
-  ChevronDown,
-  RotateCcw,
-  RotateCw,
-  MessageSquare,
   Undo2,
   Redo2,
   MessageCircle,
   LayoutGrid,
   Box,
   Code2,
-  Hand,
-  Ruler,
   FileEdit,
   Settings,
   LogOut,
@@ -32,7 +24,6 @@ import {
   FileText,
   Image as ImageIcon
 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
@@ -585,7 +576,7 @@ export default function WorkspaceLayout() {
                   {canvasViewMode === 'code' && (
                     <div className="w-full h-full p-6 flex flex-col font-mono text-[10px] text-cyan-400/80 overflow-hidden">
                       <div className="mb-4 border-b border-cyan-400/20 pb-2 flex justify-between">
-                        <span>// DESIGN_ENTITY_DATA_STREAM</span>
+                        <span>{"// DESIGN_ENTITY_DATA_STREAM"}</span>
                         <span className="animate-pulse">REC</span>
                       </div>
                       <div className="flex-1 space-y-1">
