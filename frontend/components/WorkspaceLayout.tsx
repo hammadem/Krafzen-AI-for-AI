@@ -28,12 +28,81 @@ import {
   Settings,
   LogOut,
   Clock,
-  Shield
+  Shield,
+  FileText,
+  Image as ImageIcon
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
+import { Button } from "@/components/ui/button";
+import { downloadComplianceReportTxt } from "@/lib/complianceReport";
+import { type CompliancePayload } from "@/lib/api/chat";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import "../app/workspace.css";
+
+
+function ComplianceStrip({ data, projectName }: { data: CompliancePayload; projectName: string }) {
+    const band =
+        data.status_label === "good"
+            ? "border-emerald-500/40 bg-emerald-950/30"
+            : data.status_label === "needs_review"
+                ? "border-amber-500/40 bg-amber-950/20"
+                : data.status_label === "not_compliant"
+                    ? "border-red-500/40 bg-red-950/25"
+                    : "border-white/15 bg-black/30";
+
+    const label =
+        data.status_label === "good"
+            ? "Good"
+            : data.status_label === "needs_review"
+                ? "Needs review"
+                : data.status_label === "not_compliant"
+                    ? "Not compliant"
+                    : "Insufficient data";
+
+    return (
+        <div className={`mt-3 rounded-lg border p-3 text-[11px] space-y-2 ${band}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium text-gray-200">{data.jurisdiction_label}</span>
+                {data.score_percent != null ? (
+                    <span className="text-gray-100 tabular-nums">
+                        Score: <strong>{data.score_percent}%</strong>
+                        <span className="text-gray-400"> · {label}</span>
+                    </span>
+                ) : (
+                    <span className="text-gray-400">{label}</span>
+                )}
+            </div>
+            {data.violations.length > 0 && (
+                <ul className="list-disc pl-4 space-y-1 text-gray-400">
+                    {data.violations.map((v, i) => (
+                        <li key={`${v.rule_id}-${i}`}>{v.message}</li>
+                    ))}
+                </ul>
+            )}
+            <div className="flex flex-wrap gap-2 pt-1 border-t border-white/10">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-[10px] h-7 border-white/15 text-gray-200 hover:bg-white/10 px-2"
+                    onClick={() => downloadComplianceReportTxt(projectName, data)}
+                >
+                    <FileText className="w-3 h-3 mr-1.5 shrink-0" />
+                    Download report
+                </Button>
+            </div>
+            <p className="text-[9px] leading-snug text-gray-500">{data.disclaimer}</p>
+        </div>
+    );
+}
 
 export default function WorkspaceLayout() {
   const { 
@@ -136,6 +205,43 @@ export default function WorkspaceLayout() {
     }
   };
 
+  const handleDownloadImage = async () => {
+    if (!lastImage) return;
+    try {
+        let blob: Blob;
+        try {
+            const response = await fetch(lastImage);
+            if (response.ok) {
+                blob = await response.blob();
+            } else {
+                throw new Error("Direct fetch failed");
+            }
+        } catch (e) {
+            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(lastImage)}`;
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error("Proxy fetch failed");
+            blob = await response.blob();
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `design-${new Date().getTime()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+    } catch (error) {
+        console.error("Download failed:", error);
+        const link = document.createElement('a');
+        link.href = lastImage;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+  };
+
   return (
     <div className="workspace-app">
       {/* ============ TOPBAR ============ */}
@@ -181,11 +287,22 @@ export default function WorkspaceLayout() {
 
           <button 
             className={`workspace-export-btn ${!lastImage ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={handleDownloadImage}
+            disabled={!lastImage}
+            title="Download Image"
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            Image
+          </button>
+
+          <button 
+            className={`workspace-export-btn ${!lastImage ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={handleExport}
             disabled={!lastImage}
+            title="Export DXF"
           >
             <Download className="w-3.5 h-3.5" />
-            Export
+            DXF
           </button>
 
           {/* Account Avatar + Dropdown */}
@@ -344,7 +461,10 @@ export default function WorkspaceLayout() {
               <button className="workspace-tool-btn" title="Toggle Layers" aria-label="Toggle Layers">
                 <LayoutGrid className="w-4 h-4 opacity-70" />
               </button>
-              <button className="workspace-tool-btn" title="Export Design" aria-label="Export Design" onClick={handleExport}>
+              <button className="workspace-tool-btn" title="Download Image" aria-label="Download Image" onClick={handleDownloadImage} disabled={!lastImage}>
+                <ImageIcon className="w-4 h-4" />
+              </button>
+              <button className="workspace-tool-btn" title="Export DXF" aria-label="Export DXF" onClick={handleExport} disabled={!lastImage}>
                 <Download className="w-4 h-4" />
               </button>
               <button className="workspace-tool-btn" title="Edit Design" aria-label="Edit Design">
@@ -414,7 +534,10 @@ export default function WorkspaceLayout() {
                     <span>{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '14:32'}</span>
                     {msg.role === 'assistant' && <span className="msg-duration">· 3.2s</span>}
                   </div>
-                  {msg.content}
+                  {msg.role === 'user' ? msg.content : ((!msg.imageUrl && !msg.content?.trim().startsWith("To draw a")) && msg.content)}
+                  {msg.compliance && (
+                    <ComplianceStrip data={msg.compliance} projectName={currentSession?.title || "Workspace"} />
+                  )}
                 </div>
               ))}
               {isLoading && (
@@ -600,6 +723,21 @@ export default function WorkspaceLayout() {
         role="form" 
         onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
       >
+        <div className="flex items-center gap-2 mb-2 px-1">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Jurisdiction</span>
+          <Select
+            value={chatJurisdiction}
+            onValueChange={(v) => setChatJurisdiction(v as 'standard' | 'US_IRC_BASELINE')}
+          >
+            <SelectTrigger className="w-[240px] h-7 text-[10px] bg-zinc-900/50 border-white/10 text-gray-300">
+              <SelectValue placeholder="Select jurisdiction" />
+            </SelectTrigger>
+            <SelectContent className="bg-zinc-900 border-white/10 text-gray-100">
+              <SelectItem value="standard" className="text-[10px]">Standard (no IRC screening)</SelectItem>
+              <SelectItem value="US_IRC_BASELINE" className="text-[10px]">USA — IRC baseline screening</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="workspace-prompt-shell">
           <textarea 
             ref={promptInputRef}
