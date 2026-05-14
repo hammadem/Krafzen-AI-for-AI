@@ -72,6 +72,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // 1️⃣ Load session on mount
     const loadSession = async () => {
+      // 0️⃣ Catch OAuth code in URL and redirect to callback if we are on the home page
+      // This happens if Supabase redirect whitelist defaults to Site URL instead of /auth/callback
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        const code = url.searchParams.get("code");
+        if (code && url.pathname === "/") {
+          window.location.href = `/auth/callback?code=${code}`;
+          return;
+        }
+      }
+
       // Refresh session so we have a valid access_token (avoids 401 from expired token)
       try {
         await supabase.auth.refreshSession();
