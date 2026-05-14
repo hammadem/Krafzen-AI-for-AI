@@ -443,18 +443,33 @@ export default function WorkspaceLayout() {
         </div>
 
         <div className="workspace-rail-foot">
-          <div className="workspace-quota-wrap">
-            <div className="workspace-quota-info">
-              <span>Requests remaining</span>
-              <strong>{user?.trial_requests_remaining ?? 0} / 3,000</strong>
-            </div>
-            <div className="workspace-quota-bar">
-              <div 
-                className="workspace-quota-progress" 
-                style={{ width: `${Math.min(100, ((user?.trial_requests_remaining ?? 0) / 3000) * 100)}%` }}
-              ></div>
-            </div>
-          </div>
+          {(() => {
+            const isTrial = user?.in_free_signup_tier || !user?.has_active_subscription;
+            const plan = (user?.subscription_plan || 'trial').toLowerCase();
+            let total = 15;
+            if (plan.includes('starter')) total = 50;
+            else if (plan.includes('professional')) total = 300;
+            else if (plan.includes('enterprise')) total = 2000;
+            
+            const current = isTrial ? (user?.trial_requests_remaining ?? 0) : (user?.plan_requests_remaining ?? 0);
+            const displayTotal = !isTrial && user?.plan_requests_total ? user.plan_requests_total : total;
+            const percentage = Math.min(100, (current / displayTotal) * 100);
+
+            return (
+              <div className="workspace-quota-wrap">
+                <div className="workspace-quota-info">
+                  <span>{isTrial ? 'Trial requests' : `${plan.charAt(0).toUpperCase() + plan.slice(1)} requests`}</span>
+                  <strong>{current} / {displayTotal.toLocaleString()}</strong>
+                </div>
+                <div className="workspace-quota-bar">
+                  <div 
+                    className="workspace-quota-progress" 
+                    style={{ width: `${percentage}%`, background: percentage < 20 ? 'var(--red-500)' : 'var(--cyan-400)' }}
+                  ></div>
+                </div>
+              </div>
+            );
+          })()}
           <Link href="/pricing" style={{ color: "var(--cyan-400)", fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Upgrade Plan</Link>
         </div>
       </aside>
