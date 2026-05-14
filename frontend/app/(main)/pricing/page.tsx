@@ -24,7 +24,11 @@ const pricingPlans = [
         ],
         trial: "15 free requests · no card required",
         cta: "Get Started",
-        featured: false
+        featured: false,
+        links: {
+            monthly: "https://buy.stripe.com/9B6cN53rB8FTgPL3HY4wM09",
+            annual: "https://buy.stripe.com/cNi7sL8LV7BP8jfemC4wM0c"
+        }
     },
     {
         id: "professional",
@@ -44,7 +48,11 @@ const pricingPlans = [
         trial: "15 free requests · no card required",
         cta: "Get Started",
         featured: true,
-        popular: true
+        popular: true,
+        links: {
+            monthly: "https://buy.stripe.com/3cIeVdbY76xL6b7diy4wM0a",
+            annual: "https://buy.stripe.com/00w3cvbY77BP42ZemC4wM0d"
+        }
     },
     {
         id: "enterprise",
@@ -64,7 +72,11 @@ const pricingPlans = [
         ],
         trial: "15 free requests · no card required",
         cta: "Get Started",
-        featured: false
+        featured: false,
+        links: {
+            monthly: "https://buy.stripe.com/bJebJ13rBf4heHDceu4wM0b",
+            annual: "https://buy.stripe.com/00w3cvd2b9JX6b7diy4wM0e"
+        }
     },
     {
         id: "enterprise_plus",
@@ -108,6 +120,17 @@ export default function PricingPage() {
 
         try {
             setLoadingPlan(plan.id);
+            // Use the specific Stripe Payment Link provided by the user
+            const links = (plan as any).links;
+            if (links) {
+                const baseUrl = billingCycle === 'monthly' ? links.monthly : links.annual;
+                // Append client_reference_id so the webhook can identify the user
+                const checkoutUrl = `${baseUrl}?client_reference_id=${user.userId || ""}`;
+                window.location.href = checkoutUrl;
+                return;
+            }
+
+            // Fallback to dynamic session if no specific link
             const { url } = await createCheckoutSession(user, plan.id, billingCycle);
             if (url) {
                 window.location.href = url;

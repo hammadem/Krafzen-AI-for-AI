@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import CalendlyBooking from './CalendlyBooking';
 import StripePaymentModal from './StripePaymentModal';
@@ -15,6 +16,7 @@ import Footer from './Footer';
 
 export default function NewLanding() {
   const { user } = useAuth();
+  const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [showCalendly, setShowCalendly] = useState(false);
   const [monthly, setMonthly] = useState(true);
@@ -63,9 +65,38 @@ export default function NewLanding() {
     };
   }, []);
 
+  const stripeLinks: Record<string, { monthly: string; annual: string }> = {
+    starter: {
+      monthly: "https://buy.stripe.com/9B6cN53rB8FTgPL3HY4wM09",
+      annual: "https://buy.stripe.com/cNi7sL8LV7BP8jfemC4wM0c"
+    },
+    professional: {
+      monthly: "https://buy.stripe.com/3cIeVdbY76xL6b7diy4wM0a",
+      annual: "https://buy.stripe.com/00w3cvbY77BP42ZemC4wM0d"
+    },
+    enterprise: {
+      monthly: "https://buy.stripe.com/bJebJ13rBf4heHDceu4wM0b",
+      annual: "https://buy.stripe.com/00w3cvd2b9JX6b7diy4wM0e"
+    }
+  };
+
   const handlePlanSelect = (plan: string, amount: string, theme: string) => {
     if (plan === 'enterprise_plus') {
       setShowCalendly(true);
+      return;
+    }
+
+    if (!user) {
+      router.push(`/login?redirect=/pricing`);
+      return;
+    }
+
+    // Use specific Stripe link if available
+    const planLinks = stripeLinks[plan];
+    if (planLinks) {
+      const baseUrl = monthly ? planLinks.monthly : planLinks.annual;
+      const checkoutUrl = `${baseUrl}?client_reference_id=${user.userId || ""}`;
+      window.location.href = checkoutUrl;
       return;
     }
     
