@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 _BUNDLE_DIR_NAME = ".oda_bundle"
 _MANIFEST = "converter_relpath.txt"
 _LD_PATH_FILE = "ld_library_path.txt"
+_QT_PLUGIN_PATH_FILE = "qt_plugin_path.txt"
 # Cloudflare R2 presigned URLs: max expiry is 7 days (604800 seconds), not 30 days.
 _R2_PRESIGN_MAX_SECONDS = 604_800
 _last_oda_error: Optional[str] = None
@@ -56,20 +57,40 @@ def bundle_dir(root: Optional[Path] = None) -> Path:
     return (root or backend_root()) / _BUNDLE_DIR_NAME
 
 
-def _read_bundle(root: Path) -> Tuple[Optional[str], Optional[str]]:
+def _find_qt_platforms_dir(bdir: Path) -> Optional[str]:
+    """Directory containing libq*.so platform plugins (e.g. .../plugins/platforms)."""
+    saved = bdir / _QT_PLUGIN_PATH_FILE
+    if saved.is_file():
+        p = saved.read_text(encoding="utf-8").strip()
+        if p and Path(p).is_dir():
+            return p
+    candidates: list[Path] = []
+    for platforms in bdir.rglob("platforms"):
+        if platforms.is_dir() and any(platforms.glob("libq*.so")):
+            candidates.append(platforms)
+    if not candidates:
+        return None
+    for d in candidates:
+        if (d / "libqoffscreen.so").exists():
+            return str(d.resolve())
+    return str(candidates[0].resolve())
+
+
+def _read_bundle(root: Path) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     rel_file = bundle_dir(root) / _MANIFEST
     ld_file = bundle_dir(root) / _LD_PATH_FILE
     if not rel_file.is_file():
-        return None, None
+        return None, None, None
     rel = rel_file.read_text(encoding="utf-8").strip()
     if not rel:
-        return None, None
+        return None, None, None
     exe = (root / rel).resolve()
     if not exe.is_file():
         logger.warning("ODA manifest points to missing file: %s", exe)
-        return None, None
+        return None, None, None
     ld_extra = ld_file.read_text(encoding="utf-8").strip() if ld_file.is_file() else ""
-    return str(exe), ld_extra or None
+    qt_plugins = _find_qt_platforms_dir(bundle_dir(root))
+    return str(exe), ld_extra or None, qt_plugins
 
 
 def _write_manifest(root: Path, oda_bin: Path) -> None:
@@ -84,7 +105,19 @@ def _write_manifest(root: Path, oda_bin: Path) -> None:
             lib_dirs.append(str(so.parent.resolve()))
     ld_extra = ":".join(dict.fromkeys(lib_dirs))
     (bdir / _LD_PATH_FILE).write_text(ld_extra + "\n", encoding="utf-8")
-    logger.info("ODA bundle manifest written: exe=%s lib_dirs=%s", rel, len(lib_dirs))
+    qt_dir = _find_qt_platforms_dir(bdir)
+    if qt_dir:
+        (bdir / _QT_PLUGIN_PATH_FILE).write_text(qt_dir + "\n", encoding="utf-8")
+        off = Path(qt_dir) / "libqoffscreen.so"
+        logger.info(
+            "ODA bundle manifest written: exe=%s lib_dirs=%s qt_plugins=%s offscreen=%s",
+            rel,
+            len(lib_dirs),
+            qt_dir,
+            off.is_file(),
+        )
+    else:
+        logger.warning("ODA bundle: no Qt platforms/ directory found under %s", bdir)
 
 
 def _is_elf_executable(path: Path) -> bool:
@@ -448,9 +481,60 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         deb_local.unlink(missing_ok=True)
 
 
+def apply_oda_runtime_env(run_env: dict[str, str], root: Optional[Path] = None) -> None:
+    """Set LD_LIBRARY_PATH and Qt platform env for headless ODA on Linux."""
+    import sys
+
+    root = root or backend_root()
+    _, ld_extra, qt_plugins = _read_bundle(root)
+    if ld_extra:
+        sep = os.pathsep
+        prev = run_env.get("LD_LIBRARY_PATH", "")
+        run_env["LD_LIBRARY_PATH"] = f"{ld_extra}{sep}{prev}" if prev else ld_extra
+    if qt_plugins:
+        run_env["QT_PLUGIN_PATH"] = qt_plugins
+        run_env["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_plugins
+        p = Path(qt_plugins)
+        if (p / "libqoffscreen.so").exists():
+            run_env["QT_QPA_PLATFORM"] = "offscreen"
+        elif (p / "libqminimal.so").exists():
+            run_env["QT_QPA_PLATFORM"] = "minimal"
+        elif (p / "libqxcb.so").exists():
+            # xcb needs a display; use xvfb-run if bundled or on PATH
+            run_env["QT_QPA_PLATFORM"] = "xcb"
+    elif sys.platform.startswith("linux"):
+        run_env.setdefault("QT_QPA_PLATFORM", "offscreen")
+    run_env.setdefault("QT_LOGGING_RULES", "qt.qpa.plugin=false")
+
+
+def wrap_oda_command(cmd: list[str], root: Optional[Path] = None) -> list[str]:
+    """Prefix with bundled/system xvfb-run when only the xcb Qt plugin is available."""
+    root = root or backend_root()
+    _, _, qt_plugins = _read_bundle(root)
+    if not qt_plugins:
+        return cmd
+    p = Path(qt_plugins)
+    if (p / "libqoffscreen.so").exists() or (p / "libqminimal.so").exists():
+        return cmd
+    if not (p / "libqxcb.so").exists():
+        return cmd
+    bdir = bundle_dir(root)
+    for candidate in (
+        bdir / "xvfb" / "usr" / "bin" / "xvfb-run",
+        bdir / "usr" / "bin" / "xvfb-run",
+    ):
+        if candidate.is_file():
+            return [str(candidate), "-a", "-s", "-screen 0 1280x1024x24", *cmd]
+    xvfb = shutil.which("xvfb-run")
+    if xvfb:
+        return [xvfb, "-a", "-s", "-screen 0 1280x1024x24", *cmd]
+    return cmd
+
+
 def resolve_bundled_oda() -> Tuple[Optional[str], Optional[str]]:
     """Return (converter_path, ld_library_path_prefix) from .oda_bundle if present."""
     root = backend_root()
     ensure_oda_bundle()
     _repair_bundle_manifest(root)
-    return _read_bundle(root)
+    exe, ld, _qt = _read_bundle(root)
+    return exe, ld

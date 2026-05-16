@@ -9,7 +9,13 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from app.core.config import settings
-from app.services.oda_bundle import get_last_oda_error, resolve_bundled_oda
+from app.services.oda_bundle import (
+    apply_oda_runtime_env,
+    backend_root,
+    get_last_oda_error,
+    resolve_bundled_oda,
+    wrap_oda_command,
+)
 import ezdxf
 
 logger = logging.getLogger(__name__)
@@ -118,12 +124,8 @@ class DwgConverterService:
         ]
 
         run_env = os.environ.copy()
-        if ld_extra:
-            sep = os.pathsep
-            prev = run_env.get("LD_LIBRARY_PATH", "")
-            run_env["LD_LIBRARY_PATH"] = f"{ld_extra}{sep}{prev}" if prev else ld_extra
-        if sys.platform.startswith("linux"):
-            run_env.setdefault("QT_QPA_PLATFORM", "offscreen")
+        apply_oda_runtime_env(run_env, backend_root())
+        cmd = wrap_oda_command(cmd, backend_root())
 
         logger.info("Converting DXF → DWG via ODA", extra={"cmd": " ".join(cmd)})
         result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=run_env)

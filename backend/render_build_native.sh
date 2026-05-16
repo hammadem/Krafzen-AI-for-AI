@@ -105,6 +105,36 @@ if [ -n "${DWG_ODA_DEB_URL:-}" ]; then
     done < <(find "$ODA_BUNDLE" -name '*.so*' \( -type f -o -type l \) 2>/dev/null | while IFS= read -r f; do dirname "$f"; done | sort -u)
 
     printf '%s\n' "${LD_EXTRA:-}" > "$ODA_BUNDLE/ld_library_path.txt"
+
+    PLATFORMS_DIR="$(find "$ODA_BUNDLE" -type d -name platforms 2>/dev/null | head -1 || true)"
+    if [ -n "$PLATFORMS_DIR" ]; then
+        printf '%s\n' "$PLATFORMS_DIR" > "$ODA_BUNDLE/qt_plugin_path.txt"
+        if [ ! -f "$PLATFORMS_DIR/libqoffscreen.so" ] && command -v apt-get >/dev/null; then
+            apt-get install -y -qq libqt6gui6 2>/dev/null || apt-get install -y -qq libqt6gui6t64 2>/dev/null || apt-get install -y -qq libqt5gui5 || true
+            OFFSCREEN="$(find /usr/lib -name 'libqoffscreen.so' 2>/dev/null | head -1 || true)"
+            if [ -n "$OFFSCREEN" ]; then
+                cp "$OFFSCREEN" "$PLATFORMS_DIR/"
+                echo "DWG: copied Qt offscreen plugin into $PLATFORMS_DIR"
+            fi
+        fi
+    fi
+
+    # Optional: bundle xvfb for xcb-only Qt (headless display)
+    if [ -n "$PLATFORMS_DIR" ] && [ -f "$PLATFORMS_DIR/libqxcb.so" ] && [ ! -f "$PLATFORMS_DIR/libqoffscreen.so" ] && command -v apt-get >/dev/null; then
+        apt-get install -y -qq xvfb || true
+        XVFB_OUT="$ODA_BUNDLE/xvfb"
+        rm -rf "$XVFB_OUT"
+        mkdir -p "$XVFB_OUT"
+        if command -v xvfb-run >/dev/null && command -v dpkg-deb >/dev/null; then
+            apt-get download xvfb xserver-common 2>/dev/null || true
+            for deb in ./*.deb; do
+                [ -f "$deb" ] && dpkg-deb -x "$deb" "$XVFB_OUT" 2>/dev/null || true
+            done
+            rm -f ./*.deb 2>/dev/null || true
+            echo "DWG: bundled xvfb under $XVFB_OUT (for xcb Qt plugin)"
+        fi
+    fi
+
     echo "DWG: bundled ODA converter OK (relative: $REL)"
 fi
 
