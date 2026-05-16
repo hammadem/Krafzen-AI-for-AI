@@ -27,10 +27,17 @@ Runtime env (defaults are set in the Dockerfile when ODA is installed):
 ## Render (staging / production)
 
 1. Download the **Linux x86_64** `.deb` from ODA (same page as above).
-2. Upload the file to a **private** HTTPS location your build can reach (e.g. private S3 object URL, artifact storage, or signed URL).
-3. In Render, add an environment variable used at **build** time:
-   - `DWG_ODA_DEB_URL` = direct HTTPS URL to the `.deb` (mark as secret in Render).
-4. Ensure the service runs on **amd64** (Render native Linux is x86_64).
+2. Upload the file to a **private** HTTPS location (e.g. Cloudflare R2 bucket).
+3. Create a presigned GET URL. **R2 maximum expiry is 7 days** (`604800` seconds — not 30 days):
+
+```bash
+aws s3 presign s3://YOUR_BUCKET/ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb \
+  --endpoint-url "https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com" \
+  --expires-in 604800
+```
+
+4. In Render, set **`DWG_ODA_DEB_URL`** to that URL (secret). Paste the **full** URL with **no quotes** or line breaks. The API also downloads at **runtime** if the build bundle is missing.
+5. Ensure the service runs on **amd64** (Render native Linux is x86_64).
 
 `render_build_native.sh` installs ODA when `DWG_ODA_DEB_URL` is set and `apt-get` is available.
 

@@ -27,6 +27,19 @@ logger = logging.getLogger(__name__)
 _BUNDLE_DIR_NAME = ".oda_bundle"
 _MANIFEST = "converter_relpath.txt"
 _LD_PATH_FILE = "ld_library_path.txt"
+# Cloudflare R2 presigned URLs: max expiry is 7 days (604800 seconds), not 30 days.
+_R2_PRESIGN_MAX_SECONDS = 604_800
+_last_oda_error: Optional[str] = None
+
+
+def get_last_oda_error() -> Optional[str]:
+    """Human-readable reason the last bundle download/install failed (for API errors)."""
+    return _last_oda_error
+
+
+def _sanitize_deb_url(url: str) -> str:
+    u = url.strip().strip('"').strip("'")
+    return u.replace("\r", "").replace("\n", "").replace(" ", "")
 
 
 def backend_root() -> Path:
@@ -181,9 +194,48 @@ def ensure_oda_bundle(force: bool = False) -> bool:
         return _ensure_oda_bundle_locked(force)
 
 
+def _hint_for_download_failure(status_code: int, body: str, url: str) -> str:
+    if "X-Amz-Expires=2592000" in url or "expires=2592000" in url.lower():
+        return (
+            "R2/S3 presigned URL uses 30-day expiry (2592000s); Cloudflare R2 allows at most 7 days. "
+            f"Regenerate with: aws s3 presign ... --expires-in {_R2_PRESIGN_MAX_SECONDS}"
+        )
+    if status_code == 400:
+        return (
+            "Storage returned HTTP 400 (invalid presigned URL). Regenerate DWG_ODA_DEB_URL: "
+            f"use --expires-in {_R2_PRESIGN_MAX_SECONDS} or less, paste the full URL with no quotes/newlines."
+        )
+    if status_code in (403, 404):
+        return "Presigned URL expired or object missing — generate a new R2 presigned URL and update Render."
+    snippet = (body or "").strip()[:200]
+    if snippet:
+        return f"HTTP {status_code}: {snippet}"
+    return f"HTTP {status_code} downloading .deb"
+
+
+def _download_deb(url: str, dest: Path) -> None:
+    """Download .deb with minimal headers (compatible with S3/R2 presigned GET)."""
+    headers = {"Accept": "*/*"}
+    timeout = httpx.Timeout(600.0, connect=60.0)
+    with httpx.Client(timeout=timeout, follow_redirects=True, http2=False) as client:
+        with client.stream("GET", url, headers=headers) as resp:
+            if resp.status_code >= 400:
+                body = resp.read().decode("utf-8", errors="replace")
+                raise httpx.HTTPStatusError(
+                    _hint_for_download_failure(resp.status_code, body, url),
+                    request=resp.request,
+                    response=resp,
+                )
+            with dest.open("wb") as out:
+                for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
+                    out.write(chunk)
+
+
 def _ensure_oda_bundle_locked(force: bool = False) -> bool:
+    global _last_oda_error
     root = backend_root()
-    url = (getattr(settings, "DWG_ODA_DEB_URL", None) or os.environ.get("DWG_ODA_DEB_URL") or "").strip()
+    raw = getattr(settings, "DWG_ODA_DEB_URL", None) or os.environ.get("DWG_ODA_DEB_URL") or ""
+    url = _sanitize_deb_url(raw)
 
     if not force:
         exe, _ = _read_bundle(root)
@@ -191,16 +243,21 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
             return True
 
     if not url:
+        _last_oda_error = "DWG_ODA_DEB_URL is not set on this service."
         logger.warning(
             "DWG_ODA_DEB_URL is not set; ODA bundle will not be downloaded. "
             "Set it on Render to a direct HTTPS URL of the Linux x64 .deb."
         )
         return bool(_read_bundle(root)[0])
 
+    if url != raw.strip():
+        logger.warning("DWG_ODA_DEB_URL had extra whitespace or quotes; sanitized before download.")
+
     bdir = bundle_dir(root)
     deb_local = root / ".oda_download.deb"
 
     try:
+        _last_oda_error = None
         bdir.mkdir(parents=True, exist_ok=True)
         # Another worker may have finished while we waited
         if not force:
@@ -209,17 +266,12 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
                 return True
 
         logger.info("Downloading ODA .deb from DWG_ODA_DEB_URL into %s ...", bdir)
-        with httpx.Client(timeout=httpx.Timeout(600.0, connect=60.0), follow_redirects=True) as client:
-            with client.stream("GET", url) as resp:
-                resp.raise_for_status()
-                with deb_local.open("wb") as out:
-                    for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
-                        out.write(chunk)
+        _download_deb(url, deb_local)
 
         if deb_local.stat().st_size < 1_000_000:
             raise RuntimeError(
                 f"Downloaded .deb is too small ({deb_local.stat().st_size} bytes); "
-                "check DWG_ODA_DEB_URL (presigned URL may have expired)."
+                "check DWG_ODA_DEB_URL (presigned URL may be invalid or expired)."
             )
 
         extract_dest = bdir / "_extract"
@@ -254,7 +306,16 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
             return True
         raise RuntimeError("ODA bundle install finished but manifest is invalid")
 
+    except httpx.HTTPStatusError as e:
+        _last_oda_error = str(e) or _hint_for_download_failure(
+            e.response.status_code if e.response else 0,
+            e.response.text if e.response else "",
+            url,
+        )
+        logger.error("Failed to ensure ODA bundle: %s", _last_oda_error, exc_info=True)
+        return bool(_read_bundle(root)[0])
     except Exception as e:
+        _last_oda_error = str(e)
         logger.error("Failed to ensure ODA bundle: %s", e, exc_info=True)
         return bool(_read_bundle(root)[0])
     finally:

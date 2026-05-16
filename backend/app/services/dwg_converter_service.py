@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from app.core.config import settings
-from app.services.oda_bundle import resolve_bundled_oda
+from app.services.oda_bundle import get_last_oda_error, resolve_bundled_oda
 import ezdxf
 
 logger = logging.getLogger(__name__)
@@ -67,11 +67,14 @@ class DwgConverterService:
 
     def convert_dxf_path_to_dwg(self, dxf_path: str, *, output_filename: Optional[str] = None) -> DwgConvertResult:
         if not self.is_configured():
-            raise RuntimeError(
-                "DWG converter is not configured. On Render, set DWG_ODA_DEB_URL to a direct HTTPS URL "
-                "of the Linux x64 ODA .deb and redeploy (or check server logs for bundle download errors). "
-                "Locally, install ODA and set DWG_CONVERTER_CMD."
+            detail = get_last_oda_error()
+            msg = (
+                "DWG converter is not configured. On Render, set DWG_ODA_DEB_URL to a valid HTTPS URL "
+                "for the Linux x64 ODA .deb (R2 presign: use --expires-in 604800 max, not 30 days)."
             )
+            if detail:
+                msg = f"{msg} Details: {detail}"
+            raise RuntimeError(msg)
         if not os.path.exists(dxf_path):
             raise RuntimeError("DXF input file does not exist")
 
