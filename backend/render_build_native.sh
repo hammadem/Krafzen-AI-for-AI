@@ -76,10 +76,14 @@ if [ -n "${DWG_ODA_DEB_URL:-}" ]; then
     rm -f "$DEB_LOCAL"
 
     ODA_BIN=""
-    if [ -f "$ODA_BUNDLE/usr/bin/ODAFileConverter" ]; then
-        ODA_BIN="$ODA_BUNDLE/usr/bin/ODAFileConverter"
-    else
-        ODA_BIN="$(find "$ODA_BUNDLE" -type f \( -name 'ODAFileConverter' -o -name 'ODAFileConverter_*' \) 2>/dev/null | head -1 || true)"
+    for d in "$ODA_BUNDLE/usr/bin"/ODAFileConverter_*; do
+        if [ -f "$d/ODAFileConverter" ]; then
+            ODA_BIN="$d/ODAFileConverter"
+            break
+        fi
+    done
+    if [ -z "$ODA_BIN" ] || [ ! -f "$ODA_BIN" ]; then
+        ODA_BIN="$(find "$ODA_BUNDLE" -type f -name 'ODAFileConverter' -path '*/ODAFileConverter_*/*' 2>/dev/null | head -1 || true)"
     fi
     if [ -z "$ODA_BIN" ] || [ ! -f "$ODA_BIN" ]; then
         echo "ERROR: ODAFileConverter binary not found inside extracted .deb under $ODA_BUNDLE" >&2

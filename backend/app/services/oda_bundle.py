@@ -87,14 +87,57 @@ def _write_manifest(root: Path, oda_bin: Path) -> None:
     logger.info("ODA bundle manifest written: exe=%s lib_dirs=%s", rel, len(lib_dirs))
 
 
+def _is_elf_executable(path: Path) -> bool:
+    try:
+        with path.open("rb") as f:
+            return f.read(4) == b"\x7fELF"
+    except OSError:
+        return False
+
+
 def _find_oda_binary(extract_root: Path) -> Optional[Path]:
-    direct = extract_root / "usr" / "bin" / "ODAFileConverter"
-    if direct.is_file():
-        return direct
-    for path in extract_root.rglob("ODAFileConverter*"):
-        if path.is_file() and not path.name.endswith(".deb"):
-            return path
+    """
+    Return the real ODA ELF binary, not usr/bin/ODAFileConverter (a shell wrapper
+  that execs hardcoded /usr/bin/ODAFileConverter_* paths).
+    """
+    # Prefer versioned directory from .deb: usr/bin/ODAFileConverter_27.1.0.0/ODAFileConverter
+    bin_dir = extract_root / "usr" / "bin"
+    if bin_dir.is_dir():
+        for sub in sorted(bin_dir.glob("ODAFileConverter_*")):
+            if sub.is_dir():
+                inner = sub / "ODAFileConverter"
+                if inner.is_file() and _is_elf_executable(inner):
+                    return inner
+
+    elf_candidates: list[Path] = []
+    for path in extract_root.rglob("ODAFileConverter"):
+        if not path.is_file():
+            continue
+        if _is_elf_executable(path):
+            elf_candidates.append(path)
+
+    if elf_candidates:
+        # Prefer nested versioned binary over any stray matches
+        return sorted(elf_candidates, key=lambda p: len(p.parts), reverse=True)[0]
     return None
+
+
+def _repair_bundle_manifest(root: Path) -> None:
+    """Fix manifest if it points at the wrapper script instead of the ELF binary."""
+    bdir = bundle_dir(root)
+    if not bdir.is_dir():
+        return
+    rel_file = bdir / _MANIFEST
+    if rel_file.is_file():
+        rel = rel_file.read_text(encoding="utf-8").strip()
+        if rel:
+            current = (root / rel).resolve()
+            if current.is_file() and _is_elf_executable(current):
+                return
+    real = _find_oda_binary(bdir)
+    if real:
+        logger.info("Repairing ODA bundle manifest -> %s", real.relative_to(root))
+        _write_manifest(root, real)
 
 
 def _extract_deb_dpkg(deb_path: Path, dest: Path) -> bool:
@@ -407,5 +450,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
 
 def resolve_bundled_oda() -> Tuple[Optional[str], Optional[str]]:
     """Return (converter_path, ld_library_path_prefix) from .oda_bundle if present."""
+    root = backend_root()
     ensure_oda_bundle()
-    return _read_bundle(backend_root())
+    _repair_bundle_manifest(root)
+    return _read_bundle(root)
