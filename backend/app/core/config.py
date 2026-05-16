@@ -80,7 +80,8 @@ class Settings(BaseSettings):
     # Recommended local converter: ODA File Converter (command often: ODAFileConverter)
     DWG_CONVERTER_TYPE: str = "ODA"
     DWG_CONVERTER_CMD: str = ""  # e.g. "ODAFileConverter"
-    
+    DWG_ODA_DEB_URL: Optional[str] = None  # HTTPS URL to Linux x64 .deb (Render runtime + build)
+
     # External DXF Service (Removed in favor of local Potrace)
     # API_2_CONVERT_KEY / URL removed.
     

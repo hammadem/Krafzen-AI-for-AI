@@ -49,3 +49,5 @@ See [docker/README.md](../docker/README.md) for installing ODA in container imag
 **Render native (non-Docker) Python:** the build VM is not the same machine as runtime. `dpkg -i` during build does not ship `/usr` to your service. `render_build_native.sh` therefore **extracts** the `.deb` into `backend/.oda_bundle/` so ODA is deployed with your repo directory (same idea as `backend/bin/potrace`). Keep `DWG_ODA_DEB_URL` set as a direct HTTPS URL to the `.deb`.
 
 **Important:** `backend/.gitignore` must not ignore `*.so` globally or ODA’s extracted `usr/lib/*.so` files will be omitted from the deploy artifact and the converter will not load at runtime.
+
+**Runtime fallback:** If the build-time bundle is missing, the API downloads and extracts the `.deb` on startup when `DWG_ODA_DEB_URL` is set (first boot may take 1–2 minutes; check logs for `ODA bundle ready`).

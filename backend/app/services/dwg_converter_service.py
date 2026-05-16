@@ -6,39 +6,13 @@ import sys
 import tempfile
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional, Tuple
 
 from app.core.config import settings
+from app.services.oda_bundle import resolve_bundled_oda
 import ezdxf
 
 logger = logging.getLogger(__name__)
-
-
-def _backend_root() -> Path:
-    return Path(__file__).resolve().parent.parent.parent
-
-
-def _oda_bundle_converter() -> Tuple[Optional[str], Optional[str]]:
-    """
-    Render/native: ODA is extracted at build into backend/.oda_bundle/ (see render_build_native.sh).
-    Returns (absolute path to ODAFileConverter, extra LD_LIBRARY_PATH prefix) or (None, None).
-    """
-    root = _backend_root()
-    rel_file = root / ".oda_bundle" / "converter_relpath.txt"
-    ld_file = root / ".oda_bundle" / "ld_library_path.txt"
-    if not rel_file.is_file():
-        return None, None
-    rel = rel_file.read_text(encoding="utf-8").strip()
-    if not rel:
-        return None, None
-    exe = (root / rel).resolve()
-    if not exe.is_file():
-        return None, None
-    ld_extra = ""
-    if ld_file.is_file():
-        ld_extra = ld_file.read_text(encoding="utf-8").strip()
-    return str(exe), ld_extra or None
 
 
 @dataclass(frozen=True)
@@ -75,7 +49,7 @@ class DwgConverterService:
                 if resolved:
                     return resolved, None
 
-        bundle_bin, bundle_ld = _oda_bundle_converter()
+        bundle_bin, bundle_ld = resolve_bundled_oda()
         if bundle_bin:
             return bundle_bin, bundle_ld
 
@@ -94,8 +68,9 @@ class DwgConverterService:
     def convert_dxf_path_to_dwg(self, dxf_path: str, *, output_filename: Optional[str] = None) -> DwgConvertResult:
         if not self.is_configured():
             raise RuntimeError(
-                "DWG converter is not configured. Set DWG_CONVERTER_CMD (e.g. 'ODAFileConverter') "
-                "and ensure it is installed and available on PATH."
+                "DWG converter is not configured. On Render, set DWG_ODA_DEB_URL to a direct HTTPS URL "
+                "of the Linux x64 ODA .deb and redeploy (or check server logs for bundle download errors). "
+                "Locally, install ODA and set DWG_CONVERTER_CMD."
             )
         if not os.path.exists(dxf_path):
             raise RuntimeError("DXF input file does not exist")
@@ -224,11 +199,4 @@ class DwgConverterService:
 
 
 dwg_converter_service = DwgConverterService()
-_oda_manifest = _backend_root() / ".oda_bundle" / "converter_relpath.txt"
-logger.info(
-    "DWG: ODA manifest %s exists=%s converter_ready=%s",
-    _oda_manifest,
-    _oda_manifest.is_file(),
-    dwg_converter_service.is_configured(),
-)
 

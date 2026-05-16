@@ -181,6 +181,27 @@ async def rebuild_openapi_schema():
              print(f"   - {route.path} [{','.join(route.methods)}]")
     print("---------------------\n")
 
+    import threading
+
+    def _bootstrap_oda_bundle() -> None:
+        try:
+            from app.services.oda_bundle import ensure_oda_bundle
+            from app.services.dwg_converter_service import dwg_converter_service
+
+            if ensure_oda_bundle():
+                logger.info("DWG: ODA converter ready after bundle bootstrap")
+            else:
+                logger.warning(
+                    "DWG: ODA bundle bootstrap finished but converter not configured "
+                    "(check DWG_ODA_DEB_URL and server logs)"
+                )
+            if not dwg_converter_service.is_configured():
+                logger.warning("DWG: converter still not configured after bundle bootstrap")
+        except Exception as oda_err:
+            logger.error("DWG: ODA bundle bootstrap failed: %s", oda_err, exc_info=True)
+
+    threading.Thread(target=_bootstrap_oda_bundle, daemon=True, name="oda-bundle-bootstrap").start()
+
 # Health check route (PR version - kept for backward compatibility)
 @app.get("/health")
 async def health_check():
