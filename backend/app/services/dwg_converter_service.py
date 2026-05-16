@@ -224,4 +224,11 @@ class DwgConverterService:
 
 
 dwg_converter_service = DwgConverterService()
+_oda_manifest = _backend_root() / ".oda_bundle" / "converter_relpath.txt"
+logger.info(
+    "DWG: ODA manifest %s exists=%s converter_ready=%s",
+    _oda_manifest,
+    _oda_manifest.is_file(),
+    dwg_converter_service.is_configured(),
+)
 

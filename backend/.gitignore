@@ -5,7 +5,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+# Native extension modules only (do not use bare *.so — ODA bundle under .oda_bundle/ ships many .so files)
+**/*.cpython-*.so
+**/*.abi3*.so
 .Python
 venv/
 env/
@@ -26,6 +28,5 @@ Thumbs.db
 
 temp/
 
-# ODA .deb extract for Render/native deploy (created at build from DWG_ODA_DEB_URL)
-.oda_bundle/
+# ODA: temp deb download only (.oda_bundle/ must NOT be ignored — it contains required .so libs for Render)
 .oda_download.deb
