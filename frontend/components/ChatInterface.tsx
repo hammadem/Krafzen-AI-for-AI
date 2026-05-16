@@ -421,7 +421,11 @@ export function ChatInterface({
                                                         window.URL.revokeObjectURL(url);
                                                     } catch (e) {
                                                         console.error("DWG Download error:", e);
-                                                        alert("Failed to download DWG. If you’re running locally, ensure the DWG converter is installed/configured.");
+                                                        const detail =
+                                                            e instanceof Error
+                                                                ? e.message
+                                                                : "Failed to download DWG.";
+                                                        alert(detail);
                                                     }
                                                 }}
                                             >

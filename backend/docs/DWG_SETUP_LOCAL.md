@@ -45,3 +45,5 @@ test -x /Applications/ODAFileConverter.app/Contents/MacOS/ODAFileConverter && ec
 ## 6) Docker & Render (staging / production)
 
 See [docker/README.md](../docker/README.md) for installing ODA in container images and on Render (build-time `DWG_ODA_DEB_URL`, Linux x64 `.deb`, optional `docker/oda-file-converter.deb` for local Docker builds).
+
+**Render native (non-Docker) Python:** the build VM is not the same machine as runtime. `dpkg -i` during build does not ship `/usr` to your service. `render_build_native.sh` therefore **extracts** the `.deb` into `backend/.oda_bundle/` so ODA is deployed with your repo directory (same idea as `backend/bin/potrace`). Keep `DWG_ODA_DEB_URL` set as a direct HTTPS URL to the `.deb`.

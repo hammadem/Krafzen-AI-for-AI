@@ -25,3 +25,7 @@ Thumbs.db
 *.log
 
 temp/
+
+# ODA .deb extract for Render/native deploy (created at build from DWG_ODA_DEB_URL)
+.oda_bundle/
+.oda_download.deb

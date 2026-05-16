@@ -2,15 +2,43 @@ import logging
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from pathlib import Path
+from typing import Optional, Tuple
 
 from app.core.config import settings
 import ezdxf
 
 logger = logging.getLogger(__name__)
+
+
+def _backend_root() -> Path:
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def _oda_bundle_converter() -> Tuple[Optional[str], Optional[str]]:
+    """
+    Render/native: ODA is extracted at build into backend/.oda_bundle/ (see render_build_native.sh).
+    Returns (absolute path to ODAFileConverter, extra LD_LIBRARY_PATH prefix) or (None, None).
+    """
+    root = _backend_root()
+    rel_file = root / ".oda_bundle" / "converter_relpath.txt"
+    ld_file = root / ".oda_bundle" / "ld_library_path.txt"
+    if not rel_file.is_file():
+        return None, None
+    rel = rel_file.read_text(encoding="utf-8").strip()
+    if not rel:
+        return None, None
+    exe = (root / rel).resolve()
+    if not exe.is_file():
+        return None, None
+    ld_extra = ""
+    if ld_file.is_file():
+        ld_extra = ld_file.read_text(encoding="utf-8").strip()
+    return str(exe), ld_extra or None
 
 
 @dataclass(frozen=True)
@@ -33,26 +61,35 @@ class DwgConverterService:
         self._converter_cmd = (getattr(settings, "DWG_CONVERTER_CMD", None) or "").strip()
         self._converter_type = (getattr(settings, "DWG_CONVERTER_TYPE", None) or "ODA").strip().upper()
 
-    def _resolve_converter_cmd(self) -> Optional[str]:
+    def _resolve_converter_cmd_and_ld(self) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Resolve ODA executable and optional LD_LIBRARY_PATH prefix (bundled .deb on Render).
+        """
         if self._converter_cmd:
-            if os.path.basename(self._converter_cmd) == self._converter_cmd:
-                resolved = shutil.which(self._converter_cmd)
-                return resolved
-            return self._converter_cmd if os.path.exists(self._converter_cmd) else None
+            raw = self._converter_cmd
+            if os.path.basename(raw) != raw:
+                if os.path.isfile(raw) and os.access(raw, os.X_OK):
+                    return raw, None
+            else:
+                resolved = shutil.which(raw)
+                if resolved:
+                    return resolved, None
 
-        # Linux (Docker / Render): ODA .deb usually installs ODAFileConverter on PATH.
+        bundle_bin, bundle_ld = _oda_bundle_converter()
+        if bundle_bin:
+            return bundle_bin, bundle_ld
+
         for p in ("/usr/bin/ODAFileConverter", "/usr/local/bin/ODAFileConverter"):
             if os.path.isfile(p) and os.access(p, os.X_OK):
-                return p
+                return p, None
 
-        # macOS default install path for ODA app bundle.
         mac_app_bin = "/Applications/ODAFileConverter.app/Contents/MacOS/ODAFileConverter"
         if os.path.exists(mac_app_bin):
-            return mac_app_bin
-        return None
+            return mac_app_bin, None
+        return None, None
 
     def is_configured(self) -> bool:
-        return bool(self._resolve_converter_cmd())
+        return bool(self._resolve_converter_cmd_and_ld()[0])
 
     def convert_dxf_path_to_dwg(self, dxf_path: str, *, output_filename: Optional[str] = None) -> DwgConvertResult:
         if not self.is_configured():
@@ -85,7 +122,7 @@ class DwgConverterService:
         # ODA args (typical):
         # ODAFileConverter <inputFolder> <outputFolder> <outputVersion> <outputType> <recurse> <audit> [<inputFilter>]
         # We keep it conservative: 2018 DWG, DWG output, no recursion, no audit.
-        converter_cmd = self._resolve_converter_cmd()
+        converter_cmd, ld_extra = self._resolve_converter_cmd_and_ld()
         if not converter_cmd:
             raise RuntimeError(
                 "DWG converter executable not found. Install ODA File Converter and set DWG_CONVERTER_CMD "
@@ -102,8 +139,16 @@ class DwgConverterService:
             "0",
         ]
 
+        run_env = os.environ.copy()
+        if ld_extra:
+            sep = os.pathsep
+            prev = run_env.get("LD_LIBRARY_PATH", "")
+            run_env["LD_LIBRARY_PATH"] = f"{ld_extra}{sep}{prev}" if prev else ld_extra
+        if sys.platform.startswith("linux"):
+            run_env.setdefault("QT_QPA_PLATFORM", "offscreen")
+
         logger.info("Converting DXF → DWG via ODA", extra={"cmd": " ".join(cmd)})
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=run_env)
         if result.returncode != 0:
             raise RuntimeError(
                 "DWG conversion failed. "
