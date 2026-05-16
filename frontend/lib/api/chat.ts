@@ -243,10 +243,14 @@ export const downloadDesignFile = async (
         try {
             const errorData = JSON.parse(text) as {
                 detail?: string | Array<{ msg?: string }> | { msg?: string };
+                message?: string;
             };
             const d = errorData?.detail;
+            const m = errorData?.message;
             if (typeof d === "string" && d.trim()) {
                 errorMessage = d.trim();
+            } else if (typeof m === "string" && m.trim()) {
+                errorMessage = m.trim();
             } else if (Array.isArray(d) && d.length > 0) {
                 errorMessage = d
                     .map((x) => (typeof x?.msg === "string" ? x.msg : JSON.stringify(x)))

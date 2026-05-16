@@ -7,9 +7,13 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 def add_exception_handlers(app):
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        # Use `detail` like FastAPI's default so clients (e.g. design-file download) can show errors.
+        payload: dict = {"detail": exc.detail}
+        if isinstance(exc.detail, str):
+            payload["message"] = exc.detail
         return JSONResponse(
             status_code=exc.status_code,
-            content={"message": exc.detail},
+            content=payload,
         )
     
     @app.exception_handler(RequestValidationError)
