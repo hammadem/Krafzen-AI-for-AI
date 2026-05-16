@@ -238,12 +238,26 @@ export const downloadDesignFile = async (
     });
 
     if (!response.ok) {
-        let errorMessage = response.statusText;
+        const text = await response.text();
+        let errorMessage = (response.statusText || "").trim() || `HTTP ${response.status}`;
         try {
-            const errorData = await response.json();
-            if (errorData.detail) errorMessage = errorData.detail;
+            const errorData = JSON.parse(text) as {
+                detail?: string | Array<{ msg?: string }> | { msg?: string };
+            };
+            const d = errorData?.detail;
+            if (typeof d === "string" && d.trim()) {
+                errorMessage = d.trim();
+            } else if (Array.isArray(d) && d.length > 0) {
+                errorMessage = d
+                    .map((x) => (typeof x?.msg === "string" ? x.msg : JSON.stringify(x)))
+                    .join("; ");
+            } else if (d && typeof d === "object" && "msg" in d && typeof (d as { msg?: string }).msg === "string") {
+                errorMessage = (d as { msg: string }).msg;
+            }
         } catch {
-            // ignore
+            if (text.trim()) {
+                errorMessage = text.trim().slice(0, 800);
+            }
         }
         throw new Error(`Failed to download ${fileType.toUpperCase()}: ${errorMessage}`);
     }
