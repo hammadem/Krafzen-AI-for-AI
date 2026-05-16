@@ -1,6 +1,5 @@
 "use client";
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { Video } from 'lucide-react';
 import CalendlyBooking from '@/components/CalendlyBooking';
 

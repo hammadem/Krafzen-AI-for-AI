@@ -147,10 +147,10 @@ export const PricingPlans: PricingPlans = {
   monthly: [
     {
       type: "Starter",
-      price: "$249",
-      stripeLink: "https://buy.stripe.com/aFa9ATd2b1dr6b71zQ4wM01",
+      price: "$149",
+      stripeLink: "https://buy.stripe.com/9B6cN53rB8FTgPL3HY4wM09",
       features: [
-        "Includes 500 requests per month",
+        "Includes 50 drawings per month",
         "15 free workspace requests when you sign up (no card)",
         "Up to 3 team seats",
         "Access to transcript view",
@@ -162,25 +162,25 @@ export const PricingPlans: PricingPlans = {
     },
     {
       type: "Professional",
-      price: "$649",
-      stripeLink: "https://buy.stripe.com/8x2eVdbY709n1URemC4wM02",
+      price: "$499",
+      stripeLink: "https://buy.stripe.com/3cIeVdbY76xL6b7diy4wM0a",
       features: [
-        "Includes 3,000 requests per month",
+        "Includes 300 drawings per month",
         "15 free workspace requests when you sign up (no card)",
         "Up to 10 team seats",
         "Batch uploads for faster workflows",
         "Google Drive & Dropbox connectors",
         "Priority queue for faster processing",
-        "CSV export support",
+        "Advanced export formats (including CSV)",
         "Unlimited projects",
       ],
     },
     {
       type: "Enterprise",
-      price: "$1,799",
-      stripeLink: "https://buy.stripe.com/6oUdR94vF09n7fb1zQ4wM04",
+      price: "$1,499",
+      stripeLink: "https://buy.stripe.com/bJebJ13rBf4heHDceu4wM0b",
       features: [
-        "Includes 10,000 requests per month",
+        "Includes 2,000 drawings per month",
         "15 free workspace requests when you sign up (no card)",
         "Up to 25 team seats",
         "API access & webhooks integration",
@@ -195,7 +195,7 @@ export const PricingPlans: PricingPlans = {
       price: "Custom",
       stripeLink: undefined, // Contact Us
       features: [
-        "Includes 25,000-100,000 requests per month",
+        "Includes custom request volume",
         "15 free workspace requests when you sign up (no card)",
         "25+ team seats",
         "Dedicated workers for faster performance",
@@ -210,10 +210,10 @@ export const PricingPlans: PricingPlans = {
   annual: [
     {
       type: "Starter",
-      price: "$2,490",
-      stripeLink: "https://buy.stripe.com/fZu7sL4vFcW9dDz7Ye4wM05",
+      price: "$1,490",
+      stripeLink: "https://buy.stripe.com/cNi7sL8LV7BP8jfemC4wM0c",
       features: [
-        "Includes 500 requests per month",
+        "Includes 50 drawings per month",
         "15 free workspace requests when you sign up (no card)",
         "Up to 3 team seats",
         "Access to transcript view",
@@ -225,25 +225,25 @@ export const PricingPlans: PricingPlans = {
     },
     {
       type: "Professional",
-      price: "$6,490",
-      stripeLink: "https://buy.stripe.com/5kQaEX8LVe0d9njdiy4wM07",
+      price: "$4,990",
+      stripeLink: "https://buy.stripe.com/00w3cvbY77BP42ZemC4wM0d",
       features: [
-        "Includes 3,000 requests per month",
+        "Includes 300 drawings per month",
         "15 free workspace requests when you sign up (no card)",
         "Up to 10 team seats",
-        "Batch uploads for faster workflows",
+        "Batch uploads for bulk workflows",
         "Google Drive & Dropbox connectors",
         "Priority queue for faster processing",
-        "CSV export support",
+        "Advanced export formats (including CSV)",
         "Unlimited projects",
       ],
     },
     {
       type: "Enterprise",
-      price: "$18,190",
-      stripeLink: "https://buy.stripe.com/5kQdR92nx09n8jfceu4wM08",
+      price: "$14,990",
+      stripeLink: "https://buy.stripe.com/00w3cvd2b9JX6b7diy4wM0e",
       features: [
-        "Includes 10,000 requests per month",
+        "Includes 2,000 drawings per month",
         "15 free workspace requests when you sign up (no card)",
         "Up to 25 team seats",
         "API access & webhooks integration",
@@ -258,7 +258,7 @@ export const PricingPlans: PricingPlans = {
       price: "Custom",
       stripeLink: undefined, // Contact Us
       features: [
-        "Includes 25,000-100,000 requests per month",
+        "Includes custom request volume",
         "15 free workspace requests when you sign up (no card)",
         "25+ team seats",
         "Dedicated workers for faster performance",

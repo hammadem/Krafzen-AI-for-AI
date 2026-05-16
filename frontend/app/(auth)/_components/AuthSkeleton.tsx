@@ -1,4 +1,3 @@
-import CompanyLogo from "@/components/CompanyLogo";
 import Image from "next/image";
 
 export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {

@@ -452,7 +452,7 @@ export default function WorkspaceLayout() {
             else if (plan.includes('enterprise')) total = 2000;
             
             const current = isTrial ? (user?.trial_requests_remaining ?? 0) : (user?.plan_requests_remaining ?? 0);
-            const displayTotal = !isTrial && user?.plan_requests_total ? user.plan_requests_total : total;
+            const displayTotal = total;
             const percentage = Math.min(100, (current / displayTotal) * 100);
 
             return (

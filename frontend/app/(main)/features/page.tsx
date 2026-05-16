@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import { Mic, Zap, AlertTriangle, Download, ArrowRight, Layers, Cpu, ShieldCheck } from 'lucide-react';
+import { Mic, AlertTriangle, Download, Layers, Cpu, ShieldCheck } from 'lucide-react';
 
 const features = [
     {

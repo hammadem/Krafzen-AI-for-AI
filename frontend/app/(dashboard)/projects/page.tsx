@@ -2,7 +2,6 @@
 import ProjectsDashboard from "@/components/ProjectsDashboard";
 import { useAuth } from "@/context/AuthContext";
 import { 
-  Home, 
   MessageSquare, 
   Layers, 
   Settings, 
