@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -213,6 +214,86 @@ def _hint_for_download_failure(status_code: int, body: str, url: str) -> str:
     return f"HTTP {status_code} downloading .deb"
 
 
+def _r2_download_config() -> Optional[dict[str, str]]:
+    """R2 S3 API settings (preferred over presigned URL on Render)."""
+    access = (
+        (getattr(settings, "R2_ACCESS_KEY_ID", None) or "")
+        or os.environ.get("R2_ACCESS_KEY_ID", "")
+        or os.environ.get("AWS_ACCESS_KEY_ID", "")
+    ).strip()
+    secret = (
+        (getattr(settings, "R2_SECRET_ACCESS_KEY", None) or "")
+        or os.environ.get("R2_SECRET_ACCESS_KEY", "")
+        or os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+    ).strip()
+    endpoint = (
+        (getattr(settings, "R2_ENDPOINT_URL", None) or "") or os.environ.get("R2_ENDPOINT_URL", "")
+    ).strip().rstrip("/")
+    bucket = (
+        (getattr(settings, "R2_ODA_BUCKET", None) or "")
+        or os.environ.get("R2_ODA_BUCKET", "")
+        or "krafzen-build-private"
+    ).strip()
+    key = (
+        (getattr(settings, "R2_ODA_OBJECT_KEY", None) or "")
+        or os.environ.get("R2_ODA_OBJECT_KEY", "")
+        or "ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb"
+    ).strip()
+    if access and secret and endpoint and bucket and key:
+        return {
+            "access": access,
+            "secret": secret,
+            "endpoint": endpoint,
+            "bucket": bucket,
+            "key": key,
+        }
+    return None
+
+
+def _download_deb_from_r2(dest: Path, r2: dict[str, str]) -> None:
+    import boto3
+    from botocore.config import Config
+
+    client = boto3.client(
+        "s3",
+        endpoint_url=r2["endpoint"],
+        aws_access_key_id=r2["access"],
+        aws_secret_access_key=r2["secret"],
+        region_name="auto",
+        config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+    )
+    client.download_file(r2["bucket"], r2["key"], str(dest))
+
+
+def _download_oda_deb(dest: Path, url: str) -> None:
+    """Download ODA .deb via R2 API (preferred) or presigned HTTPS URL."""
+    r2 = _r2_download_config()
+    if r2:
+        try:
+            logger.info(
+                "Downloading ODA .deb from R2 API s3://%s/%s",
+                r2["bucket"],
+                r2["key"],
+            )
+            _download_deb_from_r2(dest, r2)
+            return
+        except Exception as exc:
+            logger.warning("R2 API download failed, trying presigned URL if set: %s", exc)
+
+    if not url:
+        raise RuntimeError(
+            "Cannot download ODA .deb: set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL "
+            "(and optionally R2_ODA_BUCKET / R2_ODA_OBJECT_KEY) on Render, or set DWG_ODA_DEB_URL."
+        )
+
+    expires = "?"
+    m = re.search(r"X-Amz-Expires=(\d+)", url)
+    if m:
+        expires = m.group(1)
+    logger.info("Downloading ODA .deb via presigned URL (X-Amz-Expires=%s)", expires)
+    _download_deb(url, dest)
+
+
 def _download_deb(url: str, dest: Path) -> None:
     """Download .deb with minimal headers (compatible with S3/R2 presigned GET)."""
     headers = {"Accept": "*/*"}
@@ -242,15 +323,17 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         if exe:
             return True
 
-    if not url:
-        _last_oda_error = "DWG_ODA_DEB_URL is not set on this service."
-        logger.warning(
-            "DWG_ODA_DEB_URL is not set; ODA bundle will not be downloaded. "
-            "Set it on Render to a direct HTTPS URL of the Linux x64 .deb."
+    r2 = _r2_download_config()
+    if not url and not r2:
+        _last_oda_error = (
+            "Neither R2 API credentials nor DWG_ODA_DEB_URL is configured. "
+            "Set R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL on Render (recommended), "
+            "or a valid presigned DWG_ODA_DEB_URL."
         )
+        logger.warning(_last_oda_error)
         return bool(_read_bundle(root)[0])
 
-    if url != raw.strip():
+    if url and url != raw.strip():
         logger.warning("DWG_ODA_DEB_URL had extra whitespace or quotes; sanitized before download.")
 
     bdir = bundle_dir(root)
@@ -265,8 +348,8 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
             if exe:
                 return True
 
-        logger.info("Downloading ODA .deb from DWG_ODA_DEB_URL into %s ...", bdir)
-        _download_deb(url, deb_local)
+        logger.info("Fetching ODA .deb into %s ...", bdir)
+        _download_oda_deb(deb_local, url)
 
         if deb_local.stat().st_size < 1_000_000:
             raise RuntimeError(

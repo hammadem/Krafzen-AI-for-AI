@@ -28,16 +28,33 @@ Runtime env (defaults are set in the Dockerfile when ODA is installed):
 
 1. Download the **Linux x86_64** `.deb` from ODA (same page as above).
 2. Upload the file to a **private** HTTPS location (e.g. Cloudflare R2 bucket).
-3. Create a presigned GET URL. **R2 maximum expiry is 7 days** (`604800` seconds — not 30 days):
+3. **Recommended (Render):** add R2 API env vars on the API service (no presigned URL):
+
+| Variable | Example |
+|----------|---------|
+| `R2_ACCESS_KEY_ID` | From R2 API token |
+| `R2_SECRET_ACCESS_KEY` | From R2 API token |
+| `R2_ENDPOINT_URL` | `https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com` |
+| `R2_ODA_BUCKET` | `krafzen-build-private` |
+| `R2_ODA_OBJECT_KEY` | `ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb` |
+
+The API downloads the `.deb` at startup via boto3. Mark secrets in Render.
+
+**Alternative:** presigned URL in `DWG_ODA_DEB_URL` (max **7 days**, `604800` seconds):
 
 ```bash
-aws s3 presign s3://YOUR_BUCKET/ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb \
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
+export AWS_REGION=auto
+aws s3 presign s3://krafzen-build-private/ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb \
   --endpoint-url "https://YOUR_ACCOUNT_ID.r2.cloudflarestorage.com" \
-  --expires-in 604800
+  --expires-in 604800 \
+  --region auto
 ```
 
-4. In Render, set **`DWG_ODA_DEB_URL`** to that URL (secret). Paste the **full** URL with **no quotes** or line breaks. The API also downloads at **runtime** if the build bundle is missing.
-5. Ensure the service runs on **amd64** (Render native Linux is x86_64).
+Paste the **full** URL with **no quotes**. If you still get HTTP 400, use the R2 API vars above instead.
+
+4. Ensure the service runs on **amd64** (Render native Linux is x86_64).
 
 `render_build_native.sh` installs ODA when `DWG_ODA_DEB_URL` is set and `apt-get` is available.
 

@@ -80,7 +80,13 @@ class Settings(BaseSettings):
     # Recommended local converter: ODA File Converter (command often: ODAFileConverter)
     DWG_CONVERTER_TYPE: str = "ODA"
     DWG_CONVERTER_CMD: str = ""  # e.g. "ODAFileConverter"
-    DWG_ODA_DEB_URL: Optional[str] = None  # HTTPS URL to Linux x64 .deb (Render runtime + build)
+    DWG_ODA_DEB_URL: Optional[str] = None  # HTTPS presigned URL to Linux x64 .deb (fallback)
+    # Preferred on Render: direct R2 API download (avoids presign 400 issues)
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    R2_ENDPOINT_URL: Optional[str] = None  # e.g. https://<account>.r2.cloudflarestorage.com
+    R2_ODA_BUCKET: Optional[str] = None  # e.g. krafzen-build-private
+    R2_ODA_OBJECT_KEY: Optional[str] = None  # e.g. ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb
 
     # External DXF Service (Removed in favor of local Potrace)
     # API_2_CONVERT_KEY / URL removed.
