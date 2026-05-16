@@ -202,18 +202,6 @@ async def rebuild_openapi_schema():
 
     threading.Thread(target=_bootstrap_oda_bundle, daemon=True, name="oda-bundle-bootstrap").start()
 
-# Health check route (PR version - kept for backward compatibility)
-@app.get("/health")
-async def health_check():
-    """Check API and DB connectivity."""
-    try:
-        result = db.table("projects").select("id", count="exact").execute()
-        return {"status": "healthy", "db_project_count": result.count}
-    except Exception as e:
-        print(f"Health check error: {e}")
-        return {"status": "degraded", "db": "unreachable"}
-
-
 # Init logging / Sentry / error handlers
 init_sentry(settings.SENTRY_DSN)
 add_exception_handlers(app)

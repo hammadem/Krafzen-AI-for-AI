@@ -395,7 +395,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
     url = _sanitize_deb_url(raw)
 
     if not force:
-        exe, _ = _read_bundle(root)
+        exe, _, _ = _read_bundle(root)
         if exe:
             return True
 
@@ -420,7 +420,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         bdir.mkdir(parents=True, exist_ok=True)
         # Another worker may have finished while we waited
         if not force:
-            exe, _ = _read_bundle(root)
+            exe, _, _ = _read_bundle(root)
             if exe:
                 return True
 
@@ -459,7 +459,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         shutil.rmtree(extract_dest, ignore_errors=True)
 
         _write_manifest(root, _find_oda_binary(bdir) or oda_bin)
-        exe, _ = _read_bundle(root)
+        exe, _, _ = _read_bundle(root)
         if exe:
             logger.info("ODA bundle ready at %s", exe)
             return True
