@@ -202,6 +202,18 @@ export default function WorkspaceLayout() {
   }, [inputValue]);
 
   const currentSession = sessions.find(s => s.id === currentSessionId);
+  
+  // Shared Subscription Logic
+  const isTrial = user?.in_free_signup_tier || !user?.has_active_subscription;
+  const plan = (user?.subscription_plan || 'trial').toLowerCase();
+  let totalRequests = 15;
+  if (plan.includes('starter')) totalRequests = 50;
+  else if (plan.includes('professional')) totalRequests = 300;
+  else if (plan.includes('enterprise')) totalRequests = 2000;
+  const currentRequests = isTrial ? (user?.trial_requests_remaining ?? 0) : (user?.plan_requests_remaining ?? 0);
+  const displayTotalRequests = totalRequests;
+  const requestsPercentage = Math.min(100, (currentRequests / displayTotalRequests) * 100);
+
   const lastImage = messages.filter(m => m.role === 'assistant' && m.imageUrl).reverse()[0]?.imageUrl;
 
   const handleExport = async () => {
@@ -346,24 +358,24 @@ export default function WorkspaceLayout() {
                   <div className="wam-stat-row wam-stat-plan">
                     <Shield size={14} />
                     <span>Plan:</span>
-                    <span className="wam-plan-badge">FREE</span>
+                    <span className="wam-plan-badge">{user?.subscription_plan?.toUpperCase() || 'FREE'}</span>
                     <span className="wam-plan-dot"></span>
                   </div>
                   <div className="wam-stat-row">
                     <Clock size={14} className="wam-icon-blue" />
                     <span>Free requests:</span>
-                    <strong>{user?.trial_requests_remaining ?? 0}</strong>
+                    <strong>{user?.trial_requests_remaining ?? 0} {isTrial ? `/ 15` : ''}</strong>
                   </div>
                   <div className="wam-stat-row">
                     <Clock size={14} className="wam-icon-blue" />
                     <span>Package requests:</span>
-                    <strong>0</strong>
+                    <strong>{user?.plan_requests_remaining ?? 0} {!isTrial ? `/ ${displayTotalRequests}` : ''}</strong>
                   </div>
                 </div>
 
                 {/* CTA */}
                 <Link href="/pricing" className="wam-cta-btn" onClick={() => setShowAccountMenu(false)}>
-                  GET STARTED
+                  {isTrial ? "GET STARTED" : "UPGRADE PLAN"}
                 </Link>
 
                 {/* Actions */}
@@ -443,33 +455,18 @@ export default function WorkspaceLayout() {
         </div>
 
         <div className="workspace-rail-foot">
-          {(() => {
-            const isTrial = user?.in_free_signup_tier || !user?.has_active_subscription;
-            const plan = (user?.subscription_plan || 'trial').toLowerCase();
-            let total = 15;
-            if (plan.includes('starter')) total = 50;
-            else if (plan.includes('professional')) total = 300;
-            else if (plan.includes('enterprise')) total = 2000;
-            
-            const current = isTrial ? (user?.trial_requests_remaining ?? 0) : (user?.plan_requests_remaining ?? 0);
-            const displayTotal = total;
-            const percentage = Math.min(100, (current / displayTotal) * 100);
-
-            return (
-              <div className="workspace-quota-wrap">
-                <div className="workspace-quota-info">
-                  <span>{isTrial ? 'Trial requests' : `${plan.charAt(0).toUpperCase() + plan.slice(1)} requests`}</span>
-                  <strong>{current} / {displayTotal.toLocaleString()}</strong>
-                </div>
-                <div className="workspace-quota-bar">
-                  <div 
-                    className="workspace-quota-progress" 
-                    style={{ width: `${percentage}%`, background: percentage < 20 ? 'var(--red-500)' : 'var(--cyan-400)' }}
-                  ></div>
-                </div>
-              </div>
-            );
-          })()}
+          <div className="workspace-quota-wrap">
+            <div className="workspace-quota-info">
+              <span>{isTrial ? 'Trial requests' : `${plan.charAt(0).toUpperCase() + plan.slice(1)} requests`}</span>
+              <strong>{currentRequests} / {totalRequests.toLocaleString()}</strong>
+            </div>
+            <div className="workspace-quota-bar">
+              <div 
+                className="workspace-quota-progress" 
+                style={{ width: `${requestsPercentage}%`, background: requestsPercentage < 20 ? 'var(--red-500)' : 'var(--cyan-400)' }}
+              ></div>
+            </div>
+          </div>
           <Link href="/pricing" style={{ color: "var(--cyan-400)", fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Upgrade Plan</Link>
         </div>
       </aside>

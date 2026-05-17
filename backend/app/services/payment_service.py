@@ -243,8 +243,8 @@ class PaymentService:
                 if line_items.data:
                     price_id = line_items.data[0].price.id
                     # You could map specific Price IDs here if you have them.
-                    # For now, we'll look at the amount_total as a fallback if price_id mapping isn't set up.
-                    amount = session.get("amount_total", 0) / 100
+                    # Use amount_subtotal to get the price before discounts are applied (crucial for 100% off coupons)
+                    amount = session.get("amount_subtotal", session.get("amount_total", 0)) / 100
                     
                     # Mapping based on the new prices provided by the user
                     plan_map = {
