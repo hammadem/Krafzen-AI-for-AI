@@ -30,6 +30,13 @@ _MANIFEST = "converter_relpath.txt"
 _LD_PATH_FILE = "ld_library_path.txt"
 _QT_PLUGIN_PATH_FILE = "qt_plugin_path.txt"
 _QT6_RUNTIME_MARKER = ".qt6_runtime_ready"
+_OGL_RUNTIME_MARKER = ".ogl_runtime_ready"
+_DEBIAN_OGL_DEB_URLS = (
+    "https://deb.debian.org/debian/pool/main/libg/libglvnd/libopengl0_1.6.0-1_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/libg/libglvnd/libgl1_1.6.0-1_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/libg/libglvnd/libglvnd0_1.6.0-1_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/libg/libglvnd/libglx0_1.6.0-1_amd64.deb",
+)
 # Cloudflare R2 presigned URLs: max expiry is 7 days (604800 seconds), not 30 days.
 _R2_PRESIGN_MAX_SECONDS = 604_800
 _last_oda_error: Optional[str] = None
@@ -87,12 +94,57 @@ def _prepend_ld_path(env: dict[str, str], extra_dirs: list[str]) -> None:
     env["LD_LIBRARY_PATH"] = f"{prefix}{sep}{prev}" if prev else prefix
 
 
+def _ogl_runtime_lib_dir(bdir: Path) -> Optional[str]:
+    lib_dir = bdir / "_ogl_runtime" / "usr/lib/x86_64-linux-gnu"
+    if lib_dir.is_dir() and (
+        (lib_dir / "libOpenGL.so.0").exists() or any(lib_dir.glob("libOpenGL.so*"))
+    ):
+        return str(lib_dir.resolve())
+    return None
+
+
+def _ensure_opengl_runtime_extracted(bdir: Path) -> bool:
+    """Extract libOpenGL and related libs (ODA needs libOpenGL.so.0 on headless Linux)."""
+    marker = bdir / _OGL_RUNTIME_MARKER
+    lib_dir_s = _ogl_runtime_lib_dir(bdir)
+    if marker.is_file() and lib_dir_s:
+        return True
+
+    cache_dir = bdir / "_ogl_debs"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    ogl_root = bdir / "_ogl_runtime"
+    ogl_root.mkdir(parents=True, exist_ok=True)
+
+    for url in _DEBIAN_OGL_DEB_URLS:
+        deb_name = url.rsplit("/", 1)[-1]
+        deb_path = cache_dir / deb_name
+        try:
+            if not deb_path.is_file():
+                logger.info("DWG: downloading OpenGL runtime %s", deb_name)
+                _download_deb(url, deb_path)
+            _extract_deb(deb_path, ogl_root)
+        except Exception as e:
+            logger.warning("DWG: OpenGL deb %s failed: %s", deb_name, e)
+            deb_path.unlink(missing_ok=True)
+
+    lib_dir_s = _ogl_runtime_lib_dir(bdir)
+    if lib_dir_s:
+        marker.write_text(lib_dir_s + "\n", encoding="utf-8")
+        logger.info("DWG: OpenGL runtime ready at %s", lib_dir_s)
+        return True
+    logger.warning("DWG: libOpenGL.so.0 not found after extracting OpenGL debs")
+    return False
+
+
 def _bundle_extra_ld_dirs(bdir: Path) -> list[str]:
     dirs: list[str] = []
-    for name in ("xcb_libs",):
+    for name in ("ogl_libs", "xcb_libs"):
         d = bdir / name
         if d.is_dir():
             dirs.append(str(d.resolve()))
+    ogl_rt = _ogl_runtime_lib_dir(bdir)
+    if ogl_rt:
+        dirs.append(ogl_rt)
     xvfb_lib = bdir / "xvfb" / "usr" / "lib" / "x86_64-linux-gnu"
     if xvfb_lib.is_dir():
         dirs.append(str(xvfb_lib.resolve()))
@@ -415,10 +467,9 @@ def _write_manifest(root: Path, oda_bin: Path) -> None:
             qt_dir,
             off.is_file(),
         )
-        if not off.is_file():
+        if not off.is_file() and not _qt6_runtime_paths(bdir)[0]:
             logger.warning(
-                "DWG: Qt offscreen plugin missing; conversion may use Xvfb+xcb (slower). "
-                "Rebuild with Clear build cache so render_build_native.sh can copy libqoffscreen.so."
+                "DWG: Qt offscreen plugin missing in ODA platforms/; will try Qt6 runtime download at conversion time."
             )
     else:
         logger.warning("ODA bundle: no Qt platforms/ directory found under %s", bdir)
@@ -798,15 +849,21 @@ def apply_oda_runtime_env(run_env: dict[str, str], root: Optional[Path] = None) 
     if ld_extra:
         ld_dirs.extend(p for p in ld_extra.split(os.pathsep) if p)
 
+    _ensure_opengl_runtime_extracted(bdir)
+    ogl_lib = _ogl_runtime_lib_dir(bdir)
+    if ogl_lib and ogl_lib not in ld_dirs:
+        ld_dirs.insert(0, ogl_lib)
+
     _ensure_qt6_runtime_extracted(bdir)
     qt_plat, qt_lib = _qt6_runtime_paths(bdir)
     if qt_plat and qt_lib:
-        ld_dirs.insert(0, qt_lib)
+        if qt_lib not in ld_dirs:
+            ld_dirs.insert(0, qt_lib)
         run_env["QT_PLUGIN_PATH"] = qt_plat
         run_env["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_plat
         run_env["QT_QPA_PLATFORM"] = "offscreen"
-        if ld_dirs:
-            _prepend_ld_path(run_env, list(dict.fromkeys(ld_dirs)))
+        _prepend_ld_path(run_env, list(dict.fromkeys(ld_dirs)))
+        run_env.setdefault("LIBGL_ALWAYS_SOFTWARE", "1")
         run_env.setdefault("QT_LOGGING_RULES", "qt.qpa.plugin=false")
         return
 

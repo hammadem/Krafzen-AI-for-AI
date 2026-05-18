@@ -91,6 +91,20 @@ if [ -n "${DWG_ODA_DEB_URL:-}" ]; then
     fi
     chmod +x "$ODA_BIN" || true
 
+    if command -v apt-get >/dev/null && command -v ldd >/dev/null; then
+        apt-get install -y -qq libgl1 libopengl0 libglvnd0 libglx0 2>/dev/null || true
+        OGL_LIBS="$ODA_BUNDLE/ogl_libs"
+        mkdir -p "$OGL_LIBS"
+        ldd "$ODA_BIN" 2>/dev/null | awk '/=> \// {print $3}' | sort -u | while read -r lib; do
+            [ -f "$lib" ] && cp -n "$lib" "$OGL_LIBS/" 2>/dev/null || cp "$lib" "$OGL_LIBS/"
+        done
+        if [ -f /usr/lib/x86_64-linux-gnu/libOpenGL.so.0 ]; then
+            cp -n /usr/lib/x86_64-linux-gnu/libOpenGL.so.0 "$OGL_LIBS/" 2>/dev/null || \
+                cp /usr/lib/x86_64-linux-gnu/libOpenGL.so.0 "$OGL_LIBS/"
+        fi
+        echo "DWG: vendored OpenGL libs into $OGL_LIBS"
+    fi
+
     REL="${ODA_BIN#"$SCRIPT_DIR"/}"
     printf '%s\n' "$REL" > "$ODA_BUNDLE/converter_relpath.txt"
 
