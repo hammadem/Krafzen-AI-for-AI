@@ -185,18 +185,17 @@ async def rebuild_openapi_schema():
 
     def _bootstrap_oda_bundle() -> None:
         try:
-            from app.services.oda_bundle import ensure_oda_bundle
+            from app.services.oda_bundle import warm_dwg_runtime
             from app.services.dwg_converter_service import dwg_converter_service
 
-            if ensure_oda_bundle():
+            warm_dwg_runtime()
+            if dwg_converter_service.is_configured():
                 logger.info("DWG: ODA converter ready after bundle bootstrap")
             else:
                 logger.warning(
-                    "DWG: ODA bundle bootstrap finished but converter not configured "
-                    "(check DWG_ODA_DEB_URL and server logs)"
+                    "DWG: converter not configured after bootstrap "
+                    "(check R2 credentials or DWG_ODA_DEB_URL)"
                 )
-            if not dwg_converter_service.is_configured():
-                logger.warning("DWG: converter still not configured after bundle bootstrap")
         except Exception as oda_err:
             logger.error("DWG: ODA bundle bootstrap failed: %s", oda_err, exc_info=True)
 

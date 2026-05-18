@@ -44,6 +44,8 @@ export interface Message {
     compliance?: CompliancePayload
 }
 
+type DesignDownloadKind = 'dxf' | 'dwg' | null
+
 function ComplianceStrip({ data, projectName }: { data: CompliancePayload; projectName: string }) {
     const band =
         data.status_label === "good"
@@ -133,6 +135,10 @@ export function ChatInterface({
     const [isRecording, setIsRecording] = useState(false)
     const [feedbackPopoverMessageId, setFeedbackPopoverMessageId] = useState<string | null>(null)
     const [feedbackReason, setFeedbackReason] = useState("")
+    const [designDownload, setDesignDownload] = useState<{
+        kind: Exclude<DesignDownloadKind, null>
+        messageId: string
+    } | null>(null)
     const mediaRecorderRef = useRef<MediaRecorder | null>(null)
     const chunksRef = useRef<Blob[]>([])
 
@@ -150,6 +156,10 @@ export function ChatInterface({
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
+
+    const isDesignDownloading = (messageId: string, kind: 'dxf' | 'dwg') =>
+        designDownload?.messageId === messageId && designDownload?.kind === kind
+    const isAnyDesignDownloading = designDownload !== null
 
     // ... (keep handleMicClick and other functions)
 
@@ -373,8 +383,11 @@ export function ChatInterface({
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2 flex-1 sm:flex-none justify-center"
+                                                disabled={isAnyDesignDownloading}
+                                                className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2 flex-1 sm:flex-none justify-center disabled:opacity-50"
                                                 onClick={async () => {
+                                                    if (isAnyDesignDownloading) return;
+                                                    setDesignDownload({ kind: 'dxf', messageId: message.id });
                                                     try {
                                                         const supabase = createClient();
                                                         const { data: { session } } = await supabase.auth.getSession();
@@ -392,25 +405,41 @@ export function ChatInterface({
                                                     } catch (e) {
                                                         console.error("DXF Download error:", e);
                                                         alert("Failed to download DXF. Please try again.");
+                                                    } finally {
+                                                        setDesignDownload(null);
                                                     }
                                                 }}
                                             >
-                                                <FileCode className="w-3 h-3" />
-                                                <span className="hidden sm:inline">Download DXF</span>
+                                                {isDesignDownloading(message.id, 'dxf') ? (
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                    <FileCode className="w-3 h-3" />
+                                                )}
+                                                <span className="hidden sm:inline">
+                                                    {isDesignDownloading(message.id, 'dxf') ? 'Generating DXF…' : 'Download DXF'}
+                                                </span>
                                                 <span className="sm:hidden">DXF</span>
                                             </Button>
 
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2 flex-1 sm:flex-none justify-center"
+                                                disabled={isAnyDesignDownloading}
+                                                className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2 flex-1 sm:flex-none justify-center disabled:opacity-50"
                                                 onClick={async () => {
+                                                    if (isAnyDesignDownloading) return;
+                                                    setDesignDownload({ kind: 'dwg', messageId: message.id });
                                                     try {
                                                         const supabase = createClient();
                                                         const { data: { session } } = await supabase.auth.getSession();
                                                         const token = session?.access_token;
 
-                                                        const blob = await downloadDesignFile(message.imageUrl!, 'dwg', message.content, token);
+                                                        const blob = await downloadDesignFile(
+                                                            message.imageUrl!,
+                                                            'dwg',
+                                                            message.content,
+                                                            token
+                                                        );
                                                         const url = window.URL.createObjectURL(blob);
                                                         const link = document.createElement('a');
                                                         link.href = url;
@@ -426,12 +455,24 @@ export function ChatInterface({
                                                                 ? e.message
                                                                 : "Failed to download DWG.";
                                                         alert(detail);
+                                                    } finally {
+                                                        setDesignDownload(null);
                                                     }
                                                 }}
                                             >
-                                                <FileCode className="w-3 h-3" />
-                                                <span className="hidden sm:inline">Download DWG</span>
-                                                <span className="sm:hidden">DWG</span>
+                                                {isDesignDownloading(message.id, 'dwg') ? (
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : (
+                                                    <FileCode className="w-3 h-3" />
+                                                )}
+                                                <span className="hidden sm:inline">
+                                                    {isDesignDownloading(message.id, 'dwg')
+                                                        ? 'Generating DWG… (1–2 min)'
+                                                        : 'Download DWG'}
+                                                </span>
+                                                <span className="sm:hidden">
+                                                    {isDesignDownloading(message.id, 'dwg') ? '…' : 'DWG'}
+                                                </span>
                                             </Button>
 
                                             <Button

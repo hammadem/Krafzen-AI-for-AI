@@ -953,3 +953,16 @@ def resolve_bundled_oda() -> Tuple[Optional[str], Optional[str]]:
     _repair_bundle_manifest(root)
     exe, ld, _qt = _read_bundle(root)
     return exe, ld
+
+
+def warm_dwg_runtime() -> None:
+    """Pre-load ODA bundle, OpenGL, and Qt/Xvfb deps so first DWG click is faster."""
+    root = backend_root()
+    bdir = bundle_dir(root)
+    if ensure_oda_bundle():
+        _repair_bundle_manifest(root)
+        _ensure_opengl_runtime_extracted(bdir)
+        ensure_headless_qt_plugins(root)
+        logger.info("DWG: runtime warm-up complete (ODA + OpenGL + Qt platforms)")
+    else:
+        logger.warning("DWG: runtime warm-up skipped (ODA bundle not configured)")

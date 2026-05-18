@@ -22,6 +22,9 @@ from app.middlewares.auth import require_auth
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# One DWG conversion at a time per worker (ODA+Xvfb is heavy; parallel runs cause timeouts).
+_dwg_convert_lock = asyncio.Lock()
+
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
@@ -146,7 +149,10 @@ async def generate_design_file(
         from app.services.dwg_converter_service import dwg_converter_service
 
         try:
-            convert_result = dwg_converter_service.convert_dxf_path_to_dwg(dxf_path)
+            async with _dwg_convert_lock:
+                convert_result = await asyncio.to_thread(
+                    dwg_converter_service.convert_dxf_path_to_dwg, dxf_path
+                )
         except RuntimeError as e:
             background.add_task(_safe_unlink, dxf_path)
             raise HTTPException(status_code=503, detail=str(e))

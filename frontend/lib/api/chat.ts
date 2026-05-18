@@ -218,11 +218,15 @@ export const downloadDxf = async (imageUrl: string, prompt?: string, token?: str
     }
 };
 
+/** DWG via ODA+Xvfb can take 1–3 minutes on cold start; avoid short client/proxy timeouts. */
+const DESIGN_FILE_FETCH_MS = 5 * 60 * 1000;
+
 export const downloadDesignFile = async (
     imageUrl: string,
     fileType: 'dxf' | 'dwg',
     prompt?: string,
-    token?: string
+    token?: string,
+    signal?: AbortSignal
 ) => {
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -231,11 +235,39 @@ export const downloadDesignFile = async (
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/design-file`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ image_url: imageUrl, prompt, file_type: fileType }),
-    });
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), DESIGN_FILE_FETCH_MS);
+    const onExternalAbort = () => timeoutController.abort();
+    signal?.addEventListener('abort', onExternalAbort);
+
+    let response: Response;
+    try {
+        response = await fetch(`${getApiBaseUrl()}/api/v1/chat/design-file`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ image_url: imageUrl, prompt, file_type: fileType }),
+            signal: timeoutController.signal,
+        });
+    } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+            if (signal?.aborted) {
+                throw new Error('Download cancelled.');
+            }
+            throw new Error(
+                `Generating ${fileType.toUpperCase()} took too long. Please wait a minute and try once — do not click repeatedly.`
+            );
+        }
+        if (err instanceof TypeError) {
+            throw new Error(
+                `Could not reach the server while generating ${fileType.toUpperCase()}. ` +
+                    'Wait for the current attempt to finish (can take 1–2 minutes) and try once.'
+            );
+        }
+        throw err;
+    } finally {
+        clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', onExternalAbort);
+    }
 
     if (!response.ok) {
         const text = await response.text();
