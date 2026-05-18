@@ -1,10 +1,12 @@
 services:
-  # Production API
+  # Production API (Docker — ODA via apt/dpkg + Qt headless, same as local Docker)
   - type: web
     name: krafzen-api-prod
-    env: python
-    buildCommand: bash render_build_native.sh
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /health
     envVars:
       - key: OPENAI_API_KEY
         sync: false
@@ -28,22 +30,32 @@ services:
         sync: false
       - key: SECRET_KEY
         sync: false
-      # DWG: set DWG_ODA_DEB_URL (secret) to HTTPS URL of ODA Linux x64 .deb so render_build_native.sh installs ODA at build time
+      # ODA at Docker build time (Render passes these to docker build):
       - key: DWG_ODA_DEB_URL
         sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_ENDPOINT_URL
+        sync: false
+      - key: R2_ODA_BUCKET
+        sync: false
+      - key: R2_ODA_OBJECT_KEY
+        sync: false
       - key: DWG_CONVERTER_CMD
-        sync: false
+        value: ODAFileConverter
       - key: DWG_CONVERTER_TYPE
-        sync: false
-    healthCheckPath: /health
-    plan: starter  # Free tier for MVP
+        value: ODA
 
   # Staging API
   - type: web
     name: krafzen-api-staging
-    env: python
-    buildCommand: bash render_build_native.sh
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /health
     envVars:
       - key: OPENAI_API_KEY
         sync: false
@@ -69,9 +81,17 @@ services:
         sync: false
       - key: DWG_ODA_DEB_URL
         sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_ENDPOINT_URL
+        sync: false
+      - key: R2_ODA_BUCKET
+        sync: false
+      - key: R2_ODA_OBJECT_KEY
+        sync: false
       - key: DWG_CONVERTER_CMD
-        sync: false
+        value: ODAFileConverter
       - key: DWG_CONVERTER_TYPE
-        sync: false
-    healthCheckPath: /health
-    plan: starter  # Free tier for MVP
+        value: ODA

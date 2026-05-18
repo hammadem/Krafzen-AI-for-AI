@@ -26,9 +26,11 @@ Runtime env (defaults are set in the Dockerfile when ODA is installed):
 
 ## Render (staging / production)
 
+**Use Docker runtime** (`runtime: docker` in `render.yaml`, `rootDir: backend`). The Dockerfile installs ODA with `dpkg` and system Qt plugins (same reliability as Potrace in Docker).
+
 1. Download the **Linux x86_64** `.deb` from ODA (same page as above).
 2. Upload the file to a **private** HTTPS location (e.g. Cloudflare R2 bucket).
-3. **Recommended (Render):** add R2 API env vars on the API service (no presigned URL):
+3. **Recommended (Render):** add R2 API env vars on the API service (available at **Docker build** time):
 
 | Variable | Example |
 |----------|---------|

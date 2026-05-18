@@ -10,9 +10,11 @@ from typing import Optional, Tuple
 
 from app.core.config import settings
 from app.services.oda_bundle import (
+    apply_system_oda_runtime_env,
     backend_root,
     get_last_oda_error,
     resolve_bundled_oda,
+    resolve_system_oda,
     run_oda_subprocess,
 )
 import ezdxf
@@ -53,6 +55,10 @@ class DwgConverterService:
                 resolved = shutil.which(raw)
                 if resolved:
                     return resolved, None
+
+        system_bin, system_ld = resolve_system_oda()
+        if system_bin:
+            return system_bin, system_ld
 
         bundle_bin, bundle_ld = resolve_bundled_oda()
         if bundle_bin:
@@ -123,9 +129,14 @@ class DwgConverterService:
         ]
 
         run_env = os.environ.copy()
-
-        logger.info("Converting DXF → DWG via ODA", extra={"cmd": " ".join(cmd)})
-        result = run_oda_subprocess(cmd, run_env, backend_root())
+        system_oda, _ = resolve_system_oda()
+        if system_oda and converter_cmd == system_oda:
+            apply_system_oda_runtime_env(run_env)
+            logger.info("Converting DXF → DWG via system ODA (Docker)", extra={"cmd": " ".join(cmd)})
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=run_env)
+        else:
+            logger.info("Converting DXF → DWG via ODA bundle", extra={"cmd": " ".join(cmd)})
+            result = run_oda_subprocess(cmd, run_env, backend_root())
         if result.returncode != 0:
             raise RuntimeError(
                 "DWG conversion failed. "

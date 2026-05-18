@@ -21,7 +21,27 @@ _symlink_libxcb_util() {
 _install_prereqs() {
   export DEBIAN_FRONTEND=noninteractive
   apt-get update
-  apt-get install -y --no-install-recommends ca-certificates wget libxcb-util1
+  apt-get install -y --no-install-recommends \
+    ca-certificates wget \
+    libxcb-util1 libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+    libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxkbcommon-x11-0 \
+    libqt6gui6
+}
+
+_install_qt_headless_into_oda() {
+  local sys_platforms="/usr/lib/x86_64-linux-gnu/qt6/plugins/platforms"
+  local oda_platforms
+  oda_platforms="$(find /usr -path '*/ODAFileConverter_*/plugins/platforms' -type d 2>/dev/null | head -1 || true)"
+  if [[ -z "$oda_platforms" || ! -d "$sys_platforms" ]]; then
+    return 0
+  fi
+  local p
+  for p in libqoffscreen.so libqminimal.so; do
+    if [[ -f "$sys_platforms/$p" && ! -f "$oda_platforms/$p" ]]; then
+      cp "$sys_platforms/$p" "$oda_platforms/"
+      echo "ODA: copied $p into $oda_platforms"
+    fi
+  done
 }
 
 _from_file() {
@@ -33,6 +53,7 @@ _from_file() {
   _install_prereqs
   dpkg -i "$deb" || apt-get install -yf
   _symlink_libxcb_util
+  _install_qt_headless_into_oda
   command -v ODAFileConverter >/dev/null 2>&1 || {
     echo "ERROR: ODAFileConverter not on PATH after install." >&2
     exit 1
@@ -52,6 +73,7 @@ _from_url() {
   dpkg -i "$deb" || apt-get install -yf
   rm -f "$deb"
   _symlink_libxcb_util
+  _install_qt_headless_into_oda
   command -v ODAFileConverter >/dev/null 2>&1 || {
     echo "ERROR: ODAFileConverter not on PATH after install." >&2
     exit 1
