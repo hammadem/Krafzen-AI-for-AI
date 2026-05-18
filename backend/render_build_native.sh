@@ -109,9 +109,18 @@ if [ -n "${DWG_ODA_DEB_URL:-}" ]; then
     PLATFORMS_DIR="$(find "$ODA_BUNDLE" -type d -name platforms 2>/dev/null | head -1 || true)"
     if [ -n "$PLATFORMS_DIR" ]; then
         printf '%s\n' "$PLATFORMS_DIR" > "$ODA_BUNDLE/qt_plugin_path.txt"
+        VENDOR_QT="$SCRIPT_DIR/vendor/qt6_headless/linux_amd64"
+        if [ -d "$VENDOR_QT" ]; then
+            for plugin in libqoffscreen.so libqminimal.so; do
+                if [ -f "$VENDOR_QT/$plugin" ] && [ ! -f "$PLATFORMS_DIR/$plugin" ]; then
+                    cp "$VENDOR_QT/$plugin" "$PLATFORMS_DIR/"
+                    echo "DWG: copied vendored $plugin into $PLATFORMS_DIR"
+                fi
+            done
+        fi
         if command -v apt-get >/dev/null; then
-            apt-get install -y -qq libqt6gui6 libqt6gui6t64 qt6-qpa-plugins 2>/dev/null \
-                || apt-get install -y -qq libqt5gui5 qt5-qpa-plugins 2>/dev/null || true
+            apt-get install -y -qq libqt6gui6 libqt6gui6t64 2>/dev/null \
+                || apt-get install -y -qq libqt5gui5 2>/dev/null || true
             for QT_SYS in \
                 /usr/lib/x86_64-linux-gnu/qt6/plugins/platforms \
                 /usr/lib/x86_64-linux-gnu/qt5/plugins/platforms; do

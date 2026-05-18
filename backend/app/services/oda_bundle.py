@@ -62,16 +62,14 @@ _QT_HEADLESS_SYSTEM_DIRS = (
     Path("/usr/lib/x86_64-linux-gnu/qt6/plugins/platforms"),
     Path("/usr/lib/x86_64-linux-gnu/qt5/plugins/platforms"),
 )
-# Debian bookworm amd64 fallbacks (runtime download when build did not vendor plugins)
-_DEBIAN_QT6_QPA_PLUGINS_DEB_URLS = (
-    "https://deb.debian.org/debian/pool/main/q/qt6-qpa-plugins/qt6-qpa-plugins_6.4.2+dfsg-10_amd64.deb",
-    "https://deb.debian.org/debian/pool/main/q/qt6-qpa-plugins/qt6-qpa-plugins_6.4.2+dfsg-9_amd64.deb",
+# libqoffscreen.so / libqminimal.so ship in libqt6gui6 (not qt6-qpa-plugins). Bookworm amd64.
+_DEBIAN_LIBQT6GUI6_DEB_URLS = (
+    "https://deb.debian.org/debian/pool/main/q/qt6-base/libqt6gui6_6.4.2+dfsg-10_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/q/qt6-base/libqt6gui6_6.4.2+dfsg-9_amd64.deb",
 )
 _DEBIAN_XVFB_RUNTIME_DEB_URLS = (
-    "https://deb.debian.org/debian/pool/main/x/xorg-server/xvfb_21.1.7-3+deb12u11_amd64.deb",
-    "https://deb.debian.org/debian/pool/main/x/xorg-server/xorg-server-common_21.1.7-3+deb12u11_amd64.deb",
-    "https://deb.debian.org/debian/pool/main/x/xorg-server/xvfb_21.1.7-3+deb12u10_amd64.deb",
-    "https://deb.debian.org/debian/pool/main/x/xorg-server/xorg-server-common_21.1.7-3+deb12u10_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/x/xorg-server/xvfb_21.1.7-3+deb12u12_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/x/xorg-server/xorg-server-common_21.1.7-3+deb12u12_amd64.deb",
 )
 
 
@@ -107,8 +105,36 @@ def _find_file_in_tree(root: Path, filename: str) -> Optional[Path]:
     return None
 
 
+def _vendored_qt_headless_dir() -> Path:
+    return backend_root() / "vendor" / "qt6_headless" / "linux_amd64"
+
+
+def _install_vendored_qt_headless_plugins(bdir: Path) -> bool:
+    """Copy Qt headless platform plugins shipped in the repo (works on Render without apt)."""
+    qt_dir_s = _find_qt_platforms_dir(bdir)
+    if not qt_dir_s:
+        return False
+    qt_dir = Path(qt_dir_s)
+    if _has_headless_qt_plugin(qt_dir):
+        return True
+    vendor = _vendored_qt_headless_dir()
+    if not vendor.is_dir():
+        return False
+    installed = False
+    for name in _QT_HEADLESS_PLUGIN_NAMES:
+        src = vendor / name
+        dest = qt_dir / name
+        if src.is_file() and not dest.is_file():
+            shutil.copy2(src, dest)
+            logger.info("DWG: installed %s from vendored %s", name, src)
+            installed = True
+    return installed and _has_headless_qt_plugin(qt_dir)
+
+
 def _bootstrap_qt_headless_plugins(bdir: Path) -> bool:
     """Copy offscreen/minimal Qt plugins from the build image into ODA's platforms/ dir."""
+    if _install_vendored_qt_headless_plugins(bdir):
+        return True
     qt_dir_s = _find_qt_platforms_dir(bdir)
     if not qt_dir_s:
         return False
@@ -151,7 +177,9 @@ def _bootstrap_qt_headless_plugins(bdir: Path) -> bool:
 
 
 def _ensure_headless_qt_plugins_from_deb(bdir: Path) -> bool:
-    """Download qt6-qpa-plugins .deb on Render runtime when offscreen/minimal are missing."""
+    """Download libqt6gui6 .deb on Render runtime when offscreen/minimal are missing."""
+    if _install_vendored_qt_headless_plugins(bdir):
+        return True
     qt_dir_s = _find_qt_platforms_dir(bdir)
     if not qt_dir_s:
         return False
@@ -163,7 +191,7 @@ def _ensure_headless_qt_plugins_from_deb(bdir: Path) -> bool:
     extract_root = bdir / "_qt_plugins_extract"
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    for url in _DEBIAN_QT6_QPA_PLUGINS_DEB_URLS:
+    for url in _DEBIAN_LIBQT6GUI6_DEB_URLS:
         deb_name = url.rsplit("/", 1)[-1]
         deb_path = cache_dir / deb_name
         try:
@@ -721,9 +749,11 @@ def run_oda_subprocess(
 
     xvfb = _find_xvfb_binary(root)
     if not xvfb:
+        qt_plugins = _find_qt_platforms_dir(bdir) or ""
+        plugins_list = [p.name for p in Path(qt_plugins).glob("libq*.so")] if qt_plugins else []
         raise RuntimeError(
-            "DWG: only xcb Qt plugin is available but Xvfb could not be installed. "
-            "Redeploy with Clear build cache or check Render logs for Qt plugin download errors."
+            "DWG: only xcb Qt plugin is available; headless plugins and Xvfb are missing. "
+            f"platforms={qt_plugins} plugins={plugins_list}. Redeploy latest main."
         )
 
     display = ":99"
