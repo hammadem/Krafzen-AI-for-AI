@@ -29,6 +29,7 @@ _BUNDLE_DIR_NAME = ".oda_bundle"
 _MANIFEST = "converter_relpath.txt"
 _LD_PATH_FILE = "ld_library_path.txt"
 _QT_PLUGIN_PATH_FILE = "qt_plugin_path.txt"
+_QT6_RUNTIME_MARKER = ".qt6_runtime_ready"
 # Cloudflare R2 presigned URLs: max expiry is 7 days (604800 seconds), not 30 days.
 _R2_PRESIGN_MAX_SECONDS = 604_800
 _last_oda_error: Optional[str] = None
@@ -109,6 +110,56 @@ def _vendored_qt_headless_dir() -> Path:
     return backend_root() / "vendor" / "qt6_headless" / "linux_amd64"
 
 
+def _qt6_runtime_root(bdir: Path) -> Path:
+    return bdir / "_qt6_runtime"
+
+
+def _qt6_runtime_paths(bdir: Path) -> Tuple[Optional[str], Optional[str]]:
+    """(platforms_dir, lib_dir) from extracted libqt6gui6 .deb."""
+    base = _qt6_runtime_root(bdir)
+    platforms = base / "usr/lib/x86_64-linux-gnu/qt6/plugins/platforms"
+    lib_dir = base / "usr/lib/x86_64-linux-gnu"
+    if platforms.is_dir() and (platforms / "libqoffscreen.so").is_file() and lib_dir.is_dir():
+        return str(platforms.resolve()), str(lib_dir.resolve())
+    return None, None
+
+
+def _ensure_qt6_runtime_extracted(bdir: Path) -> bool:
+    """
+    Extract Debian libqt6gui6 (full Qt6 GUI libs + platform plugins) beside .oda_bundle.
+    Using only libqoffscreen.so copied into ODA's folder often fails to load (missing libQt6Gui).
+    """
+    marker = bdir / _QT6_RUNTIME_MARKER
+    platforms, lib_dir = _qt6_runtime_paths(bdir)
+    if marker.is_file() and platforms:
+        return True
+
+    cache_dir = bdir / "_qt_debs"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    runtime = _qt6_runtime_root(bdir)
+
+    for url in _DEBIAN_LIBQT6GUI6_DEB_URLS:
+        deb_name = url.rsplit("/", 1)[-1]
+        deb_path = cache_dir / deb_name
+        try:
+            if not deb_path.is_file():
+                logger.info("DWG: downloading Qt6 runtime %s (~3MB)", deb_name)
+                _download_deb(url, deb_path)
+            if runtime.exists():
+                shutil.rmtree(runtime)
+            runtime.mkdir(parents=True)
+            _extract_deb(deb_path, runtime)
+            platforms, lib_dir = _qt6_runtime_paths(bdir)
+            if platforms and lib_dir:
+                marker.write_text(f"{platforms}\n", encoding="utf-8")
+                logger.info("DWG: Qt6 runtime ready platforms=%s lib=%s", platforms, lib_dir)
+                return True
+        except Exception as e:
+            logger.warning("DWG: Qt6 runtime deb %s failed: %s", deb_name, e)
+            deb_path.unlink(missing_ok=True)
+    return False
+
+
 def _oda_platforms_dir(root: Path) -> Optional[Path]:
     """
     Qt platforms/ folder ODA actually uses (next to ODAFileConverter_* ELF).
@@ -159,12 +210,27 @@ def ensure_headless_qt_plugins(root: Optional[Path] = None) -> bool:
     """Install offscreen/minimal plugins into ODA's platforms/ and update qt_plugin_path.txt."""
     root = root or backend_root()
     bdir = bundle_dir(root)
+
+    if _ensure_qt6_runtime_extracted(bdir):
+        plat, _ = _qt6_runtime_paths(bdir)
+        if plat:
+            (bdir / _QT_PLUGIN_PATH_FILE).write_text(plat + "\n", encoding="utf-8")
+            logger.info("DWG: using Qt6 runtime from libqt6gui6 deb at %s", plat)
+            return True
+
     platforms = _oda_platforms_dir(root)
     if not platforms:
         logger.warning("DWG: ODA platforms/ directory not found under %s", bdir)
         return False
 
     ok = _install_vendored_qt_headless_plugins(platforms)
+    if not ok:
+        for name in _QT_HEADLESS_PLUGIN_NAMES:
+            found = next(bdir.rglob(name), None)
+            if found and found.is_file():
+                shutil.copy2(found, platforms / name)
+                logger.info("DWG: installed %s from ODA bundle at %s", name, found)
+                ok = True
     if not ok:
         ok = _ensure_headless_qt_plugins_from_deb(bdir, platforms)
     if not ok:
@@ -727,12 +793,26 @@ def apply_oda_runtime_env(run_env: dict[str, str], root: Optional[Path] = None) 
 
     root = root or backend_root()
     bdir = bundle_dir(root)
-    _, ld_extra, qt_plugins = _read_bundle(root)
+    _, ld_extra, _qt_plugins = _read_bundle(root)
     ld_dirs = _bundle_extra_ld_dirs(bdir)
     if ld_extra:
         ld_dirs.extend(p for p in ld_extra.split(os.pathsep) if p)
+
+    _ensure_qt6_runtime_extracted(bdir)
+    qt_plat, qt_lib = _qt6_runtime_paths(bdir)
+    if qt_plat and qt_lib:
+        ld_dirs.insert(0, qt_lib)
+        run_env["QT_PLUGIN_PATH"] = qt_plat
+        run_env["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_plat
+        run_env["QT_QPA_PLATFORM"] = "offscreen"
+        if ld_dirs:
+            _prepend_ld_path(run_env, list(dict.fromkeys(ld_dirs)))
+        run_env.setdefault("QT_LOGGING_RULES", "qt.qpa.plugin=false")
+        return
+
     if ld_dirs:
         _prepend_ld_path(run_env, list(dict.fromkeys(ld_dirs)))
+    qt_plugins = _qt_plugins or _find_qt_platforms_dir(bdir)
     if qt_plugins:
         run_env["QT_PLUGIN_PATH"] = qt_plugins
         run_env["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_plugins
@@ -742,7 +822,6 @@ def apply_oda_runtime_env(run_env: dict[str, str], root: Optional[Path] = None) 
         elif (p / "libqminimal.so").exists():
             run_env["QT_QPA_PLATFORM"] = "minimal"
         elif (p / "libqxcb.so").exists():
-            # xcb needs a display; use xvfb-run if bundled or on PATH
             run_env["QT_QPA_PLATFORM"] = "xcb"
     elif sys.platform.startswith("linux"):
         run_env.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -751,7 +830,11 @@ def apply_oda_runtime_env(run_env: dict[str, str], root: Optional[Path] = None) 
 
 def _needs_virtual_display(root: Path) -> bool:
     """True when ODA only has the xcb Qt plugin (needs an X display)."""
-    _, _, qt_plugins = _read_bundle(root)
+    bdir = bundle_dir(root)
+    qt_plat, _ = _qt6_runtime_paths(bdir)
+    if qt_plat:
+        return False
+    qt_plugins = _find_qt_platforms_dir(bdir)
     if not qt_plugins:
         return False
     p = Path(qt_plugins)
