@@ -109,37 +109,81 @@ def _vendored_qt_headless_dir() -> Path:
     return backend_root() / "vendor" / "qt6_headless" / "linux_amd64"
 
 
-def _install_vendored_qt_headless_plugins(bdir: Path) -> bool:
+def _oda_platforms_dir(root: Path) -> Optional[Path]:
+    """
+    Qt platforms/ folder ODA actually uses (next to ODAFileConverter_* ELF).
+    Must match: .oda_bundle/usr/bin/ODAFileConverter_27.1.0.0/plugins/platforms
+    """
+    bdir = bundle_dir(root)
+    rel_file = bdir / _MANIFEST
+    if rel_file.is_file():
+        rel = rel_file.read_text(encoding="utf-8").strip()
+        if rel:
+            exe = (root / rel).resolve()
+            if exe.is_file():
+                p = exe.parent / "plugins" / "platforms"
+                if p.is_dir():
+                    return p
+    for platforms in bdir.rglob("platforms"):
+        if platforms.is_dir() and "ODAFileConverter" in str(platforms) and (
+            platforms / "libqxcb.so"
+        ).is_file():
+            return platforms.resolve()
+    return None
+
+
+def _install_vendored_qt_headless_plugins(platforms_dir: Path) -> bool:
     """Copy Qt headless platform plugins shipped in the repo (works on Render without apt)."""
-    qt_dir_s = _find_qt_platforms_dir(bdir)
-    if not qt_dir_s:
-        return False
-    qt_dir = Path(qt_dir_s)
-    if _has_headless_qt_plugin(qt_dir):
+    if _has_headless_qt_plugin(platforms_dir):
         return True
     vendor = _vendored_qt_headless_dir()
     if not vendor.is_dir():
+        logger.warning(
+            "DWG: vendored Qt plugins missing at %s (not deployed? check git includes vendor/*.so)",
+            vendor,
+        )
         return False
     installed = False
     for name in _QT_HEADLESS_PLUGIN_NAMES:
         src = vendor / name
-        dest = qt_dir / name
-        if src.is_file() and not dest.is_file():
+        dest = platforms_dir / name
+        if src.is_file():
             shutil.copy2(src, dest)
-            logger.info("DWG: installed %s from vendored %s", name, src)
+            dest.chmod(dest.stat().st_mode | 0o755)
+            logger.info("DWG: installed %s into %s (from %s)", name, platforms_dir, src)
             installed = True
-    return installed and _has_headless_qt_plugin(qt_dir)
+    return installed and _has_headless_qt_plugin(platforms_dir)
 
 
-def _bootstrap_qt_headless_plugins(bdir: Path) -> bool:
-    """Copy offscreen/minimal Qt plugins from the build image into ODA's platforms/ dir."""
-    if _install_vendored_qt_headless_plugins(bdir):
-        return True
-    qt_dir_s = _find_qt_platforms_dir(bdir)
-    if not qt_dir_s:
+def ensure_headless_qt_plugins(root: Optional[Path] = None) -> bool:
+    """Install offscreen/minimal plugins into ODA's platforms/ and update qt_plugin_path.txt."""
+    root = root or backend_root()
+    bdir = bundle_dir(root)
+    platforms = _oda_platforms_dir(root)
+    if not platforms:
+        logger.warning("DWG: ODA platforms/ directory not found under %s", bdir)
         return False
-    qt_dir = Path(qt_dir_s)
-    if _has_headless_qt_plugin(qt_dir):
+
+    ok = _install_vendored_qt_headless_plugins(platforms)
+    if not ok:
+        ok = _ensure_headless_qt_plugins_from_deb(bdir, platforms)
+    if not ok:
+        ok = _bootstrap_qt_headless_plugins_legacy(bdir, platforms)
+
+    (bdir / _QT_PLUGIN_PATH_FILE).write_text(str(platforms.resolve()) + "\n", encoding="utf-8")
+    plugins = sorted(p.name for p in platforms.glob("libq*.so"))
+    logger.info(
+        "DWG: ODA platforms=%s plugins=%s offscreen=%s",
+        platforms,
+        plugins,
+        (platforms / "libqoffscreen.so").is_file(),
+    )
+    return _has_headless_qt_plugin(platforms)
+
+
+def _bootstrap_qt_headless_plugins_legacy(bdir: Path, platforms: Path) -> bool:
+    """Fallback: copy from build image /usr/lib when vendored + deb download failed."""
+    if _has_headless_qt_plugin(platforms):
         return True
     installed = False
     for sys_dir in _QT_HEADLESS_SYSTEM_DIRS:
@@ -147,13 +191,12 @@ def _bootstrap_qt_headless_plugins(bdir: Path) -> bool:
             continue
         for name in _QT_HEADLESS_PLUGIN_NAMES:
             src = sys_dir / name
-            dest = qt_dir / name
-            if src.is_file() and not dest.is_file():
-                shutil.copy2(src, dest)
+            if src.is_file():
+                shutil.copy2(src, platforms / name)
                 logger.info("DWG: installed %s from %s", name, src)
                 installed = True
-    if installed and _has_headless_qt_plugin(qt_dir):
-        return True
+    if installed:
+        return _has_headless_qt_plugin(platforms)
     try:
         proc = subprocess.run(
             ["find", "/usr/lib", "-name", "libqoffscreen.so", "-o", "-name", "libqminimal.so"],
@@ -164,27 +207,23 @@ def _bootstrap_qt_headless_plugins(bdir: Path) -> bool:
         )
         for line in proc.stdout.splitlines():
             src = Path(line.strip())
-            if not src.is_file():
-                continue
-            dest = qt_dir / src.name
-            if not dest.is_file():
-                shutil.copy2(src, dest)
+            if src.is_file():
+                shutil.copy2(src, platforms / src.name)
                 logger.info("DWG: installed %s from %s", src.name, src)
                 installed = True
     except (OSError, subprocess.SubprocessError) as e:
         logger.debug("DWG: system search for Qt headless plugins failed: %s", e)
-    return _has_headless_qt_plugin(qt_dir)
+    return _has_headless_qt_plugin(platforms)
 
 
-def _ensure_headless_qt_plugins_from_deb(bdir: Path) -> bool:
+def _bootstrap_qt_headless_plugins(bdir: Path) -> bool:
+    """Copy offscreen/minimal Qt plugins into ODA's platforms/ dir."""
+    return ensure_headless_qt_plugins(backend_root())
+
+
+def _ensure_headless_qt_plugins_from_deb(bdir: Path, platforms: Path) -> bool:
     """Download libqt6gui6 .deb on Render runtime when offscreen/minimal are missing."""
-    if _install_vendored_qt_headless_plugins(bdir):
-        return True
-    qt_dir_s = _find_qt_platforms_dir(bdir)
-    if not qt_dir_s:
-        return False
-    qt_dir = Path(qt_dir_s)
-    if _has_headless_qt_plugin(qt_dir):
+    if _has_headless_qt_plugin(platforms):
         return True
 
     cache_dir = bdir / "_qt_debs"
@@ -205,16 +244,15 @@ def _ensure_headless_qt_plugins_from_deb(bdir: Path) -> bool:
             for name in _QT_HEADLESS_PLUGIN_NAMES:
                 src = _find_file_in_tree(extract_root, name)
                 if src and src.is_file():
-                    shutil.copy2(src, qt_dir / name)
+                    shutil.copy2(src, platforms / name)
                     logger.info("DWG: installed %s from %s", name, deb_name)
-            if _has_headless_qt_plugin(qt_dir):
-                (bdir / _QT_PLUGIN_PATH_FILE).write_text(str(qt_dir.resolve()) + "\n", encoding="utf-8")
+            if _has_headless_qt_plugin(platforms):
                 shutil.rmtree(extract_root, ignore_errors=True)
                 return True
         except Exception as e:
             logger.warning("DWG: Qt plugins deb %s failed: %s", deb_name, e)
             deb_path.unlink(missing_ok=True)
-    return _has_headless_qt_plugin(qt_dir)
+    return _has_headless_qt_plugin(platforms)
 
 
 def _ensure_xvfb_bundle(bdir: Path) -> Optional[str]:
@@ -249,6 +287,10 @@ def _ensure_xvfb_bundle(bdir: Path) -> Optional[str]:
 
 def _find_qt_platforms_dir(bdir: Path) -> Optional[str]:
     """Directory containing libq*.so platform plugins (e.g. .../plugins/platforms)."""
+    root = backend_root()
+    oda_plat = _oda_platforms_dir(root)
+    if oda_plat:
+        return str(oda_plat)
     saved = bdir / _QT_PLUGIN_PATH_FILE
     if saved.is_file():
         p = saved.read_text(encoding="utf-8").strip()
@@ -295,8 +337,7 @@ def _write_manifest(root: Path, oda_bin: Path) -> None:
             lib_dirs.append(str(so.parent.resolve()))
     ld_extra = ":".join(dict.fromkeys(lib_dirs))
     (bdir / _LD_PATH_FILE).write_text(ld_extra + "\n", encoding="utf-8")
-    _bootstrap_qt_headless_plugins(bdir)
-    _ensure_headless_qt_plugins_from_deb(bdir)
+    ensure_headless_qt_plugins(root)
     qt_dir = _find_qt_platforms_dir(bdir)
     if qt_dir:
         (bdir / _QT_PLUGIN_PATH_FILE).write_text(qt_dir + "\n", encoding="utf-8")
@@ -594,8 +635,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
     if not force:
         exe, _, _ = _read_bundle(root)
         if exe:
-            _bootstrap_qt_headless_plugins(bundle_dir(root))
-            _ensure_headless_qt_plugins_from_deb(bundle_dir(root))
+            ensure_headless_qt_plugins(root)
             return True
 
     r2 = _r2_download_config()
@@ -621,8 +661,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         if not force:
             exe, _, _ = _read_bundle(root)
             if exe:
-                _bootstrap_qt_headless_plugins(bdir)
-                _ensure_headless_qt_plugins_from_deb(bdir)
+                ensure_headless_qt_plugins(root)
                 return True
 
         logger.info("Fetching ODA .deb into %s ...", bdir)
@@ -738,8 +777,14 @@ def run_oda_subprocess(
 
     root = root or backend_root()
     bdir = bundle_dir(root)
-    _bootstrap_qt_headless_plugins(bdir)
-    _ensure_headless_qt_plugins_from_deb(bdir)
+    if not ensure_headless_qt_plugins(root):
+        platforms = _oda_platforms_dir(root)
+        vendor = _vendored_qt_headless_dir()
+        raise RuntimeError(
+            "DWG: Qt headless plugins could not be installed. "
+            f"platforms={platforms} vendor_dir={vendor} vendor_exists={vendor.is_dir()}. "
+            "Deploy latest main and ensure backend/vendor/qt6_headless/*.so are in the build."
+        )
     apply_oda_runtime_env(env, root)
 
     if not _needs_virtual_display(root):

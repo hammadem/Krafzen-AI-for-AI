@@ -189,6 +189,9 @@ async def rebuild_openapi_schema():
             from app.services.dwg_converter_service import dwg_converter_service
 
             if ensure_oda_bundle():
+                from app.services.oda_bundle import ensure_headless_qt_plugins
+
+                ensure_headless_qt_plugins()
                 logger.info("DWG: ODA converter ready after bundle bootstrap")
             else:
                 logger.warning(
