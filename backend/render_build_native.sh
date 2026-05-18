@@ -110,28 +110,46 @@ if [ -n "${DWG_ODA_DEB_URL:-}" ]; then
     if [ -n "$PLATFORMS_DIR" ]; then
         printf '%s\n' "$PLATFORMS_DIR" > "$ODA_BUNDLE/qt_plugin_path.txt"
         if [ ! -f "$PLATFORMS_DIR/libqoffscreen.so" ] && command -v apt-get >/dev/null; then
-            apt-get install -y -qq libqt6gui6 2>/dev/null || apt-get install -y -qq libqt6gui6t64 2>/dev/null || apt-get install -y -qq libqt5gui5 || true
-            OFFSCREEN="$(find /usr/lib -name 'libqoffscreen.so' 2>/dev/null | head -1 || true)"
+            apt-get install -y -qq libqt6gui6 libqt6gui6t64 qt6-qpa-plugins 2>/dev/null \
+                || apt-get install -y -qq libqt5gui5 qt5-qpa-plugins 2>/dev/null || true
+            OFFSCREEN=""
+            for path in \
+                /usr/lib/x86_64-linux-gnu/qt6/plugins/platforms/libqoffscreen.so \
+                /usr/lib/x86_64-linux-gnu/qt5/plugins/platforms/libqoffscreen.so; do
+                if [ -f "$path" ]; then
+                    OFFSCREEN="$path"
+                    break
+                fi
+            done
+            if [ -z "$OFFSCREEN" ]; then
+                OFFSCREEN="$(find /usr/lib -name 'libqoffscreen.so' 2>/dev/null | head -1 || true)"
+            fi
             if [ -n "$OFFSCREEN" ]; then
                 cp "$OFFSCREEN" "$PLATFORMS_DIR/"
                 echo "DWG: copied Qt offscreen plugin into $PLATFORMS_DIR"
+            else
+                echo "WARNING: libqoffscreen.so not found; DWG will use bundled Xvfb+xcb at runtime"
             fi
         fi
     fi
 
-    # Optional: bundle xvfb for xcb-only Qt (headless display)
+    # Bundle Xvfb binary for xcb-only Qt (run Xvfb directly; no xauth/xvfb-run)
     if [ -n "$PLATFORMS_DIR" ] && [ -f "$PLATFORMS_DIR/libqxcb.so" ] && [ ! -f "$PLATFORMS_DIR/libqoffscreen.so" ] && command -v apt-get >/dev/null; then
-        apt-get install -y -qq xvfb || true
+        apt-get install -y -qq xvfb xserver-common || true
         XVFB_OUT="$ODA_BUNDLE/xvfb"
         rm -rf "$XVFB_OUT"
         mkdir -p "$XVFB_OUT"
-        if command -v xvfb-run >/dev/null && command -v dpkg-deb >/dev/null; then
+        if command -v dpkg-deb >/dev/null; then
             apt-get download xvfb xserver-common 2>/dev/null || true
             for deb in ./*.deb; do
                 [ -f "$deb" ] && dpkg-deb -x "$deb" "$XVFB_OUT" 2>/dev/null || true
             done
             rm -f ./*.deb 2>/dev/null || true
-            echo "DWG: bundled xvfb under $XVFB_OUT (for xcb Qt plugin)"
+            if [ -f "$XVFB_OUT/usr/bin/Xvfb" ]; then
+                echo "DWG: bundled Xvfb at $XVFB_OUT/usr/bin/Xvfb (for xcb Qt plugin)"
+            else
+                echo "WARNING: Xvfb binary missing after extract"
+            fi
         fi
     fi
 

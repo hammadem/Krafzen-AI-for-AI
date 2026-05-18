@@ -57,6 +57,45 @@ def bundle_dir(root: Optional[Path] = None) -> Path:
     return (root or backend_root()) / _BUNDLE_DIR_NAME
 
 
+_QT_OFFSCREEN_SYSTEM_PATHS = (
+    Path("/usr/lib/x86_64-linux-gnu/qt6/plugins/platforms/libqoffscreen.so"),
+    Path("/usr/lib/x86_64-linux-gnu/qt5/plugins/platforms/libqoffscreen.so"),
+)
+
+
+def _bootstrap_qt_offscreen_plugin(bdir: Path) -> bool:
+    """Copy libqoffscreen.so into the ODA bundle when only xcb is shipped (build or first boot)."""
+    qt_dir_s = _find_qt_platforms_dir(bdir)
+    if not qt_dir_s:
+        return False
+    qt_dir = Path(qt_dir_s)
+    dest = qt_dir / "libqoffscreen.so"
+    if dest.is_file():
+        return True
+    for src in _QT_OFFSCREEN_SYSTEM_PATHS:
+        if src.is_file():
+            shutil.copy2(src, dest)
+            logger.info("DWG: installed Qt offscreen plugin from %s", src)
+            return True
+    try:
+        proc = subprocess.run(
+            ["find", "/usr/lib", "-name", "libqoffscreen.so", "-type", "f"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        for line in proc.stdout.splitlines():
+            src = Path(line.strip())
+            if src.is_file():
+                shutil.copy2(src, dest)
+                logger.info("DWG: installed Qt offscreen plugin from %s", src)
+                return True
+    except (OSError, subprocess.SubprocessError) as e:
+        logger.debug("DWG: system search for libqoffscreen.so failed: %s", e)
+    return False
+
+
 def _find_qt_platforms_dir(bdir: Path) -> Optional[str]:
     """Directory containing libq*.so platform plugins (e.g. .../plugins/platforms)."""
     saved = bdir / _QT_PLUGIN_PATH_FILE
@@ -105,6 +144,7 @@ def _write_manifest(root: Path, oda_bin: Path) -> None:
             lib_dirs.append(str(so.parent.resolve()))
     ld_extra = ":".join(dict.fromkeys(lib_dirs))
     (bdir / _LD_PATH_FILE).write_text(ld_extra + "\n", encoding="utf-8")
+    _bootstrap_qt_offscreen_plugin(bdir)
     qt_dir = _find_qt_platforms_dir(bdir)
     if qt_dir:
         (bdir / _QT_PLUGIN_PATH_FILE).write_text(qt_dir + "\n", encoding="utf-8")
@@ -116,6 +156,11 @@ def _write_manifest(root: Path, oda_bin: Path) -> None:
             qt_dir,
             off.is_file(),
         )
+        if not off.is_file():
+            logger.warning(
+                "DWG: Qt offscreen plugin missing; conversion may use Xvfb+xcb (slower). "
+                "Rebuild with Clear build cache so render_build_native.sh can copy libqoffscreen.so."
+            )
     else:
         logger.warning("ODA bundle: no Qt platforms/ directory found under %s", bdir)
 
@@ -397,6 +442,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
     if not force:
         exe, _, _ = _read_bundle(root)
         if exe:
+            _bootstrap_qt_offscreen_plugin(bundle_dir(root))
             return True
 
     r2 = _r2_download_config()
@@ -422,6 +468,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         if not force:
             exe, _, _ = _read_bundle(root)
             if exe:
+                _bootstrap_qt_offscreen_plugin(bdir)
                 return True
 
         logger.info("Fetching ODA .deb into %s ...", bdir)
@@ -507,27 +554,73 @@ def apply_oda_runtime_env(run_env: dict[str, str], root: Optional[Path] = None) 
     run_env.setdefault("QT_LOGGING_RULES", "qt.qpa.plugin=false")
 
 
-def wrap_oda_command(cmd: list[str], root: Optional[Path] = None) -> list[str]:
-    """Prefix with bundled/system xvfb-run when only the xcb Qt plugin is available."""
-    root = root or backend_root()
+def _needs_virtual_display(root: Path) -> bool:
+    """True when ODA only has the xcb Qt plugin (needs an X display)."""
     _, _, qt_plugins = _read_bundle(root)
     if not qt_plugins:
-        return cmd
+        return False
     p = Path(qt_plugins)
     if (p / "libqoffscreen.so").exists() or (p / "libqminimal.so").exists():
-        return cmd
-    if not (p / "libqxcb.so").exists():
-        return cmd
+        return False
+    return (p / "libqxcb.so").exists()
+
+
+def _find_xvfb_binary(root: Path) -> Optional[str]:
     bdir = bundle_dir(root)
     for candidate in (
-        bdir / "xvfb" / "usr" / "bin" / "xvfb-run",
-        bdir / "usr" / "bin" / "xvfb-run",
+        bdir / "xvfb" / "usr" / "bin" / "Xvfb",
+        bdir / "usr" / "bin" / "Xvfb",
     ):
         if candidate.is_file():
-            return [str(candidate), "-a", "-s", "-screen 0 1280x1024x24", *cmd]
-    xvfb = shutil.which("xvfb-run")
-    if xvfb:
-        return [xvfb, "-a", "-s", "-screen 0 1280x1024x24", *cmd]
+            return str(candidate)
+    found = shutil.which("Xvfb")
+    return found if found else None
+
+
+def run_oda_subprocess(
+    cmd: list[str],
+    env: dict[str, str],
+    root: Optional[Path] = None,
+) -> subprocess.CompletedProcess[str]:
+    """
+    Run ODA with correct Qt env. Starts Xvfb directly when only xcb is available
+    (avoids xvfb-run's xauth dependency on headless servers).
+    """
+    import time
+
+    root = root or backend_root()
+    _bootstrap_qt_offscreen_plugin(bundle_dir(root))
+    apply_oda_runtime_env(env, root)
+
+    if not _needs_virtual_display(root):
+        return subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+
+    xvfb = _find_xvfb_binary(root)
+    if not xvfb:
+        logger.warning("DWG: xcb Qt plugin but no Xvfb binary; running ODA without virtual display")
+        return subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+
+    display = ":99"
+    xvfb_proc = subprocess.Popen(
+        [xvfb, display, "-screen", "0", "1280x1024x24", "-ac", "-nolisten", "tcp"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        time.sleep(0.5)
+        run_env = {**env, "DISPLAY": display, "QT_QPA_PLATFORM": "xcb"}
+        logger.info("DWG: running ODA under Xvfb display %s", display)
+        return subprocess.run(cmd, capture_output=True, text=True, check=False, env=run_env)
+    finally:
+        xvfb_proc.terminate()
+        try:
+            xvfb_proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            xvfb_proc.kill()
+
+
+def wrap_oda_command(cmd: list[str], root: Optional[Path] = None) -> list[str]:
+    """Deprecated: use run_oda_subprocess. Kept for tests that only inspect command wrapping."""
     return cmd
 
 
