@@ -109,27 +109,42 @@ if [ -n "${DWG_ODA_DEB_URL:-}" ]; then
     PLATFORMS_DIR="$(find "$ODA_BUNDLE" -type d -name platforms 2>/dev/null | head -1 || true)"
     if [ -n "$PLATFORMS_DIR" ]; then
         printf '%s\n' "$PLATFORMS_DIR" > "$ODA_BUNDLE/qt_plugin_path.txt"
-        if [ ! -f "$PLATFORMS_DIR/libqoffscreen.so" ] && command -v apt-get >/dev/null; then
+        if command -v apt-get >/dev/null; then
             apt-get install -y -qq libqt6gui6 libqt6gui6t64 qt6-qpa-plugins 2>/dev/null \
                 || apt-get install -y -qq libqt5gui5 qt5-qpa-plugins 2>/dev/null || true
-            OFFSCREEN=""
-            for path in \
-                /usr/lib/x86_64-linux-gnu/qt6/plugins/platforms/libqoffscreen.so \
-                /usr/lib/x86_64-linux-gnu/qt5/plugins/platforms/libqoffscreen.so; do
-                if [ -f "$path" ]; then
-                    OFFSCREEN="$path"
-                    break
-                fi
+            for QT_SYS in \
+                /usr/lib/x86_64-linux-gnu/qt6/plugins/platforms \
+                /usr/lib/x86_64-linux-gnu/qt5/plugins/platforms; do
+                [ -d "$QT_SYS" ] || continue
+                for plugin in libqoffscreen.so libqminimal.so; do
+                    if [ -f "$QT_SYS/$plugin" ] && [ ! -f "$PLATFORMS_DIR/$plugin" ]; then
+                        cp "$QT_SYS/$plugin" "$PLATFORMS_DIR/"
+                        echo "DWG: copied $plugin into $PLATFORMS_DIR"
+                    fi
+                done
             done
-            if [ -z "$OFFSCREEN" ]; then
-                OFFSCREEN="$(find /usr/lib -name 'libqoffscreen.so' 2>/dev/null | head -1 || true)"
+            if [ ! -f "$PLATFORMS_DIR/libqoffscreen.so" ] && [ ! -f "$PLATFORMS_DIR/libqminimal.so" ]; then
+                echo "WARNING: no headless Qt plugins; runtime will download qt6-qpa-plugins .deb"
             fi
-            if [ -n "$OFFSCREEN" ]; then
-                cp "$OFFSCREEN" "$PLATFORMS_DIR/"
-                echo "DWG: copied Qt offscreen plugin into $PLATFORMS_DIR"
+        fi
+        if [ -f "$PLATFORMS_DIR/libqxcb.so" ]; then
+            apt-get install -y -qq libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+                libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxkbcommon-x11-0 libxcb-util1 2>/dev/null || true
+            XCB_LIBS="$ODA_BUNDLE/xcb_libs"
+            mkdir -p "$XCB_LIBS"
+            ldd "$PLATFORMS_DIR/libqxcb.so" 2>/dev/null | awk '/=> \// {print $3}' | sort -u | while read -r lib; do
+                [ -f "$lib" ] && cp -n "$lib" "$XCB_LIBS/" 2>/dev/null || cp "$lib" "$XCB_LIBS/"
+            done
+            if [ -f "$XCB_LIBS/libxcb-util.so.1" ] && [ ! -e "$XCB_LIBS/libxcb-util.so.0" ]; then
+                ln -sf libxcb-util.so.1 "$XCB_LIBS/libxcb-util.so.0"
+            fi
+            echo "DWG: vendored xcb libs into $XCB_LIBS"
+            if [ -n "${LD_EXTRA:-}" ]; then
+                LD_EXTRA="$XCB_LIBS:$LD_EXTRA"
             else
-                echo "WARNING: libqoffscreen.so not found; DWG will use bundled Xvfb+xcb at runtime"
+                LD_EXTRA="$XCB_LIBS"
             fi
+            printf '%s\n' "$LD_EXTRA" > "$ODA_BUNDLE/ld_library_path.txt"
         fi
     fi
 

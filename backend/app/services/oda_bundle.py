@@ -57,29 +57,80 @@ def bundle_dir(root: Optional[Path] = None) -> Path:
     return (root or backend_root()) / _BUNDLE_DIR_NAME
 
 
-_QT_OFFSCREEN_SYSTEM_PATHS = (
-    Path("/usr/lib/x86_64-linux-gnu/qt6/plugins/platforms/libqoffscreen.so"),
-    Path("/usr/lib/x86_64-linux-gnu/qt5/plugins/platforms/libqoffscreen.so"),
+_QT_HEADLESS_PLUGIN_NAMES = ("libqoffscreen.so", "libqminimal.so")
+_QT_HEADLESS_SYSTEM_DIRS = (
+    Path("/usr/lib/x86_64-linux-gnu/qt6/plugins/platforms"),
+    Path("/usr/lib/x86_64-linux-gnu/qt5/plugins/platforms"),
+)
+# Debian bookworm amd64 fallbacks (runtime download when build did not vendor plugins)
+_DEBIAN_QT6_QPA_PLUGINS_DEB_URLS = (
+    "https://deb.debian.org/debian/pool/main/q/qt6-qpa-plugins/qt6-qpa-plugins_6.4.2+dfsg-10_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/q/qt6-qpa-plugins/qt6-qpa-plugins_6.4.2+dfsg-9_amd64.deb",
+)
+_DEBIAN_XVFB_RUNTIME_DEB_URLS = (
+    "https://deb.debian.org/debian/pool/main/x/xorg-server/xvfb_21.1.7-3+deb12u11_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/x/xorg-server/xorg-server-common_21.1.7-3+deb12u11_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/x/xorg-server/xvfb_21.1.7-3+deb12u10_amd64.deb",
+    "https://deb.debian.org/debian/pool/main/x/xorg-server/xorg-server-common_21.1.7-3+deb12u10_amd64.deb",
 )
 
 
-def _bootstrap_qt_offscreen_plugin(bdir: Path) -> bool:
-    """Copy libqoffscreen.so into the ODA bundle when only xcb is shipped (build or first boot)."""
+def _has_headless_qt_plugin(platforms: Path) -> bool:
+    return any((platforms / name).is_file() for name in _QT_HEADLESS_PLUGIN_NAMES)
+
+
+def _prepend_ld_path(env: dict[str, str], extra_dirs: list[str]) -> None:
+    if not extra_dirs:
+        return
+    sep = os.pathsep
+    prefix = sep.join(extra_dirs)
+    prev = env.get("LD_LIBRARY_PATH", "")
+    env["LD_LIBRARY_PATH"] = f"{prefix}{sep}{prev}" if prev else prefix
+
+
+def _bundle_extra_ld_dirs(bdir: Path) -> list[str]:
+    dirs: list[str] = []
+    for name in ("xcb_libs",):
+        d = bdir / name
+        if d.is_dir():
+            dirs.append(str(d.resolve()))
+    xvfb_lib = bdir / "xvfb" / "usr" / "lib" / "x86_64-linux-gnu"
+    if xvfb_lib.is_dir():
+        dirs.append(str(xvfb_lib.resolve()))
+    return dirs
+
+
+def _find_file_in_tree(root: Path, filename: str) -> Optional[Path]:
+    for path in root.rglob(filename):
+        if path.is_file():
+            return path
+    return None
+
+
+def _bootstrap_qt_headless_plugins(bdir: Path) -> bool:
+    """Copy offscreen/minimal Qt plugins from the build image into ODA's platforms/ dir."""
     qt_dir_s = _find_qt_platforms_dir(bdir)
     if not qt_dir_s:
         return False
     qt_dir = Path(qt_dir_s)
-    dest = qt_dir / "libqoffscreen.so"
-    if dest.is_file():
+    if _has_headless_qt_plugin(qt_dir):
         return True
-    for src in _QT_OFFSCREEN_SYSTEM_PATHS:
-        if src.is_file():
-            shutil.copy2(src, dest)
-            logger.info("DWG: installed Qt offscreen plugin from %s", src)
-            return True
+    installed = False
+    for sys_dir in _QT_HEADLESS_SYSTEM_DIRS:
+        if not sys_dir.is_dir():
+            continue
+        for name in _QT_HEADLESS_PLUGIN_NAMES:
+            src = sys_dir / name
+            dest = qt_dir / name
+            if src.is_file() and not dest.is_file():
+                shutil.copy2(src, dest)
+                logger.info("DWG: installed %s from %s", name, src)
+                installed = True
+    if installed and _has_headless_qt_plugin(qt_dir):
+        return True
     try:
         proc = subprocess.run(
-            ["find", "/usr/lib", "-name", "libqoffscreen.so", "-type", "f"],
+            ["find", "/usr/lib", "-name", "libqoffscreen.so", "-o", "-name", "libqminimal.so"],
             capture_output=True,
             text=True,
             timeout=15,
@@ -87,13 +138,85 @@ def _bootstrap_qt_offscreen_plugin(bdir: Path) -> bool:
         )
         for line in proc.stdout.splitlines():
             src = Path(line.strip())
-            if src.is_file():
+            if not src.is_file():
+                continue
+            dest = qt_dir / src.name
+            if not dest.is_file():
                 shutil.copy2(src, dest)
-                logger.info("DWG: installed Qt offscreen plugin from %s", src)
-                return True
+                logger.info("DWG: installed %s from %s", src.name, src)
+                installed = True
     except (OSError, subprocess.SubprocessError) as e:
-        logger.debug("DWG: system search for libqoffscreen.so failed: %s", e)
-    return False
+        logger.debug("DWG: system search for Qt headless plugins failed: %s", e)
+    return _has_headless_qt_plugin(qt_dir)
+
+
+def _ensure_headless_qt_plugins_from_deb(bdir: Path) -> bool:
+    """Download qt6-qpa-plugins .deb on Render runtime when offscreen/minimal are missing."""
+    qt_dir_s = _find_qt_platforms_dir(bdir)
+    if not qt_dir_s:
+        return False
+    qt_dir = Path(qt_dir_s)
+    if _has_headless_qt_plugin(qt_dir):
+        return True
+
+    cache_dir = bdir / "_qt_debs"
+    extract_root = bdir / "_qt_plugins_extract"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    for url in _DEBIAN_QT6_QPA_PLUGINS_DEB_URLS:
+        deb_name = url.rsplit("/", 1)[-1]
+        deb_path = cache_dir / deb_name
+        try:
+            if not deb_path.is_file():
+                logger.info("DWG: downloading Qt6 headless plugins (%s)", deb_name)
+                _download_deb(url, deb_path)
+            if extract_root.exists():
+                shutil.rmtree(extract_root)
+            extract_root.mkdir(parents=True)
+            _extract_deb(deb_path, extract_root)
+            for name in _QT_HEADLESS_PLUGIN_NAMES:
+                src = _find_file_in_tree(extract_root, name)
+                if src and src.is_file():
+                    shutil.copy2(src, qt_dir / name)
+                    logger.info("DWG: installed %s from %s", name, deb_name)
+            if _has_headless_qt_plugin(qt_dir):
+                (bdir / _QT_PLUGIN_PATH_FILE).write_text(str(qt_dir.resolve()) + "\n", encoding="utf-8")
+                shutil.rmtree(extract_root, ignore_errors=True)
+                return True
+        except Exception as e:
+            logger.warning("DWG: Qt plugins deb %s failed: %s", deb_name, e)
+            deb_path.unlink(missing_ok=True)
+    return _has_headless_qt_plugin(qt_dir)
+
+
+def _ensure_xvfb_bundle(bdir: Path) -> Optional[str]:
+    """Ensure bundled Xvfb exists (build artifact or runtime deb extract)."""
+    bin_path = bdir / "xvfb" / "usr" / "bin" / "Xvfb"
+    if bin_path.is_file():
+        return str(bin_path)
+    system = shutil.which("Xvfb")
+    if system:
+        return system
+
+    xvfb_root = bdir / "xvfb"
+    cache_dir = bdir / "_xvfb_debs"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    for url in _DEBIAN_XVFB_RUNTIME_DEB_URLS:
+        deb_name = url.rsplit("/", 1)[-1]
+        deb_path = cache_dir / deb_name
+        try:
+            if not deb_path.is_file():
+                logger.info("DWG: downloading %s for headless Xvfb", deb_name)
+                _download_deb(url, deb_path)
+            _extract_deb(deb_path, xvfb_root)
+        except Exception as e:
+            logger.warning("DWG: xvfb deb %s failed: %s", deb_name, e)
+            deb_path.unlink(missing_ok=True)
+
+    if bin_path.is_file():
+        logger.info("DWG: Xvfb ready at %s", bin_path)
+        return str(bin_path)
+    return None
 
 
 def _find_qt_platforms_dir(bdir: Path) -> Optional[str]:
@@ -144,7 +267,8 @@ def _write_manifest(root: Path, oda_bin: Path) -> None:
             lib_dirs.append(str(so.parent.resolve()))
     ld_extra = ":".join(dict.fromkeys(lib_dirs))
     (bdir / _LD_PATH_FILE).write_text(ld_extra + "\n", encoding="utf-8")
-    _bootstrap_qt_offscreen_plugin(bdir)
+    _bootstrap_qt_headless_plugins(bdir)
+    _ensure_headless_qt_plugins_from_deb(bdir)
     qt_dir = _find_qt_platforms_dir(bdir)
     if qt_dir:
         (bdir / _QT_PLUGIN_PATH_FILE).write_text(qt_dir + "\n", encoding="utf-8")
@@ -442,7 +566,8 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
     if not force:
         exe, _, _ = _read_bundle(root)
         if exe:
-            _bootstrap_qt_offscreen_plugin(bundle_dir(root))
+            _bootstrap_qt_headless_plugins(bundle_dir(root))
+            _ensure_headless_qt_plugins_from_deb(bundle_dir(root))
             return True
 
     r2 = _r2_download_config()
@@ -468,7 +593,8 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         if not force:
             exe, _, _ = _read_bundle(root)
             if exe:
-                _bootstrap_qt_offscreen_plugin(bdir)
+                _bootstrap_qt_headless_plugins(bdir)
+                _ensure_headless_qt_plugins_from_deb(bdir)
                 return True
 
         logger.info("Fetching ODA .deb into %s ...", bdir)
@@ -533,11 +659,13 @@ def apply_oda_runtime_env(run_env: dict[str, str], root: Optional[Path] = None) 
     import sys
 
     root = root or backend_root()
+    bdir = bundle_dir(root)
     _, ld_extra, qt_plugins = _read_bundle(root)
+    ld_dirs = _bundle_extra_ld_dirs(bdir)
     if ld_extra:
-        sep = os.pathsep
-        prev = run_env.get("LD_LIBRARY_PATH", "")
-        run_env["LD_LIBRARY_PATH"] = f"{ld_extra}{sep}{prev}" if prev else ld_extra
+        ld_dirs.extend(p for p in ld_extra.split(os.pathsep) if p)
+    if ld_dirs:
+        _prepend_ld_path(run_env, list(dict.fromkeys(ld_dirs)))
     if qt_plugins:
         run_env["QT_PLUGIN_PATH"] = qt_plugins
         run_env["QT_QPA_PLATFORM_PLUGIN_PATH"] = qt_plugins
@@ -566,15 +694,7 @@ def _needs_virtual_display(root: Path) -> bool:
 
 
 def _find_xvfb_binary(root: Path) -> Optional[str]:
-    bdir = bundle_dir(root)
-    for candidate in (
-        bdir / "xvfb" / "usr" / "bin" / "Xvfb",
-        bdir / "usr" / "bin" / "Xvfb",
-    ):
-        if candidate.is_file():
-            return str(candidate)
-    found = shutil.which("Xvfb")
-    return found if found else None
+    return _ensure_xvfb_bundle(bundle_dir(root))
 
 
 def run_oda_subprocess(
@@ -589,27 +709,38 @@ def run_oda_subprocess(
     import time
 
     root = root or backend_root()
-    _bootstrap_qt_offscreen_plugin(bundle_dir(root))
+    bdir = bundle_dir(root)
+    _bootstrap_qt_headless_plugins(bdir)
+    _ensure_headless_qt_plugins_from_deb(bdir)
     apply_oda_runtime_env(env, root)
 
     if not _needs_virtual_display(root):
+        platform = env.get("QT_QPA_PLATFORM", "unknown")
+        logger.info("DWG: running ODA with Qt platform %s (no Xvfb)", platform)
         return subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
 
     xvfb = _find_xvfb_binary(root)
     if not xvfb:
-        logger.warning("DWG: xcb Qt plugin but no Xvfb binary; running ODA without virtual display")
-        return subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+        raise RuntimeError(
+            "DWG: only xcb Qt plugin is available but Xvfb could not be installed. "
+            "Redeploy with Clear build cache or check Render logs for Qt plugin download errors."
+        )
 
     display = ":99"
     xvfb_proc = subprocess.Popen(
         [xvfb, display, "-screen", "0", "1280x1024x24", "-ac", "-nolisten", "tcp"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
     )
     try:
-        time.sleep(0.5)
+        time.sleep(1.0)
+        if xvfb_proc.poll() is not None:
+            err = (xvfb_proc.stderr.read() if xvfb_proc.stderr else b"").decode("utf-8", errors="replace")
+            raise RuntimeError(f"Xvfb exited immediately (code {xvfb_proc.returncode}): {err.strip() or '(no stderr)'}")
         run_env = {**env, "DISPLAY": display, "QT_QPA_PLATFORM": "xcb"}
-        logger.info("DWG: running ODA under Xvfb display %s", display)
+        _prepend_ld_path(run_env, _bundle_extra_ld_dirs(bdir))
+        logger.info("DWG: running ODA under Xvfb display %s (%s)", display, xvfb)
         return subprocess.run(cmd, capture_output=True, text=True, check=False, env=run_env)
     finally:
         xvfb_proc.terminate()
