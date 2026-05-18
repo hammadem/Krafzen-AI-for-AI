@@ -1,51 +1,47 @@
-# KRAFZEN AI backend — Python + Potrace + ODA File Converter (DWG).
-# Render: set runtime to Docker, rootDir=backend. Build-time env: R2_* or DWG_ODA_DEB_URL.
-# Local Apple Silicon: docker build --platform linux/amd64 ...
+# KRAFZEN AI backend — Python + Potrace + optional ODA File Converter (DWG).
+# ODA Linux packages are x86_64; on Apple Silicon build hosts use: --platform linux/amd64
+#
+# Build with ODA (pick one):
+#   docker build --platform linux/amd64 --build-arg DWG_ODA_DEB_URL="https://.../file.deb" ...
+#   Place docker/oda-file-converter.deb in build context (gitignored) and build without the arg.
 
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim
 
 ARG DWG_ODA_DEB_URL=
-ARG R2_ACCESS_KEY_ID=
-ARG R2_SECRET_ACCESS_KEY=
-ARG R2_ENDPOINT_URL=
-ARG R2_ODA_BUCKET=
-ARG R2_ODA_OBJECT_KEY=
-
-ENV DWG_ODA_DEB_URL=${DWG_ODA_DEB_URL} \
-    R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID} \
-    R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY} \
-    R2_ENDPOINT_URL=${R2_ENDPOINT_URL} \
-    R2_ODA_BUCKET=${R2_ODA_BUCKET} \
-    R2_ODA_OBJECT_KEY=${R2_ODA_OBJECT_KEY}
 
 RUN useradd -m -u 1000 appuser
 
 WORKDIR /app
 
+COPY docker/install_oda_file_converter.sh /tmp/install_oda_file_converter.sh
+RUN chmod +x /tmp/install_oda_file_converter.sh
+
+# Optional local .deb (filename fixed for predictable Docker COPY)
 COPY docker /tmp/docker-build/
-COPY docker/install_oda_file_converter.sh docker/fetch_and_install_oda.sh docker/download_oda_deb.py /tmp/
 
-RUN chmod +x /tmp/install_oda_file_converter.sh /tmp/fetch_and_install_oda.sh \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends potrace \
-    && /tmp/fetch_and_install_oda.sh \
-    && rm -rf /tmp/docker-build /tmp/*.sh /tmp/*.py /var/lib/apt/lists/*
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends potrace; \
+    if [ -n "$DWG_ODA_DEB_URL" ]; then \
+      /tmp/install_oda_file_converter.sh from-url "$DWG_ODA_DEB_URL"; \
+    elif [ -f /tmp/docker-build/oda-file-converter.deb ]; then \
+      /tmp/install_oda_file_converter.sh from-file /tmp/docker-build/oda-file-converter.deb; \
+    else \
+      echo "WARNING: ODA not installed — DWG export disabled in this image (set DWG_ODA_DEB_URL or add docker/oda-file-converter.deb)."; \
+    fi; \
+    rm -rf /tmp/docker-build; \
+    rm -f /tmp/install_oda_file_converter.sh; \
+    rm -rf /var/lib/apt/lists/*
 
-ENV DWG_CONVERTER_TYPE=ODA \
-    DWG_CONVERTER_CMD=ODAFileConverter \
-    QT_QPA_PLATFORM=offscreen \
-    QT_LOGGING_RULES=qt.qpa.plugin=false
+ENV DWG_CONVERTER_TYPE=ODA
+ENV DWG_CONVERTER_CMD=ODAFileConverter
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
 COPY . .
 
 RUN chown -R appuser:appuser /app
 
 USER appuser
 
-EXPOSE 8000
-
-# Render sets PORT; default 8000 for local docker run
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

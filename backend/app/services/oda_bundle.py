@@ -463,11 +463,7 @@ def ensure_oda_bundle(force: bool = False) -> bool:
     """
     Ensure backend/.oda_bundle exists with ODAFileConverter when DWG_ODA_DEB_URL is set.
     Returns True if a converter binary is available after this call.
-    Skips download when ODA is already installed via dpkg (Docker).
     """
-    if not force and resolve_system_oda()[0]:
-        logger.info("DWG: system ODA present (Docker); skipping .oda_bundle download")
-        return True
     with _bundle_lock:
         return _ensure_oda_bundle_locked(force)
 
@@ -787,37 +783,6 @@ def run_oda_subprocess(
 def wrap_oda_command(cmd: list[str], root: Optional[Path] = None) -> list[str]:
     """Deprecated: use run_oda_subprocess. Kept for tests that only inspect command wrapping."""
     return cmd
-
-
-def resolve_system_oda() -> Tuple[Optional[str], Optional[str]]:
-    """ODA installed via dpkg (Docker image). Prefer real ELF under /usr/bin/ODAFileConverter_*."""
-    bin_dir = Path("/usr/bin")
-    if bin_dir.is_dir():
-        for sub in sorted(bin_dir.glob("ODAFileConverter_*")):
-            exe = sub / "ODAFileConverter"
-            if exe.is_file() and _is_elf_executable(exe):
-                return str(exe.resolve()), None
-    wrapper = shutil.which("ODAFileConverter")
-    if wrapper:
-        wp = Path(wrapper).resolve()
-        if _is_elf_executable(wp):
-            return str(wp), None
-    return None, None
-
-
-def apply_system_oda_runtime_env(run_env: dict[str, str]) -> None:
-    """Qt env when ODA is installed with apt/dpkg (Docker)."""
-    sys_platforms = Path("/usr/lib/x86_64-linux-gnu/qt6/plugins/platforms")
-    if sys_platforms.is_dir():
-        p = str(sys_platforms.resolve())
-        run_env["QT_PLUGIN_PATH"] = p
-        run_env["QT_QPA_PLATFORM_PLUGIN_PATH"] = p
-        if (sys_platforms / "libqoffscreen.so").is_file():
-            run_env["QT_QPA_PLATFORM"] = "offscreen"
-        elif (sys_platforms / "libqminimal.so").is_file():
-            run_env["QT_QPA_PLATFORM"] = "minimal"
-    run_env.setdefault("QT_QPA_PLATFORM", "offscreen")
-    run_env.setdefault("QT_LOGGING_RULES", "qt.qpa.plugin=false")
 
 
 def resolve_bundled_oda() -> Tuple[Optional[str], Optional[str]]:

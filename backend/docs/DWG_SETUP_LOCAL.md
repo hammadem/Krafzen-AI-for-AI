@@ -44,15 +44,10 @@ test -x /Applications/ODAFileConverter.app/Contents/MacOS/ODAFileConverter && ec
 
 ## 6) Docker & Render (staging / production)
 
-**Recommended:** Run the API on Render with **`runtime: docker`** (see `render.yaml`). The image installs ODA via `apt`/`dpkg` with Qt headless plugins — same approach as Potrace in Docker.
+See [docker/README.md](../docker/README.md) for installing ODA in container images and on Render (build-time `DWG_ODA_DEB_URL`, Linux x64 `.deb`, optional `docker/oda-file-converter.deb` for local Docker builds).
 
-On each Render service, set **build-time** env (used during `docker build`):
+**Render native (non-Docker) Python:** the build VM is not the same machine as runtime. `dpkg -i` during build does not ship `/usr` to your service. `render_build_native.sh` therefore **extracts** the `.deb` into `backend/.oda_bundle/` so ODA is deployed with your repo directory (same idea as `backend/bin/potrace`). Keep `DWG_ODA_DEB_URL` set as a direct HTTPS URL to the `.deb`.
 
-- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT_URL`, `R2_ODA_BUCKET`, `R2_ODA_OBJECT_KEY` (recommended), **or**
-- `DWG_ODA_DEB_URL` — HTTPS URL to the Linux x64 `.deb`
+**Important:** `backend/.gitignore` must not ignore `*.so` globally or ODA’s extracted `usr/lib/*.so` files will be omitted from the deploy artifact and the converter will not load at runtime.
 
-After deploy, logs should show `Converting DXF → DWG via system ODA (Docker)`.
-
-See [docker/README.md](../docker/README.md) for local `docker build` commands.
-
-**Legacy native Python on Render** (`render_build_native.sh` + `.oda_bundle/`) is fragile because ODA needs Qt; prefer Docker for production/staging.
+**Runtime fallback:** If the build-time bundle is missing, the API downloads and extracts the `.deb` on startup when `DWG_ODA_DEB_URL` is set (first boot may take 1–2 minutes; check logs for `ODA bundle ready`).
