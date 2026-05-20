@@ -19,6 +19,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
+!backend/vendor/qt6_headless/**/*.so
 .Python
 venv/
 env/

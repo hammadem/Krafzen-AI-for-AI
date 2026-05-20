@@ -181,17 +181,25 @@ async def rebuild_openapi_schema():
              print(f"   - {route.path} [{','.join(route.methods)}]")
     print("---------------------\n")
 
-# Health check route (PR version - kept for backward compatibility)
-@app.get("/health")
-async def health_check():
-    """Check API and DB connectivity."""
-    try:
-        result = db.table("projects").select("id", count="exact").execute()
-        return {"status": "healthy", "db_project_count": result.count}
-    except Exception as e:
-        print(f"Health check error: {e}")
-        return {"status": "degraded", "db": "unreachable"}
+    import threading
 
+    def _bootstrap_oda_bundle() -> None:
+        try:
+            from app.services.oda_bundle import warm_dwg_runtime
+            from app.services.dwg_converter_service import dwg_converter_service
+
+            warm_dwg_runtime()
+            if dwg_converter_service.is_configured():
+                logger.info("DWG: ODA converter ready after bundle bootstrap")
+            else:
+                logger.warning(
+                    "DWG: converter not configured after bootstrap "
+                    "(check R2 credentials or DWG_ODA_DEB_URL)"
+                )
+        except Exception as oda_err:
+            logger.error("DWG: ODA bundle bootstrap failed: %s", oda_err, exc_info=True)
+
+    threading.Thread(target=_bootstrap_oda_bundle, daemon=True, name="oda-bundle-bootstrap").start()
 
 # Init logging / Sentry / error handlers
 init_sentry(settings.SENTRY_DSN)

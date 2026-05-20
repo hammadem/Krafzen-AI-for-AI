@@ -7,17 +7,28 @@ from datetime import datetime
 import time
 from app.services.supabase_service import supabase_service
 from app.core.config import settings
+from app.db.supabase_client import db
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("")
 async def health_check():
-    """Basic health check endpoint"""
-    return {
-        "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "service": "KRAFZEN AI Backend"
-    }
+    """Basic health check endpoint (Render probes GET /health)."""
+    try:
+        result = db.table("projects").select("id", count="exact").execute()
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "service": "KRAFZEN AI Backend",
+            "db_project_count": result.count,
+        }
+    except Exception:
+        return {
+            "status": "degraded",
+            "timestamp": datetime.utcnow().isoformat(),
+            "service": "KRAFZEN AI Backend",
+            "db": "unreachable",
+        }
 
 @router.get("/detailed")
 async def detailed_health_check():

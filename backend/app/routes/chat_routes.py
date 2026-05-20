@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
 from fastapi.responses import FileResponse
 from typing import List, Dict, Optional, Any
 import asyncio
@@ -22,6 +22,9 @@ from app.middlewares.auth import require_auth
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# One DWG conversion at a time per worker (ODA+Xvfb is heavy; parallel runs cause timeouts).
+_dwg_convert_lock = asyncio.Lock()
+
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
@@ -43,6 +46,12 @@ class ChatResponse(BaseModel):
 
 class DxfRequest(BaseModel):
     image_url: str
+    prompt: Optional[str] = None
+
+
+class DesignFileRequest(BaseModel):
+    image_url: str
+    file_type: str  # "dxf" | "dwg"
     prompt: Optional[str] = None
 
 class CreateSessionRequest(BaseModel):
@@ -82,6 +91,86 @@ async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_au
 
     except Exception as e:
         logger.error(f"DXF Generation Error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _safe_unlink(path: str) -> None:
+    try:
+        if path and os.path.exists(path):
+            os.unlink(path)
+    except Exception:
+        pass
+
+
+def _safe_rmtree(path: str) -> None:
+    try:
+        if path and os.path.exists(path):
+            import shutil
+            shutil.rmtree(path, ignore_errors=True)
+    except Exception:
+        pass
+
+
+@router.post("/chat/design-file")
+async def generate_design_file(
+    request: DesignFileRequest,
+    background: BackgroundTasks,
+    user_data: dict = Depends(require_auth),
+):
+    """
+    Generate a design file from an image URL.
+
+    - file_type="dxf": raster → DXF (Potrace) and downloads
+    - file_type="dwg": raster → DXF (Potrace) → DWG (external converter) and downloads
+    """
+    try:
+        _ = user_data["user_id"]  # validate auth context
+
+        file_type = (request.file_type or "").strip().lower()
+        if file_type not in ("dxf", "dwg"):
+            raise HTTPException(status_code=400, detail="file_type must be 'dxf' or 'dwg'")
+
+        from app.services.local_dxf_service import local_dxf_service
+
+        logger.info("Generating DXF from image (local Potrace)...")
+        dxf_path = await local_dxf_service.convert_to_dxf(request.image_url)
+        if not os.path.exists(dxf_path):
+            raise HTTPException(status_code=500, detail="Failed to generate DXF")
+
+        if file_type == "dxf":
+            background.add_task(_safe_unlink, dxf_path)
+            return FileResponse(
+                path=dxf_path,
+                filename=os.path.basename(dxf_path),
+                media_type="application/dxf",
+                background=background,
+            )
+
+        from app.services.dwg_converter_service import dwg_converter_service
+
+        try:
+            async with _dwg_convert_lock:
+                convert_result = await asyncio.to_thread(
+                    dwg_converter_service.convert_dxf_path_to_dwg, dxf_path
+                )
+        except RuntimeError as e:
+            background.add_task(_safe_unlink, dxf_path)
+            raise HTTPException(status_code=503, detail=str(e))
+
+        background.add_task(_safe_unlink, dxf_path)
+        background.add_task(_safe_rmtree, convert_result.work_dir)
+
+        return FileResponse(
+            path=convert_result.dwg_path,
+            filename=os.path.basename(convert_result.dwg_path),
+            media_type="application/acad",
+            background=background,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Design file generation error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

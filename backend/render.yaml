@@ -28,6 +28,13 @@ services:
         sync: false
       - key: SECRET_KEY
         sync: false
+      # DWG: set DWG_ODA_DEB_URL (secret) to HTTPS URL of ODA Linux x64 .deb so render_build_native.sh installs ODA at build time
+      - key: DWG_ODA_DEB_URL
+        sync: false
+      - key: DWG_CONVERTER_CMD
+        sync: false
+      - key: DWG_CONVERTER_TYPE
+        sync: false
     healthCheckPath: /health
     plan: starter  # Free tier for MVP
 
@@ -59,6 +66,12 @@ services:
       - key: SENTRY_DSN
         sync: false
       - key: SECRET_KEY
+        sync: false
+      - key: DWG_ODA_DEB_URL
+        sync: false
+      - key: DWG_CONVERTER_CMD
+        sync: false
+      - key: DWG_CONVERTER_TYPE
         sync: false
     healthCheckPath: /health
     plan: starter  # Free tier for MVP

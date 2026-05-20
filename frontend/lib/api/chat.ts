@@ -218,6 +218,89 @@ export const downloadDxf = async (imageUrl: string, prompt?: string, token?: str
     }
 };
 
+/** DWG via ODA+Xvfb can take 1–3 minutes on cold start; avoid short client/proxy timeouts. */
+const DESIGN_FILE_FETCH_MS = 5 * 60 * 1000;
+
+export const downloadDesignFile = async (
+    imageUrl: string,
+    fileType: 'dxf' | 'dwg',
+    prompt?: string,
+    token?: string,
+    signal?: AbortSignal
+) => {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), DESIGN_FILE_FETCH_MS);
+    const onExternalAbort = () => timeoutController.abort();
+    signal?.addEventListener('abort', onExternalAbort);
+
+    let response: Response;
+    try {
+        response = await fetch(`${getApiBaseUrl()}/api/v1/chat/design-file`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ image_url: imageUrl, prompt, file_type: fileType }),
+            signal: timeoutController.signal,
+        });
+    } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+            if (signal?.aborted) {
+                throw new Error('Download cancelled.');
+            }
+            throw new Error(
+                `Generating ${fileType.toUpperCase()} took too long. Please wait a minute and try once — do not click repeatedly.`
+            );
+        }
+        if (err instanceof TypeError) {
+            throw new Error(
+                `Could not reach the server while generating ${fileType.toUpperCase()}. ` +
+                    'Wait for the current attempt to finish (can take 1–2 minutes) and try once.'
+            );
+        }
+        throw err;
+    } finally {
+        clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', onExternalAbort);
+    }
+
+    if (!response.ok) {
+        const text = await response.text();
+        let errorMessage = (response.statusText || "").trim() || `HTTP ${response.status}`;
+        try {
+            const errorData = JSON.parse(text) as {
+                detail?: string | Array<{ msg?: string }> | { msg?: string };
+                message?: string;
+            };
+            const d = errorData?.detail;
+            const m = errorData?.message;
+            if (typeof d === "string" && d.trim()) {
+                errorMessage = d.trim();
+            } else if (typeof m === "string" && m.trim()) {
+                errorMessage = m.trim();
+            } else if (Array.isArray(d) && d.length > 0) {
+                errorMessage = d
+                    .map((x) => (typeof x?.msg === "string" ? x.msg : JSON.stringify(x)))
+                    .join("; ");
+            } else if (d && typeof d === "object" && "msg" in d && typeof (d as { msg?: string }).msg === "string") {
+                errorMessage = (d as { msg: string }).msg;
+            }
+        } catch {
+            if (text.trim()) {
+                errorMessage = text.trim().slice(0, 800);
+            }
+        }
+        throw new Error(`Failed to download ${fileType.toUpperCase()}: ${errorMessage}`);
+    }
+
+    return await response.blob();
+};
+
 export async function transcribeAudio(audioBlob: Blob, token?: string): Promise<string> {
     const formData = new FormData();
     const extension = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';

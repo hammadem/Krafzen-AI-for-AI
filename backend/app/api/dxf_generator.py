@@ -13,6 +13,8 @@ from app.schemas.parser import (
 from typing import Dict, Any
 from datetime import datetime
 import logging
+import os
+import shutil
 from app.middlewares.auth import require_auth
 from app.utils.storage_service import storage_service
 from app.db.queries.project_queries import update_project
@@ -52,6 +54,12 @@ try:
 except Exception as e:
     logger.warning(f"Failed to import local_dxf_service: {e}.")
     local_dxf_service = None
+
+try:
+    from app.services.dwg_converter_service import dwg_converter_service
+except Exception as e:
+    logger.warning(f"Failed to import dwg_converter_service: {e}.")
+    dwg_converter_service = None
 
 from app.core.config import settings
 
@@ -212,10 +220,7 @@ async def generate_and_store_dxf(
     project_id: Optional[str] = Body(None, description="Project ID to associate the DXF file with"),
     user: dict = Depends(require_auth)
 ):
-    """
-    Generate DXF file from text using Unified Flow and store it in Supabase Storage.
-    Text -> CADLLM Prompt Enhancement -> Gemini Validate & Fix -> Gemini Image -> API2Convert -> DXF
-    """
+    """Generate DXF/DWG from text and optionally store on project."""
     if not cadllm_service:
         raise HTTPException(status_code=503, detail="CADLLM service unavailable.")
     if not gemini_service:
@@ -240,50 +245,86 @@ async def generate_and_store_dxf(
             logger.info("Converting Image to DXF (Local - Potrace)...")
             dxf_path = await local_dxf_service.convert_to_dxf(image_url)
         else:
-            # 3. Convert to DXF (Api2Convert)
             logger.info("Converting Image to DXF (API)...")
             dxf_path = await external_dxf_service.convert_to_dxf(image_url)
 
-        
-        # 4. Read File
-        with open(dxf_path, 'rb') as f:
+        with open(dxf_path, "rb") as f:
             dxf_bytes = f.read()
-            
-        # Cleanup
+
+        requested_type = request.file_type or CADFileType.DXF
+        dwg_bytes = None
+        dwg_temp_dir = None
+        if requested_type == CADFileType.DWG:
+            if not dwg_converter_service:
+                raise HTTPException(status_code=503, detail="DWG converter service unavailable.")
+            try:
+                convert_result = dwg_converter_service.convert_dxf_path_to_dwg(dxf_path)
+            except RuntimeError as e:
+                raise HTTPException(status_code=503, detail=str(e))
+
+            dwg_temp_dir = convert_result.work_dir
+            with open(convert_result.dwg_path, "rb") as f:
+                dwg_bytes = f.read()
+
         try:
-            import os
             os.unlink(dxf_path)
-        except:
+        except Exception:
             pass
-        
-        # 5. Upload to storage if project_id provided
+
+        if dwg_temp_dir:
+            try:
+                shutil.rmtree(dwg_temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+
         dxf_url = None
+        dwg_url = None
+        image_public_url = image_url
         if project_id:
             user_id = user.get("user_id")
             if not user_id:
                 raise HTTPException(status_code=401, detail="User ID not found")
-            
-            dxf_url = await storage_service.upload_dxf_file(
-                dxf_bytes=dxf_bytes,
+
+            dxf_url = await storage_service.upload_cad_file(
+                file_bytes=dxf_bytes,
                 project_id=project_id,
-                user_id=user_id
+                user_id=user_id,
+                file_extension="dxf",
             )
-            
-            if dxf_url:
-                # Update project with dxf_url
+
+            if dwg_bytes:
+                dwg_url = await storage_service.upload_cad_file(
+                    file_bytes=dwg_bytes,
+                    project_id=project_id,
+                    user_id=user_id,
+                    file_extension="dwg",
+                )
+
+            update_payload = ProjectUpdate(
+                image_url=image_public_url,
+                dxf_url=dxf_url,
+                dwg_url=dwg_url,
+            )
+            if dxf_url or dwg_url or image_public_url:
                 await update_project(
                     project_id=project_id,
-                    update_data=ProjectUpdate(dxf_url=dxf_url),
-                    user=user
+                    update_data=update_payload,
+                    user=user,
                 )
-                logger.info(f"✅ DXF file stored and project updated: {project_id}")
-        
+                logger.info("✅ CAD files stored and project updated: %s", project_id)
+
         return {
             "status": "success",
-            "message": "DXF file generated successfully",
+            "message": "Design file generated successfully",
+            "file_type": requested_type.value if isinstance(requested_type, CADFileType) else str(requested_type),
+            "image_url": image_public_url,
             "dxf_url": dxf_url,
-            "download_url": f"/api/v1/dxf/download?project_id={project_id}" if project_id else None,
-            "file_size": len(dxf_bytes)
+            "dwg_url": dwg_url,
+            "download_url": (
+                f"/api/v1/dxf/download?project_id={project_id}&file_type="
+                f"{'dwg' if requested_type == CADFileType.DWG else 'dxf'}"
+            ) if project_id else None,
+            "file_size": len(dwg_bytes) if requested_type == CADFileType.DWG and dwg_bytes else len(dxf_bytes),
         }
         
     except HTTPException:
@@ -299,6 +340,7 @@ async def generate_and_store_dxf(
 @router.get("/download")
 async def download_project_dxf(
     project_id: str = Query(..., description="Project ID to download DXF file from"),
+    file_type: CADFileType = Query(CADFileType.DXF, description="File type to download: dxf|dwg"),
     user: dict = Depends(require_auth)
 ):
     """
@@ -316,25 +358,22 @@ async def download_project_dxf(
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found")
         
-        # Download from storage
-        dxf_bytes = await storage_service.download_dxf_file(
-            project_id=project_id,
-            user_id=user_id
-        )
-        
-        if not dxf_bytes:
+        ext = "dwg" if file_type == CADFileType.DWG else "dxf"
+        file_bytes = await storage_service.download_cad_file(project_id=project_id, user_id=user_id, file_extension=ext)
+
+        if not file_bytes:
             raise HTTPException(
                 status_code=404,
-                detail="DXF file not found for this project"
+                detail=f"{ext.upper()} file not found for this project",
             )
-        
-        # Return file as download
+
+        media_type = "application/acad" if ext == "dwg" else "application/dxf"
         return Response(
-            content=dxf_bytes,
-            media_type="application/dxf",
+            content=file_bytes,
+            media_type=media_type,
             headers={
-                "Content-Disposition": f'attachment; filename="project_{project_id}.dxf"'
-            }
+                "Content-Disposition": f'attachment; filename="project_{project_id}.{ext}"'
+            },
         )
         
     except HTTPException:
