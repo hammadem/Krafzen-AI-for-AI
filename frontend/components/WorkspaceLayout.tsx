@@ -36,6 +36,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { ShareModal } from "./ShareModal";
+import { CommentSidebar } from "./CommentSidebar";
 import "../app/workspace.css";
 
 
@@ -116,6 +118,8 @@ export default function WorkspaceLayout() {
   const [activeTab, setActiveTab] = useState('parameters');
   const [isRecording, setIsRecording] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isCommentSidebarOpen, setIsCommentSidebarOpen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
@@ -219,18 +223,23 @@ export default function WorkspaceLayout() {
   const handleExport = async () => {
     if (!lastImage) return;
     try {
-      const { downloadDxf } = await import("@/lib/api/chat");
-      const blob = await downloadDxf(lastImage, undefined, session?.access_token);
+      const { downloadDesignFile } = await import("@/lib/api/chat");
+      const fileType = outputFormat.toLowerCase() as 'dxf' | 'dwg';
+      if (fileType !== 'dxf' && fileType !== 'dwg') {
+         alert(`${outputFormat} export is not supported yet.`);
+         return;
+      }
+      const blob = await downloadDesignFile(lastImage, fileType, undefined, session?.access_token);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `design_${currentSessionId}.dxf`;
+      a.download = `design_${currentSessionId}.${fileType}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e) {
       console.error(e);
-      alert("Failed to export DXF");
+      alert(`Failed to export ${outputFormat}`);
     }
   };
 
@@ -305,11 +314,19 @@ export default function WorkspaceLayout() {
           <button className="workspace-icon-btn" title="Redo (⌘⇧Z)" aria-label="Redo">
             <Redo2 className="w-4 h-4" />
           </button>
-          <button className="workspace-icon-btn" title="Comment" aria-label="Comment">
+          <button 
+            className="workspace-icon-btn" 
+            title="Comment" 
+            aria-label="Comment"
+            onClick={() => setIsCommentSidebarOpen(true)}
+          >
             <MessageCircle className="w-4 h-4" />
           </button>
 
-          <button className="workspace-share-btn">
+          <button 
+            className="workspace-share-btn"
+            onClick={() => setIsShareModalOpen(true)}
+          >
             <Share2 className="w-3.5 h-3.5" />
             Share
           </button>
@@ -328,10 +345,10 @@ export default function WorkspaceLayout() {
             className={`workspace-export-btn ${!lastImage ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={handleExport}
             disabled={!lastImage}
-            title="Export DXF"
+            title={`Export ${outputFormat}`}
           >
             <Download className="w-3.5 h-3.5" />
-            DXF
+            {outputFormat}
           </button>
 
           {/* Account Avatar + Dropdown */}
@@ -1016,7 +1033,19 @@ export default function WorkspaceLayout() {
       <div className="workspace-demo-state">
         DEMO STATE: <span>populated</span>
       </div>
-    </div>
 
+      <ShareModal 
+        isOpen={isShareModalOpen} 
+        onClose={() => setIsShareModalOpen(false)} 
+        sessionTitle={currentSession?.title || "New Project"}
+        previewImage={lastImage}
+      />
+
+      <CommentSidebar 
+        isOpen={isCommentSidebarOpen}
+        onClose={() => setIsCommentSidebarOpen(false)}
+        currentUser={user?.firstname ? `${user.firstname} ${user.lastname || ''}`.trim() : (user?.email?.split('@')[0] || 'User')}
+      />
+    </div>
   );
 }
