@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from app.db.supabase_client import db
+from app.core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,40 +12,48 @@ PLAN_CONFIG = {
         "monthly": {
             "requests": 50,
             "price": 149,
+            "stripe_price_id": settings.STRIPE_PRICE_ID_STARTER_MONTHLY,
         },
         "annual": {
             "requests": 600,
             "price": 1490,
+            "stripe_price_id": settings.STRIPE_PRICE_ID_STARTER_ANNUAL,
         }
     },
     "professional": {
         "monthly": {
             "requests": 300,
             "price": 499,
+            "stripe_price_id": settings.STRIPE_PRICE_ID_PROFESSIONAL_MONTHLY,
         },
         "annual": {
             "requests": 3600,
             "price": 4990,
+            "stripe_price_id": settings.STRIPE_PRICE_ID_PROFESSIONAL_ANNUAL,
         }
     },
     "enterprise": {
         "monthly": {
             "requests": 2000,
             "price": 1499,
+            "stripe_price_id": settings.STRIPE_PRICE_ID_ENTERPRISE_MONTHLY,
         },
         "annual": {
             "requests": 24000,
             "price": 14990,
+            "stripe_price_id": settings.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL,
         }
     },
     "enterprise_plus": {
         "monthly": {
             "requests": 10000,
             "price": None,
+            "stripe_price_id": None,
         },
         "annual": {
             "requests": 120000,
             "price": None,
+            "stripe_price_id": None,
         }
     }
 }

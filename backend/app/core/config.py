@@ -100,6 +100,14 @@ class Settings(BaseSettings):
     STRIPE_PRICE_ID_100_MINS: Optional[str] = None  # Price ID for purchasing minutes
     STRIPE_LIVE_MODE: bool = False  # True only in Vercel Production; disables mock payments
 
+    # Subscription Price IDs
+    STRIPE_PRICE_ID_STARTER_MONTHLY: Optional[str] = None
+    STRIPE_PRICE_ID_STARTER_ANNUAL: Optional[str] = None
+    STRIPE_PRICE_ID_PROFESSIONAL_MONTHLY: Optional[str] = None
+    STRIPE_PRICE_ID_PROFESSIONAL_ANNUAL: Optional[str] = None
+    STRIPE_PRICE_ID_ENTERPRISE_MONTHLY: Optional[str] = None
+    STRIPE_PRICE_ID_ENTERPRISE_ANNUAL: Optional[str] = None
+
     # External Links
     CALENDLY_URL: str = "https://calendly.com/" # Default or empty
 
