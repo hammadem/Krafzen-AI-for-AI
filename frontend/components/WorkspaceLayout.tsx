@@ -702,41 +702,99 @@ export default function WorkspaceLayout() {
 
                       {message.imageUrl && (
                         <div className="mt-2 space-y-2">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <div className="relative group cursor-pointer rounded-lg overflow-hidden border border-white/10">
-                                <img
-                                  src={message.imageUrl}
-                                  alt="Generated content"
-                                  className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-102"
-                                  loading="lazy"
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                  <Search className="text-white w-6 h-6 drop-shadow-lg" />
+                          <div className="relative group/drawing overflow-hidden rounded-lg border border-white/10">
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <div className="relative cursor-pointer">
+                                  <img
+                                    src={message.imageUrl}
+                                    alt="Generated content"
+                                    className="w-full h-auto object-cover transition-transform duration-300 group-hover/drawing:scale-102"
+                                    loading="lazy"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover/drawing:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover/drawing:opacity-100">
+                                    <Search className="text-white w-6 h-6 drop-shadow-lg" />
+                                  </div>
                                 </div>
-                              </div>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[80vw] w-[80vw] max-h-[85vh] p-0 bg-zinc-950/95 border-white/10 shadow-2xl flex flex-col items-center justify-center" aria-describedby={undefined}>
-                              <DialogTitle className="sr-only">Expanded Design Image</DialogTitle>
-                              <div className="relative w-full h-full flex items-center justify-center p-6 overflow-auto">
-                                <img
-                                  src={message.imageUrl}
-                                  alt="Full size design"
-                                  className="max-w-full max-h-[70vh] object-contain rounded-md shadow-2xl border border-white/10"
-                                />
+                              </DialogTrigger>
+                              <DialogContent className="sm:max-w-[80vw] w-[80vw] max-h-[85vh] p-0 bg-zinc-950/95 border-white/10 shadow-2xl flex flex-col items-center justify-center" aria-describedby={undefined}>
+                                <DialogTitle className="sr-only">Expanded Design Image</DialogTitle>
+                                <div className="relative w-full h-full flex items-center justify-center p-6 overflow-auto">
+                                  <img
+                                    src={message.imageUrl}
+                                    alt="Full size design"
+                                    className="max-w-full max-h-[70vh] object-contain rounded-md shadow-2xl border border-white/10"
+                                  />
+                                  <Button
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDownloadMessageImage(message.imageUrl!);
+                                    }}
+                                    className="absolute bottom-4 right-4 gap-2 bg-zinc-900/90 border border-white/10 hover:bg-zinc-800 text-white shadow-lg"
+                                  >
+                                    <Download className="w-4 h-4" /> Download
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+
+                            {/* Feedback overlay */}
+                            {onMessageFeedback && (
+                              <div 
+                                className={`absolute top-2 right-2 flex items-center gap-1 z-20 bg-zinc-950/80 backdrop-blur-sm border border-white/10 p-1 rounded-md shadow-lg transition-opacity duration-200 ${message.feedback?.reaction ? 'opacity-100' : 'opacity-0 group-hover/drawing:opacity-100'}`}
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 <Button
+                                  variant="ghost"
                                   size="sm"
+                                  className={`text-xs gap-1.5 h-7 w-7 p-0 hover:bg-white/10 ${message.feedback?.reaction === 'up' ? 'text-emerald-400 hover:text-emerald-300' : 'text-gray-400 hover:text-white'}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleDownloadMessageImage(message.imageUrl!);
+                                    onMessageFeedback(message.id, 'up');
                                   }}
-                                  className="absolute bottom-4 right-4 gap-2 bg-zinc-900/90 border border-white/10 hover:bg-zinc-800 text-white shadow-lg"
+                                  title="Good result"
                                 >
-                                  <Download className="w-4 h-4" /> Download
+                                  <ThumbsUp className="w-3.5 h-3.5" />
                                 </Button>
+                                <Popover open={feedbackPopoverMessageId === message.id} onOpenChange={(open) => { if (open) setFeedbackPopoverMessageId(message.id); else { setFeedbackPopoverMessageId(null); setFeedbackReason(""); } }}>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className={`text-xs gap-1.5 h-7 w-7 p-0 hover:bg-white/10 ${message.feedback?.reaction === 'down' ? 'text-amber-400 hover:text-amber-300' : 'text-gray-400 hover:text-white'}`}
+                                      title="Poor result"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <ThumbsDown className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-72 bg-zinc-900 border border-white/10 text-gray-100 p-3" align="end" onClick={(e) => e.stopPropagation()}>
+                                    <p className="text-xs text-gray-400 mb-2">Optional: why wasn&apos;t this helpful?</p>
+                                    <textarea
+                                      placeholder="e.g. wrong layout, missing elements..."
+                                      value={feedbackReason}
+                                      onChange={(e) => setFeedbackReason(e.target.value)}
+                                      className="w-full min-h-[72px] rounded-md bg-black/40 border border-white/10 text-sm text-gray-100 placeholder:text-gray-500 p-2 resize-none focus:outline-none focus:ring-1 focus:ring-white/20"
+                                      rows={3}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      className="w-full mt-2 bg-white/10 hover:bg-white/20 text-gray-100"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        await onMessageFeedback(message.id, 'down', feedbackReason.trim() || undefined);
+                                        setFeedbackPopoverMessageId(null);
+                                        setFeedbackReason("");
+                                      }}
+                                    >
+                                      Submit feedback
+                                    </Button>
+                                  </PopoverContent>
+                                </Popover>
                               </div>
-                            </DialogContent>
-                          </Dialog>
+                            )}
+                          </div>
 
                           <div className="flex flex-row items-center justify-end gap-2 w-full flex-wrap sm:flex-nowrap pt-1">
                             <Button
@@ -833,53 +891,6 @@ export default function WorkspaceLayout() {
                               <Download className="w-3 h-3" />
                               <span>Download Image</span>
                             </Button>
-
-                            {onMessageFeedback && (
-                              <div className="flex items-center gap-1 ml-auto">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className={`text-xs gap-1.5 h-8 w-8 p-0 ${message.feedback?.reaction === 'up' ? 'text-emerald-400 hover:text-emerald-300' : 'text-gray-400 hover:text-white'}`}
-                                  onClick={() => onMessageFeedback(message.id, 'up')}
-                                  title="Good result"
-                                >
-                                  <ThumbsUp className="w-3.5 h-3.5" />
-                                </Button>
-                                <Popover open={feedbackPopoverMessageId === message.id} onOpenChange={(open) => { if (open) setFeedbackPopoverMessageId(message.id); else { setFeedbackPopoverMessageId(null); setFeedbackReason(""); } }}>
-                                  <PopoverTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className={`text-xs gap-1.5 h-8 w-8 p-0 ${message.feedback?.reaction === 'down' ? 'text-amber-400 hover:text-amber-300' : 'text-gray-400 hover:text-white'}`}
-                                      title="Poor result"
-                                    >
-                                      <ThumbsDown className="w-3.5 h-3.5" />
-                                    </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-72 bg-zinc-900 border border-white/10 text-gray-100 p-3" align="end">
-                                    <p className="text-xs text-gray-400 mb-2">Optional: why wasn&apos;t this helpful?</p>
-                                    <textarea
-                                      placeholder="e.g. wrong layout, missing elements..."
-                                      value={feedbackReason}
-                                      onChange={(e) => setFeedbackReason(e.target.value)}
-                                      className="w-full min-h-[72px] rounded-md bg-black/40 border border-white/10 text-sm text-gray-100 placeholder:text-gray-500 p-2 resize-none focus:outline-none focus:ring-1 focus:ring-white/20"
-                                      rows={3}
-                                    />
-                                    <Button
-                                      size="sm"
-                                      className="w-full mt-2 bg-white/10 hover:bg-white/20 text-gray-100"
-                                      onClick={async () => {
-                                        await onMessageFeedback(message.id, 'down', feedbackReason.trim() || undefined);
-                                        setFeedbackPopoverMessageId(null);
-                                        setFeedbackReason("");
-                                      }}
-                                    >
-                                      Submit feedback
-                                    </Button>
-                                  </PopoverContent>
-                                </Popover>
-                              </div>
-                            )}
                           </div>
 
                           {message.compliance && (
