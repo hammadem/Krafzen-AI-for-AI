@@ -62,6 +62,7 @@ class PaymentService:
                     'quantity': 1,
                 }],
                 mode='subscription',  # Use subscription mode
+                allow_promotion_codes=True,
                 success_url=success_url,
                 cancel_url=cancel_url,
                 metadata={
@@ -125,6 +126,7 @@ class PaymentService:
                     "quantity": 1,
                 }],
                 mode="subscription",
+                allow_promotion_codes=True,
                 metadata={
                     "user_id": user_id,
                     "type": "subscription",
@@ -160,6 +162,7 @@ class PaymentService:
                     'quantity': 1,
                 }],
                 mode='payment',
+                allow_promotion_codes=True,
                 success_url=success_url,
                 cancel_url=cancel_url,
                 metadata={
