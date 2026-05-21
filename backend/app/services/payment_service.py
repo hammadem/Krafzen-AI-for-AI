@@ -44,10 +44,15 @@ class PaymentService:
             if price is None:
                 # Custom pricing - redirect to contact/calendly
                 raise ValueError("This plan requires custom pricing. Please contact sales.")
-            
-            checkout_session = stripe.checkout.Session.create(
-                payment_method_types=['card'],
-                line_items=[{
+            stripe_price_id = plan_config.get("stripe_price_id")
+            line_items = []
+            if stripe_price_id:
+                line_items = [{
+                    'price': stripe_price_id,
+                    'quantity': 1,
+                }]
+            else:
+                line_items = [{
                     'price_data': {
                         'currency': 'usd',
                         'unit_amount': int(price * 100),  # Convert to cents
@@ -60,7 +65,11 @@ class PaymentService:
                         } if billing_cycle in ['monthly', 'annual'] else None,
                     },
                     'quantity': 1,
-                }],
+                }]
+
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=line_items,
                 mode='subscription',  # Use subscription mode
                 allow_promotion_codes=True,
                 success_url=success_url,
@@ -107,11 +116,15 @@ class PaymentService:
             if price is None:
                 raise ValueError("This plan requires custom pricing. Please contact sales.")
 
-            checkout_session = stripe.checkout.Session.create(
-                ui_mode="embedded_page",
-                return_url=return_url,
-                payment_method_types=["card"],
-                line_items=[{
+            stripe_price_id = plan_config.get("stripe_price_id")
+            line_items = []
+            if stripe_price_id:
+                line_items = [{
+                    'price': stripe_price_id,
+                    'quantity': 1,
+                }]
+            else:
+                line_items = [{
                     "price_data": {
                         "currency": "usd",
                         "unit_amount": int(price * 100),
@@ -124,7 +137,13 @@ class PaymentService:
                         },
                     },
                     "quantity": 1,
-                }],
+                }]
+
+            checkout_session = stripe.checkout.Session.create(
+                ui_mode="embedded_page",
+                return_url=return_url,
+                payment_method_types=["card"],
+                line_items=line_items,
                 mode="subscription",
                 allow_promotion_codes=True,
                 metadata={
@@ -241,7 +260,6 @@ class PaymentService:
             # We need to determine what they bought by looking at the line items/price
             # For simplicity, we'll try to infer it from the amount or retrieve line items
             try:
-                # Retrieve line items to see what was purchased
                 line_items = stripe.checkout.Session.list_line_items(session.get("id"), limit=1)
                 if line_items.data:
                     price_id = line_items.data[0].price.id
@@ -259,7 +277,22 @@ class PaymentService:
                         14990: ("enterprise", "annual")
                     }
                     
-                    plan_name, billing_cycle = plan_map.get(int(amount), (None, None))
+                    # First try to match by Price ID in PLAN_CONFIG
+                    found_plan = None
+                    found_cycle = None
+                    for p_name, cycles in PLAN_CONFIG.items():
+                        for c_cycle, config in cycles.items():
+                            if config.get("stripe_price_id") == price_id:
+                                found_plan = p_name
+                                found_cycle = c_cycle
+                                break
+                        if found_plan:
+                            break
+                            
+                    if found_plan:
+                        plan_name, billing_cycle = found_plan, found_cycle
+                    else:
+                        plan_name, billing_cycle = plan_map.get(int(amount), (None, None))
                     
                     if plan_name:
                         event_type = "subscription"
