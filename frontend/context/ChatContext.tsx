@@ -34,7 +34,7 @@ interface ChatContextType {
     setCurrentSessionId: (id: string | null) => void;
     chatJurisdiction: ChatJurisdiction;
     setChatJurisdiction: (j: ChatJurisdiction) => void;
-    handleSendMessage: () => Promise<void>;
+    handleSendMessage: (previousImageUrl?: string) => Promise<void>;
     createNewChat: () => void;
     deleteSession: (id: string) => Promise<void>;
     onMessageFeedback: (messageId: string, reaction: 'up' | 'down', reason?: string) => Promise<void>;
@@ -252,7 +252,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const handleSendMessage = async () => {
+    const handleSendMessage = async (previousImageUrl?: string) => {
         if (!inputValue.trim() || !activeSessionId) return;
 
         const currentId = activeSessionId;
@@ -293,7 +293,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
 
             if (token) {
                 // Pass the sessionId to ensure messages are saved to the correct session
-                const response = await sendChatMessage(userContent, [], token, currentId, chatJurisdiction);
+                const response = await sendChatMessage(userContent, [], token, currentId, chatJurisdiction, previousImageUrl);
 
                 // Update session ID if backend created a new one (shouldn't happen if we pass sessionId)
                 if (response.session_id && response.session_id !== currentId) {

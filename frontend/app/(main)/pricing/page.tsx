@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Check, Shield, Zap, Globe, MessageSquare, Layers, Loader2 } from 'lucide-react';
 import CalendlyBooking from '@/components/CalendlyBooking';
+import StripePaymentModal from '@/components/StripePaymentModal';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { createCheckoutSession } from '@/lib/api/payment';
@@ -123,8 +124,16 @@ export default function PricingPage() {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
     const [isCalendlyOpen, setIsCalendlyOpen] = useState(false);
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+    const [paymentModal, setPaymentModal] = useState<{
+        open: boolean;
+        planName: string;
+        planDisplayName: string;
+        amount: string;
+        billingCycle: 'monthly' | 'annual';
+        colorTheme: string;
+    } | null>(null);
 
-    const handlePlanAction = async (plan: PricingPlan) => {
+    const handlePlanAction = (plan: PricingPlan) => {
         if (plan.id === 'enterprise_plus') {
             setIsCalendlyOpen(true);
             return;
@@ -135,31 +144,20 @@ export default function PricingPage() {
             return;
         }
 
-        try {
-            setLoadingPlan(plan.id);
-            // Use the specific Stripe Payment Link provided by the user
-            const links = plan.links;
-            if (links) {
-                const baseUrl = billingCycle === 'monthly' ? links.monthly : links.annual;
-                // Append client_reference_id so the webhook can identify the user
-                const checkoutUrl = `${baseUrl}?client_reference_id=${user.userId || ""}`;
-                window.location.href = checkoutUrl;
-                return;
-            }
+        let theme = "green";
+        if (plan.id === "professional") theme = "blue";
+        if (plan.id === "enterprise") theme = "yellow";
 
-            // Fallback to dynamic session if no specific link
-            const { url } = await createCheckoutSession(user, plan.id, billingCycle);
-            if (url) {
-                window.location.href = url;
-            } else {
-                toast.error("Failed to initiate checkout. Please try again.");
-            }
-        } catch (error) {
-            console.error("Payment error:", error);
-            toast.error(error instanceof Error ? error.message : "Payment initialization failed");
-        } finally {
-            setLoadingPlan(null);
-        }
+        const amount = billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
+
+        setPaymentModal({
+            open: true,
+            planName: plan.id,
+            planDisplayName: plan.name,
+            amount: amount,
+            billingCycle: billingCycle,
+            colorTheme: theme
+        });
     };
 
     return (
@@ -273,6 +271,14 @@ export default function PricingPage() {
                 isOpen={isCalendlyOpen}
                 onClose={() => setIsCalendlyOpen(false)}
             />
+
+            {paymentModal && (
+                <StripePaymentModal
+                    isOpen={paymentModal.open}
+                    onClose={() => setPaymentModal(null)}
+                    {...paymentModal}
+                />
+            )}
         </div>
     );
 }

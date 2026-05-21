@@ -90,15 +90,6 @@ export default function NewLanding() {
       router.push(`/login?redirect=/pricing`);
       return;
     }
-
-    // Use specific Stripe link if available
-    const planLinks = stripeLinks[plan];
-    if (planLinks) {
-      const baseUrl = monthly ? planLinks.monthly : planLinks.annual;
-      const checkoutUrl = `${baseUrl}?client_reference_id=${user.userId || ""}`;
-      window.location.href = checkoutUrl;
-      return;
-    }
     
     setPaymentModal({
       open: true,

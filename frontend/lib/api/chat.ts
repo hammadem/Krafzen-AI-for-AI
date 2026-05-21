@@ -38,7 +38,8 @@ export async function sendChatMessage(
     history: { role: string, content: string, imageUrl?: string }[] = [],
     token?: string,
     sessionId?: string,
-    jurisdiction?: ChatJurisdiction
+    jurisdiction?: ChatJurisdiction,
+    previousImageUrl?: string
 ): Promise<ChatResponse> {
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -50,6 +51,7 @@ export async function sendChatMessage(
     const body: Record<string, unknown> = { message, history };
     if (sessionId) body.session_id = sessionId;
     if (jurisdiction === "US_IRC_BASELINE") body.jurisdiction = "US_IRC_BASELINE";
+    if (previousImageUrl) body.previous_image_url = previousImageUrl;
 
     const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/generate`, {
         method: 'POST',

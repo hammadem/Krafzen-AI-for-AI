@@ -13,6 +13,10 @@ import {
   Undo2,
   Redo2,
   MessageCircle,
+  MessageSquare,
+  ChevronsLeft,
+  ThumbsUp,
+  ThumbsDown,
   LayoutGrid,
   Box,
   Code2,
@@ -22,13 +26,17 @@ import {
   Clock,
   Shield,
   FileText,
+  Loader2,
   Image as ImageIcon
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { downloadComplianceReportTxt } from "@/lib/complianceReport";
-import { type CompliancePayload } from "@/lib/api/chat";
+import { type CompliancePayload, downloadDesignFile, downloadDxf } from "@/lib/api/chat";
+import { createClient } from "@/lib/supabase/supabaseClient";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import {
     Select,
     SelectContent,
@@ -36,6 +44,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import { ShareModal } from "./ShareModal";
 import { CommentSidebar } from "./CommentSidebar";
 import "../app/workspace.css";
@@ -139,7 +152,79 @@ export default function WorkspaceLayout() {
   const [drawingScale, setDrawingScale] = useState('1/4" = 1\'-0"');
 
   // Canvas View Mode state
-  const [canvasViewMode, setCanvasViewMode] = useState<'2d' | '3d' | 'code'>('2d');
+  const [canvasViewMode, setCanvasViewMode] = useState<'2d' | '3d' | 'code' | 'chat'>('2d');
+  const [isChatOverlayCollapsed, setIsChatOverlayCollapsed] = useState(false);
+  const [feedbackPopoverMessageId, setFeedbackPopoverMessageId] = useState<string | null>(null);
+  const [feedbackReason, setFeedbackReason] = useState("");
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [designDownload, setDesignDownload] = useState<{
+    kind: 'dxf' | 'dwg';
+    messageId: string;
+  } | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const threadMessagesRef = useRef<HTMLDivElement>(null);
+
+  const displayMessages = (() => {
+    if (!selectedMessageId) return messages;
+    const idx = messages.findIndex(m => m.id === selectedMessageId);
+    return idx === -1 ? messages : messages.slice(0, idx + 1);
+  })();
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    if (canvasViewMode === 'chat') {
+      scrollToBottom();
+    }
+  }, [messages, displayMessages, canvasViewMode]);
+
+  useEffect(() => {
+    if (!isChatOverlayCollapsed && threadMessagesRef.current) {
+      threadMessagesRef.current.scrollTop = threadMessagesRef.current.scrollHeight;
+    }
+  }, [messages, displayMessages, isChatOverlayCollapsed, selectedMessageId]);
+
+  useEffect(() => {
+    setSelectedMessageId(null);
+  }, [messages.length, currentSessionId]);
+
+  const handleDownloadMessageImage = async (imageUrl: string) => {
+    try {
+        let blob: Blob;
+        try {
+            const response = await fetch(imageUrl);
+            if (response.ok) {
+                blob = await response.blob();
+            } else {
+                throw new Error("Direct fetch failed");
+            }
+        } catch (e) {
+            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+            const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error("Proxy fetch failed");
+            blob = await response.blob();
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `design-${new Date().getTime()}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+    } catch (error) {
+        console.error("Download failed:", error);
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+  };
 
   // Compliance & Generation toggles
   const [complianceToggles, setComplianceToggles] = useState({
@@ -218,7 +303,11 @@ export default function WorkspaceLayout() {
   const displayTotalRequests = totalRequests;
   const requestsPercentage = Math.min(100, (currentRequests / displayTotalRequests) * 100);
 
-  const lastImage = messages.filter(m => m.role === 'assistant' && m.imageUrl).reverse()[0]?.imageUrl;
+  const assistantImageMessages = messages.filter(m => m.role === 'assistant' && m.imageUrl);
+  const selectedMsg = selectedMessageId 
+    ? messages.find(m => m.id === selectedMessageId) 
+    : null;
+  const lastImage = selectedMsg?.imageUrl || (assistantImageMessages.length > 0 ? assistantImageMessages[assistantImageMessages.length - 1].imageUrl : undefined);
 
   const handleExport = async () => {
     if (!lastImage) return;
@@ -517,6 +606,14 @@ export default function WorkspaceLayout() {
               >
                 <Code2 className="w-4 h-4" />
               </button>
+              <button 
+                className={`workspace-tool-btn ${canvasViewMode === 'chat' ? 'active' : ''}`} 
+                onClick={() => setCanvasViewMode('chat')}
+                title="Chat view" 
+                aria-label="Chat view"
+              >
+                <MessageSquare className="w-4 h-4" />
+              </button>
             </div>
             <div className="workspace-tool-group" role="group" aria-label="Tools">
               <button 
@@ -580,6 +677,245 @@ export default function WorkspaceLayout() {
                 </button>
               </div>
             </div>
+          ) : canvasViewMode === 'chat' ? (
+            <div className="workspace-chat-view-container custom-scrollbar">
+              <div className="workspace-chat-view-inner">
+                {displayMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`workspace-chat-message-row ${message.role === 'user' ? 'user-row' : 'assistant-row'}`}
+                  >
+                    <Avatar className="w-8 h-8 shrink-0">
+                      <AvatarFallback className={message.role === 'user' ? 'bg-white text-black font-bold' : 'bg-zinc-800 text-cyan-400 border border-white/10'}>
+                        {message.role === 'user' ? (
+                          (user?.firstname?.[0] || user?.email?.[0]?.toUpperCase() || "U")
+                        ) : (
+                          <ChevronsLeft className="w-5 h-5 stroke-[3px]" />
+                        )}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div className={`workspace-chat-message-bubble ${message.role === 'user' ? 'user-bubble' : 'assistant-bubble'}`}>
+                      {message.content && !message.content.trim().startsWith("To draw a") && (
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{message.content}</p>
+                      )}
+
+                      {message.imageUrl && (
+                        <div className="mt-2 space-y-2">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <div className="relative group cursor-pointer rounded-lg overflow-hidden border border-white/10">
+                                <img
+                                  src={message.imageUrl}
+                                  alt="Generated content"
+                                  className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-102"
+                                  loading="lazy"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                  <Search className="text-white w-6 h-6 drop-shadow-lg" />
+                                </div>
+                              </div>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[80vw] w-[80vw] max-h-[85vh] p-0 bg-zinc-950/95 border-white/10 shadow-2xl flex flex-col items-center justify-center" aria-describedby={undefined}>
+                              <DialogTitle className="sr-only">Expanded Design Image</DialogTitle>
+                              <div className="relative w-full h-full flex items-center justify-center p-6 overflow-auto">
+                                <img
+                                  src={message.imageUrl}
+                                  alt="Full size design"
+                                  className="max-w-full max-h-[70vh] object-contain rounded-md shadow-2xl border border-white/10"
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownloadMessageImage(message.imageUrl!);
+                                  }}
+                                  className="absolute bottom-4 right-4 gap-2 bg-zinc-900/90 border border-white/10 hover:bg-zinc-800 text-white shadow-lg"
+                                >
+                                  <Download className="w-4 h-4" /> Download
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+
+                          <div className="flex flex-row items-center justify-end gap-2 w-full flex-wrap sm:flex-nowrap pt-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={designDownload !== null}
+                              className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2 flex-1 sm:flex-none justify-center disabled:opacity-50 h-8"
+                              onClick={async () => {
+                                if (designDownload !== null) return;
+                                setDesignDownload({ kind: 'dxf', messageId: message.id });
+                                try {
+                                  const supabase = createClient();
+                                  const { data: { session } } = await supabase.auth.getSession();
+                                  const token = session?.access_token;
+
+                                  const blob = await downloadDxf(message.imageUrl!, message.content, token);
+                                  const url = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = `plan-${new Date().getTime()}.dxf`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(url);
+                                } catch (e) {
+                                  console.error("DXF Download error:", e);
+                                  alert("Failed to download DXF. Please try again.");
+                                } finally {
+                                  setDesignDownload(null);
+                                }
+                              }}
+                            >
+                              {designDownload?.messageId === message.id && designDownload?.kind === 'dxf' ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Download className="w-3 h-3" />
+                              )}
+                              <span>
+                                {designDownload?.messageId === message.id && designDownload?.kind === 'dxf' ? 'Generating DXF...' : 'Download DXF'}
+                              </span>
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={designDownload !== null}
+                              className="text-xs text-gray-400 border-white/10 hover:bg-white/5 hover:text-white gap-2 flex-1 sm:flex-none justify-center disabled:opacity-50 h-8"
+                              onClick={async () => {
+                                if (designDownload !== null) return;
+                                setDesignDownload({ kind: 'dwg', messageId: message.id });
+                                try {
+                                  const supabase = createClient();
+                                  const { data: { session } } = await supabase.auth.getSession();
+                                  const token = session?.access_token;
+
+                                  const blob = await downloadDesignFile(
+                                    message.imageUrl!,
+                                    'dwg',
+                                    message.content,
+                                    token
+                                  );
+                                  const url = window.URL.createObjectURL(blob);
+                                  const link = document.createElement('a');
+                                  link.href = url;
+                                  link.download = `plan-${new Date().getTime()}.dwg`;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  window.URL.revokeObjectURL(url);
+                                } catch (e) {
+                                  console.error("DWG Download error:", e);
+                                  alert("Failed to download DWG.");
+                                } finally {
+                                  setDesignDownload(null);
+                                }
+                              }}
+                            >
+                              {designDownload?.messageId === message.id && designDownload?.kind === 'dwg' ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Download className="w-3 h-3" />
+                              )}
+                              <span>
+                                {designDownload?.messageId === message.id && designDownload?.kind === 'dwg' ? 'Generating DWG...' : 'Download DWG'}
+                              </span>
+                            </Button>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-gray-400 hover:text-white hover:bg-white/5 gap-2 flex-1 sm:flex-none justify-center h-8"
+                              onClick={() => handleDownloadMessageImage(message.imageUrl!)}
+                            >
+                              <Download className="w-3 h-3" />
+                              <span>Download Image</span>
+                            </Button>
+
+                            {onMessageFeedback && (
+                              <div className="flex items-center gap-1 ml-auto">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={`text-xs gap-1.5 h-8 w-8 p-0 ${message.feedback?.reaction === 'up' ? 'text-emerald-400 hover:text-emerald-300' : 'text-gray-400 hover:text-white'}`}
+                                  onClick={() => onMessageFeedback(message.id, 'up')}
+                                  title="Good result"
+                                >
+                                  <ThumbsUp className="w-3.5 h-3.5" />
+                                </Button>
+                                <Popover open={feedbackPopoverMessageId === message.id} onOpenChange={(open) => { if (open) setFeedbackPopoverMessageId(message.id); else { setFeedbackPopoverMessageId(null); setFeedbackReason(""); } }}>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className={`text-xs gap-1.5 h-8 w-8 p-0 ${message.feedback?.reaction === 'down' ? 'text-amber-400 hover:text-amber-300' : 'text-gray-400 hover:text-white'}`}
+                                      title="Poor result"
+                                    >
+                                      <ThumbsDown className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-72 bg-zinc-900 border border-white/10 text-gray-100 p-3" align="end">
+                                    <p className="text-xs text-gray-400 mb-2">Optional: why wasn&apos;t this helpful?</p>
+                                    <textarea
+                                      placeholder="e.g. wrong layout, missing elements..."
+                                      value={feedbackReason}
+                                      onChange={(e) => setFeedbackReason(e.target.value)}
+                                      className="w-full min-h-[72px] rounded-md bg-black/40 border border-white/10 text-sm text-gray-100 placeholder:text-gray-500 p-2 resize-none focus:outline-none focus:ring-1 focus:ring-white/20"
+                                      rows={3}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      className="w-full mt-2 bg-white/10 hover:bg-white/20 text-gray-100"
+                                      onClick={async () => {
+                                        await onMessageFeedback(message.id, 'down', feedbackReason.trim() || undefined);
+                                        setFeedbackPopoverMessageId(null);
+                                        setFeedbackReason("");
+                                      }}
+                                    >
+                                      Submit feedback
+                                    </Button>
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                            )}
+                          </div>
+
+                          {message.compliance && (
+                            <ComplianceStrip data={message.compliance} projectName={currentSession?.title || "Workspace"} />
+                          )}
+                        </div>
+                      )}
+
+                      <span className="text-[10px] opacity-70 mt-2 block text-right font-mono">
+                        {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                {isLoading && (
+                  <div className="workspace-chat-message-row assistant-row">
+                    <Avatar className="w-8 h-8 border border-white/10 shrink-0">
+                      <AvatarFallback className="bg-zinc-800 text-cyan-400 border border-white/10">
+                        <ChevronsLeft className="w-5 h-5 stroke-[3px]" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="workspace-chat-message-bubble assistant-bubble">
+                      <div className="flex space-x-2 items-center">
+                        <span className="text-xs text-gray-400 mr-2">Generating...</span>
+                        <div className="h-2 w-2 bg-cyan-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                        <div className="h-2 w-2 bg-cyan-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                        <div className="h-2 w-2 bg-cyan-400 rounded-full animate-bounce"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
           ) : (
             <div className={`workspace-drawing-frame ${canvasViewMode}`} id="drawingFrame">
               {lastImage ? (
@@ -635,40 +971,93 @@ export default function WorkspaceLayout() {
           )}
 
           {/* Conversation thread overlay */}
-          {(messages.length > 0 || isLoading) && (
-            <div className="workspace-thread" id="thread">
-              {messages.slice(-2).map((msg, idx) => (
-                <div key={idx} className={`workspace-msg ${msg.role === 'user' ? 'user' : 'assistant'}`}>
-                  <div className="msg-meta">
-                    <span className="role-dot"></span>
-                    <span>{msg.role === 'user' ? 'YOU' : 'KRAFZEN'}</span>
-                    <span>·</span>
-                    <span>{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '14:32'}</span>
-                    {msg.role === 'assistant' && <span className="msg-duration">· 3.2s</span>}
+          {canvasViewMode !== 'chat' && (messages.length > 0 || isLoading) && (
+            isChatOverlayCollapsed ? (
+              <button 
+                type="button"
+                className="workspace-thread-toggle-btn"
+                onClick={() => setIsChatOverlayCollapsed(false)}
+                title="Expand chat overlay"
+                aria-label="Expand chat overlay"
+              >
+                <MessageSquare className="w-5 h-5 text-cyan-400" />
+                <span className="toggle-badge">{messages.length}</span>
+              </button>
+            ) : (
+              <div className="workspace-thread" id="thread">
+                <div className="workspace-thread-header">
+                  <div className="flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className="font-mono text-[10px] font-bold tracking-wider text-gray-300">CHAT OVERLAY</span>
                   </div>
-                  {msg.role === 'user' ? msg.content : ((!msg.imageUrl && !msg.content?.trim().startsWith("To draw a")) && msg.content)}
-                  {msg.compliance && (
-                    <ComplianceStrip data={msg.compliance} projectName={currentSession?.title || "Workspace"} />
+                  <button 
+                    type="button"
+                    className="workspace-thread-minimize-btn"
+                    onClick={() => setIsChatOverlayCollapsed(true)}
+                    title="Minimize"
+                    aria-label="Minimize chat overlay"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                </div>
+
+                <div ref={threadMessagesRef} className="workspace-thread-messages custom-scrollbar">
+                  {displayMessages.map((msg) => (
+                    <div 
+                      key={msg.id} 
+                      className={`workspace-msg ${msg.role === 'user' ? 'user' : 'assistant'} ${selectedMessageId === msg.id ? 'active border-cyan-400 bg-cyan-400/[0.03]' : ''}`}
+                      onClick={() => {
+                        if (msg.imageUrl) {
+                          setSelectedMessageId(msg.id);
+                          setCanvasViewMode('2d');
+                        }
+                      }}
+                      style={{ cursor: msg.imageUrl ? 'pointer' : 'default' }}
+                    >
+                      <div className="msg-meta">
+                        <span className="role-dot"></span>
+                        <span>{msg.role === 'user' ? 'YOU' : 'KRAFZEN'}</span>
+                        <span>·</span>
+                        <span>{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '14:32'}</span>
+                        {msg.role === 'assistant' && <span className="msg-duration">· 3.2s</span>}
+                      </div>
+                      {msg.content && !msg.content.trim().startsWith("To draw a") && (
+                        <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.imageUrl ? 'mb-2' : ''}`}>{msg.content}</p>
+                      )}
+                      {msg.imageUrl && (
+                        <div className="relative group rounded-lg overflow-hidden border border-white/10 mt-1 max-w-[200px]">
+                          <img
+                            src={msg.imageUrl}
+                            alt="Generated content"
+                            className="w-full h-auto object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                      {msg.compliance && (
+                        <ComplianceStrip data={msg.compliance} projectName={currentSession?.title || "Workspace"} />
+                      )}
+                    </div>
+                  ))}
+                  {isLoading && (
+                    <div className="workspace-msg assistant">
+                      <div className="msg-meta">
+                        <span className="role-dot"></span>
+                        <span>KRAFZEN</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-medium opacity-70">Generating design...</span>
+                        <div className="flex items-center gap-1.5 py-1">
+                          <span className="w-1 h-1 bg-cyan-400 rounded-full animate-dots-bounce" style={{ animationDelay: '0s' }}></span>
+                          <span className="w-1 h-1 bg-cyan-400 rounded-full animate-dots-bounce" style={{ animationDelay: '0.2s' }}></span>
+                          <span className="w-1 h-1 bg-cyan-400 rounded-full animate-dots-bounce" style={{ animationDelay: '0.4s' }}></span>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-              ))}
-              {isLoading && (
-                <div className="workspace-msg assistant">
-                  <div className="msg-meta">
-                    <span className="role-dot"></span>
-                    <span>KRAFZEN</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium opacity-70">Generating design...</span>
-                    <div className="flex items-center gap-1.5 py-1">
-                      <span className="w-1 h-1 bg-cyan-400 rounded-full animate-dots-bounce" style={{ animationDelay: '0s' }}></span>
-                      <span className="w-1 h-1 bg-cyan-400 rounded-full animate-dots-bounce" style={{ animationDelay: '0.2s' }}></span>
-                      <span className="w-1 h-1 bg-cyan-400 rounded-full animate-dots-bounce" style={{ animationDelay: '0.4s' }}></span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )
           )}
         </div>
 
@@ -947,21 +1336,43 @@ export default function WorkspaceLayout() {
                 {messages.filter(m => m.imageUrl).length === 0 ? (
                   <p className="text-[11px] text-gray-500 italic px-2">No iterations yet.</p>
                 ) : (
-                  messages.filter(m => m.imageUrl).reverse().map((msg, i) => (
-                    <div key={i} className="p-2 rounded-lg bg-white/5 border border-white/5 hover:border-cyan-400/30 transition-all cursor-pointer group">
-                      <div className="flex justify-between items-start mb-1.5">
-                        <span className="text-[10px] font-mono text-cyan-400/70">v{messages.filter(m => m.imageUrl).length - i}.0</span>
-                        <span className="text-[9px] text-gray-500">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}</span>
+                  messages.filter(m => m.imageUrl).reverse().map((msg, i) => {
+                    const totalImages = messages.filter(m => m.imageUrl).length;
+                    const versionNum = totalImages - i;
+                    const isActive = selectedMessageId ? selectedMessageId === msg.id : (i === 0);
+                    
+                    return (
+                      <div 
+                        key={msg.id} 
+                        onClick={() => { setSelectedMessageId(msg.id); setCanvasViewMode('2d'); }}
+                        className={`p-2.5 rounded-lg bg-white/5 border transition-all cursor-pointer group ${isActive ? 'border-cyan-400 bg-cyan-400/[0.03]' : 'border-white/5 hover:border-cyan-400/30'}`}
+                      >
+                        <div className="flex justify-between items-start mb-1.5">
+                          <span className={`text-[10px] font-mono ${isActive ? 'text-cyan-400 font-bold' : 'text-cyan-400/70'}`}>v{versionNum}.0</span>
+                          <span className="text-[9px] text-gray-500">{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent'}</span>
+                        </div>
+                        <p className="text-[11px] text-gray-300 line-clamp-2 leading-relaxed mb-2">
+                          {messages.find((m, idx) => idx === messages.indexOf(msg) - 1)?.content || "Initial design"}
+                        </p>
+                        <div className="flex gap-2">
+                          <button 
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setSelectedMessageId(msg.id); setCanvasViewMode('2d'); }}
+                            className={`text-[9px] px-2 py-1 rounded transition-colors ${isActive ? 'bg-cyan-400 text-black font-semibold' : 'bg-cyan-400/10 text-cyan-400 hover:bg-cyan-400/20'}`}
+                          >
+                            {isActive ? 'Active' : 'Restore'}
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setSelectedMessageId(msg.id); setCanvasViewMode('code'); }}
+                            className="text-[9px] px-2 py-1 rounded bg-white/5 text-gray-400 hover:bg-white/10 transition-colors"
+                          >
+                            View Data
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-[11px] text-gray-300 line-clamp-2 leading-relaxed mb-2">
-                        {messages.find((m, idx) => idx === messages.indexOf(msg) - 1)?.content || "Initial design"}
-                      </p>
-                      <div className="flex gap-2">
-                        <button className="text-[9px] px-2 py-1 rounded bg-cyan-400/10 text-cyan-400 hover:bg-cyan-400/20 transition-colors">Restore</button>
-                        <button className="text-[9px] px-2 py-1 rounded bg-white/5 text-gray-400 hover:bg-white/10 transition-colors">View Data</button>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -980,7 +1391,7 @@ export default function WorkspaceLayout() {
         className="workspace-prompt-bar" 
         id="promptBar" 
         role="form" 
-        onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+        onSubmit={(e) => { e.preventDefault(); handleSendMessage(selectedMsg?.imageUrl || undefined); }}
       >
         <div className="flex items-center gap-2 mb-2 px-1">
           <span className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Jurisdiction</span>
@@ -1006,7 +1417,7 @@ export default function WorkspaceLayout() {
             placeholder="Iterate on this design... e.g. 'add a kitchen island 6 feet wide'" 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(selectedMsg?.imageUrl || undefined); } }}
           />
 
           <div className="workspace-prompt-actions">
