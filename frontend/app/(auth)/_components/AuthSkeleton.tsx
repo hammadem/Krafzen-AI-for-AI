@@ -1,4 +1,3 @@
-import CompanyLogo from "@/components/CompanyLogo";
 import Image from "next/image";
 
 export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
@@ -22,14 +21,15 @@ export default function AuthSkeleton({ AuthType }: { AuthType: React.FC }) {
             </div>
 
             {/* Right Side: Content Area */}
-            <div className="relative ml-auto w-full md:w-1/2 flex flex-col items-center justify-center min-h-screen p-10 gap-12 z-10">
+            <div className="relative ml-auto w-full md:w-1/2 lg:w-2/5 flex flex-col items-center justify-center min-h-screen p-10 gap-12 z-10 bg-[#06080d]/80 backdrop-blur-xl border-l border-white/5">
                 {/* Ambient Vibrancy Glows */}
-                <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px] pointer-events-none mix-blend-screen animate-pulse"></div>
-                <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-blue-600/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
+                <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-[#54e3b5]/10 rounded-full blur-[120px] pointer-events-none mix-blend-screen animate-pulse"></div>
+                <div className="absolute bottom-1/4 right-0 w-80 h-80 bg-[#3fc89c]/5 rounded-full blur-[100px] pointer-events-none mix-blend-screen"></div>
 
-                <span className="mx-auto relative z-20 -translate-x-[15px] mt-8 md:mt-12">
-                    <CompanyLogo />
-                </span>
+                <div className="mx-auto relative z-20 flex items-center gap-3">
+                    <Image src="/icon.svg" alt="Krafzen AI" width={32} height={32} className="h-auto" />
+                    <span className="text-2xl font-bold tracking-tighter text-white">KRAFZEN AI</span>
+                </div>
 
                 <div className="w-full max-w-md relative z-20 mt-2">
                     <AuthType />

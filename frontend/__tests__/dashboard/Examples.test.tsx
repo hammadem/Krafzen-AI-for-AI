@@ -53,7 +53,7 @@ describe("Example components", () => {
 
         expect(screen.getByText(/Starter/i)).toBeInTheDocument();
         expect(screen.getByText(/Basic features for individual use./i)).toBeInTheDocument();
-        expect(screen.getByText(/\$249/i)).toBeInTheDocument();
+        expect(screen.getByText(/\$149/i)).toBeInTheDocument();
         expect(screen.getByText(/Current Plan/i)).toBeInTheDocument();
     });
 

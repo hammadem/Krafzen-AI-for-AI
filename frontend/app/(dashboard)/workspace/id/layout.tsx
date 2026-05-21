@@ -5,7 +5,7 @@ import { examplePrompt } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import Toolbar from "../../_component/Toolbar";
 import { useAuth } from "@/context/AuthContext";
-import { useDashboard } from "@/context/DashboardContex";
+import { useDashboard } from "@/context/DashboardContext";
 import { useCreateProject } from "@/hooks/useCreateProject";
 
 export default function DashboardLayout({

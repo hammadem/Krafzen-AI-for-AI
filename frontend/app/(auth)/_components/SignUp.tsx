@@ -19,6 +19,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { toast } from "react-toastify";
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 
 export default function SignUp() {
@@ -33,6 +34,8 @@ export default function SignUp() {
         },
     });
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     async function onSubmit(data: z.infer<typeof loginSchema>) {
         if (data?.password.toString() !== data?.confirmPassword.toString()) {
@@ -150,15 +153,24 @@ export default function SignUp() {
                                 control={form.control}
                                 render={({ field, fieldState }) => (
                                     <Field data-invalid={fieldState.invalid}>
-                                        <Input
-                                            {...field}
-                                            type="password"
-                                            id="password"
-                                            aria-invalid={fieldState.invalid}
-                                            placeholder="Password"
-                                            autoComplete="off"
-                                            className="border border-white/10 bg-black p-4 h-12 focus-visible:ring-1 focus-visible:ring-white"
-                                        />
+                                        <div className="relative">
+                                            <Input
+                                                {...field}
+                                                type={showPassword ? "text" : "password"}
+                                                id="password"
+                                                aria-invalid={fieldState.invalid}
+                                                placeholder="Password"
+                                                autoComplete="off"
+                                                className="border border-white/10 bg-black p-4 pr-12 h-12 focus-visible:ring-1 focus-visible:ring-white w-full"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                                            >
+                                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                            </button>
+                                        </div>
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
                                         )}
@@ -171,15 +183,24 @@ export default function SignUp() {
                                 control={form.control}
                                 render={({ field, fieldState }) => (
                                     <Field data-invalid={fieldState.invalid}>
-                                        <Input
-                                            {...field}
-                                            type="password"
-                                            id="confirmPassword"
-                                            aria-invalid={fieldState.invalid}
-                                            placeholder="Confirm Password"
-                                            autoComplete="off"
-                                            className="border border-white/10 bg-black p-4 h-12 focus-visible:ring-1 focus-visible:ring-white"
-                                        />
+                                        <div className="relative">
+                                            <Input
+                                                {...field}
+                                                type={showConfirmPassword ? "text" : "password"}
+                                                id="confirmPassword"
+                                                aria-invalid={fieldState.invalid}
+                                                placeholder="Confirm Password"
+                                                autoComplete="off"
+                                                className="border border-white/10 bg-black p-4 pr-12 h-12 focus-visible:ring-1 focus-visible:ring-white w-full"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                                            >
+                                                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                            </button>
+                                        </div>
                                         {fieldState.invalid && (
                                             <FieldError errors={[fieldState.error]} />
                                         )}

@@ -1,324 +1,190 @@
 "use client";
-import Image from 'next/image';
-import { Button } from './ui/button';
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from "next/navigation";
-import CompanyLogo from './CompanyLogo';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Settings, LogOut, ShieldCheck, Clock } from 'lucide-react';
+import { ChevronDown, Menu, X, Settings, LogOut, ShieldCheck, Clock } from 'lucide-react';
+import { Button } from './ui/button';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const navigation = [
-    { name: 'Features', href: '/features' },
-    { name: 'Pricing', href: '/pricing' },
-    { name: 'FAQs', href: '/faqs' },
-    { name: 'Support', href: '/support' },
-]
+interface NavbarProps {
+  isHome?: boolean;
+  onBookDemo?: () => void;
+}
 
-function classNames(...classes: string[]) {
-    return classes.filter(Boolean).join(' ')
-};
+export default function Navbar({ isHome = false, onBookDemo }: NavbarProps) {
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const { user, logout } = useAuth();
 
-export default function Navbar({ isRoot = false }: {
-    isRoot?: boolean;
-}) {
-    const [open, setOpen] = useState(false);
-    const pathname = usePathname();
-    const { user, logout } = useAuth();
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
-    return (
-        <div className='h-[100px]'>
-            <nav
-                className={classNames("absolute top-0 left-0 z-[100] w-full", isRoot ? "sm:bg-transparent" : "")}
+  const navLinks = [
+    { name: 'Features', href: isHome ? '#features' : '/#features' },
+    { name: 'How It Works', href: isHome ? '#how-it-works' : '/#how-it-works' },
+    { name: 'Pricing', href: isHome ? '#pricing' : '/pricing' },
+    { name: 'FAQs', href: isHome ? '#faq' : '/faqs' },
+    { name: 'Affiliates', href: '/affiliates' },
+    ...(user ? [{ name: 'Workspace', href: '/workspace' }] : []),
+  ];
+
+  return (
+    <>
+      <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-400 px-6 md:px-12 h-[72px] flex items-center justify-between ${
+        scrolled || !isHome ? 'bg-[#06080d]/85 backdrop-blur-xl border-b border-[#54e3b5]/10' : 'bg-transparent'
+      }`}>
+        <Link href="/" className="flex items-center">
+          <div className="mr-3 text-[#54e3b5]">
+            <svg width="28" height="28" viewBox="0 0 45 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M16.4642 1.54449C16.9906 1.03557 17.4471 0.435356 18.0551 0.0196732C20.454 -0.0036361 22.8568 -0.0114061 25.2577 0.0255003C22.3693 3.03823 19.3662 5.94024 16.4351 8.91218C12.659 12.6941 8.8984 16.4974 5.132 20.2891C5.08538 21.4565 5.13394 22.6278 5.1184 23.7971C9.9531 28.4784 14.6344 33.3229 19.4109 38.0663C20.287 38.9735 21.2116 39.834 22.0701 40.7586C19.7139 40.8421 17.3539 40.7741 14.9957 40.7955C12.8629 38.5112 10.5747 36.3706 8.3953 34.129C5.58459 31.3163 2.76027 28.5192 -0.048502 25.7066C-0.209725 25.5084 -0.499149 25.3492 -0.470012 25.0578C-0.504976 23.0474 -0.481667 21.0369 -0.493322 19.0265C-0.559365 18.5525 -0.120372 18.2748 0.153512 17.9698C5.5807 12.4863 11.0429 7.03578 16.4642 1.54449Z" fill="currentColor" />
+              <path d="M35.2561 0.287671C35.563 -0.0833355 36.0855 0.0215582 36.5089 0.00407616C38.6243 0.0176733 40.7396 -0.027002 42.8549 0.0293289C35.9146 6.95026 29.0383 13.9353 22.098 20.8543C28.6945 27.5421 35.4192 34.1056 42.0235 40.7877C39.6169 40.7779 37.2024 40.8459 34.7996 40.7527C29.2772 35.4459 23.8908 29.9877 18.4248 24.6168C17.8984 25.0946 17.3992 25.5977 16.9039 26.1067C14.8895 26.0931 12.8772 26.1086 10.8648 26.0931C10.4297 26.1999 10.3908 25.7026 10.4161 25.4054C10.5171 25.1296 10.7541 24.9392 10.9464 24.7314C19.0522 16.5867 27.1522 8.43429 35.2561 0.287671Z" fill="currentColor" />
+            </svg>
+          </div>
+          <span className="text-xl font-bold tracking-tight text-white font-display">KRAFZEN AI</span>
+        </Link>
+
+        {/* Desktop Links */}
+        <div className="hidden lg:flex items-center gap-8">
+          {navLinks.map((link) => (
+            <Link 
+              key={link.name}
+              href={link.href} 
+              className="text-sm font-medium text-[#cbd5e1]/70 hover:text-white transition-colors relative nav-link-underline"
             >
-                {/** Parent Div Navbar */}
-                <div className="relative w-full flex h-[100px] items-center">
-
-                    {/** Mobile Menu Button */}
-                    <div
-                        onClick={() => setOpen(!open)}
-                        className="absolute p-1 right-0 inline-flex cursor-pointer items-center justify-center rounded-md text-gray-400 hover:bg-white/5 hover:text-white focus:outline-2 focus:-outline-offset-1 focus:outline-indigo-500">
-                        <Image
-                            priority
-                            width={25.76}
-                            height={40.8}
-                            alt="Toggle Button"
-                            src="/navbar/icon.svg"
-                            className={classNames(
-                                "sm:hidden p-0 m-2 cursor-pointer transition-transform duration-500",
-                                open ? "rotate-90" : "rotate-0"
-                            )}
-                        />
-                    </div>
-
-                    {/** Company Logo - Always Visible now */}
-                    <div className="flex mx-2 lg:flex-1 md:flex-1 xlg:flex-1 w-full items-center justify-between">
-                        <CompanyLogo />
-
-                        { /** Desktop medium and large scale view of Navbar */}
-                        <div className="hidden sm:ml-6 sm:block mx-auto"
-                            // this is used in tests to target this div
-                            data-testid="desktop-menu">
-                            <div className="flex gap-4">
-                                {navigation.map((item) => {
-                                    const isActive = pathname === item.href;
-
-                                    return (
-                                        <Link
-                                            key={item.name}
-                                            href={item.href}
-                                            className={classNames(
-                                                'rounded-md md:px-0 py-2 lg:px-3 xlg:px-3 text-sm font-medium',
-                                            )}
-                                            aria-label={`Link to ${item.name} section`}
-                                        >
-                                            <h1 className={isActive ? "font-bold text-white inline" : "text-white inline font-semibold hover:text-gray-300 cursor-pointer"}>{item.name}</h1>
-                                        </Link>
-                                    )
-                                })}
-
-                                {user ? (
-                                    <>
-                                        {user.can_access_workspace ? (
-                                            <Button
-                                                asChild
-                                                className="bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
-                                            >
-                                                <Link href="/workspace">
-                                                    Workspace
-                                                </Link>
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                asChild
-                                                className="bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 hover:scale-105 hover:-translate-y-0.5"
-                                            >
-                                                <Link href="/pricing">
-                                                    Get Started
-                                                </Link>
-                                            </Button>
-                                        )}
-                                        <UserDropdown user={user} logout={logout} />
-                                    </>
-                                ) : (
-                                    <Button
-                                        variant="secondary"
-                                        className="cursor-pointer rounded-full bg-green-400 hover:bg-green-400"
-                                        asChild
-                                    >
-                                        <Link href="/login">
-                                            Start Free Trial
-                                        </Link>
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/** Mobile Menu Overlay Background */}
-                <div
-                    className={classNames(
-                        "sm:hidden fixed inset-0 z-[99998] bg-black/60 backdrop-blur-sm transition-opacity duration-300",
-                        open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-                    )}
-                    onClick={() => setOpen(false)}
-                />
-
-                {/** Mobile Menu Drawer (Right Side) */}
-                <div
-                    // this is to test mobile view
-                    data-testid="mobile-menu"
-                    className={classNames(
-                        "sm:hidden fixed top-0 right-0 z-[99999] h-full w-[280px] bg-black border-l border-white/10 flex flex-col pt-[100px] items-start px-6 overflow-y-auto transition-transform duration-300 ease-in-out shadow-2xl",
-                        open
-                            ? "translate-x-0"
-                            : "translate-x-full"
-                    )}
-                >
-                    <div className="flex flex-col w-full gap-2">
-                        {navigation.map((item) => {
-                            const isActive = pathname === item.href;
-
-                            return (
-                                <Link
-                                    key={item.name}
-                                    href={item.href}
-                                    onClick={() => setOpen(false)}
-                                    className={classNames(
-                                        'rounded-md py-3 text-base font-medium w-full border-b border-white/5',
-                                    )}
-                                    aria-label={`Link to ${item.name} section`}
-                                >
-                                    <h1 className={isActive ? "font-bold text-green-400" : "text-gray-300 hover:text-white"}>{item.name}</h1>
-                                </Link>
-                            )
-                        })}
-                    </div>
-
-                    {user ? (
-                        <div className="mt-8 flex flex-col items-start w-full gap-4">
-                            <div className="flex items-center gap-3 w-full p-2 bg-white/5 rounded-lg border border-white/10">
-                                <Avatar className="h-8 w-8">
-                                    <AvatarImage src={user.avatar_url || ""} />
-                                    <AvatarFallback className="bg-green-400 text-black font-bold">
-                                        {user.firstname?.[0] || user.email?.[0]?.toUpperCase()}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="flex flex-col overflow-hidden">
-                                    <span className="text-white text-sm font-medium truncate">{user.firstname || user.email}</span>
-                                    <span className="text-gray-500 text-xs truncate">{user.email}</span>
-                                </div>
-                            </div>
-
-                            {user.can_access_workspace ? (
-                                <Button
-                                    asChild
-                                    className="w-full bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 transform active:scale-95"
-                                >
-                                    <Link href="/workspace">
-                                        Workspace
-                                    </Link>
-                                </Button>
-                            ) : (
-                                <Button
-                                    asChild
-                                    className="w-full bg-gradient-to-b from-green-300 via-green-400 to-emerald-500 text-zinc-950 font-bold border-t border-white/60 border-b border-green-900/20 rounded-full shadow-[inset_0_2px_10px_rgba(255,255,255,0.5),0_0_30px_rgba(74,222,128,0.6)] hover:shadow-[inset_0_2px_15px_rgba(255,255,255,0.7),0_0_50px_rgba(74,222,128,0.8)] transition-all duration-300 transform active:scale-95"
-                                >
-                                    <Link href="/pricing">
-                                        Get Started
-                                    </Link>
-                                </Button>
-                            )}
-
-                            <Link href="/account" className="text-gray-300 hover:text-white text-sm flex items-center gap-2 mt-2" onClick={() => setOpen(false)}>
-                                <Settings className="w-4 h-4" />
-                                Account Settings
-                            </Link>
-
-                            <div
-                                className="text-red-400 hover:text-red-300 text-sm flex items-center gap-2 cursor-pointer mt-2"
-                                onClick={() => { logout(); setOpen(false); }}
-                            >
-                                <LogOut className="w-4 h-4" />
-                                Sign Out
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="mt-8 w-full">
-                            <Button
-                                variant="secondary"
-                                className="w-full cursor-pointer rounded-full bg-green-400 hover:bg-green-400 text-black font-bold h-12"
-                                asChild
-                            >
-                                <Link href="/login">Start Free Trial</Link>
-                            </Button>
-                        </div>
-                    )}
-                </div>
-            </nav>
+              {link.name}
+            </Link>
+          ))}
+          
+          {user ? (
+            <UserDropdown user={user} logout={logout} />
+          ) : (
+            <Link 
+              href="/login"
+              className="px-6 py-2.5 bg-gradient-to-br from-[#3fc89c] to-[#54e3b5] text-white rounded-lg font-semibold text-[13px] uppercase tracking-wider shadow-[0_0_20px_rgba(84,227,181,0.2)] hover:shadow-[0_0_40px_rgba(84,227,181,0.35)] transition-all hover:-translate-y-0.5"
+            >
+              Get Started
+            </Link>
+          )}
         </div>
-    )
+
+        {/* Mobile Toggle */}
+        <button 
+          className="lg:hidden text-[#cbd5e1]"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          {mobileMenuOpen ? <X /> : <Menu />}
+        </button>
+      </nav>
+
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[99] bg-[#06080d] pt-[100px] px-6 lg:hidden">
+          <div className="flex flex-col gap-6">
+            {navLinks.map((link) => (
+              <Link 
+                key={link.name}
+                href={link.href}
+                className="text-lg font-medium text-[#cbd5e1]"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {link.name}
+              </Link>
+            ))}
+            {!user && (
+              <Link 
+                href="/login"
+                className="w-full py-4 bg-gradient-to-br from-[#3fc89c] to-[#54e3b5] text-white rounded-xl font-bold text-center block"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Get Started
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function trialDaysLeft(trialEndDate: string): number {
-    try {
-        const end = new Date(trialEndDate);
-        const now = new Date();
-        const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        return Math.max(0, diff);
-    } catch {
-        return 0;
-    }
+  try {
+    const end = new Date(trialEndDate);
+    const now = new Date();
+    const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(0, diff);
+  } catch {
+    return 0;
+  }
 }
 
-function UserDropdown({ user, logout }: { user: User, logout: () => void }) {
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <div className="relative h-10 w-10 cursor-pointer rounded-full overflow-hidden border border-white/20 hover:border-green-400 transition-colors">
-                    <Avatar className="h-full w-full">
-                        <AvatarImage src={user.avatar_url || ""} className="object-cover" />
-                        <AvatarFallback className="bg-zinc-800 text-white font-bold flex items-center justify-center h-full w-full">
-                            {user.firstname?.[0] || user.email?.[0]?.toUpperCase()}
-                        </AvatarFallback>
-                    </Avatar>
-                </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 bg-zinc-900 border-zinc-800 text-white shadow-xl rounded-xl mt-2">
-                <div className="flex flex-col space-y-1 p-3">
-                    <p className="text-sm font-bold leading-none text-white">{user.firstname ? `${user.firstname} ${user.lastname || ''}` : "User"}</p>
-                    <p className="text-xs leading-none text-gray-500 font-medium">{user.email}</p>
-                </div>
-                <div className="px-3 py-2.5 text-xs font-bold text-emerald-400 bg-emerald-500/10 rounded-lg mx-2 mb-2 border border-emerald-500/20 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4" />
-                        Plan: <span className="uppercase">{user.subscription_plan || "Free Trial"}</span>
-                    </div>
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                </div>
-                {user.subscription_status === "trial" && user.trial_end_date && (
-                    <div className="px-3 py-1.5 text-xs text-amber-400 bg-amber-500/10 rounded-lg mx-2 mb-1.5 border border-amber-500/20">
-                        Trial: {trialDaysLeft(user.trial_end_date)} days left
-                    </div>
-                )}
-                <div className="px-3 py-2 text-xs font-bold text-blue-400 bg-blue-500/10 rounded-lg mx-2 mb-1.5 border border-blue-500/20 flex justify-between items-center gap-3">
-                    <div className="flex flex-col gap-0.5">
-                        <span className="whitespace-nowrap flex items-center gap-2">
-                            <Clock className="w-4 h-4" />
-                            Free requests: {user.trial_requests_remaining ?? 0}
-                        </span>
-                        {(user.trial_requests_remaining ?? 0) === 0 && user.in_free_signup_tier && (
-                            <span className="text-[10px] text-amber-400 font-normal">
-                                Used up — subscribe to continue
-                            </span>
-                        )}
-                    </div>
-                </div>
-                <div className="px-3 py-2 text-xs font-bold text-blue-400 bg-blue-500/10 rounded-lg mx-2 mb-1.5 border border-blue-500/20 flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    <span className="whitespace-nowrap">
-                        Package requests: {(user.plan_requests_remaining ?? 0).toLocaleString()}
-                    </span>
-                </div>
-                <div className="mx-2 mb-2">
-                    <Link href="/pricing" className="flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg border border-blue-500/30 shadow-sm transition-all hover:shadow-blue-500/20 uppercase tracking-wider">
-                        {user.has_active_subscription ? "Upgrade" : "Get Started"}
-                    </Link>
-                </div>
+function UserDropdown({ user, logout }: { user: { avatar_url?: string | null; firstname?: string | null; lastname?: string | null; email?: string | null; subscription_plan?: string | null }, logout: () => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <div className="relative h-10 w-10 cursor-pointer rounded-full overflow-hidden border border-white/20 hover:border-[#54e3b5] transition-colors">
+          <Avatar className="h-full w-full">
+            <AvatarImage src={user.avatar_url || ""} className="object-cover" />
+            <AvatarFallback className="bg-[#0c111c] text-white font-bold flex items-center justify-center h-full w-full">
+              {user.firstname?.[0] || user.email?.[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 bg-[#0c111c] border-[#54e3b5]/10 text-white shadow-2xl rounded-xl mt-2 backdrop-blur-xl">
+        <div className="flex flex-col space-y-1 p-4">
+          <p className="text-sm font-bold leading-none text-white">{user.firstname ? `${user.firstname} ${user.lastname || ''}` : "User"}</p>
+          <p className="text-xs leading-none text-[#cbd5e1]/50 font-medium">{user.email}</p>
+        </div>
+        <div className="px-4 py-2.5 text-xs font-bold text-[#54e3b5] bg-[#54e3b5]/10 rounded-lg mx-3 mb-2 border border-[#54e3b5]/20 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4" />
+            Plan: <span className="uppercase">{user.subscription_plan || "Free Trial"}</span>
+          </div>
+          <div className="w-2 h-2 rounded-full bg-[#54e3b5] animate-pulse" />
+        </div>
+        
+        <div className="mx-3 mb-4">
+          <Link href="/workspace" className="flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold text-[#06080d] bg-[#54e3b5] hover:shadow-[0_0_20px_rgba(84,227,181,0.3)] rounded-lg transition-all uppercase tracking-wider">
+            Go to Workspace
+          </Link>
+        </div>
 
-                <DropdownMenuSeparator className="bg-zinc-800 my-2" />
+        <DropdownMenuSeparator className="bg-white/5 my-2" />
 
-                <DropdownMenuItem asChild className="cursor-pointer focus:bg-transparent mt-1 mb-3 p-0">
-                    <Link href="/account" className="block mx-2">
-                        <div className="flex items-center w-full px-3 py-2 text-xs font-semibold text-indigo-400 bg-indigo-400/10 rounded-md border border-indigo-400/20 hover:bg-indigo-400/20 transition-colors gap-2">
-                            <Settings className="w-4 h-4" />
-                            Account Settings
-                        </div>
-                    </Link>
-                </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer focus:bg-transparent mt-1 mb-2 p-0">
+          <Link href="/workspace/settings" className="block mx-3">
+            <div className="flex items-center w-full px-3 py-2 text-xs font-semibold text-[#cbd5e1]/70 hover:text-white hover:bg-white/5 rounded-md transition-colors gap-2">
+              <Settings className="w-4 h-4" />
+              Account Settings
+            </div>
+          </Link>
+        </DropdownMenuItem>
 
-                <DropdownMenuItem
-                    className="cursor-pointer focus:bg-transparent mt-1 mb-3 p-0"
-                    onClick={logout}
-                    asChild
-                >
-                    <div className="block mx-2">
-                        <div className="flex items-center w-full px-3 py-2 text-xs font-semibold text-red-500 bg-red-500/10 rounded-md border border-red-500/20 hover:bg-red-500/20 transition-colors gap-2">
-                            <LogOut className="w-4 h-4" />
-                            Log out
-                        </div>
-                    </div>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
-    )
+        <DropdownMenuItem
+          className="cursor-pointer focus:bg-transparent mb-3 p-0"
+          onClick={logout}
+          asChild
+        >
+          <div className="block mx-3">
+            <div className="flex items-center w-full px-3 py-2 text-xs font-semibold text-red-400 hover:text-red-300 hover:bg-red-400/5 rounded-md transition-colors gap-2">
+              <LogOut className="w-4 h-4" />
+              Log out
+            </div>
+          </div>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }

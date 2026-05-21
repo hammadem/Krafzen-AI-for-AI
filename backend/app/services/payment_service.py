@@ -223,17 +223,52 @@ class PaymentService:
     async def _handle_checkout_completed(self, session):
         """
         Handle checkout session completion.
+        Supports both dynamic sessions (with metadata) and static Payment Links (with client_reference_id).
         """
         metadata = session.get("metadata", {})
-        user_id = metadata.get("user_id")
+        user_id = metadata.get("user_id") or session.get("client_reference_id")
         event_type = metadata.get("type")
         
         if not user_id:
-            logger.error("Webhook missing user_id in metadata")
+            logger.error(f"Webhook missing user_id/client_reference_id in session {session.get('id')}")
             return
         
+        # If event_type is missing, it's likely a static Payment Link
+        if not event_type:
+            # We need to determine what they bought by looking at the line items/price
+            # For simplicity, we'll try to infer it from the amount or retrieve line items
+            try:
+                # Retrieve line items to see what was purchased
+                line_items = stripe.checkout.Session.list_line_items(session.get("id"), limit=1)
+                if line_items.data:
+                    price_id = line_items.data[0].price.id
+                    # You could map specific Price IDs here if you have them.
+                    # Use amount_subtotal to get the price before discounts are applied (crucial for 100% off coupons)
+                    amount = session.get("amount_subtotal", session.get("amount_total", 0)) / 100
+                    
+                    # Mapping based on the new prices provided by the user
+                    plan_map = {
+                        149: ("starter", "monthly"),
+                        1490: ("starter", "annual"),
+                        499: ("professional", "monthly"),
+                        4990: ("professional", "annual"),
+                        1499: ("enterprise", "monthly"),
+                        14990: ("enterprise", "annual")
+                    }
+                    
+                    plan_name, billing_cycle = plan_map.get(int(amount), (None, None))
+                    
+                    if plan_name:
+                        event_type = "subscription"
+                        metadata["plan_name"] = plan_name
+                        metadata["billing_cycle"] = billing_cycle
+                    else:
+                        logger.error(f"Could not infer plan for amount {amount}")
+            except Exception as e:
+                logger.error(f"Error inferring plan from session: {e}")
+
         if event_type == "subscription":
-            # Start subscription with trial
+            # Start subscription
             plan_name = metadata.get("plan_name")
             billing_cycle = metadata.get("billing_cycle")
             

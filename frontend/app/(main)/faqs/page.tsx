@@ -1,125 +1,90 @@
 "use client";
-import NavHeader from "@/components/NavHeader";
-import { Button } from "@/components/ui/button";
-import { ComboboxDemo } from "@/components/ui/combobox";
-import { faqs } from "@/lib/data";
-import { useState } from "react";
+import React, { useState } from 'react';
+import { ChevronDown, MessageSquare, Search } from 'lucide-react';
+import { faqs } from '@/lib/data';
 
-function classNames(...classes: string[]) {
-    return classes.filter(Boolean).join(' ')
-};
+export default function FaqsPage() {
+    const [openIndex, setOpenIndex] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
 
-function renderWithBold(text: string) {
-    const parts = text.split(/<b>|<\/b>/g);
-    return parts.map((part: string, i: number) =>
-        i % 2 === 1 ? <strong key={i}>{part}</strong> : part
-    );
-}
+    const toggleFaq = (id: string) => {
+        setOpenIndex(openIndex === id ? null : id);
+    };
 
-export default function Faqs() {
-    const [currentQues, setQues] = useState<number>(0);
-    const [value, setValue] = useState<string>(faqs[0]?.type || "General");
+    const filteredFaqs = faqs.map(group => ({
+        ...group,
+        QandA: group.QandA.filter(qa => 
+            qa.question.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            qa.answer.some(a => a.toLowerCase().includes(searchQuery.toLowerCase()))
+        )
+    })).filter(group => group.QandA.length > 0);
 
     return (
-        <>
-            <NavHeader currentNav="FAQs" />
+        <div className="bg-[#06080d] text-[#f0f4f8] min-h-screen pt-12 pb-20">
+            <div className="page-wrap">
+                <div className="page-eyebrow">Frequently Asked Questions</div>
+                <h1 className="page-title">Everything you need to know about Krafzen AI.</h1>
+                <p className="page-subtitle">
+                    Can&apos;t find what you&apos;re looking for? Reach out to our team at <a href="mailto:hello@krafzen.com" className="text-[#54e3b5] hover:underline">hello@krafzen.com</a>.
+                </p>
 
-            <div className="bg-black w-full min-h-screen py-10">
-                <div className="w-full max-w-5xl mx-auto px-4">
-                    {/* Desktop View */}
-                    <div className="hidden md:grid grid-cols-12 gap-8">
-                        {/* Sidebar */}
-                        <div className="col-span-4 flex flex-col gap-2">
-                            {faqs.map((faq, ind) => (
-                                <Button
-                                    key={ind}
-                                    variant="ghost"
-                                    className={classNames(
-                                        "w-full justify-start py-6 px-4 text-left transition-all duration-200",
-                                        ind === currentQues
-                                            ? "bg-white text-black font-semibold"
-                                            : "text-gray-400 hover:text-white hover:bg-zinc-900"
-                                    )}
-                                    onClick={() => setQues(ind)}
-                                >
-                                    <span className="text-lg">{faq.type}</span>
-                                </Button>
-                            ))}
-                        </div>
+                <div className="relative max-w-2xl mb-16">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
+                    <input 
+                        type="text" 
+                        placeholder="Search for a question..." 
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:border-[#54e3b5]/50 transition-colors"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
 
-                        {/* Divider */}
-                        <div className="col-span-1 flex justify-center">
-                            <div className="w-[1px] h-full bg-white/10"></div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="col-span-7 text-white space-y-8">
-                            <h2 className="text-2xl font-bold border-b border-white/10 pb-4">{faqs[currentQues].type}</h2>
-                            <div className="space-y-8">
-                                {faqs[currentQues].QandA.map((val, ind) => (
-                                    <div key={val.question + ind} className="space-y-3">
-                                        <h3 className="font-semibold text-lg text-white">{val.question}</h3>
-                                        <div className="text-gray-400 leading-relaxed font-light">
-                                            {val.answer.length === 1 ? (
-                                                <p>{val.answer[0]}</p>
-                                            ) : (
-                                                <ul className="space-y-2">
-                                                    {val.answer.map((ans, i) => (
-                                                        <li key={i} className="flex gap-2">
-                                                            <span>•</span>
-                                                            <span>{renderWithBold(ans)}</span>
-                                                        </li>
+                <div className="space-y-16">
+                    {filteredFaqs.map((group, groupIdx) => (
+                        <div key={groupIdx} className="reveal visible">
+                            <h2 className="text-xs font-bold text-[#54e3b5] uppercase tracking-[0.2em] mb-8 font-mono border-b border-white/5 pb-4">
+                                {group.type}
+                            </h2>
+                            <div className="space-y-4">
+                                {group.QandA.map((qa, qaIdx) => {
+                                    const id = `${groupIdx}-${qaIdx}`;
+                                    const isOpen = openIndex === id;
+                                    return (
+                                        <div 
+                                            key={id}
+                                            className={`bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-all duration-300 ${isOpen ? 'border-[#54e3b5]/30 bg-white/[0.07]' : 'hover:border-white/20'}`}
+                                        >
+                                            <button 
+                                                onClick={() => toggleFaq(id)}
+                                                className="w-full px-6 py-5 text-left flex items-center justify-between gap-4"
+                                            >
+                                                <span className="font-semibold text-lg">{qa.question.replace(/^Q\d+\.\s*/, '')}</span>
+                                                <ChevronDown className={`w-5 h-5 text-white/30 transition-transform duration-300 ${isOpen ? 'rotate-180 text-[#54e3b5]' : ''}`} />
+                                            </button>
+                                            <div 
+                                                className={`px-6 transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[500px] pb-6 opacity-100' : 'max-h-0 opacity-0'}`}
+                                            >
+                                                <div className="text-[#cbd5e1]/70 leading-relaxed space-y-3">
+                                                    {qa.answer.map((para, pIdx) => (
+                                                        <p key={pIdx}>{para}</p>
                                                     ))}
-                                                </ul>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Mobile View */}
-                    <div className="md:hidden flex flex-col gap-8">
-                        <ComboboxDemo setValue={setValue} value={value} />
-
-                        {!value && (
-                            <div className="text-center py-10 text-gray-400">
-                                <p className="text-xl">Select a topic to view FAQs.</p>
-                            </div>
-                        )}
-
-                        {value && (
-                            <div className="space-y-8 text-white">
-                                {faqs.filter(faq => faq.type === value).map((faqGroup) => (
-                                    <div key={faqGroup.type} className="space-y-8">
-                                        <h2 className="text-2xl font-bold border-b border-white/10 pb-4">{faqGroup.type}</h2>
-                                        {faqGroup.QandA.map((val, ind) => (
-                                            <div key={ind} className="space-y-3">
-                                                <h3 className="font-semibold text-lg">{val.question}</h3>
-                                                <div className="text-gray-400 leading-relaxed font-light">
-                                                    {val.answer.length === 1 ? (
-                                                        <p>{val.answer[0]}</p>
-                                                    ) : (
-                                                        <ul className="space-y-2">
-                                                            {val.answer.map((ans, i) => (
-                                                                <li key={i} className="flex gap-2">
-                                                                    <span>•</span>
-                                                                    <span>{renderWithBold(ans)}</span>
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    )}
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                ))}
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    ))}
                 </div>
+
+                {filteredFaqs.length === 0 && (
+                    <div className="text-center py-20">
+                        <MessageSquare className="w-12 h-12 text-white/10 mx-auto mb-4" />
+                        <p className="text-[#cbd5e1]/40">No results found for &quot;{searchQuery}&quot;</p>
+                    </div>
+                )}
             </div>
-        </>
-    )
+        </div>
+    );
 }

@@ -32,6 +32,7 @@ class ChatRequest(BaseModel):
     history: List[Dict[str, Any]] = []
     # When "US_IRC_BASELINE", runs parallel Gemini JSON extraction + IRC baseline screening (see compliance in response).
     jurisdiction: Optional[str] = None
+    previous_image_url: Optional[str] = None
 
 class ChatResponse(BaseModel):
     session_id: str
@@ -233,13 +234,14 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         logger.info("Generating Image with Gemini")
         
         # Try to find previous image in DB history for this session
-        previous_image_url = None
-        messages = await chat_history_service.get_session_messages(session_id)
-        # Iterate backwards to find last assistant message with image
-        for msg in reversed(messages):
-            if msg.get("role") == "assistant" and msg.get("image_url"):
-                previous_image_url = msg.get("image_url")
-                break
+        previous_image_url = request.previous_image_url
+        if not previous_image_url:
+            messages = await chat_history_service.get_session_messages(session_id)
+            # Iterate backwards to find last assistant message with image
+            for msg in reversed(messages):
+                if msg.get("role") == "assistant" and msg.get("image_url"):
+                    previous_image_url = msg.get("image_url")
+                    break
         
         if previous_image_url:
             logger.info("Found previous image in history.")

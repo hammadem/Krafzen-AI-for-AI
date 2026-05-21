@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { BellRing, CircleQuestionMark } from "lucide-react";
 import Image from "next/image";
 import { NavLinks, Projects } from "./Examples";
-import { useDashboard } from "@/context/DashboardContex";
+import { useDashboard } from "@/context/DashboardContext";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { History } from "./History";

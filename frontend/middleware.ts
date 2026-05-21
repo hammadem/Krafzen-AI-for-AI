@@ -55,33 +55,41 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name) {
-          return req.cookies.get(name)?.value;
-        },
-        set(name, value, options) {
-          res.cookies.set(name, value, options);
-        },
-        remove(name) {
-          res.cookies.delete(name);
-        },
-      },
+  // Only run Supabase session logic for protected routes or auth-related paths
+  // This avoids unnecessary server-side auth checks on public landing pages like /case-studies
+  const isProtectedRoute = path.startsWith("/workspace") || path.startsWith("/chat");
+  const isAuthRoute = path.startsWith("/login") || path.startsWith("/signup") || path.startsWith("/auth");
+
+  if (isProtectedRoute || isAuthRoute) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url || !key) {
+      return res;
     }
-  );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    const supabase = createServerClient(url, key, {
+        cookies: {
+          get(name) {
+            return req.cookies.get(name)?.value;
+          },
+          set(name, value, options) {
+            res.cookies.set(name, value, options);
+          },
+          remove(name) {
+            res.cookies.delete(name);
+          },
+        },
+      }
+    );
 
-  if (
-    !session &&
-    (path.startsWith("/workspace") || path.startsWith("/chat"))
-  ) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session && isProtectedRoute) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
   }
 
   return res;
