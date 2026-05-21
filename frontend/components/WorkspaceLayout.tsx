@@ -696,7 +696,7 @@ export default function WorkspaceLayout() {
                     </Avatar>
 
                     <div className={`workspace-chat-message-bubble ${message.role === 'user' ? 'user-bubble' : 'assistant-bubble'}`}>
-                      {message.content && !message.content.trim().startsWith("To draw a") && (
+                      {message.content && !message.imageUrl && !message.content.trim().startsWith("To draw a") && (
                         <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{message.content}</p>
                       )}
 
@@ -1021,7 +1021,7 @@ export default function WorkspaceLayout() {
                         <span>{msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '14:32'}</span>
                         {msg.role === 'assistant' && <span className="msg-duration">· 3.2s</span>}
                       </div>
-                      {msg.content && !msg.content.trim().startsWith("To draw a") && (
+                      {msg.content && !msg.imageUrl && !msg.content.trim().startsWith("To draw a") && (
                         <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.imageUrl ? 'mb-2' : ''}`}>{msg.content}</p>
                       )}
                       {msg.imageUrl && (
