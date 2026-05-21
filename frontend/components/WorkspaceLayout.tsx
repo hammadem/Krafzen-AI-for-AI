@@ -308,6 +308,7 @@ export default function WorkspaceLayout() {
     ? messages.find(m => m.id === selectedMessageId) 
     : null;
   const lastImage = selectedMsg?.imageUrl || (assistantImageMessages.length > 0 ? assistantImageMessages[assistantImageMessages.length - 1].imageUrl : undefined);
+  const activeMessage = selectedMsg || (assistantImageMessages.length > 0 ? assistantImageMessages[assistantImageMessages.length - 1] : null);
 
   const handleExport = async () => {
     if (!lastImage) return;
@@ -928,57 +929,115 @@ export default function WorkspaceLayout() {
               </div>
             </div>
           ) : (
-            <div className={`workspace-drawing-frame ${canvasViewMode}`} id="drawingFrame">
-              {lastImage ? (
-                <>
-                  {canvasViewMode === '2d' && (
-                    <img src={lastImage} alt="Generated Design" className="workspace-drawing-svg" style={{ objectFit: 'contain' }} />
-                  )}
-                  {canvasViewMode === '3d' && (
-                    <div style={{ perspective: '1000px', width: '100%', height: '100%', display: 'grid', placeItems: 'center' }}>
-                      <img 
-                        src={lastImage} 
-                        alt="3D Perspective" 
-                        className="workspace-drawing-svg" 
-                        style={{ 
-                          objectFit: 'contain', 
-                          transform: 'rotateX(45deg) rotateZ(-45deg) scale(0.8)',
-                          boxShadow: '20px 20px 50px rgba(0,0,0,0.5)',
-                          transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
-                        }} 
-                      />
-                    </div>
-                  )}
-                  {canvasViewMode === 'code' && (
-                    <div className="w-full h-full p-6 flex flex-col font-mono text-[10px] text-cyan-400/80 overflow-hidden">
-                      <div className="mb-4 border-b border-cyan-400/20 pb-2 flex justify-between">
-                        <span>{"// DESIGN_ENTITY_DATA_STREAM"}</span>
-                        <span className="animate-pulse">REC</span>
+            <>
+              <div className={`workspace-drawing-frame ${canvasViewMode}`} id="drawingFrame">
+                {lastImage ? (
+                  <>
+                    {canvasViewMode === '2d' && (
+                      <img src={lastImage} alt="Generated Design" className="workspace-drawing-svg" style={{ objectFit: 'contain' }} />
+                    )}
+                    {canvasViewMode === '3d' && (
+                      <div style={{ perspective: '1000px', width: '100%', height: '100%', display: 'grid', placeItems: 'center' }}>
+                        <img 
+                          src={lastImage} 
+                          alt="3D Perspective" 
+                          className="workspace-drawing-svg" 
+                          style={{ 
+                            objectFit: 'contain', 
+                            transform: 'rotateX(45deg) rotateZ(-45deg) scale(0.8)',
+                            boxShadow: '20px 20px 50px rgba(0,0,0,0.5)',
+                            transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                          }} 
+                        />
                       </div>
-                      <div className="flex-1 space-y-1">
-                        <p>OBJECT: FLOOR_PLAN_V2</p>
-                        <p>BOUNDS: {projectMetadata.location || "12'x10'"}</p>
-                        <p>ENTITIES: 24</p>
-                        <p>LAYERS: WALLS, WINDOWS, DOORS, APPLIANCES</p>
-                        <p className="mt-4 text-white/40">Fetching geometric primitives...</p>
-                        <div className="grid grid-cols-2 gap-2 mt-2 opacity-50">
-                          <div className="border border-white/5 p-2 rounded">LINE (0,0) (12,0)</div>
-                          <div className="border border-white/5 p-2 rounded">LINE (12,0) (12,10)</div>
-                          <div className="border border-white/5 p-2 rounded">LINE (12,10) (0,10)</div>
-                          <div className="border border-white/5 p-2 rounded">LINE (0,10) (0,0)</div>
+                    )}
+                    {canvasViewMode === 'code' && (
+                      <div className="w-full h-full p-6 flex flex-col font-mono text-[10px] text-cyan-400/80 overflow-hidden">
+                        <div className="mb-4 border-b border-cyan-400/20 pb-2 flex justify-between">
+                          <span>{"// DESIGN_ENTITY_DATA_STREAM"}</span>
+                          <span className="animate-pulse">REC</span>
                         </div>
-                        <p className="mt-4 text-cyan-400">READY FOR DXF EXPORT</p>
+                        <div className="flex-1 space-y-1">
+                          <p>OBJECT: FLOOR_PLAN_V2</p>
+                          <p>BOUNDS: {projectMetadata.location || "12'x10'"}</p>
+                          <p>ENTITIES: 24</p>
+                          <p>LAYERS: WALLS, WINDOWS, DOORS, APPLIANCES</p>
+                          <p className="mt-4 text-white/40">Fetching geometric primitives...</p>
+                          <div className="grid grid-cols-2 gap-2 mt-2 opacity-50">
+                            <div className="border border-white/5 p-2 rounded">LINE (0,0) (12,0)</div>
+                            <div className="border border-white/5 p-2 rounded">LINE (12,0) (12,10)</div>
+                            <div className="border border-white/5 p-2 rounded">LINE (12,10) (0,10)</div>
+                            <div className="border border-white/5 p-2 rounded">LINE (0,10) (0,0)</div>
+                          </div>
+                          <p className="mt-4 text-cyan-400">READY FOR DXF EXPORT</p>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="flex flex-col items-center gap-4 text-white/40">
-                  <LayoutGrid className="w-12 h-12" />
-                  <p className="text-sm font-medium">Design in progress...</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center gap-4 text-white/40">
+                    <LayoutGrid className="w-12 h-12" />
+                    <p className="text-sm font-medium">Design in progress...</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Floating Feedback Overlay in 2D/3D Mode */}
+              {(canvasViewMode === '2d' || canvasViewMode === '3d') && onMessageFeedback && activeMessage && (
+                <div 
+                  className="absolute top-4 right-4 flex items-center gap-1.5 z-20 bg-zinc-950/85 backdrop-blur-sm border border-white/15 p-1 rounded-md shadow-lg"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`text-xs gap-1.5 h-8 w-8 p-0 hover:bg-white/10 ${activeMessage.feedback?.reaction === 'up' ? 'text-emerald-400 hover:text-emerald-300' : 'text-gray-400 hover:text-white'}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMessageFeedback(activeMessage.id, 'up');
+                    }}
+                    title="Good result"
+                  >
+                    <ThumbsUp className="w-4 h-4" />
+                  </Button>
+                  <Popover open={feedbackPopoverMessageId === `canvas-${activeMessage.id}`} onOpenChange={(open) => { if (open) setFeedbackPopoverMessageId(`canvas-${activeMessage.id}`); else { setFeedbackPopoverMessageId(null); setFeedbackReason(""); } }}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`text-xs gap-1.5 h-8 w-8 p-0 hover:bg-white/10 ${activeMessage.feedback?.reaction === 'down' ? 'text-amber-400 hover:text-amber-300' : 'text-gray-400 hover:text-white'}`}
+                        title="Poor result"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ThumbsDown className="w-4 h-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 bg-zinc-900 border border-white/10 text-gray-100 p-3 shadow-2xl" align="end" onClick={(e) => e.stopPropagation()}>
+                      <p className="text-xs text-gray-400 mb-2">Optional: why wasn&apos;t this helpful?</p>
+                      <textarea
+                        placeholder="e.g. wrong layout, missing elements..."
+                        value={feedbackReason}
+                        onChange={(e) => setFeedbackReason(e.target.value)}
+                        className="w-full min-h-[72px] rounded-md bg-black/40 border border-white/10 text-sm text-gray-100 placeholder:text-gray-500 p-2 resize-none focus:outline-none focus:ring-1 focus:ring-white/20"
+                        rows={3}
+                      />
+                      <Button
+                        size="sm"
+                        className="w-full mt-2 bg-white/10 hover:bg-white/20 text-gray-100"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await onMessageFeedback(activeMessage.id, 'down', feedbackReason.trim() || undefined);
+                          setFeedbackPopoverMessageId(null);
+                          setFeedbackReason("");
+                        }}
+                      >
+                        Submit feedback
+                      </Button>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {/* Conversation thread overlay */}
