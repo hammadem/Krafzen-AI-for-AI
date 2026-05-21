@@ -47,11 +47,13 @@ class PaymentService:
             stripe_price_id = plan_config.get("stripe_price_id")
             line_items = []
             if stripe_price_id:
+                logger.info(f"Stripe Integration: Using configured Price ID: {stripe_price_id} for plan: {plan_name} ({billing_cycle})")
                 line_items = [{
                     'price': stripe_price_id,
                     'quantity': 1,
                 }]
             else:
+                logger.warning(f"Stripe Integration WARNING: No Price ID configured for plan: {plan_name} ({billing_cycle}). Falling back to dynamic price_data. Coupon/promotion code restricted to specific products may fail!")
                 line_items = [{
                     'price_data': {
                         'currency': 'usd',
@@ -119,11 +121,13 @@ class PaymentService:
             stripe_price_id = plan_config.get("stripe_price_id")
             line_items = []
             if stripe_price_id:
+                logger.info(f"Stripe Integration: Using configured Price ID: {stripe_price_id} for plan: {plan_name} ({billing_cycle}) in embedded checkout")
                 line_items = [{
                     'price': stripe_price_id,
                     'quantity': 1,
                 }]
             else:
+                logger.warning(f"Stripe Integration WARNING: No Price ID configured for plan: {plan_name} ({billing_cycle}) in embedded checkout. Falling back to dynamic price_data. Coupon/promotion code restricted to specific products may fail!")
                 line_items = [{
                     "price_data": {
                         "currency": "usd",
