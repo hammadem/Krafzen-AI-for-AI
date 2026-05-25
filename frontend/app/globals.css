@@ -38,6 +38,20 @@
 
 :root {
   --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --cyan-400: #54e3b5;
+  --cyan-500: #3fc89c;
+  --cyan-600: #2aa882;
+  --mint-soft: rgba(84, 227, 181, 0.12);
+  --text-muted: rgba(148, 163, 184, 0.55);
+  --border-mint: rgba(84, 227, 181, 0.22);
+  --border-strong: rgba(255, 255, 255, 0.10);
+  --bg-primary: #06080d;
+  --bg-secondary: #0a0e17;
+  --bg-elevated: #0d121d;
+  --shadow-mint: 0 0 20px rgba(84, 227, 181, 0.15);
   --background: #06080d;
   --foreground: #f0f4f8;
   --card: rgba(12, 17, 28, 0.7);
@@ -145,4 +159,76 @@ h3,
 h4,
 h5 {
   overflow-wrap: anywhere;
+}
+
+/* ─── Skeleton Loading ─────────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Table Utilities ──────────────────────────────────────────── */
+.kz-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.kz-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-mint);
+}
+
+.kz-table td {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--foreground);
+  border-bottom: 1px solid var(--border);
+}
+
+.kz-table tr:last-child td {
+  border-bottom: none;
+}
+
+.kz-table tr:hover td {
+  background: rgba(84, 227, 181, 0.03);
+}
+
+/* ─── Modal Overlay ────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mint);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--shadow-mint);
 }
