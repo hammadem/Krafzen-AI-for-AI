@@ -2,27 +2,52 @@
 import React from 'react';
 import { useFetchProjects } from '@/hooks/useFetchProjects';
 import { useAuth } from '@/context/AuthContext';
-import { 
-  Folder, 
-  Plus, 
-  Search, 
-  MoreVertical, 
-  Calendar, 
+import {
+  Folder,
+  Plus,
+  Search,
+  MoreVertical,
+  Calendar,
   Clock,
   ArrowRight,
-  Loader2
+  Loader2,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
 
 export default function ProjectsDashboard() {
-  const { projects, status, forceRefetch } = useFetchProjects();
+  const { projects, status, apiError, forceRefetch } = useFetchProjects();
   const { user } = useAuth();
 
   if (status === 'inprogress') {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-[#54e3b5] animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4">
+        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+          <AlertCircle className="w-8 h-8 text-red-400" />
+        </div>
+        <div className="text-center">
+          <h3 className="text-white font-medium">Failed to load projects</h3>
+          <p className="text-[#94a3b8] text-sm mt-1">
+            {apiError?.message || 'Something went wrong. Please try again.'}
+          </p>
+        </div>
+        <button
+          onClick={forceRefetch}
+          className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white hover:bg-white/10 transition-all"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Try again
+        </button>
       </div>
     );
   }
@@ -97,8 +122,11 @@ export default function ProjectsDashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <div 
-                key={project.id} 
+              <Link
+                key={project.id}
+                href={`/workspace/id/${project.id}`}
+              >
+              <div
                 className="group bg-[#0a0e17] border border-white/10 rounded-2xl p-6 hover:border-[#54e3b5]/50 transition-all hover:shadow-[0_0_30px_rgba(84,227,181,0.05)] cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-4">
@@ -128,6 +156,7 @@ export default function ProjectsDashboard() {
                   </div>
                 </div>
               </div>
+              </Link>
             ))}
           </div>
         )}
