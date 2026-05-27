@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { DashRoutes } from "@/context/DashboardContext";
 import { PricingPlans } from "@/lib/data";
 import { classNames } from "@/lib/utils";
-import { CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings } from "lucide-react";
+import { Activity, CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChangeEvent } from "react";
@@ -70,6 +70,21 @@ export function NavLinks({ setCurrentRoute }: { setCurrentRoute: (value: Partial
                 aria-label="Link to Settings"
                 href="/workspace/settings"
                 className="flex gap-4 items-center cursor-pointer" ><Settings />Settings</Link>
+
+            <Link
+                onClick={() => setCurrentRoute({ activity: "activity" })}
+                aria-label="Link to Activity"
+                href="/workspace/activity"
+                className="flex gap-4 items-center cursor-pointer" >
+                <Activity />Activity
+            </Link>
+            <Link
+                onClick={() => setCurrentRoute({ members: "members" })}
+                aria-label="Link to Members"
+                href="/workspace/members"
+                className="flex gap-4 items-center cursor-pointer" >
+                <Users />Members
+            </Link>
 
             <Separator className="bg-[#919191] h-[1px] mt-2" />
         </div>

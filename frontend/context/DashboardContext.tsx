@@ -6,7 +6,10 @@ export interface DashRoutes {
   exports: "exports",
   templates: "templates",
   projects: "projects",
-  home: "home"
+  home: "home",
+  activity: "activity",
+  notifications: "notifications",
+  members: "members"
 }
 
 interface DashboardContextType {
