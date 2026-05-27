@@ -1,5 +1,4 @@
 "use client";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Download, LucideCreditCard, Plus, FileText } from "lucide-react";
 import { SeePlans } from "@/app/(dashboard)/_component/Examples";
