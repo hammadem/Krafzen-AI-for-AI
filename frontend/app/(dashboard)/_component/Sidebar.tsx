@@ -2,6 +2,7 @@
 import { Badge } from "@/components/ui/badge";
 import { BellRing, CircleQuestionMark } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { NavLinks, Projects } from "./Examples";
 import { useDashboard } from "@/context/DashboardContext";
 import { useEffect, useState } from "react";
@@ -115,7 +116,9 @@ export default function Sidebar() {
                 }
                 <span className={classNames("flex gap-4 mx-2 h-15 w-full items-center", sideBarOpen ? "justify-start" : "flex-col! h-20!")}>
                     <CircleQuestionMark className="text-white cursor-pointer" />
-                    <BellRing className="text-white cursor-pointer" />
+                    <Link href="/workspace/notifications" aria-label="Notifications">
+                        <BellRing className="text-white cursor-pointer hover:text-[#54e3b5] transition-colors" />
+                    </Link>
                 </span>
             </div>
 
