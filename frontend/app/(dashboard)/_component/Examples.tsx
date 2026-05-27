@@ -213,7 +213,7 @@ export function ExportHistory({ ind, currentExp }: { ind: number, currentExp: nu
     )
 }
 
-export function Projects({ createProject, setProjectName }: { createProject: () => void, setProjectName: (value: string) => void }) {
+export function Projects({ createProject, setProjectName, projects = [] }: { createProject: () => void, setProjectName: (value: string) => void, projects?: ProjectDetails[] }) {
     return (
         <div className="w-full text-white flex flex-col gap-4">
             <h1 className="font-semibold flex gap-4 px-4"><FolderIcon /> Projects</h1>
@@ -224,7 +224,6 @@ export function Projects({ createProject, setProjectName }: { createProject: () 
                     <DialogContent className="sm:max-w-[425px] bg-[#191919] text-white border-0 z-999999999!">
                         <DialogHeader>
                             <DialogTitle>Project Name</DialogTitle>
-
                         </DialogHeader>
                         <div className="grid gap-4 text-white">
                             <div className="grid gap-3">
@@ -241,10 +240,21 @@ export function Projects({ createProject, setProjectName }: { createProject: () 
                     </DialogContent>
                 </Dialog>
 
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer" />file_name_1</p>
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer" />file_name_2</p>
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer" />file_name_3</p>
+                {projects.length === 0 ? (
+                    <p className="text-[#8F8F8F] text-[2vh] text-center px-4">No projects yet. Create one above!</p>
+                ) : (
+                    projects.slice(0, 5).map((project) => (
+                        <Link
+                            key={project.id}
+                            href={`/workspace/id/${project.id}`}
+                            className="flex text-[2vh] text-[#8F8F8F] w-[90%] items-center gap-2 hover:text-white transition-colors truncate"
+                        >
+                            <FileText className="w-4 h-4 shrink-0" />
+                            <span className="truncate">{project.input_text || "Untitled Project"}</span>
+                        </Link>
+                    ))
+                )}
             </span>
-        </div >
+        </div>
     )
 }
