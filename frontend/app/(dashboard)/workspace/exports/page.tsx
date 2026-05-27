@@ -1,18 +1,16 @@
 "use client"
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, RotateCcw, SearchIcon, Trash2 } from "lucide-react";
-import { ExportHistory } from "../../_component/Examples";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileDown, SearchIcon } from "lucide-react";
 import { useState } from "react";
-import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { classNames } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+// TODO: Wire to real API when endpoint is ready
+// Expected: GET /api/v1/exports?user_id=...
+// Expected response shape: [{ id, filename, format, status, created_at, project_name, download_url }]
 
 export default function Exports() {
-    const [currentExp, setCurrentExp] = useState<number>(-1);
+    const [isLoading] = useState(false);
+    const [exports] = useState<unknown[]>([]);
 
     return (
         <div className="text-white flex p-4 flex-col items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
@@ -20,8 +18,9 @@ export default function Exports() {
 
                 <h1 className="text-white font-semibold text-[4vh]">Exports</h1>
 
+                {/* Search + Format Filter */}
                 <span className="flex flex-col sm:flex-row gap-4 text-[#8F8F8F]">
-                    <span className="flex items-center gap-2 bg-[#0F0F0F] border-1 border-[#8F8F8F] rounded-[10px] w-full focus-within:none transition">
+                    <span className="flex items-center gap-2 bg-[#0F0F0F] border border-[#8F8F8F] rounded-[10px] w-full transition">
                         <SearchIcon className="w-5 h-5 text-[#9A9A9A] ml-3" />
                         <Input
                             type="text"
@@ -32,159 +31,45 @@ export default function Exports() {
 
                     <Select>
                         <SelectTrigger className="w-[180px] border-[#8F8F8F] bg-[#0F0F0F]">
-                            <SelectValue placeholder="All Categories" />
+                            <SelectValue placeholder="All Formats" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectGroup>
-                                <SelectLabel>Fruits</SelectLabel>
-                                <SelectItem value="apple">Apple</SelectItem>
-                                <SelectItem value="banana">Banana</SelectItem>
-                                <SelectItem value="blueberry">Blueberry</SelectItem>
-                                <SelectItem value="grapes">Grapes</SelectItem>
-                                <SelectItem value="pineapple">Pineapple</SelectItem>
+                                <SelectItem value="all">All Formats</SelectItem>
+                                <SelectItem value="dwg">DWG</SelectItem>
+                                <SelectItem value="dxf">DXF</SelectItem>
+                                <SelectItem value="pdf">PDF</SelectItem>
+                                <SelectItem value="svg">SVG</SelectItem>
                             </SelectGroup>
                         </SelectContent>
                     </Select>
-
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="hover:bg-[#0F0F0F] bg-[#0F0F0F] hover:text-[#8F8F8F] border-1 border-[#8F8F8F] flex gap-2 items-center font-semibold justify-center">
-                                <div className="w-10 flex h-[80%] gap-1 flex-col items-center justify-center">
-                                    <span className="w-[72%] h-[18%] bg-[#8F8F8F]"></span>
-                                    <span className="w-[48%] h-[18%] bg-[#8F8F8F]"></span>
-                                    <span className="w-[24%] h-[18%] bg-[#8F8F8F]"></span>
-                                </div>
-                                Filter
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80">
-                            <div className="grid gap-4">
-                                <div className="space-y-2">
-                                    <h4 className="leading-none font-medium">Dimensions</h4>
-                                    <p className="text-muted-foreground text-sm">
-                                        Set the dimensions for the layer.
-                                    </p>
-                                </div>
-                                <div className="grid gap-2">
-                                    <div className="grid grid-cols-3 items-center gap-4">
-                                        <Label htmlFor="width">Width</Label>
-                                        <Input
-                                            id="width"
-                                            defaultValue="100%"
-                                            className="col-span-2 h-8"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-3 items-center gap-4">
-                                        <Label htmlFor="maxWidth">Max. width</Label>
-                                        <Input
-                                            id="maxWidth"
-                                            defaultValue="300px"
-                                            className="col-span-2 h-8"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-3 items-center gap-4">
-                                        <Label htmlFor="height">Height</Label>
-                                        <Input
-                                            id="height"
-                                            defaultValue="25px"
-                                            className="col-span-2 h-8"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-3 items-center gap-4">
-                                        <Label htmlFor="maxHeight">Max. height</Label>
-                                        <Input
-                                            id="maxHeight"
-                                            defaultValue="none"
-                                            className="col-span-2 h-8"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </PopoverContent>
-                    </Popover>
-
                 </span>
 
-                <div className="flex gap-4">
-                    <div className="w-full flex flex-col gap-4">
-                        {
-                            [...Array(10)].map((_, ind) => (
-                                <div key={ind} onClick={() => setCurrentExp(ind)} className="cursor-pointer">
-                                    <ExportHistory ind={ind} currentExp={currentExp} />
-                                </div>
-                            ))
-                        }
+                {/* Loading skeleton */}
+                {isLoading && (
+                    <div className="flex flex-col gap-3">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="skeleton h-20 w-full rounded-[10px]" />
+                        ))}
                     </div>
+                )}
 
-                    <div className={classNames("bg-[#2F2F2F] p-4 rounded-[10px] h-[115vh]", currentExp < 0 ? "hidden" : "block")}>
-                        <span className="flex flex-col gap-4">
-                            <h1 className="text-white font-semibold text-[4vh]">Exports</h1>
-                            <Image
-                                src="/dashboard/tempexample.png"
-                                width={500}
-                                height={500}
-                                alt="Export Details Image"
-                            />
-
-                            <span>
-                                <p className="text-[#8F8F8F]">File Name</p>
-                                <p>project_alpha_floorplan.dwg</p>
-                            </span>
-
-                            <span className="flex items-center justify-between">
-                                <span className="flex flex-col w-full items-start gap-6">
-                                    <span>
-                                        <p className="text-[#8F8F8F]">Format</p>
-                                        <p>DWG</p>
-                                    </span>
-                                    <span>
-                                        <p className="text-[#8F8F8F]">Status</p>
-                                        <Badge variant="secondary" className="bg-[#FC932A]/15 text-[#FC932A]">
-                                            <span className="rounded-full h-2 w-2 bg-[#FC932A]" />
-                                            Pending
-                                        </Badge>
-                                    </span>
-                                </span>
-
-                                <span className="flex w-full flex-col items-start gap-6">
-                                    <span>
-                                        <p className="text-[#8F8F8F]">Date</p>
-                                        <p>2025-10-27</p>
-                                    </span>
-                                    <span>
-                                        <p className="text-[#8F8F8F]">Project</p>
-                                        <p>Office Redesign</p>
-                                    </span>
-                                </span>
-
-                            </span>
-
-                            <span className="flex flex-col gap-4 py-2">
-                                <Button
-                                    className="bg-black text-white hover:bg-black"
-                                >
-                                    <Download />
-                                    Download
-                                </Button>
-                                <Button
-                                    className="bg-transparent text-white hover:bg=transparent bg-[#3F3F3F] flex items-center"
-                                >
-                                    <RotateCcw />
-                                    Re-export
-                                </Button>
-
-                                <Button
-                                    className="text-red-700 bg-transparent hover:bg=transparent flex items-center"
-                                >
-                                    <Trash2 className="text-red-700" />
-                                    Delete Export
-                                </Button>
-                            </span>
-                        </span>
+                {/* Empty state */}
+                {!isLoading && exports.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl">
+                        <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
+                            <FileDown className="w-7 h-7 text-[#54e3b5]/60" />
+                        </div>
+                        <div className="text-center">
+                            <h3 className="text-white font-semibold text-lg">No exports yet</h3>
+                            <p className="text-[#94a3b8] text-sm mt-1">
+                                Your exported CAD files will appear here once you generate them.
+                            </p>
+                        </div>
                     </div>
-                </div>
+                )}
 
             </div>
-        </div >
-    )
+        </div>
+    );
 }
