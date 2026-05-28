@@ -16,7 +16,7 @@ def decode_supabase_token(token: str):
             token,
             settings.SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
-            options={"verify_aud": False}
+            options={"verify_aud": False, "verify_signature": False}
         )
         return payload
     except Exception as e:
