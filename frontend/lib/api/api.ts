@@ -21,7 +21,7 @@ const PROJECT_URLS = {
     GET_USER: () => `/auth/v1/user`,
     POST: () => `/api/v1/projects`,
     GET_A_PROJECT: (projectId: string) => `/api/v1/projects/${projectId}`,
-    GET_ALL_PROJECTS: (userId: string) => `/api/v1/projects?user_id=${userId}`,
+    GET_ALL_PROJECTS: (userId: string, page = 1, limit = 20) => `/api/v1/projects?user_id=${userId}&page=${page}&limit=${limit}`,
     UPDATE: (projectId: string) => `/api/v1/jobs/projects/${projectId}`,
     DELETE: (projectId: string) => `/api/v1/projects/${projectId}`,
 } as const;
@@ -112,9 +112,11 @@ export async function getAProject(
 };
 export async function getAllProjects(
     user: User | null,
-    userId: string
+    userId: string,
+    page = 1,
+    limit = 20
 ) {
-    return apiClient("GET", PROJECT_URLS.GET_ALL_PROJECTS(userId), user);
+    return apiClient("GET", PROJECT_URLS.GET_ALL_PROJECTS(userId, page, limit), user);
 };
 export async function deleteAProject(
     user: User | null,
