@@ -10,7 +10,7 @@ import NavHeader from "@/components/NavHeader";
 // Expected response shape: [{ id, filename, format, status, created_at, project_name, download_url }]
 
 export default function Exports() {
-    const [isLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [exports] = useState<unknown[]>([]);
 
     return (

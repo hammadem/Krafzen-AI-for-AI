@@ -15,8 +15,9 @@ export function useFetchProjects(initialPage = 1) {
     const [hasMore, setHasMore] = useState<boolean>(true);
 
     const fetchProjects = useCallback(async (pageToFetch = 1) => {
+        if (!user?.userId) return;
         setStatus("inprogress");
-        const { ok, data, error } = await getAllProjects(user, user!.userId!, pageToFetch, DEFAULT_LIMIT);
+        const { ok, data, error } = await getAllProjects(user, user.userId, pageToFetch, DEFAULT_LIMIT);
 
         if (ok) {
             // Handle both response shapes:

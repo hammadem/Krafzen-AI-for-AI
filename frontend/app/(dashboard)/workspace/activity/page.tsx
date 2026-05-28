@@ -7,7 +7,7 @@ import { useState } from "react";
 // Expected response shape: [{ id, type, description, created_at, project_id, project_name }]
 
 export default function ActivityPage() {
-    const [isLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [activities] = useState<unknown[]>([]);
 
     return (

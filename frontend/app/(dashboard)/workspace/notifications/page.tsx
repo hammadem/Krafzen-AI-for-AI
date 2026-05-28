@@ -7,7 +7,7 @@ import { useState } from "react";
 // Expected response shape: [{ id, title, message, read, created_at, type }]
 
 export default function NotificationsPage() {
-    const [isLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [notifications] = useState<unknown[]>([]);
 
     return (

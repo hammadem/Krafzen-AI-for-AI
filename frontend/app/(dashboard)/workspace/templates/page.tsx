@@ -10,7 +10,7 @@ import NavHeader from "@/components/NavHeader";
 // Expected response shape: [{ id, name, category, preview_url, description }]
 
 export default function Templates() {
-    const [isLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [templates] = useState<unknown[]>([]);
 
     return (

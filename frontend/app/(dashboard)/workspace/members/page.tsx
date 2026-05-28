@@ -1,5 +1,5 @@
 "use client";
-import { Users } from "lucide-react";
+import { Users, RefreshCw, AlertCircle } from "lucide-react";
 import { useState } from "react";
 
 // TODO: Wire to real API when Yehor's endpoint is ready
@@ -7,8 +7,9 @@ import { useState } from "react";
 // Expected response shape: [{ id, name, email, role, avatar_url, joined_at }]
 
 export default function MembersPage() {
-    const [isLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [members] = useState<unknown[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
     return (
         <div className="text-white flex p-4 flex-col items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
@@ -16,6 +17,26 @@ export default function MembersPage() {
 
                 <h1 className="text-white font-semibold text-[4vh]">Members</h1>
                 <p className="text-[#8F8F8F]">Manage who has access to your workspace.</p>
+
+                {/* Error state */}
+                {error && (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4">
+                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+                            <AlertCircle className="w-8 h-8 text-red-400" />
+                        </div>
+                        <div className="text-center">
+                            <h3 className="text-white font-medium">Failed to load members</h3>
+                            <p className="text-[#94a3b8] text-sm mt-1">{error}</p>
+                        </div>
+                        <button
+                            onClick={() => setError(null)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white hover:bg-white/10 transition-all"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            Try again
+                        </button>
+                    </div>
+                )}
 
                 {/* Loading skeleton */}
                 {isLoading && (
