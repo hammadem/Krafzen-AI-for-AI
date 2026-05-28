@@ -38,11 +38,12 @@ export default function Exports() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectGroup>
+                                {/* Values match ExportFormat contract: export_contracts.py */}
                                 <SelectItem value="all">All Formats</SelectItem>
-                                <SelectItem value="dwg">DWG</SelectItem>
                                 <SelectItem value="dxf">DXF</SelectItem>
-                                <SelectItem value="pdf">PDF</SelectItem>
-                                <SelectItem value="svg">SVG</SelectItem>
+                                <SelectItem value="dwg">DWG</SelectItem>
+                                <SelectItem value="ifc">IFC</SelectItem>
+                                <SelectItem value="revit_package">Revit Package</SelectItem>
                             </SelectGroup>
                         </SelectContent>
                     </Select>
