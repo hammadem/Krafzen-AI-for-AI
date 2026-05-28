@@ -15,6 +15,20 @@ from app.schemas.parser import (
     ParsingResponse,
     ParsingError
 )
+from app.schemas.export_contracts import (
+    ExportStatus,
+    ValidationSeverity,
+    ValidationCategory,
+    ExportFormat,
+    ApprovalState,
+    JurisdictionSummary,
+    CompliancePresetSummary,
+    JurisdictionContractsResponse,
+    CompliancePresetsResponse,
+    ValidationIssue,
+    ExportValidationPayload,
+    ExportLifecycleContract,
+)
 
 __all__ = [
     "TranscriptionRequest",
@@ -25,5 +39,17 @@ __all__ = [
     "ParsedInstruction",
     "ParsingResponse",
     "ParsingError",
+    "ExportStatus",
+    "ValidationSeverity",
+    "ValidationCategory",
+    "ExportFormat",
+    "ApprovalState",
+    "JurisdictionSummary",
+    "CompliancePresetSummary",
+    "JurisdictionContractsResponse",
+    "CompliancePresetsResponse",
+    "ValidationIssue",
+    "ExportValidationPayload",
+    "ExportLifecycleContract",
 ]
 
