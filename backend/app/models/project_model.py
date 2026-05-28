@@ -3,7 +3,6 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 class ProjectCreate(BaseModel):
-    user_id: str = Field(..., description="Supabase Auth UUID")
     input_text: str
 
 class ProjectUpdate(BaseModel):
