@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileDown, SearchIcon } from "lucide-react";
 import { useState } from "react";
+import NavHeader from "@/components/NavHeader";
 
 // TODO: Wire to real API when endpoint is ready
 // Expected: GET /api/v1/exports?user_id=...
@@ -13,8 +14,10 @@ export default function Exports() {
     const [exports] = useState<unknown[]>([]);
 
     return (
-        <div className="text-white flex p-4 flex-col items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
-            <div className="w-[80%] p-4 gap-4 flex flex-col">
+        <div className="min-h-screen bg-[#06080d] text-white pb-20">
+        <NavHeader currentNav="Exports" />
+        <div className="text-white flex p-4 flex-col items-center justify-start gap-6 w-full bg-[#06080d] overflow-y-auto custom-scrollbar2">
+            <div className="w-full max-w-4xl px-4 gap-4 flex flex-col">
 
                 <h1 className="text-white font-semibold text-[4vh]">Exports</h1>
 
@@ -70,6 +73,7 @@ export default function Exports() {
                 )}
 
             </div>
+        </div>
         </div>
     );
 }
