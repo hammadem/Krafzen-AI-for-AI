@@ -138,6 +138,29 @@ button {
   /* scrollbar width */
 }
 
+/* ── Design System: Loading Skeleton ── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.10) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Design System: Status Badges ── */
+.badge-active   { background: rgba(84,227,181,0.10); color: #54e3b5; }
+.badge-trial    { background: rgba(251,191,36,0.10);  color: #fbbf24; }
+.badge-inactive { background: rgba(248,113,113,0.10); color: #f87171; }
+
 h1,
 p,
 h2,
