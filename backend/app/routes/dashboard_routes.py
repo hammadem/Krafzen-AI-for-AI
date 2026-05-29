@@ -3,15 +3,16 @@ Dashboard endpoints — activity feed + workspace summary.
 Owner: Tazwar (queue_owner). Feeds Sunny's UI shells (Step 4/5).
 """
 
+import logger
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
-
 from app.middlewares.auth import require_auth
 from app.schemas.export_contracts import ExportStatus
 from app.db.queries.job_queries import get_jobs
 from app.db.queries.project_queries import get_projects
+from app.utils.queue_monitor import get_queue_health
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -251,6 +252,33 @@ async def get_notifications(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.patch("/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    user=Depends(require_auth),
+):
+    """
+    Mark a notification (job event) as read.
+    notification_id is the job_id (same as the id field in NotificationItem).
+    Week 1: stores read state on the job's error_message field is NOT correct —
+    this is a stub that returns 200 so Sunny can wire the UI now.
+    Week 2: add a notifications table with per-user read state.
+    """
+    # Verify the job exists and belongs to this user before returning 200
+    from app.db.queries.job_queries import get_job
+    job = await get_job(notification_id, user)
+    if not job:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    # Week 2: persist read=True to notifications table here
+    logger.info(
+        "[mark_notification_read] Read state acknowledged (persistence in Week 2)",
+        notification_id=notification_id,
+        user_id=user["user_id"],
+    )
+    return {"id": notification_id, "read": True}
+
+
 # ── Members list ─────────────────────────────────────────────────────────────
 
 class MemberItem(BaseModel):
@@ -289,3 +317,28 @@ async def get_workspace_members(user=Depends(require_auth)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class QueueHealthResponse(BaseModel):
+    counts_by_status: dict
+    stuck_jobs: int
+    stuck_job_ids: List[str]
+    unknown_status_rows: int
+    threshold_minutes: int
+    assessed_at: str
+    error: Optional[str] = None
+
+
+@router.get("/queue-health", response_model=QueueHealthResponse)
+async def queue_health_endpoint(user=Depends(require_auth)):
+    """
+    Live queue health snapshot.
+    Returns counts by status, stuck job count, and unknown-status rows
+    (non-zero unknown rows means the contract migration hasn't run).
+    Week 3 will expand with avg processing time, failure rate, retry frequency.
+    Owner: Tazwar — monitoring foundation per Week 1 Step 6.
+    """
+    result = await get_queue_health()
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result
