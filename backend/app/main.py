@@ -11,6 +11,7 @@ from app.core.logging_config import init_sentry
 from app.utils.error_handler import add_exception_handlers
 from app.api import health, transcriber
 from app.db.supabase_client import db
+from app.routes import dashboard_routes
 import logging
 import sys
 
@@ -100,6 +101,7 @@ app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
 app.include_router(architecture_routes.router, prefix="/api/v1", tags=["Architecture Contracts"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
+app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"])
 
 # Parser module removed from build system as requested
 # (Previously imported app.api.parser here)

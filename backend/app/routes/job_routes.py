@@ -10,7 +10,7 @@ from app.db.queries.job_queries import (
 )
 from app.models.job_model import JobCreate, JobUpdate, JobResponse
 from app.middlewares.auth import require_auth
-from app.services.queue_service import advance_job_status, enque_job, retry_job
+from app.services.queue_service import advance_job_status, enqueue_job, retry_job
 from app.schemas.export_contracts import ExportStatus
 
 class StatusAdvanceRequest(BaseModel):
