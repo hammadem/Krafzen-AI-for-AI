@@ -1,5 +1,6 @@
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Header, Query, Depends
-from typing import List
+from typing import List, Optional
 from app.db.queries.job_queries import (
     create_job as create_job_query,
     get_jobs,
@@ -9,6 +10,12 @@ from app.db.queries.job_queries import (
 )
 from app.models.job_model import JobCreate, JobUpdate, JobResponse
 from app.middlewares.auth import require_auth
+from app.services.queue_service import advance_job_status, enque_job, retry_job
+from app.schemas.export_contracts import ExportStatus
+
+class StatusAdvanceRequest(BaseModel):
+    status: ExportStatus
+    error_message: Optional[str] = None
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -65,3 +72,35 @@ async def delete_job_route(
     if not deleted:
         raise HTTPException(status_code=400, detail="Job deletion failed")
     return {"message": "Job deleted successfully"}
+
+
+@router.post("/{job_id}/advance", response_model=JobResponse)
+async def advance_job_status_route(
+    job_id: str,
+    body: StatusAdvanceRequest,
+    user=Depends(require_auth),
+):
+    """
+    Advance a job to the next lifecycle status.
+    Only contract-aligned transitions are accepted.
+    Source of truth: /api/v1/contracts/export-lifecycle
+    """
+    result = await advance_job_status(job_id, body.status, user, body.error_message)
+    if not result or result.get("error"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Status transition failed"))
+    return result
+
+
+@router.post("/{job_id}/retry", response_model=JobResponse)
+async def retry_job_route(
+    job_id: str,
+    user=Depends(require_auth),
+):
+    """
+    Re-queue a FAILED or CANCELLED job.
+    Retryable states: failed, cancelled (per /api/v1/contracts/export-lifecycle)
+    """
+    result = await retry_job(job_id, user)
+    if not result or result.get("error"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Retry failed"))
+    return result
