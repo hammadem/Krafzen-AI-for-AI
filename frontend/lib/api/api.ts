@@ -26,6 +26,11 @@ const PROJECT_URLS = {
     DELETE: (projectId: string) => `/api/v1/projects/${projectId}`,
 } as const;
 
+// Dashboard routes (Tazwar — dashboard_routes.py)
+const DASHBOARD_URLS = {
+    GET_ACTIVITY: () => `/api/v1/dashboard/activity`,
+} as const;
+
 // Text to CAD maker api
 const GPT_PARSERS = {
     PARSE: () => `/api/v1/parse`,
@@ -130,6 +135,14 @@ export async function updateAProject(
     data: string
 ) {
     return apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, data);
+}
+
+
+// Activity feed for the dashboard (auth-scoped by Bearer token)
+export async function getDashboardActivity(
+    user: User | null
+) {
+    return apiClient("GET", DASHBOARD_URLS.GET_ACTIVITY(), user);
 }
 
 
