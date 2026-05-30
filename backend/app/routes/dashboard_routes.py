@@ -3,7 +3,6 @@ Dashboard endpoints — activity feed + workspace summary.
 Owner: Tazwar (queue_owner). Feeds Sunny's UI shells (Step 4/5).
 """
 
-import logger
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
 from pydantic import BaseModel
@@ -13,6 +12,7 @@ from app.schemas.export_contracts import ExportStatus
 from app.db.queries.job_queries import get_jobs
 from app.db.queries.project_queries import get_projects
 from app.utils.queue_monitor import get_queue_health
+from app.utils.logger import logger
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -110,6 +110,7 @@ async def get_activity_feed(
         return ActivityFeedResponse(events=events, total=len(events))
 
     except Exception as e:
+        logger.error(f"Error occurred while fetching activity feed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -148,6 +149,7 @@ async def get_workspace_summary(user=Depends(require_auth)):
         )
 
     except Exception as e:
+        logger.error(f"Error occurred while fetching workspace summary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
