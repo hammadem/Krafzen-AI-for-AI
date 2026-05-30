@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from app.services.subscription_service import subscription_service
 from app.middlewares.auth import require_auth
 from app.services.user_service import get_user_email
+from app.core.permissions import get_role_payload
 import logging
 
 router = APIRouter()
@@ -16,6 +17,7 @@ async def get_user_profile(request: Request, user_data: dict = Depends(require_a
         user_id = user_data["user_id"]
         sub = await subscription_service.get_subscription(user_id)
         profile = await get_user_email(user_id)
+        role_data = get_role_payload("member") # TODO: replace with real role from DB
         
         # Combine with auth info if needed, but for now just return subscription info
         return {
@@ -23,7 +25,8 @@ async def get_user_profile(request: Request, user_data: dict = Depends(require_a
             "email": profile["email"], # Placeholder or fetch from Auth service if possible, or just ignore. 
             # Note: auth middleware only returns user_id. We'd need to fetch user details from Supabase Auth API if email is needed repeatedly.
             # But frontend has the email from session.
-            "role": "member",  # hardcoded until role system is built in Step 
+            **role_data,
+            #"role": "member",  # TODO: hardcoded until role system is built in Step 
             "plan_tier": sub.get("plan_tier"),
             "remaining_minutes": sub.get("remaining_minutes"),
             "total_minutes_purchased": sub.get("total_minutes_purchased", 0),

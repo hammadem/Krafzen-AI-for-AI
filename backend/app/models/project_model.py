@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-class ProjectCreate(BaseModel):
+class ProjectCreate(BaseModel): 
     input_text: str
 
 class ProjectUpdate(BaseModel):
