@@ -15,7 +15,7 @@ class FileCreate(BaseModel):
     project_id: Optional[str] = None
     file_type: str = "dxf"
     path: str
-    bucket: Optional[str] = "krafzen-files"
+    bucket: Optional[str] = "dxf-files"
     mime_type: Optional[str] = None
     size_bytes: Optional[int] = None
 
