@@ -29,6 +29,11 @@ const PROJECT_URLS = {
 // Dashboard routes (Tazwar — dashboard_routes.py)
 const DASHBOARD_URLS = {
     GET_ACTIVITY: () => `/api/v1/dashboard/activity`,
+    GET_NOTIFICATIONS: (query = "") => `/api/v1/dashboard/notifications${query}`,
+    // NOTE: confirm exact path/method with Tazwar — assuming PATCH .../{id}/read
+    MARK_NOTIFICATION_READ: (id: string) => `/api/v1/dashboard/notifications/${id}/read`,
+    GET_WORKSPACE_SUMMARY: () => `/api/v1/dashboard/workspace-summary`,
+    GET_MEMBERS: () => `/api/v1/dashboard/members`,
 } as const;
 
 // Text to CAD maker api
@@ -143,6 +148,40 @@ export async function getDashboardActivity(
     user: User | null
 ) {
     return apiClient("GET", DASHBOARD_URLS.GET_ACTIVITY(), user);
+}
+
+// Notifications (auth-scoped). Supports unread_only + limit.
+export async function getDashboardNotifications(
+    user: User | null,
+    opts?: { unreadOnly?: boolean; limit?: number }
+) {
+    const qs = new URLSearchParams();
+    if (opts?.unreadOnly) qs.set("unread_only", "true");
+    if (opts?.limit) qs.set("limit", String(opts.limit));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return apiClient("GET", DASHBOARD_URLS.GET_NOTIFICATIONS(query), user);
+}
+
+// Mark a single notification as read
+export async function markNotificationRead(
+    user: User | null,
+    notificationId: string
+) {
+    return apiClient("PATCH", DASHBOARD_URLS.MARK_NOTIFICATION_READ(notificationId), user);
+}
+
+// Workspace summary counts
+export async function getWorkspaceSummary(
+    user: User | null
+) {
+    return apiClient("GET", DASHBOARD_URLS.GET_WORKSPACE_SUMMARY(), user);
+}
+
+// Workspace members (Week 1: returns authed user as owner only)
+export async function getDashboardMembers(
+    user: User | null
+) {
+    return apiClient("GET", DASHBOARD_URLS.GET_MEMBERS(), user);
 }
 
 
