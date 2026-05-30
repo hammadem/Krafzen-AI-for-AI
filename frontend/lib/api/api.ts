@@ -30,7 +30,7 @@ const PROJECT_URLS = {
 const DASHBOARD_URLS = {
     GET_ACTIVITY: () => `/api/v1/dashboard/activity`,
     GET_NOTIFICATIONS: (query = "") => `/api/v1/dashboard/notifications${query}`,
-    // NOTE: confirm exact path/method with Tazwar — assuming PATCH .../{id}/read
+    // PATCH .../{notification_id}/read → returns { id, read: true } (confirmed w/ Tazwar)
     MARK_NOTIFICATION_READ: (id: string) => `/api/v1/dashboard/notifications/${id}/read`,
     GET_WORKSPACE_SUMMARY: () => `/api/v1/dashboard/workspace-summary`,
     GET_MEMBERS: () => `/api/v1/dashboard/members`,
