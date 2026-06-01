@@ -1,8 +1,7 @@
 "use client";
 import { Users, RefreshCw, AlertCircle, FolderKanban, Activity, AlertTriangle } from "lucide-react";
-import { useState, useEffect } from "react";
 import { getDashboardMembers, getWorkspaceSummary } from "@/lib/api/api";
-import { useAuth } from "@/context/AuthContext";
+import { useApiResource } from "@/hooks/useApiResource";
 
 // Wired to Tazwar's endpoints (dashboard_routes.py)
 // GET /api/v1/dashboard/members          -> { members: [{ user_id, email, display_name, role }], total }
@@ -24,49 +23,29 @@ interface WorkspaceSummary {
 }
 
 export default function MembersPage() {
-    const { user } = useAuth();
-    const [isLoading, setIsLoading] = useState(false);
-    const [members, setMembers] = useState<Member[]>([]);
-    const [summary, setSummary] = useState<WorkspaceSummary | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [reloadKey, setReloadKey] = useState(0);
+    // Members is the critical resource — its loading/error/retry drives the page.
+    const {
+        data: members,
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useApiResource<Member[]>({
+        fetcher: (u) => getDashboardMembers(u),
+        select: (raw) =>
+            raw && typeof raw === "object" && "members" in raw
+                ? (raw as { members?: Member[] }).members ?? []
+                : [],
+        fallback: [],
+    });
 
-    useEffect(() => {
-        if (!user?.userId) return;
-        let isMounted = true;
-
-        const load = async () => {
-            setIsLoading(true);
-            setError(null);
-
-            const [membersRes, summaryRes] = await Promise.all([
-                getDashboardMembers(user),
-                getWorkspaceSummary(user),
-            ]);
-            if (!isMounted) return;
-
-            if (membersRes.ok && membersRes.data && typeof membersRes.data === "object" && "members" in membersRes.data) {
-                const list = (membersRes.data as { members?: Member[] }).members;
-                setMembers(Array.isArray(list) ? list : []);
-            } else if (membersRes.ok) {
-                setMembers([]);
-            } else {
-                setError(membersRes.error?.message || "Could not load members.");
-            }
-
-            // Summary is non-critical — show it if available, ignore quietly if not
-            if (summaryRes.ok && summaryRes.data && typeof summaryRes.data === "object") {
-                setSummary(summaryRes.data as unknown as WorkspaceSummary);
-            }
-
-            setIsLoading(false);
-        };
-
-        load();
-        return () => {
-            isMounted = false;
-        };
-    }, [user, reloadKey]);
+    // Summary is non-critical — show it if available, ignore quietly otherwise.
+    const { data: summary } = useApiResource<WorkspaceSummary | null>({
+        fetcher: (u) => getWorkspaceSummary(u),
+        select: (raw) =>
+            raw && typeof raw === "object" ? (raw as unknown as WorkspaceSummary) : null,
+        fallback: null,
+    });
 
     const stats = summary
         ? [
@@ -85,7 +64,7 @@ export default function MembersPage() {
                 <p className="text-[#8F8F8F]">Manage who has access to your workspace.</p>
 
                 {/* Workspace summary stats */}
-                {!error && summary && (
+                {!isError && summary && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
                         {stats.map((s) => (
                             <div key={s.label} className="bg-[#2F2F2F] rounded-[10px] p-4 flex flex-col gap-1">
@@ -100,17 +79,17 @@ export default function MembersPage() {
                 )}
 
                 {/* Error state */}
-                {error && (
+                {isError && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
                             <AlertCircle className="w-8 h-8 text-red-400" />
                         </div>
                         <div className="text-center">
                             <h3 className="text-white font-medium">Failed to load members</h3>
-                            <p className="text-[#94a3b8] text-sm mt-1">{error}</p>
+                            <p className="text-[#94a3b8] text-sm mt-1">{error?.message || "Could not load members."}</p>
                         </div>
                         <button
-                            onClick={() => setReloadKey((k) => k + 1)}
+                            onClick={refetch}
                             className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white hover:bg-white/10 transition-all"
                         >
                             <RefreshCw className="w-4 h-4" />
@@ -120,7 +99,7 @@ export default function MembersPage() {
                 )}
 
                 {/* Loading skeleton */}
-                {isLoading && !error && (
+                {isLoading && !isError && (
                     <div className="flex flex-col gap-3 mt-4">
                         {[1, 2, 3].map((i) => (
                             <div key={i} className="bg-[#2F2F2F] rounded-[10px] p-4 flex items-center gap-4">
@@ -136,7 +115,7 @@ export default function MembersPage() {
                 )}
 
                 {/* Members list */}
-                {!isLoading && !error && members.length > 0 && (
+                {!isLoading && !isError && members.length > 0 && (
                     <div className="flex flex-col gap-3 mt-4">
                         {members.map((m) => (
                             <div key={m.user_id} className="bg-[#2F2F2F] rounded-[10px] p-4 flex items-center gap-4">
@@ -156,7 +135,7 @@ export default function MembersPage() {
                 )}
 
                 {/* Empty state */}
-                {!isLoading && !error && members.length === 0 && (
+                {!isLoading && !isError && members.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl mt-4">
                         <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
                             <Users className="w-7 h-7 text-[#54e3b5]/60" />

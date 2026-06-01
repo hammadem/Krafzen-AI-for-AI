@@ -1,8 +1,7 @@
 "use client";
 import { Activity, RefreshCw, AlertCircle } from "lucide-react";
-import { useState, useEffect } from "react";
 import { getDashboardActivity } from "@/lib/api/api";
-import { useAuth } from "@/context/AuthContext";
+import { useApiResource } from "@/hooks/useApiResource";
 
 // Wired to Tazwar's endpoint (dashboard_routes.py)
 // GET /api/v1/dashboard/activity  (auth-scoped by Bearer token, no user_id param)
@@ -18,40 +17,20 @@ interface ActivityEvent {
 }
 
 export default function ActivityPage() {
-    const { user } = useAuth();
-    const [isLoading, setIsLoading] = useState(false);
-    const [activities, setActivities] = useState<ActivityEvent[]>([]);
-    const [error, setError] = useState<string | null>(null);
-    const [reloadKey, setReloadKey] = useState(0);
-
-    useEffect(() => {
-        if (!user?.userId) return;
-        let isMounted = true;
-
-        const load = async () => {
-            setIsLoading(true);
-            setError(null);
-
-            const { ok, data, error: apiError } = await getDashboardActivity(user);
-            if (!isMounted) return;
-
-            if (ok && data && typeof data === "object" && "events" in data) {
-                const events = (data as { events?: ActivityEvent[] }).events;
-                setActivities(Array.isArray(events) ? events : []);
-            } else if (ok) {
-                setActivities([]);
-            } else {
-                setError(apiError?.message || "Could not load activity.");
-            }
-
-            setIsLoading(false);
-        };
-
-        load();
-        return () => {
-            isMounted = false;
-        };
-    }, [user, reloadKey]);
+    const {
+        data: activities,
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useApiResource<ActivityEvent[]>({
+        fetcher: (user) => getDashboardActivity(user),
+        select: (raw) =>
+            raw && typeof raw === "object" && "events" in raw
+                ? (raw as { events?: ActivityEvent[] }).events ?? []
+                : [],
+        fallback: [],
+    });
 
     return (
         <div className="text-white flex p-4 flex-col items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
@@ -61,17 +40,17 @@ export default function ActivityPage() {
                 <p className="text-[#8F8F8F]">Track all actions and updates across your projects.</p>
 
                 {/* Error state */}
-                {error && (
+                {isError && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
                             <AlertCircle className="w-8 h-8 text-red-400" />
                         </div>
                         <div className="text-center">
                             <h3 className="text-white font-medium">Failed to load activity</h3>
-                            <p className="text-[#94a3b8] text-sm mt-1">{error}</p>
+                            <p className="text-[#94a3b8] text-sm mt-1">{error?.message || "Could not load activity."}</p>
                         </div>
                         <button
-                            onClick={() => setReloadKey((k) => k + 1)}
+                            onClick={refetch}
                             className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white hover:bg-white/10 transition-all"
                         >
                             <RefreshCw className="w-4 h-4" />
@@ -81,7 +60,7 @@ export default function ActivityPage() {
                 )}
 
                 {/* Loading skeleton */}
-                {isLoading && !error && (
+                {isLoading && !isError && (
                     <div className="flex flex-col gap-3 mt-4">
                         {[1, 2, 3, 4, 5].map((i) => (
                             <div key={i} className="flex items-center gap-4">
@@ -96,7 +75,7 @@ export default function ActivityPage() {
                 )}
 
                 {/* Activity list */}
-                {!isLoading && !error && activities.length > 0 && (
+                {!isLoading && !isError && activities.length > 0 && (
                     <div className="flex flex-col gap-3 mt-4">
                         {activities.map((event, index) => (
                             <div
@@ -119,7 +98,7 @@ export default function ActivityPage() {
                 )}
 
                 {/* Empty state */}
-                {!isLoading && !error && activities.length === 0 && (
+                {!isLoading && !isError && activities.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl mt-4">
                         <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
                             <Activity className="w-7 h-7 text-[#54e3b5]/60" />

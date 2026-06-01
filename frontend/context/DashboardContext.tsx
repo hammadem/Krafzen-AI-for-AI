@@ -9,7 +9,8 @@ export interface DashRoutes {
   home: "home",
   activity: "activity",
   notifications: "notifications",
-  members: "members"
+  members: "members",
+  archive: "archive"
 }
 
 interface DashboardContextType {

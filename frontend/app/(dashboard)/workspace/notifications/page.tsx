@@ -1,8 +1,8 @@
 "use client";
 import { Bell, RefreshCw, AlertCircle } from "lucide-react";
-import { useState, useEffect } from "react";
 import { getDashboardNotifications, markNotificationRead } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
+import { useApiResource } from "@/hooks/useApiResource";
 import { apiCache } from "@/lib/api/cache";
 
 // Wired to Tazwar's endpoint (dashboard_routes.py)
@@ -20,39 +20,21 @@ interface NotificationItem {
 
 export default function NotificationsPage() {
     const { user } = useAuth();
-    const [isLoading, setIsLoading] = useState(false);
-    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-    const [error, setError] = useState<string | null>(null);
-    const [reloadKey, setReloadKey] = useState(0);
-
-    useEffect(() => {
-        if (!user?.userId) return;
-        let isMounted = true;
-
-        const load = async () => {
-            setIsLoading(true);
-            setError(null);
-
-            const { ok, data, error: apiError } = await getDashboardNotifications(user);
-            if (!isMounted) return;
-
-            if (ok && data && typeof data === "object" && "notifications" in data) {
-                const list = (data as { notifications?: NotificationItem[] }).notifications;
-                setNotifications(Array.isArray(list) ? list : []);
-            } else if (ok) {
-                setNotifications([]);
-            } else {
-                setError(apiError?.message || "Could not load notifications.");
-            }
-
-            setIsLoading(false);
-        };
-
-        load();
-        return () => {
-            isMounted = false;
-        };
-    }, [user, reloadKey]);
+    const {
+        data: notifications,
+        setData: setNotifications,
+        isLoading,
+        isError,
+        error,
+        refetch,
+    } = useApiResource<NotificationItem[]>({
+        fetcher: (u) => getDashboardNotifications(u),
+        select: (raw) =>
+            raw && typeof raw === "object" && "notifications" in raw
+                ? (raw as { notifications?: NotificationItem[] }).notifications ?? []
+                : [],
+        fallback: [],
+    });
 
     const handleMarkRead = async (id: string) => {
         const target = notifications.find((n) => n.id === id);
@@ -83,17 +65,17 @@ export default function NotificationsPage() {
                 <p className="text-[#8F8F8F]">Stay updated on your project generations and account activity.</p>
 
                 {/* Error state */}
-                {error && (
+                {isError && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
                             <AlertCircle className="w-8 h-8 text-red-400" />
                         </div>
                         <div className="text-center">
                             <h3 className="text-white font-medium">Failed to load notifications</h3>
-                            <p className="text-[#94a3b8] text-sm mt-1">{error}</p>
+                            <p className="text-[#94a3b8] text-sm mt-1">{error?.message || "Could not load notifications."}</p>
                         </div>
                         <button
-                            onClick={() => setReloadKey((k) => k + 1)}
+                            onClick={refetch}
                             className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white hover:bg-white/10 transition-all"
                         >
                             <RefreshCw className="w-4 h-4" />
@@ -103,7 +85,7 @@ export default function NotificationsPage() {
                 )}
 
                 {/* Loading skeleton */}
-                {isLoading && !error && (
+                {isLoading && !isError && (
                     <div className="flex flex-col gap-3 mt-4">
                         {[1, 2, 3, 4].map((i) => (
                             <div key={i} className="bg-[#2F2F2F] rounded-[10px] p-4 flex items-start gap-4">
@@ -119,7 +101,7 @@ export default function NotificationsPage() {
                 )}
 
                 {/* Notifications list */}
-                {!isLoading && !error && notifications.length > 0 && (
+                {!isLoading && !isError && notifications.length > 0 && (
                     <div className="flex flex-col gap-3 mt-4">
                         {notifications.map((n) => (
                             <button
@@ -153,7 +135,7 @@ export default function NotificationsPage() {
                 )}
 
                 {/* Empty state */}
-                {!isLoading && !error && notifications.length === 0 && (
+                {!isLoading && !isError && notifications.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl mt-4">
                         <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
                             <Bell className="w-7 h-7 text-[#54e3b5]/60" />
