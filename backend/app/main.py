@@ -85,7 +85,7 @@ app.add_middleware(WildcardCORSMiddleware)
 
 
 # Include API routers
-from app.routes import project_routes, job_routes, file_routes, chat_routes, payment_routes, user_routes, architecture_routes
+from app.routes import project_routes, job_routes, file_routes, chat_routes, payment_routes, user_routes, architecture_routes, workspace_routes
 
 # ... (middle of file)
 
@@ -100,6 +100,7 @@ app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
 app.include_router(architecture_routes.router, prefix="/api/v1", tags=["Architecture Contracts"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
+app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"])
 
 # Parser module removed from build system as requested
 # (Previously imported app.api.parser here)
