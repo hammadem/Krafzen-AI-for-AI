@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List
+from typing import List, Optional
 from app.db.queries.project_queries import (
     create_project as create_project_query,
     get_projects,
@@ -20,15 +20,18 @@ async def create_project_route(
 ):
     result = await create_project_query(project, user)
     if not result:
-        raise HTTPException(status_code=400, detail="Project creation failed")
+        raise HTTPException(status_code=400, detail={"error":"Project creation failed"})
     return result
 
 
 @router.get("/", response_model=List[ProjectOut])
 async def list_projects(
-    user: dict = Depends(require_auth)
+    user: dict = Depends(require_auth),
+    page : int = Query(default=1, ge=1),
+    limit: int = Query(default=10,ge=1,le=100),
+    status: Optional[str] = Query(default=None)
 ):
-    projects = await get_projects(user)
+    projects = await get_projects(user, page = page, limit = limit, status=status)
     return projects
 
 
@@ -39,7 +42,7 @@ async def get_project_route(
 ):
     project = await get_project(project_id, user)
     if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail={"error":"Project not found"})
     return project
 
 
@@ -51,7 +54,7 @@ async def update_project_route(
 ):
     updated = await update_project(project_id, update_data, user)
     if not updated:
-        raise HTTPException(status_code=404, detail="Project not found or no changes applied")
+        raise HTTPException(status_code=404, detail={"error":"Project not found or no changes applied"})
     return updated
 
 
@@ -62,5 +65,5 @@ async def delete_project_route(
 ):
     deleted = await delete_project(project_id, user)
     if not deleted:
-        raise HTTPException(status_code=400, detail="Delete failed")
+        raise HTTPException(status_code=400, detail={"error":"Delete failed"})
     return {"message": "Project deleted successfully"}

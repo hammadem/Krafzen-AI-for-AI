@@ -2,8 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-class ProjectCreate(BaseModel):
-    user_id: str = Field(..., description="Supabase Auth UUID")
+class ProjectCreate(BaseModel): 
     input_text: str
 
 class ProjectUpdate(BaseModel):

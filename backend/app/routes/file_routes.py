@@ -20,7 +20,7 @@ async def create_file_route(
 ):
     result = await create_file(file.model_dump(), user)
     if not result or result.get("error"):
-        raise HTTPException(status_code=400, detail=result.get("error", "File creation failed"))
+        raise HTTPException(status_code=400, detail={"error": result.get("error", "File creation failed") if result else "File creation failed"})
     return result
 
 
@@ -40,7 +40,7 @@ async def get_file_route(
 ):
     file = await get_file(file_id, user)
     if not file:
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail={"error": "File not found"})
     return file
 
 
@@ -51,8 +51,8 @@ async def update_file_route(
     user=Depends(require_auth)
 ):
     updated = await update_file(file_id, updates.model_dump(exclude_unset=True), user)
-    if not updated or updated.get("error"):
-        raise HTTPException(status_code=400, detail=updated.get("error", "File update failed"))
+    if not updated or (isinstance(updated, dict) and updated.get("error")):
+        raise HTTPException(status_code=400, detail={"error": updated.get("error", "File update failed") if updated else "File update failed"})
     return updated
 
 
@@ -63,5 +63,5 @@ async def delete_file_route(
 ):
     deleted = await delete_file(file_id, user)
     if not deleted:
-        raise HTTPException(status_code=400, detail="File deletion failed")
+        raise HTTPException(status_code=400, detail={"error": "File deletion failed"})
     return {"message": "File deleted successfully"}

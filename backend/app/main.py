@@ -11,7 +11,6 @@ from app.core.logging_config import init_sentry
 from app.utils.error_handler import add_exception_handlers
 from app.api import health, transcriber
 from app.db.supabase_client import db
-from app.routes import dashboard_routes
 import logging
 import sys
 
@@ -86,7 +85,17 @@ app.add_middleware(WildcardCORSMiddleware)
 
 
 # Include API routers
-from app.routes import project_routes, job_routes, file_routes, chat_routes, payment_routes, user_routes, architecture_routes
+from app.routes import (
+    project_routes,
+    job_routes,
+    file_routes,
+    chat_routes,
+    payment_routes,
+    user_routes,
+    architecture_routes,
+    dashboard_routes,
+    workspace_routes,
+)
 
 # ... (middle of file)
 
@@ -102,6 +111,7 @@ app.include_router(architecture_routes.router, prefix="/api/v1", tags=["Architec
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"])
+app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"])
 
 # Parser module removed from build system as requested
 # (Previously imported app.api.parser here)
