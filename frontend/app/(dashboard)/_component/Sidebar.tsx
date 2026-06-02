@@ -27,11 +27,29 @@ export default function Sidebar() {
 
 
     const createProject = async () => {
+        // Optimistic update — add placeholder immediately before API responds
+        const tempId = `temp-${Date.now()}`;
+        const now = new Date();
+        const optimisticEntry: HistoryData = {
+            iso: now.toISOString(),
+            date: "Today",
+            searches: [{
+                id: tempId,
+                title: projectName,
+                time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                isoTime: now.toISOString(),
+                chats: {} as UserChat,
+            }],
+        };
+        setHistory((prev) => [optimisticEntry, ...prev]);
+
         const res = await createAProject(user, projectName);
         if (res.ok) {
             toast.success("Project created!");
-            forceRefetch();
+            forceRefetch(); // Replace optimistic item with real data
         } else {
+            // Rollback on failure
+            setHistory((prev) => prev.filter((h) => !h.searches.some((s) => s.id === tempId)));
             toast.error(res.error?.message || "Failed to create project. Try again.");
         }
     }

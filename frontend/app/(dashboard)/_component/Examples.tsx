@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { DashRoutes } from "@/context/DashboardContext";
 import { PricingPlans } from "@/lib/data";
 import { classNames } from "@/lib/utils";
-import { Activity, CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings, Users } from "lucide-react";
+import { Activity, Archive, CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChangeEvent } from "react";
@@ -84,6 +84,13 @@ export function NavLinks({ setCurrentRoute }: { setCurrentRoute: (value: Partial
                 href="/workspace/members"
                 className="flex gap-4 items-center cursor-pointer" >
                 <Users />Members
+            </Link>
+            <Link
+                onClick={() => setCurrentRoute({ archive: "archive" })}
+                aria-label="Link to Archive"
+                href="/workspace/archive"
+                className="flex gap-4 items-center cursor-pointer" >
+                <Archive />Archive
             </Link>
 
             <Separator className="bg-[#919191] h-[1px] mt-2" />

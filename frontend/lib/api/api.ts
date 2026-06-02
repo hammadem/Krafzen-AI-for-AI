@@ -21,9 +21,31 @@ const PROJECT_URLS = {
     GET_USER: () => `/auth/v1/user`,
     POST: () => `/api/v1/projects`,
     GET_A_PROJECT: (projectId: string) => `/api/v1/projects/${projectId}`,
-    GET_ALL_PROJECTS: (userId: string) => `/api/v1/projects?user_id=${userId}`,
+    GET_ALL_PROJECTS: (userId: string, page = 1, limit = 20) => `/api/v1/projects?user_id=${userId}&page=${page}&limit=${limit}`,
+    // Archived projects (Yehor — `archived` flag/endpoint pending; page degrades to empty)
+    GET_ARCHIVED: (userId: string) => `/api/v1/projects?user_id=${userId}&archived=true`,
     UPDATE: (projectId: string) => `/api/v1/jobs/projects/${projectId}`,
     DELETE: (projectId: string) => `/api/v1/projects/${projectId}`,
+} as const;
+
+// Dashboard routes (Tazwar — dashboard_routes.py)
+const DASHBOARD_URLS = {
+    GET_ACTIVITY: () => `/api/v1/dashboard/activity`,
+    GET_NOTIFICATIONS: (query = "") => `/api/v1/dashboard/notifications${query}`,
+    // PATCH .../{notification_id}/read → returns { id, read: true } (confirmed w/ Tazwar)
+    MARK_NOTIFICATION_READ: (id: string) => `/api/v1/dashboard/notifications/${id}/read`,
+    GET_WORKSPACE_SUMMARY: () => `/api/v1/dashboard/workspace-summary`,
+    GET_MEMBERS: () => `/api/v1/dashboard/members`,
+} as const;
+
+// Templates (Yehor — endpoint not live yet; page degrades to empty state until it ships)
+const TEMPLATE_URLS = {
+    GET_ALL: (query = "") => `/api/v1/templates${query}`,
+} as const;
+
+// Exports (Kiruthikha — Step 4 enriches this; endpoint pending, page degrades to empty)
+const EXPORT_URLS = {
+    GET_ALL: (userId: string) => `/api/v1/exports?user_id=${userId}`,
 } as const;
 
 // Text to CAD maker api
@@ -112,9 +134,11 @@ export async function getAProject(
 };
 export async function getAllProjects(
     user: User | null,
-    userId: string
+    userId: string,
+    page = 1,
+    limit = 20
 ) {
-    return apiClient("GET", PROJECT_URLS.GET_ALL_PROJECTS(userId), user);
+    return apiClient("GET", PROJECT_URLS.GET_ALL_PROJECTS(userId, page, limit), user);
 };
 export async function deleteAProject(
     user: User | null,
@@ -122,12 +146,79 @@ export async function deleteAProject(
 ) {
     return apiClient("DELETE", PROJECT_URLS.DELETE(projectId), user);
 };
+export async function getArchivedProjects(
+    user: User | null,
+    userId: string
+) {
+    return apiClient("GET", PROJECT_URLS.GET_ARCHIVED(userId), user);
+};
 export async function updateAProject(
     user: User | null,
     projectId: string,
     data: string
 ) {
     return apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, data);
+}
+
+
+// Activity feed for the dashboard (auth-scoped by Bearer token)
+export async function getDashboardActivity(
+    user: User | null
+) {
+    return apiClient("GET", DASHBOARD_URLS.GET_ACTIVITY(), user);
+}
+
+// Notifications (auth-scoped). Supports unread_only + limit.
+export async function getDashboardNotifications(
+    user: User | null,
+    opts?: { unreadOnly?: boolean; limit?: number }
+) {
+    const qs = new URLSearchParams();
+    if (opts?.unreadOnly) qs.set("unread_only", "true");
+    if (opts?.limit) qs.set("limit", String(opts.limit));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return apiClient("GET", DASHBOARD_URLS.GET_NOTIFICATIONS(query), user);
+}
+
+// Mark a single notification as read
+export async function markNotificationRead(
+    user: User | null,
+    notificationId: string
+) {
+    return apiClient("PATCH", DASHBOARD_URLS.MARK_NOTIFICATION_READ(notificationId), user);
+}
+
+// Workspace summary counts
+export async function getWorkspaceSummary(
+    user: User | null
+) {
+    return apiClient("GET", DASHBOARD_URLS.GET_WORKSPACE_SUMMARY(), user);
+}
+
+// Workspace members (Week 1: returns authed user as owner only)
+export async function getDashboardMembers(
+    user: User | null
+) {
+    return apiClient("GET", DASHBOARD_URLS.GET_MEMBERS(), user);
+}
+
+// Export history (Kiruthikha — endpoint pending; Step 4 adds statuses/retry/metadata).
+export async function getExports(
+    user: User | null,
+    userId: string
+) {
+    return apiClient("GET", EXPORT_URLS.GET_ALL(userId), user);
+}
+
+// CAD templates gallery (Yehor — endpoint pending). Optional category filter.
+export async function getTemplates(
+    user: User | null,
+    opts?: { category?: string }
+) {
+    const qs = new URLSearchParams();
+    if (opts?.category && opts.category !== "all") qs.set("category", opts.category);
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return apiClient("GET", TEMPLATE_URLS.GET_ALL(query), user);
 }
 
 

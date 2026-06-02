@@ -4,37 +4,63 @@ import { getAllProjects } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
 import { apiCache } from "@/lib/api/cache";
 
-export function useFetchProjects() {
+const DEFAULT_LIMIT = 20;
+
+export function useFetchProjects(initialPage = 1) {
     const { user } = useAuth();
-    // const { setStatus, setApiError } = useApiStateProvider();
     const [projects, setProjects] = useState<ProjectDetails[]>([]);
     const [status, setStatus] = useState<ReqState>("idle");
     const [apiError, setApiError] = useState<AppError | null>(null);
+    const [page, setPage] = useState<number>(initialPage);
+    const [hasMore, setHasMore] = useState<boolean>(true);
 
-    const fetchProjects = useCallback(async () => {
+    const fetchProjects = useCallback(async (pageToFetch = 1) => {
+        if (!user?.userId) return;
         setStatus("inprogress");
-        const { ok, data, error } = await getAllProjects(user, user!.userId!);
+        const { ok, data, error } = await getAllProjects(user, user.userId, pageToFetch, DEFAULT_LIMIT);
 
         if (ok) {
-            setProjects(data as ProjectDetails[]);
+            // Handle both response shapes:
+            // 1. Array directly: ProjectDetails[]
+            // 2. Object with key: { projects: [...] } or { data: [...] }
+            let items: ProjectDetails[] = [];
+
+            if (Array.isArray(data)) {
+                items = data as ProjectDetails[];
+            } else if (data && typeof data === "object") {
+                const obj = data as Record<string, unknown>;
+                const arr = obj.projects ?? obj.data ?? obj.items ?? [];
+                items = Array.isArray(arr) ? (arr as ProjectDetails[]) : [];
+            }
+
+            setProjects(items);
+            setHasMore(items.length === DEFAULT_LIMIT);
             setStatus("success");
         } else {
             setStatus("error");
             setApiError(error);
         }
 
-    }, [user, setStatus, setApiError]);
+    }, [user]);
 
     useEffect(() => {
-        const load = async () => await fetchProjects();
+        const load = async () => await fetchProjects(page);
         load();
-    }, [fetchProjects]);
+    }, [fetchProjects, page]);
 
     const forceRefetch = useCallback(() => {
         if (!user) return;
         apiCache.delete(`GET:/api/v1/projects?user_id=${user?.userId}`);
-        fetchProjects();
-    }, [user, fetchProjects]);
+        fetchProjects(page);
+    }, [user, fetchProjects, page]);
 
-    return { projects, forceRefetch, status, apiError };
+    const nextPage = useCallback(() => {
+        if (hasMore) setPage((p) => p + 1);
+    }, [hasMore]);
+
+    const prevPage = useCallback(() => {
+        setPage((p) => Math.max(1, p - 1));
+    }, []);
+
+    return { projects, forceRefetch, status, apiError, page, hasMore, nextPage, prevPage };
 }

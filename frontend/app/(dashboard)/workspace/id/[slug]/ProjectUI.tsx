@@ -40,7 +40,6 @@ export default function ProjectUI({ slug }: { slug: string }) {
                     setStatus("success");
                 }
             } catch (err) {
-                console.log(err);
                 if (isMounted) {
                     setStatus("error");
                     setApiError({

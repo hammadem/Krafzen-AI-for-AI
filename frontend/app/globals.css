@@ -152,6 +152,154 @@ button {
   /* scrollbar width */
 }
 
+/* ── Design System: Loading Skeleton ── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.10) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Design System: Status Badges ── */
+.badge-active   { background: rgba(84,227,181,0.10); color: #54e3b5; }
+.badge-trial    { background: rgba(251,191,36,0.10);  color: #fbbf24; }
+.badge-inactive { background: rgba(248,113,113,0.10); color: #f87171; }
+
+/* ── Design System: Table ── */
+.kz-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  color: #f0f4f8;
+}
+
+.kz-table thead {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.kz-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.55);
+  white-space: nowrap;
+}
+
+.kz-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s ease;
+}
+
+.kz-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.kz-table tbody td {
+  padding: 14px 16px;
+  color: rgba(203, 213, 225, 0.78);
+  vertical-align: middle;
+}
+
+.kz-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* ── Design System: Modal ── */
+.kz-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: modal-fade-in 0.15s ease;
+}
+
+.kz-modal {
+  background: #0a0e17;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 28px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  animation: modal-slide-up 0.2s ease;
+}
+
+.kz-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.kz-modal-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #f0f4f8;
+}
+
+.kz-modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: rgba(148, 163, 184, 0.55);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kz-modal-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f0f4f8;
+}
+
+.kz-modal-body {
+  color: rgba(203, 213, 225, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.kz-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-slide-up {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 h1,
 p,
 h2,
