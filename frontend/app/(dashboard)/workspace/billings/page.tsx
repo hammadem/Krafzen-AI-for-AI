@@ -1,11 +1,24 @@
-import { Badge } from "@/components/ui/badge";
+"use client";
 import { Progress } from "@/components/ui/progress";
-import { Download, LucideCreditCard, Plus } from "lucide-react";
+import { Download, LucideCreditCard, Plus, FileText } from "lucide-react";
 import { SeePlans } from "@/app/(dashboard)/_component/Examples";
 import { Accordion, AccordionItem } from "@/components/ui/accordion";
 import { PricingPlans } from "@/lib/data";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Billings() {
+    const { user } = useAuth();
+
+    const planName = user?.subscription_plan || "Free";
+    const status = user?.subscription_status || "inactive";
+    const isOnTrial = user?.in_free_signup_tier || status === "trial";
+    const totalCredits = isOnTrial ? 15 : (user?.plan_requests_total || 0);
+    const remainingCredits = isOnTrial
+        ? (user?.trial_requests_remaining || 0)
+        : (user?.plan_requests_remaining || 0);
+    const usedCredits = totalCredits - remainingCredits;
+    const progressValue = totalCredits > 0 ? Math.round((usedCredits / totalCredits) * 100) : 0;
+
     return (
         <>
             <div className="text-white w-[80%] flex flex-col md:flex-row md:h-[86vh] gap-4 bg-[#191919]">
@@ -18,19 +31,23 @@ export default function Billings() {
                         <span className="flex gap-3 flex-col w-full">
 
                             <h1 className="text-white font-semibold">Current Plan</h1>
-                            <p>
-                                You Are Currently on the Starter Plan.
-                            </p>
-                            <div className="h-[13vh] bg-[#797979] rounded-[10px] flex flex-col items-center justify-evenly justify-center w-[90%]">
-                                <span className="w-[90%] flex items-between justify-between">
-                                    <p>
-                                        Exports this month
-                                    </p>
-                                    <p>
-                                        3 / 5
-                                    </p>
+                            <p className="flex items-center gap-2">
+                                You are currently on the{" "}
+                                <span className="text-[#54e3b5] font-semibold">{planName}</span> plan.
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                    status === "active" ? "bg-[#54e3b5]/10 text-[#54e3b5]" :
+                                    status === "trial" ? "bg-yellow-400/10 text-yellow-400" :
+                                    "bg-red-400/10 text-red-400"
+                                }`}>
+                                    {status.charAt(0).toUpperCase() + status.slice(1)}
                                 </span>
-                                <Progress value={33} className="bg-[#999999] text-black-900 w-[90%]" />
+                            </p>
+                            <div className="h-[13vh] bg-[#797979] rounded-[10px] flex flex-col items-center justify-evenly w-[90%]">
+                                <span className="w-[90%] flex items-between justify-between">
+                                    <p>Requests remaining</p>
+                                    <p>{remainingCredits} / {totalCredits}</p>
+                                </span>
+                                <Progress value={progressValue} className="bg-[#999999] w-[90%]" />
                             </div>
 
                         </span>
@@ -54,45 +71,13 @@ export default function Billings() {
                                 <div className="text-left">Status</div>
                                 <div className="text-right">Action</div>
                             </div>
-
                             <div className="h-[1px] bg-[#898989] mx-auto w-full" />
-
-                            {/* Rows */}
-                            <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-4 py-4 w-[95%]">
-                                <div className="text-left">Oct 1, 2023</div>
-                                <div className="text-left">$19.00</div>
-                                <div className="text-left">
-                                    <Badge variant="secondary" className="bg-[#00B078]/15 text-[#68D585]">Paid</Badge>
+                            {/* Empty state — billing history API not ready yet */}
+                            <div className="flex flex-col items-center justify-center py-10 gap-3 w-full">
+                                <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center">
+                                    <FileText className="w-5 h-5 text-[#94a3b8]/40" />
                                 </div>
-                                <div className="text-right text-green-400 cursor-pointer hover:underline">View Invoice</div>
-                            </div>
-                            <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-4 py-4 w-[95%]">
-                                <div className="text-left">Oct 1, 2023</div>
-                                <div className="text-left">$19.00</div>
-                                <div className="text-left">
-                                    <Badge variant="secondary" className="bg-[#00B078]/15 text-[#68D585]">Paid</Badge>
-                                </div>
-                                <div className="text-right text-green-400 cursor-pointer hover:underline">View Invoice</div>
-                            </div>
-                            <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-4 py-4 w-[95%]">
-                                <div className="text-left">Oct 1, 2023</div>
-                                <div className="text-left">$19.00</div>
-                                <div className="text-left">
-                                    <Badge variant="secondary" className="bg-[#00B078]/15 text-[#68D585]">Paid</Badge>
-                                </div>
-                                <div className="text-right text-green-400 cursor-pointer hover:underline">View Invoice</div>
-                            </div>
-                            <div className="grid grid-cols-[1fr_1fr_1fr_2fr] gap-4 py-4 w-[95%]">
-                                <div className="text-left">Oct 1, 2023</div>
-                                <div className="text-left">$19.00</div>
-                                <div className="text-left">
-                                    <Badge variant="secondary" className="bg-[#FC932A]/15 text-[#FC932A]">Pending</Badge>
-                                </div>
-                                <a
-                                    href="/dashboard/invoice.png"
-                                    download="invoice.png"
-                                    className="text-right text-green-400 cursor-pointer hover:underline">Download PDF
-                                </a>
+                                <p className="text-[#94a3b8] text-sm">No billing history yet.</p>
                             </div>
                         </div>
 

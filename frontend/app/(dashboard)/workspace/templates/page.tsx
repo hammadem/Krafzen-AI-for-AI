@@ -1,23 +1,30 @@
-import { Button } from "@/components/ui/button";
+"use client";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SearchIcon } from "lucide-react";
-import { TemplateBox } from "../../_component/Examples";
-import { TemplateData } from "@/lib/data";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LayoutTemplate, SearchIcon } from "lucide-react";
+import { useState } from "react";
+import NavHeader from "@/components/NavHeader";
+
+// TODO: Wire to real API when endpoint is ready
+// Expected: GET /api/v1/templates
+// Expected response shape: [{ id, name, category, preview_url, description }]
 
 export default function Templates() {
+    const [isLoading] = useState(false);
+    const [templates] = useState<unknown[]>([]);
+
     return (
-        <div className="text-white flex p-4 flex-col items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
-            <div className="w-[80%] p-4 gap-4 flex flex-col">
+        <div className="min-h-screen bg-[#06080d] text-white pb-20">
+        <NavHeader currentNav="Templates" />
+        <div className="text-white flex p-4 flex-col items-center justify-start gap-6 w-full bg-[#06080d] overflow-y-auto custom-scrollbar2">
+            <div className="w-full max-w-4xl px-4 gap-4 flex flex-col">
 
                 <h1 className="text-white font-semibold text-[4vh]">Templates</h1>
-
                 <p className="text-[#8F8F8F]">Browse and start your project with a pre-designed template.</p>
 
+                {/* Search + Category Filter */}
                 <span className="flex sm:flex-row flex-col gap-4 text-[#8F8F8F]">
-                    <span className="flex items-center gap-2 bg-[#0F0F0F] border-1 border-[#8F8F8F] rounded-[10px] w-full focus-within:none transition">
+                    <span className="flex items-center gap-2 bg-[#0F0F0F] border border-[#8F8F8F] rounded-[10px] w-full transition">
                         <SearchIcon className="w-5 h-5 text-[#9A9A9A] ml-3" />
                         <Input
                             type="text"
@@ -26,95 +33,48 @@ export default function Templates() {
                         />
                     </span>
 
-
                     <Select>
                         <SelectTrigger className="w-[180px] border-[#8F8F8F] bg-[#0F0F0F]">
                             <SelectValue placeholder="All Categories" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectGroup>
-                                <SelectLabel>Fruits</SelectLabel>
-                                <SelectItem value="apple">Apple</SelectItem>
-                                <SelectItem value="banana">Banana</SelectItem>
-                                <SelectItem value="blueberry">Blueberry</SelectItem>
-                                <SelectItem value="grapes">Grapes</SelectItem>
-                                <SelectItem value="pineapple">Pineapple</SelectItem>
+                                <SelectItem value="all">All Categories</SelectItem>
+                                <SelectItem value="residential">Residential</SelectItem>
+                                <SelectItem value="commercial">Commercial</SelectItem>
+                                <SelectItem value="industrial">Industrial</SelectItem>
+                                <SelectItem value="infrastructure">Infrastructure</SelectItem>
                             </SelectGroup>
                         </SelectContent>
                     </Select>
-
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="hover:bg-[#0F0F0F] bg-[#0F0F0F] hover:text-[#8F8F8F] border-1 border-[#8F8F8F] flex gap-2 items-center font-semibold justify-center">
-                                <div className="w-10 flex h-[80%] gap-1 flex-col items-center justify-center">
-                                    <span className="w-[72%] h-[18%] bg-[#8F8F8F]"></span>
-                                    <span className="w-[48%] h-[18%] bg-[#8F8F8F]"></span>
-                                    <span className="w-[24%] h-[18%] bg-[#8F8F8F]"></span>
-                                </div>
-                                Filter
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80">
-                            <div className="grid gap-4">
-                                <div className="space-y-2">
-                                    <h4 className="leading-none font-medium">Dimensions</h4>
-                                    <p className="text-muted-foreground text-sm">
-                                        Set the dimensions for the layer.
-                                    </p>
-                                </div>
-                                <div className="grid gap-2">
-                                    <div className="grid grid-cols-3 items-center gap-4">
-                                        <Label htmlFor="width">Width</Label>
-                                        <Input
-                                            id="width"
-                                            defaultValue="100%"
-                                            className="col-span-2 h-8"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-3 items-center gap-4">
-                                        <Label htmlFor="maxWidth">Max. width</Label>
-                                        <Input
-                                            id="maxWidth"
-                                            defaultValue="300px"
-                                            className="col-span-2 h-8"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-3 items-center gap-4">
-                                        <Label htmlFor="height">Height</Label>
-                                        <Input
-                                            id="height"
-                                            defaultValue="25px"
-                                            className="col-span-2 h-8"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-3 items-center gap-4">
-                                        <Label htmlFor="maxHeight">Max. height</Label>
-                                        <Input
-                                            id="maxHeight"
-                                            defaultValue="none"
-                                            className="col-span-2 h-8"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </PopoverContent>
-                    </Popover>
-
                 </span>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    <TemplateBox TemplateData={TemplateData} />
-                    <TemplateBox TemplateData={TemplateData} />
-                    <TemplateBox TemplateData={TemplateData} />
-                    <TemplateBox TemplateData={TemplateData} />
-                    <TemplateBox TemplateData={TemplateData} />
-                    <TemplateBox TemplateData={TemplateData} />
-                    <TemplateBox TemplateData={TemplateData} />
-                    <TemplateBox TemplateData={TemplateData} />
-                    <TemplateBox TemplateData={TemplateData} />
-                </div>
+                {/* Loading skeleton */}
+                {isLoading && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                            <div key={i} className="skeleton h-40 w-full rounded-[10px]" />
+                        ))}
+                    </div>
+                )}
+
+                {/* Empty state */}
+                {!isLoading && templates.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl">
+                        <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
+                            <LayoutTemplate className="w-7 h-7 text-[#54e3b5]/60" />
+                        </div>
+                        <div className="text-center">
+                            <h3 className="text-white font-semibold text-lg">No templates yet</h3>
+                            <p className="text-[#94a3b8] text-sm mt-1">
+                                Pre-designed CAD templates will appear here soon.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
             </div>
         </div>
-    )
+        </div>
+    );
 }

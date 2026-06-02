@@ -2,6 +2,7 @@
 import { Badge } from "@/components/ui/badge";
 import { BellRing, CircleQuestionMark } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { NavLinks, Projects } from "./Examples";
 import { useDashboard } from "@/context/DashboardContext";
 import { useEffect, useState } from "react";
@@ -10,12 +11,13 @@ import { History } from "./History";
 import { createAProject } from "@/lib/api/api";
 import { classNames, organizeProjectsAsHistory } from "@/lib/utils";
 import { useFetchProjects } from "@/hooks/useFetchProjects";
+import { toast } from "react-toastify";
 
 export default function Sidebar() {
     const { sideBarOpen, setSideBarOpen, route, setCurrentRoute } = useDashboard();
     const { user } = useAuth();
     const [projectName, setProjectName] = useState<string>("Create a GYM");
-    const { projects, status } = useFetchProjects();
+    const { projects, status, forceRefetch } = useFetchProjects();
     const [history, setHistory] = useState<HistoryData[]>([]);
 
     useEffect(() => {
@@ -26,7 +28,12 @@ export default function Sidebar() {
 
     const createProject = async () => {
         const res = await createAProject(user, projectName);
-        console.log(res);
+        if (res.ok) {
+            toast.success("Project created!");
+            forceRefetch();
+        } else {
+            toast.error(res.error?.message || "Failed to create project. Try again.");
+        }
     }
 
     return (
@@ -92,7 +99,7 @@ export default function Sidebar() {
 
                 {
                     route.home ? <History data={history} status={status} />
-                        : route.projects ? <Projects createProject={createProject} setProjectName={setProjectName} /> :
+                        : route.projects ? <Projects createProject={createProject} setProjectName={setProjectName} projects={projects} /> :
                             route.templates ? "" :
                                 route.exports ? "" :
                                     route.billing ? "" :
@@ -115,7 +122,9 @@ export default function Sidebar() {
                 }
                 <span className={classNames("flex gap-4 mx-2 h-15 w-full items-center", sideBarOpen ? "justify-start" : "flex-col! h-20!")}>
                     <CircleQuestionMark className="text-white cursor-pointer" />
-                    <BellRing className="text-white cursor-pointer" />
+                    <Link href="/workspace/notifications" aria-label="Notifications">
+                        <BellRing className="text-white cursor-pointer hover:text-[#54e3b5] transition-colors" />
+                    </Link>
                 </span>
             </div>
 

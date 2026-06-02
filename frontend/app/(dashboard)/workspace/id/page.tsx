@@ -1,6 +1,5 @@
+import { redirect } from 'next/navigation'
+
 export default function DashHome() {
-    return (
-        <>
-        </>
-    )
+    redirect('/projects')
 }
