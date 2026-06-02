@@ -1,12 +1,24 @@
 import { apiClient } from "@/lib/api/utils";
 
+// Files (Yehor — files_routes). Worker uploads to storage + POSTs metadata;
+// frontend only GET/rename/delete + fetch a signed URL for preview/download.
 const FILE_URLS = {
-    POST: () => `/api/v1/files`,
-    GET_A_FILE: (fileId: string) => `/api/v1/jobs/files/${fileId}`,
-    GET_ALL_FILES: (jobId: string) => `/api/v1/files?job_id=${jobId}`,
-    UPDATE: (fileId: string) => `/api/v1/jobs/files/${fileId}`,
+    POST: () => `/api/v1/files/`,
+    GET_A_FILE: (fileId: string) => `/api/v1/files/${fileId}`,
+    GET_ALL_FILES: (jobId: string) => `/api/v1/files/?job_id=${jobId}`,
+    UPDATE: (fileId: string) => `/api/v1/files/${fileId}`,
     DELETE: (fileId: string) => `/api/v1/files/${fileId}`,
+    // Bucket is private — get a short-lived signed URL for preview/download.
+    SIGNED_URL: (fileId: string) => `/api/v1/files/${fileId}/signed-url`,
+    // Direct browser→backend multipart upload. PLUG-IN POINT: Yehor confirmed the
+    // worker normally uploads + POSTs metadata; if user-driven browser upload is
+    // wanted, this is the single endpoint to confirm with Tazwar/Yehor. The whole
+    // upload UX (queue/progress/cancel/retry) is built against this one URL.
+    UPLOAD: () => `/api/v1/files/upload`,
 } as const;
+
+/** Absolute upload URL — used by the XHR uploader (needs progress + abort, which fetch can't do). */
+export const FILE_UPLOAD_URL = FILE_URLS.UPLOAD;
 
 const JOB_URLS = {
     POST: () => `/api/v1/jobs`,
@@ -94,15 +106,16 @@ export async function createAFile(
 };
 export async function getAFile(
     user: User | null,
-    jobId: string
+    fileId: string
 ) {
-    return apiClient("GET", FILE_URLS.GET_A_FILE(jobId), user);
+    return apiClient("GET", FILE_URLS.GET_A_FILE(fileId), user);
 };
+// List all files attached to a job (Step 2 file manager reads this).
 export async function getAllFiles(
     user: User | null,
-    userId: string
+    jobId: string
 ) {
-    return apiClient("GET", FILE_URLS.GET_ALL_FILES(userId), user);
+    return apiClient("GET", FILE_URLS.GET_ALL_FILES(jobId), user);
 };
 export async function deleteAFile(
     user: User | null,
@@ -110,12 +123,20 @@ export async function deleteAFile(
 ) {
     return apiClient("DELETE", FILE_URLS.DELETE(fileId), user);
 };
-export async function updateAFile(
+// Rename a file's display label (Yehor adding `name` field; PATCH { name }).
+export async function renameAFile(
     user: User | null,
     fileId: string,
-    data: string
+    name: string
 ) {
-    return apiClient("PATCH", FILE_URLS.UPDATE(fileId), user, data);
+    return apiClient("PATCH", FILE_URLS.UPDATE(fileId), user, { name });
+}
+// Short-lived signed URL for previewing/downloading a private-bucket file.
+export async function getFileSignedUrl(
+    user: User | null,
+    fileId: string
+) {
+    return apiClient("GET", FILE_URLS.SIGNED_URL(fileId), user);
 }
 
 // Can create a prompt from here also

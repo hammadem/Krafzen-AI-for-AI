@@ -45,12 +45,24 @@ interface JobDetails {
     updated_at: string;
 }
 
+// Matches Yehor's FileResponse (files_routes). Bucket is private — use the
+// signed-url endpoint for an openable link; `name` is the display label.
 interface FileDetails {
-    created_at: string;
-    file_type: string | null;
-    file_url: string | null;
-    id: string
-    job_id: string,
+    id: string;
+    job_id: string;
+    project_id: string | null;
+    bucket: string;
+    path: string;
+    name?: string | null;
+    file_type: string;
+    mime_type: string | null;
+    size_bytes: number | null;
+    created_at: string | null;
+}
+
+interface SignedUrlResponse {
+    signed_url: string;
+    expires_in: number;
 }
 
 interface JobReqType {
