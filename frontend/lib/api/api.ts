@@ -60,6 +60,64 @@ const EXPORT_URLS = {
     GET_ALL: (userId: string) => `/api/v1/exports?user_id=${userId}`,
 } as const;
 
+// Workspace + member + invite management (Yehor — Week 2 Step 2 backend).
+const WORKSPACE_URLS = {
+    GET_MINE: () => `/api/v1/workspaces/me`,
+    GET_ONE: (wsId: string) => `/api/v1/workspaces/${wsId}`,
+    GET_MEMBERS: (wsId: string, page = 1, pageSize = 50) =>
+        `/api/v1/workspaces/${wsId}/members?page=${page}&page_size=${pageSize}`,
+    MEMBER: (wsId: string, userId: string) => `/api/v1/workspaces/${wsId}/members/${userId}`,
+    CREATE_INVITE: (wsId: string) => `/api/v1/workspaces/${wsId}/invites`,
+    GET_INVITES: (wsId: string) => `/api/v1/workspaces/${wsId}/invites`,
+    REVOKE_INVITE: (wsId: string, inviteId: string) =>
+        `/api/v1/workspaces/${wsId}/invites/${inviteId}/revoke`,
+    VALIDATE_INVITE: (token: string) =>
+        `/api/v1/workspaces/invites/validate?token=${encodeURIComponent(token)}`,
+} as const;
+
+// Current user's workspace (use to get workspace_id on page load).
+export async function getMyWorkspace(user: User | null) {
+    return apiClient("GET", WORKSPACE_URLS.GET_MINE(), user);
+}
+// Paginated member list for a workspace.
+export async function getWorkspaceMembers(
+    user: User | null,
+    wsId: string,
+    page = 1,
+    pageSize = 50
+) {
+    return apiClient("GET", WORKSPACE_URLS.GET_MEMBERS(wsId, page, pageSize), user);
+}
+// Change a member's role.
+export async function updateMemberRole(
+    user: User | null,
+    wsId: string,
+    userId: string,
+    role: string
+) {
+    return apiClient("PATCH", WORKSPACE_URLS.MEMBER(wsId, userId), user, { role });
+}
+// Remove a member from the workspace.
+export async function removeWorkspaceMember(user: User | null, wsId: string, userId: string) {
+    return apiClient("DELETE", WORKSPACE_URLS.MEMBER(wsId, userId), user);
+}
+// Create an invite. Backend blocks duplicates while one is pending (409).
+export async function createInvite(
+    user: User | null,
+    wsId: string,
+    body: { email: string; role: string }
+) {
+    return apiClient("POST", WORKSPACE_URLS.CREATE_INVITE(wsId), user, body);
+}
+// List all invites for a workspace.
+export async function getWorkspaceInvites(user: User | null, wsId: string) {
+    return apiClient("GET", WORKSPACE_URLS.GET_INVITES(wsId), user);
+}
+// Revoke a pending invite.
+export async function revokeInvite(user: User | null, wsId: string, inviteId: string) {
+    return apiClient("PATCH", WORKSPACE_URLS.REVOKE_INVITE(wsId, inviteId), user);
+}
+
 // Text to CAD maker api
 const GPT_PARSERS = {
     PARSE: () => `/api/v1/parse`,

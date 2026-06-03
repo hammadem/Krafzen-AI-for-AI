@@ -93,3 +93,36 @@ interface CreateFileReq {
     file_type: string
 }
 
+
+// ---- Week 2 Step 3: Workspace member + invite management (Yehor's endpoints) ----
+
+type WorkspaceRole = "admin" | "member" | "viewer";
+
+interface WorkspaceInfo {
+    id: string;
+    name?: string | null;
+}
+
+interface WorkspaceMember {
+    user_id: string;
+    role: string;
+    id?: string;
+    workspace_id?: string;
+    joined_at?: string | null;
+    // Identity fields — pending on Yehor adding them to MemberResponse.
+    // UI renders them when present, degrades to user_id otherwise.
+    email?: string | null;
+    display_name?: string | null;
+}
+
+interface WorkspaceInvite {
+    id: string;
+    workspace_id: string;
+    email: string;
+    invited_by: string;
+    role: string;
+    token: string;
+    status: "pending" | "accepted" | "revoked" | "expired";
+    expires_at: string;
+    created_at: string | null;
+}
