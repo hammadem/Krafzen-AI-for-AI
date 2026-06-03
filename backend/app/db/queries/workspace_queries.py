@@ -4,17 +4,8 @@ from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
 from app.utils.logger import logger
+from app.utils.validators import _valid_uuid
 
-
-
-# Helper
-def _valid_uuid(value: str)-> bool:
-    try:
-        uuid.UUID(value)
-        return True
-    except (ValueError, TypeError):
-        return False
-    
 
 #GET WORKSPACE
 async def get_workspace(workspace_id:str, user_id: str) -> Optional[Dict[str, Any]]:

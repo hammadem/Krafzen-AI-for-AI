@@ -1,0 +1,8 @@
+import uuid
+
+def _valid_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+        return True
+    except (ValueError, TypeError):
+        return False

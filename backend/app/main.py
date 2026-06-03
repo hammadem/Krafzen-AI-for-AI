@@ -95,23 +95,25 @@ from app.routes import (
     architecture_routes,
     dashboard_routes,
     workspace_routes,
+    invite_routes
 )
 
 # ... (middle of file)
-
+print("✅ Registering User Routes...")
 # Include API routers
 app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"])
 app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"])
 app.include_router(payment_routes.router, prefix="/api/v1", tags=["Payments"])
-print("✅ Registering User Routes...")
+
 app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
 app.include_router(architecture_routes.router, prefix="/api/v1", tags=["Architecture Contracts"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"])
 app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"])
+app.include_router(invite_routes.router,prefix="/api/v1", tags=["Invites"])
 
 # Parser module removed from build system as requested
 # (Previously imported app.api.parser here)
