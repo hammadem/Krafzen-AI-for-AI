@@ -58,6 +58,9 @@ const TEMPLATE_URLS = {
 // Exports (Kiruthikha — Step 4 enriches this; endpoint pending, page degrades to empty)
 const EXPORT_URLS = {
     GET_ALL: (userId: string) => `/api/v1/exports?user_id=${userId}`,
+    // Retry a failed/cancelled export (lifecycle: failed|cancelled → queued).
+    // Path pending Kiruthikha's confirmation — she owns the export service.
+    RETRY: (exportId: string) => `/api/v1/exports/${exportId}/retry`,
 } as const;
 
 // Workspace + member + invite management (Yehor — Week 2 Step 2 backend).
@@ -287,6 +290,14 @@ export async function getExports(
     userId: string
 ) {
     return apiClient("GET", EXPORT_URLS.GET_ALL(userId), user);
+}
+
+// Retry a failed/cancelled export (Kiruthikha — retry path pending confirmation).
+export async function retryExport(
+    user: User | null,
+    exportId: string
+) {
+    return apiClient("POST", EXPORT_URLS.RETRY(exportId), user);
 }
 
 // CAD templates gallery (Yehor — endpoint pending). Optional category filter.
