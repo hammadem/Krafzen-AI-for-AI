@@ -6,27 +6,49 @@ from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
 from app.utils.logger import logger
 
-VALID_STATUSES = ("queued", "processing", "validating","completed", "failed", "requires_review")
+VALID_STATUSES = (
+    "queued", "processing", "validating",
+    "completed", "failed", "requires_review", "cancelled"
+)
 
-#CREATE EXPORT 
-async def create_export(job_id: str, project_id:str, format: str, user_id: str)-> Optional[Dict[str,Any]]:
-    if not _valid_uuid(job_id) or not _valid_uuid(project_id):
-        raise HTTPException(status_code=400, detail={"error": "Invalid ID format"})
-    
+
+# CREATE EXPORT
+async def create_export(
+    project_id: str,
+    format: str,
+    idempotency_key: str,
+    user_id: str,
+    source_job_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None
+) -> Optional[Dict[str, Any]]:
+    if not _valid_uuid(project_id):
+        raise HTTPException(status_code=400, detail={"error": "Invalid project_id"})
+
+    if source_job_id and not _valid_uuid(source_job_id):
+        raise HTTPException(status_code=400, detail={"error": "Invalid source_job_id"})
+
     try:
         owns = await _user_owns_project(project_id, user_id)
         if not owns:
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
 
+        payload = {
+            "project_id": project_id,
+            "requested_by": user_id,
+            "format": format,
+            "idempotency_key": idempotency_key,
+            "status": "queued",
+            "progress_percent": 0,
+        }
+
+        if source_job_id:
+            payload["source_job_id"] = source_job_id
+        if metadata:
+            payload["metadata"] = metadata
+
         res = await run_in_threadpool(
             lambda: db.table("exports")
-            .insert({
-                    "job_id": job_id,
-                    "project_id": project_id,
-                    "requested_by": user_id,
-                    "format": format,
-                    "status": "queued"
-                })
+                .insert(payload)
                 .execute()
         )
 
@@ -40,12 +62,13 @@ async def create_export(job_id: str, project_id:str, format: str, user_id: str)-
     except Exception as e:
         logger.error("[create_export] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
-    
-#GET EXPORT
-async def get_export(export_id: str, user_id: str)-> Optional[Dict[str,Any]]:
+
+
+# GET EXPORT
+async def get_export(export_id: str, user_id: str) -> Optional[Dict[str, Any]]:
     if not _valid_uuid(export_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid export_id"})
-    
+
     try:
         res = await run_in_threadpool(
             lambda: db.table("exports")
@@ -62,16 +85,19 @@ async def get_export(export_id: str, user_id: str)-> Optional[Dict[str,Any]]:
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
 
         return res.data
-    
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error("[get_export] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
-    
+
 
 # LIST EXPORTS FOR PROJECT
-async def get_project_exports(project_id: str,user_id: str)->List[Dict[str, Any]]:
+async def get_project_exports(
+    project_id: str,
+    user_id: str
+) -> List[Dict[str, Any]]:
     if not _valid_uuid(project_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid project_id"})
 
@@ -95,8 +121,8 @@ async def get_project_exports(project_id: str,user_id: str)->List[Dict[str, Any]
     except Exception as e:
         logger.error("[get_project_exports] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
-    
-    
+
+
 # UPDATE EXPORT STATUS
 async def update_export_status(
     export_id: str,

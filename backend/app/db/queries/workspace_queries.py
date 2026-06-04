@@ -86,8 +86,22 @@ async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,pa
         members = res.data if res and res.data else []
         total = res.count if res and res.count else 0
 
+        # enrich members with email and display_name from auth
+        enriched = []
+        for member in members:
+            try:
+                user_res = await run_in_threadpool(
+                    lambda uid=member["user_id"]: db.auth.admin.get_user_by_id(uid)
+                )
+                member["email"] = user_res.user.email if user_res and user_res.user else None
+                member["display_name"] = user_res.user.user_metadata.get("full_name") if user_res and user_res.user else None
+            except Exception:
+                member["email"] = None
+                member["display_name"] = None
+            enriched.append(member)
+
         return {
-            "members": members,
+            "members": enriched,
             "total": total,
             "page": page,
             "page_size": page_size

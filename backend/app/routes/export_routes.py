@@ -18,7 +18,14 @@ async def create_export_route(
     body: ExportCreate,
     user=Depends(require_auth)
 ):
-    return await create_export(body.job_id, body.project_id, body.format, user["user_id"])
+    return await create_export(
+        project_id=body.project_id,
+        format=body.format,
+        idempotency_key=body.idempotency_key,
+        user_id=user["user_id"],
+        source_job_id=body.source_job_id,
+        metadata=body.metadata
+    )
 
 
 # GET EXPORT BY ID
