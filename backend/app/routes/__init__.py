@@ -14,6 +14,7 @@ architecture_routes = import_module("app.routes.architecture_routes")
 dashboard_routes = import_module("app.routes.dashboard_routes")
 workspace_routes = import_module("app.routes.workspace_routes")
 invite_routes = import_module("app.routes.invite_routes")
+export_routes = import_module("app.routes.export_routes")
 
 __all__ = [
     "project_routes",
@@ -25,5 +26,6 @@ __all__ = [
     "architecture_routes",
     "dashboard_routes",
     "workspace_routes",
-    "invite_routes"
+    "invite_routes",
+    "export_routes"
 ]

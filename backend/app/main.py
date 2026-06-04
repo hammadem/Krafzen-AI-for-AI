@@ -95,7 +95,8 @@ from app.routes import (
     architecture_routes,
     dashboard_routes,
     workspace_routes,
-    invite_routes
+    invite_routes,
+    export_routes
 )
 
 # ... (middle of file)
@@ -114,6 +115,7 @@ app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"])
 app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"])
 app.include_router(invite_routes.router,prefix="/api/v1", tags=["Invites"])
+app.include_router(export_routes.router, prefix="/api/v1", tags=["Exports"])
 
 # Parser module removed from build system as requested
 # (Previously imported app.api.parser here)

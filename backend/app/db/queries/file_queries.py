@@ -259,3 +259,17 @@ async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:
         logger.error("[delete_file] Error", file_id=file_id, error=str(e), exc_info=True)
         return False
     
+# GET SIGNED URL
+async def get_signed_url(file_id: str, user: Dict[str, Any]) -> Optional[str]:
+    file = await get_file(file_id, user)
+    if not file:
+        return None
+    
+    try:
+        res = await run_in_threadpool(
+            lambda: db.storage.from_(file["bucket"]).create_signed_url(file["path"], 3600)
+        )
+        return res.get("signedURL") or res.get("signed_url")
+    except Exception as e:
+        logger.error("[get_signed_url] Error", file_id=file_id, error=str(e), exc_info=True)
+        return None
