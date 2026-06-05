@@ -57,6 +57,12 @@ const EXPORT_URLS = {
     RETRY: (exportId: string) => `/api/v1/exports/${exportId}/retry`,
 } as const;
 
+// Compliance validation for an export (export.compliance_record_id links them).
+// Shape = ExportValidationPayload. Path pending Kiruthikha/Fareez confirmation.
+const COMPLIANCE_URLS = {
+    GET_VALIDATION: (exportId: string) => `/api/v1/exports/${exportId}/validation`,
+} as const;
+
 // Workspace + member + invite management (Yehor — Week 2 Step 2 backend).
 const WORKSPACE_URLS = {
     GET_MINE: () => `/api/v1/workspaces/me`,
@@ -292,6 +298,14 @@ export async function retryExport(
     exportId: string
 ) {
     return apiClient("POST", EXPORT_URLS.RETRY(exportId), user);
+}
+
+// Compliance validation results for an export (Kiruthikha/Fareez — path pending).
+export async function getExportValidation(
+    user: User | null,
+    exportId: string
+) {
+    return apiClient("GET", COMPLIANCE_URLS.GET_VALIDATION(exportId), user);
 }
 
 // CAD templates gallery (Yehor — endpoint pending). Optional category filter.

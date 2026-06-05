@@ -65,6 +65,36 @@ interface SignedUrlResponse {
     expires_in: number;
 }
 
+// Compliance / validation (export_contracts.py: ValidationIssue, ExportValidationPayload).
+type ValidationSeverity = "warning" | "error" | "critical";
+type ValidationCategory =
+    | "geometry"
+    | "dimension"
+    | "zoning"
+    | "occupancy"
+    | "structure"
+    | "export_integrity";
+type ApprovalState = "pending_review" | "approved" | "rejected";
+
+interface ValidationIssue {
+    category: ValidationCategory | string;
+    severity: ValidationSeverity | string;
+    code: string;
+    message: string;
+    element_ref?: string | null;
+    suggested_fix?: string | null;
+    jurisdiction?: string | null;
+    rule_version?: string | null;
+    review_state?: ApprovalState | string | null;
+}
+
+interface ExportValidationPayload {
+    export_id?: string | null;
+    status: string;
+    format: string;
+    issues: ValidationIssue[];
+}
+
 interface JobReqType {
     project_id: string;
     status: string;
