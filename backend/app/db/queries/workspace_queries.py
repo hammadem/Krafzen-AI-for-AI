@@ -46,9 +46,10 @@ async def get_workspace(workspace_id:str, user_id: str) -> Optional[Dict[str, An
         raise HTTPException(status_code=500, detail={"error": "Server error"})
     
 
-# GET USER'S WORKSPACE
+# GET USER'S WORKSPACE (owner or member)
 async def get_my_workspace(user_id: str) -> Optional[Dict[str, Any]]:
     try:
+        # check if user is an owner first
         res = await run_in_threadpool(
             lambda: db.table("workspaces")
                 .select("*")
@@ -56,10 +57,37 @@ async def get_my_workspace(user_id: str) -> Optional[Dict[str, Any]]:
                 .maybe_single()
                 .execute()
         )
-        if not res or not res.data:
+
+        if res and res.data:
+            return res.data
+
+        # if not owner, check if user is a member
+        member_res = await run_in_threadpool(
+            lambda: db.table("workspace_members")
+                .select("workspace_id")
+                .eq("user_id", user_id)
+                .maybe_single()
+                .execute()
+        )
+
+        if not member_res or not member_res.data:
             raise HTTPException(status_code=404, detail={"error": "No workspace found"})
-        return res.data
-    
+
+        workspace_id = member_res.data["workspace_id"]
+
+        workspace_res = await run_in_threadpool(
+            lambda: db.table("workspaces")
+                .select("*")
+                .eq("id", workspace_id)
+                .maybe_single()
+                .execute()
+        )
+
+        if not workspace_res or not workspace_res.data:
+            raise HTTPException(status_code=404, detail={"error": "Workspace not found"})
+
+        return workspace_res.data
+
     except HTTPException:
         raise
     except Exception as e:

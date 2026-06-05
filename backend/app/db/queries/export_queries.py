@@ -31,6 +31,18 @@ async def create_export(
         owns = await _user_owns_project(project_id, user_id)
         if not owns:
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
+        
+        # idempotency check
+        existing = await run_in_threadpool(
+            lambda: db.table("exports")
+        .select("id, status")
+        .eq("idempotency_key", idempotency_key)
+        .maybe_single()
+        .execute()
+        )
+
+        if existing and existing.data:
+            raise HTTPException(status_code=409, detail={"error": "Export with this idempotency_key already exists"})
 
         payload = {
             "project_id": project_id,

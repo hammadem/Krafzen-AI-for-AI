@@ -234,11 +234,14 @@ async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:
             return False
         
         # delete from Storage
-        await run_in_threadpool(
-            lambda: db.storage.from_(file["bucket"]).remove([file["path"]])
-        )
+        try:
+            await run_in_threadpool(
+                lambda: db.storage.from_(file["bucket"]).remove([file["path"]]))
+        except Exception as e:
+            logger.error("[delete_file] Storage delete failed", file_id=file_id, error=str(e))
+            raise HTTPException(status_code=500, detail={"error": "Failed to delete file from storage"})
 
-        # delete from DB
+        # delete from DB only when storage delete succeeded
         response = await run_in_threadpool(
             lambda: db.table("files")
                 .delete()
