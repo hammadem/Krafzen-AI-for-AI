@@ -4,15 +4,15 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { FileDown, SearchIcon, RefreshCw, AlertCircle, Download, RotateCcw, Loader2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import NavHeader from "@/components/NavHeader";
-import { getExports, retryExport } from "@/lib/api/api";
+import { getExports, retryExport, getFileSignedUrl } from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useAuth } from "@/context/AuthContext";
 import { formatDate } from "@/lib/utils";
 import { toast } from "react-toastify";
 
-// Wired to GET /api/v1/exports?user_id=... (Kiruthikha — endpoint pending).
-// Statuses/formats match backend export_contracts.py (ExportStatus, ExportFormat).
-// Item shape (filename/download_url/progress/size) pending Kiruthikha's confirmation.
+// Shape matches Yehor's ExportResponse (export service). Statuses/formats per
+// export_contracts.py. Download = signed URL for artifact_file_id (private bucket).
+// Open with Kiruthikha/Yehor: user-wide list endpoint + frontend retry path.
 
 type ExportStatus =
     | "queued"
@@ -25,14 +25,15 @@ type ExportStatus =
 
 interface ExportItem {
     id: string;
-    filename: string;
+    project_id: string;
     format: string;
     status: ExportStatus | string;
+    progress_percent?: number | null; // 0–100 while processing/validating
+    retry_count?: number | null;
+    artifact_file_id: string | null;  // → signed URL for download
+    error_message: string | null;
+    file_path: string | null;
     created_at: string;
-    project_name: string;
-    download_url: string | null;
-    progress?: number | null; // 0–100 while processing/validating
-    size_bytes?: number | null;
 }
 
 // Per-status label + styling (covers all 7 lifecycle states).
@@ -50,11 +51,11 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 const RETRYABLE = new Set(["failed", "cancelled"]);
 const IN_PROGRESS = new Set(["processing", "validating"]);
 
-function formatBytes(bytes?: number | null): string {
-    if (!bytes || bytes <= 0) return "";
-    const units = ["B", "KB", "MB", "GB"];
-    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-    return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+/** Pull a readable filename out of a storage path. */
+function fileNameFromPath(path?: string | null): string {
+    if (!path) return "Untitled export";
+    const parts = path.split("/");
+    return parts[parts.length - 1] || "Untitled export";
 }
 
 export default function Exports() {
@@ -63,6 +64,7 @@ export default function Exports() {
     const [format, setFormat] = useState("all");
     const [status, setStatus] = useState("all");
     const [retrying, setRetrying] = useState<Set<string>>(new Set());
+    const [downloading, setDownloading] = useState<Set<string>>(new Set());
 
     const {
         data: exports,
@@ -91,8 +93,8 @@ export default function Exports() {
             const matchesStatus = status === "all" || e.status === status;
             const matchesSearch =
                 !q ||
-                e.filename?.toLowerCase().includes(q) ||
-                e.project_name?.toLowerCase().includes(q);
+                fileNameFromPath(e.file_path).toLowerCase().includes(q) ||
+                e.project_id?.toLowerCase().includes(q);
             return matchesFormat && matchesStatus && matchesSearch;
         });
     }, [exports, search, format, status]);
@@ -103,17 +105,35 @@ export default function Exports() {
 
         // Optimistic: move it to "queued" immediately.
         const prevStatus = item.status;
-        setData((prev) => prev.map((e) => (e.id === item.id ? { ...e, status: "queued", progress: 0 } : e)));
+        setData((prev) => prev.map((e) => (e.id === item.id ? { ...e, status: "queued", progress_percent: 0 } : e)));
 
         const { ok } = await retryExport(user, item.id);
         if (ok) {
             toast.dark("Export retry started");
         } else {
-            // Roll back on failure.
             setData((prev) => prev.map((e) => (e.id === item.id ? { ...e, status: prevStatus } : e)));
             toast.dark("Couldn't retry — please try again");
         }
         setRetrying((prev) => {
+            const next = new Set(prev);
+            next.delete(item.id);
+            return next;
+        });
+    };
+
+    // Private bucket → fetch a short-lived signed URL for the artifact, then open it.
+    const handleDownload = async (item: ExportItem) => {
+        if (!item.artifact_file_id || downloading.has(item.id)) return;
+        setDownloading((prev) => new Set(prev).add(item.id));
+
+        const { ok, data } = await getFileSignedUrl(user, item.artifact_file_id);
+        const url = (data as unknown as SignedUrlResponse | null)?.signed_url;
+        if (ok && url) {
+            window.open(url, "_blank", "noopener,noreferrer");
+        } else {
+            toast.dark("Couldn't get the download link");
+        }
+        setDownloading((prev) => {
             const next = new Set(prev);
             next.delete(item.id);
             return next;
@@ -225,6 +245,7 @@ export default function Exports() {
                                 const inProgress = IN_PROGRESS.has(e.status);
                                 const canRetry = RETRYABLE.has(e.status);
                                 const isRetrying = retrying.has(e.id);
+                                const isDownloading = downloading.has(e.id);
 
                                 return (
                                     <div
@@ -237,10 +258,9 @@ export default function Exports() {
                                                 <FileDown className="w-4 h-4 text-[#54e3b5]/70" />
                                             </div>
                                             <div className="flex flex-col min-w-0">
-                                                <span className="text-white text-sm truncate">{e.filename || "Untitled export"}</span>
+                                                <span className="text-white text-sm truncate">{fileNameFromPath(e.file_path)}</span>
                                                 <span className="text-[#8F8F8F] text-xs truncate">
-                                                    {e.project_name}
-                                                    {e.size_bytes ? ` · ${formatBytes(e.size_bytes)}` : ""}
+                                                    Project {e.project_id?.slice(0, 8) || "—"}
                                                 </span>
                                             </div>
                                         </div>
@@ -248,8 +268,8 @@ export default function Exports() {
                                         {/* Format */}
                                         <span className="text-[#cfcfcf] text-sm uppercase">{e.format || "—"}</span>
 
-                                        {/* Status + progress */}
-                                        <div className="flex flex-col gap-1.5">
+                                        {/* Status + progress + error */}
+                                        <div className="flex flex-col gap-1.5 min-w-0">
                                             <span className={`w-fit px-2.5 py-1 rounded-lg text-xs border ${meta.cls}`}>
                                                 {meta.label}
                                             </span>
@@ -257,9 +277,14 @@ export default function Exports() {
                                                 <div className="h-1.5 w-full max-w-[140px] bg-white/10 rounded-full overflow-hidden">
                                                     <div
                                                         className="h-full bg-[#54e3b5] rounded-full transition-all duration-300"
-                                                        style={{ width: `${e.progress ?? 0}%` }}
+                                                        style={{ width: `${e.progress_percent ?? 0}%` }}
                                                     />
                                                 </div>
+                                            )}
+                                            {e.status === "failed" && e.error_message && (
+                                                <span className="text-red-400/80 text-xs truncate max-w-[200px]" title={e.error_message}>
+                                                    {e.error_message}
+                                                </span>
                                             )}
                                         </div>
 
@@ -268,13 +293,19 @@ export default function Exports() {
 
                                         {/* Actions */}
                                         <div className="flex items-center gap-1 md:justify-end">
-                                            {e.status === "completed" && e.download_url && (
-                                                <a
-                                                    href={e.download_url}
-                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[#54e3b5] hover:bg-[#54e3b5]/10 rounded-lg text-sm transition-colors"
+                                            {e.status === "completed" && e.artifact_file_id && (
+                                                <button
+                                                    onClick={() => handleDownload(e)}
+                                                    disabled={isDownloading}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[#54e3b5] hover:bg-[#54e3b5]/10 rounded-lg text-sm transition-colors disabled:opacity-50"
                                                 >
-                                                    <Download className="w-4 h-4" /> Download
-                                                </a>
+                                                    {isDownloading ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <Download className="w-4 h-4" />
+                                                    )}
+                                                    Download
+                                                </button>
                                             )}
                                             {canRetry && (
                                                 <button
