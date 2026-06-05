@@ -180,24 +180,36 @@ async def test_advance_returns_none_causes_early_return():
     process_export_job must return early without crashing.
     No further advance calls, no activity events, no notifications.
     """
-    patches = _base_patches(advance_return=None)
+    import app.services.worker_service as worker_module
+
+    advance_mock = AsyncMock(return_value=None)
+    record_activity_mock = AsyncMock(return_value=None)
+    create_notification_mock = AsyncMock(return_value=None)
+
+    mock_execute = MagicMock()
+    mock_execute.data = {"user_id": MOCK_SYSTEM_USER["user_id"]}
+    mock_maybe_single = MagicMock(return_value=mock_execute)
+    mock_eq = MagicMock()
+    mock_eq.maybe_single = mock_maybe_single
+    mock_select = MagicMock(return_value=mock_eq)
+    mock_table = MagicMock()
+    mock_table.select = mock_select
+    mock_db = MagicMock()
+    mock_db.table = MagicMock(return_value=mock_table)
 
     with (
-        patch("app.services.worker_service.advance_job_status", patches["advance"]),
-        patch("app.services.worker_service._record_activity_event", patches["record_activity"]),
-        patch("app.services.worker_service._create_notification", patches["create_notification"]),
-        patch("app.services.worker_service.run_in_threadpool", new=AsyncMock(return_value=patches["mock_db"].table().select().eq().maybe_single())),
-        patch("app.services.worker_service.db", patches["mock_db"]),
+        patch.object(worker_module, "advance_job_status", advance_mock),
+        patch.object(worker_module, "_record_activity_event", record_activity_mock),
+        patch.object(worker_module, "_create_notification", create_notification_mock),
+        patch.object(worker_module, "run_in_threadpool", AsyncMock(return_value=mock_execute)),
+        patch.object(worker_module, "db", mock_db),
     ):
-        from app.services.worker_service import process_export_job
-        # Must not raise
-        await process_export_job(MOCK_JOB, MOCK_SYSTEM_USER)
+        await worker_module.process_export_job(MOCK_JOB, MOCK_SYSTEM_USER)
 
-    # Only the first advance was attempted
-    assert patches["advance"].call_count == 1
-    # Nothing else fired
-    assert patches["record_activity"].call_count == 0
-    assert patches["create_notification"].call_count == 0
+    # Only the PROCESSING advance was attempted — early return fired
+    assert advance_mock.call_count == 1
+    assert record_activity_mock.call_count == 0
+    assert create_notification_mock.call_count == 0
 
 
 @pytest.mark.asyncio
