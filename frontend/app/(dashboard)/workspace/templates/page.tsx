@@ -1,12 +1,14 @@
 "use client";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LayoutTemplate, SearchIcon, RefreshCw, AlertCircle } from "lucide-react";
+import { LayoutTemplate, SearchIcon } from "lucide-react";
 import { useState, useMemo } from "react";
 import Image from "next/image";
 import NavHeader from "@/components/NavHeader";
 import { getTemplates } from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
+import ErrorState from "@/components/feedback/ErrorState";
+import EmptyResultState from "@/components/feedback/EmptyResultState";
 
 // Wired to GET /api/v1/templates (Yehor — endpoint pending).
 // Response shape: [{ id, name, category, preview_url, description }]
@@ -105,22 +107,7 @@ export default function Templates() {
 
                 {/* Error state */}
                 {isError && !isLoading && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4">
-                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
-                            <AlertCircle className="w-8 h-8 text-red-400" />
-                        </div>
-                        <div className="text-center">
-                            <h3 className="text-white font-medium">Couldn&apos;t load templates</h3>
-                            <p className="text-[#94a3b8] text-sm mt-1">{error?.message || "Please try again."}</p>
-                        </div>
-                        <button
-                            onClick={refetch}
-                            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white hover:bg-white/10 transition-all"
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                            Try again
-                        </button>
-                    </div>
+                    <ErrorState error={error} title="Couldn't load templates" onRetry={refetch} />
                 )}
 
                 {/* Templates grid */}
@@ -155,21 +142,15 @@ export default function Templates() {
 
                 {/* Empty state */}
                 {!isLoading && !isError && visible.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl">
-                        <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
-                            <LayoutTemplate className="w-7 h-7 text-[#54e3b5]/60" />
-                        </div>
-                        <div className="text-center">
-                            <h3 className="text-white font-semibold text-lg">
-                                {templates.length === 0 ? "No templates yet" : "No matches"}
-                            </h3>
-                            <p className="text-[#94a3b8] text-sm mt-1">
-                                {templates.length === 0
-                                    ? "Pre-designed CAD templates will appear here soon."
-                                    : "Try a different search or category."}
-                            </p>
-                        </div>
-                    </div>
+                    <EmptyResultState
+                        icon={LayoutTemplate}
+                        title={templates.length === 0 ? "No templates yet" : "No matches"}
+                        message={
+                            templates.length === 0
+                                ? "Pre-designed CAD templates will appear here soon."
+                                : "Try a different search or category."
+                        }
+                    />
                 )}
 
             </div>

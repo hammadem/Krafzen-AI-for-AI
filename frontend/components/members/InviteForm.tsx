@@ -5,6 +5,7 @@
 // surfaces the resulting message.
 
 import { useState } from "react";
+import InlineError from "@/components/feedback/InlineError";
 import { Input } from "@/components/ui/input";
 import {
     Select,
@@ -88,7 +89,7 @@ export default function InviteForm({
                     {sending ? "Sending…" : "Send invite"}
                 </button>
             </div>
-            {localError && <p className="text-red-400 text-xs">{localError}</p>}
+            <InlineError message={localError} />
         </div>
     );
 }
