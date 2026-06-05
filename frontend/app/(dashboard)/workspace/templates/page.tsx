@@ -64,7 +64,7 @@ export default function Templates() {
         <div className="text-white flex p-4 flex-col items-center justify-start gap-6 w-full bg-[#06080d] overflow-y-auto custom-scrollbar2">
             <div className="w-full max-w-4xl px-4 gap-4 flex flex-col">
 
-                <h1 className="text-white font-semibold text-[4vh]">Templates</h1>
+                <h1 className="text-white font-semibold text-2xl sm:text-[4vh]">Templates</h1>
                 <p className="text-[#8F8F8F]">Browse and start your project with a pre-designed template.</p>
 
                 {/* Search + Category Filter */}

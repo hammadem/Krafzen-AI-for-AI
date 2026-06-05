@@ -49,9 +49,9 @@ export default function MembersPage() {
         : [];
 
     return (
-        <div className="text-white flex p-4 flex-col items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
-            <div className="w-[80%] p-4 gap-4 flex flex-col">
-                <h1 className="text-white font-semibold text-[4vh]">Members</h1>
+        <div className="text-white flex p-4 flex-col items-stretch sm:items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
+            <div className="w-full sm:w-[80%] p-2 sm:p-4 gap-4 flex flex-col">
+                <h1 className="text-white font-semibold text-2xl sm:text-[4vh]">Members</h1>
                 <p className="text-[#8F8F8F]">Manage who has access to your workspace.</p>
 
                 {/* Workspace summary stats */}

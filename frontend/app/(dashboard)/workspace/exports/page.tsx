@@ -147,7 +147,7 @@ export default function Exports() {
                 <div className="w-full max-w-5xl px-4 gap-4 flex flex-col">
 
                     <div>
-                        <h1 className="text-white font-semibold text-[4vh]">Exports</h1>
+                        <h1 className="text-white font-semibold text-2xl sm:text-[4vh]">Exports</h1>
                         <p className="text-[#8F8F8F] text-sm mt-1">Track your CAD export jobs, statuses, and downloads.</p>
                     </div>
 
