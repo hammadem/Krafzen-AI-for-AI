@@ -9,6 +9,8 @@ from starlette.responses import Response
 from app.core.config import settings
 from app.core.logging_config import init_sentry
 from app.utils.error_handler import add_exception_handlers
+from app.routes.activity_routes import router as activity_router
+from app.routes.notification_routes import router as notification_router
 from app.api import health, transcriber
 from app.db.supabase_client import db
 import logging
@@ -95,6 +97,8 @@ from app.routes import (
     architecture_routes,
     dashboard_routes,
     workspace_routes,
+    activity_routes,
+    notification_routes,
 )
 
 # ... (middle of file)
@@ -112,6 +116,8 @@ app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
 app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"])
 app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"])
+app.include_router(activity_router, prefix="/api/v1", tags=["Activity"])
+app.include_router(notification_router, prefix="/api/v1", tags=["Notifications"])
 
 # Parser module removed from build system as requested
 # (Previously imported app.api.parser here)

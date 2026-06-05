@@ -47,7 +47,7 @@ async def advance_job_status(
     next_status: ExportStatus,
     user: Dict[str, Any],
     error_message: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """
     Transition a job to the next contract-aligned lifecycle status.
     Enforces valid transitions; returns error dict on violation.
@@ -107,7 +107,7 @@ async def enqueue_job(
     project_id: str,
     user: Dict[str, Any],
     transcript: Optional[str] = None,
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """
     Create a new job at QUEUED status (the only valid starting state).
     Returns the created job dict or an error dict.
@@ -130,7 +130,7 @@ async def enqueue_job(
 async def retry_job(
     job_id: str,
     user: Dict[str, Any],
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
     """
     Re-queue a FAILED or CANCELLED job. Idempotent if already QUEUED.
     Only valid for retryable states per contract.
