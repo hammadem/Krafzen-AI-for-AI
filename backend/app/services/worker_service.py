@@ -111,7 +111,7 @@ async def _run_export_pipeline(job: Dict[str, Any]) -> None:
 
 
 async def emit_export_event(event_name: str, job_id: str, project_id: str, actor_user_id: str | None = None) -> None:
-    logger.info("[worker] Emitting event", event=event_name, job_id=job_id, project_id=project_id)
+    logger.info("[worker] Emitting event", event_name=event_name, job_id=job_id, project_id=project_id)
     await _record_activity_event(
         event_name=event_name,
         job_id=job_id,
@@ -125,7 +125,7 @@ async def emit_notification(job_id: str, project_id: str, event_type: str, messa
     # TODO Week 6: pass user_id at enqueue time instead of looking up here
     # Pass the project owner's user_id directly into process_export_job from
     # wherever the job is enqueued, so you never need to look it up inside the worker
-    logger.info("[worker] Emitting notification", type=event_type, job_id=job_id)
+    logger.info("[worker] Emitting notification", notification_type=event_type, job_id=job_id)
     try:
         response = await run_in_threadpool(
             lambda: db.table("projects")
