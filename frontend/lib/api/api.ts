@@ -10,15 +10,9 @@ const FILE_URLS = {
     DELETE: (fileId: string) => `/api/v1/files/${fileId}`,
     // Bucket is private — get a short-lived signed URL for preview/download.
     SIGNED_URL: (fileId: string) => `/api/v1/files/${fileId}/signed-url`,
-    // Direct browser→backend multipart upload. PLUG-IN POINT: Yehor confirmed the
-    // worker normally uploads + POSTs metadata; if user-driven browser upload is
-    // wanted, this is the single endpoint to confirm with Tazwar/Yehor. The whole
-    // upload UX (queue/progress/cancel/retry) is built against this one URL.
-    UPLOAD: () => `/api/v1/files/upload`,
+    // Note: no browser upload endpoint — Yehor confirmed the worker uploads to
+    // storage and POSTs the metadata. The frontend only reads/manages files.
 } as const;
-
-/** Absolute upload URL — used by the XHR uploader (needs progress + abort, which fetch can't do). */
-export const FILE_UPLOAD_URL = FILE_URLS.UPLOAD;
 
 const JOB_URLS = {
     POST: () => `/api/v1/jobs`,
