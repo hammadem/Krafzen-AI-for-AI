@@ -29,6 +29,7 @@ from app.schemas.export_contracts import (
     ExportValidationPayload,
     ExportLifecycleContract,
 )
+from app.schemas.export_model import ExportModel, ExportModelElement, ExportModelMetadata, ElementType
 
 __all__ = [
     "TranscriptionRequest",
@@ -51,5 +52,9 @@ __all__ = [
     "ValidationIssue",
     "ExportValidationPayload",
     "ExportLifecycleContract",
+    "ExportModel",
+    "ExportModelElement",
+    "ExportModelMetadata",
+    "ElementType",
 ]
 

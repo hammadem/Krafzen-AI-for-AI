@@ -13,6 +13,7 @@ from app.schemas import (
     JurisdictionSummary,
     CompliancePresetSummary,
 )
+from app.schemas.export_model import ExportModel, example_export_model
 
 router = APIRouter(prefix="/contracts", tags=["Architecture Contracts"])
 
@@ -104,4 +105,10 @@ async def get_workflow_spec() -> dict:
         },
         "supported_formats": ["dxf", "ifc", "dwg", "revit_package"],
     }
+
+
+@router.get("/export-model", response_model=ExportModel)
+async def get_export_model_template() -> ExportModel:
+    """Week 1 canonical ExportModel JSON template for all exporters."""
+    return example_export_model()
 
