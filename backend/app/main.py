@@ -99,6 +99,7 @@ from app.routes import (
     workspace_routes,
     activity_routes,
     notification_routes,
+    export_validation_routes,
 )
 
 # ... (middle of file)
@@ -118,6 +119,7 @@ app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"]
 app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"])
 app.include_router(activity_router, prefix="/api/v1", tags=["Activity"])
 app.include_router(notification_router, prefix="/api/v1", tags=["Notifications"])
+app.include_router(export_validation_routes.router, prefix="/api/v1", tags=["Export Validation"])
 
 # Parser module removed from build system as requested
 # (Previously imported app.api.parser here)

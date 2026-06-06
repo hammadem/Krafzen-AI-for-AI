@@ -66,3 +66,36 @@ def test_workflow_spec_contract(client):
     assert "ifc" in data["supported_formats"]
     assert "dwg" in data["supported_formats"]
 
+
+def test_export_stage_gates_contract(client):
+    response = client.get("/api/v1/contracts/export-stages")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["stages"]) >= 7
+    assert data["requires_idempotency_key"] is True
+    stages = {s["stage"] for s in data["stages"]}
+    assert "export_generation" in stages
+    assert "integrity_verification" in stages
+
+
+def test_export_progress_contract(client):
+    response = client.get("/api/v1/contracts/export-progress-contract")
+    assert response.status_code == 200
+    data = response.json()
+    field_names = {f["name"] for f in data["response_fields"]}
+    assert "progress_percent" in field_names
+    assert "artifact_file_id" in field_names
+    assert "file_path" in field_names
+    assert "failed" in data["retryable_states"]
+    assert data["validation_endpoint"] == "GET /api/v1/exports/{export_id}/validation"
+
+
+def test_revit_compatibility_mapping(client):
+    response = client.get("/api/v1/contracts/revit-compatibility-mapping")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["native_rvt_generation"] is False
+    assert data["package_format"] == "revit_package"
+    assert len(data["element_mappings"]) >= 5
+    assert "example_manifest" in data
+
