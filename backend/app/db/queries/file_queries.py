@@ -276,3 +276,33 @@ async def get_signed_url(file_id: str, user: Dict[str, Any]) -> Optional[str]:
     except Exception as e:
         logger.error("[get_signed_url] Error", file_id=file_id, error=str(e), exc_info=True)
         return None
+    
+    
+# CREATE ARTIFACT FILE (called after Tazwar uploads export to storage)
+async def create_artifact_file(file_data: Dict[str, Any], user_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        payload = {
+            "bucket": file_data.get("bucket", "dxf-files"),
+            "path": file_data.get("path"),
+            "file_type": file_data.get("file_type", "dxf"),
+            "mime_type": file_data.get("mime_type"),
+            "size_bytes": file_data.get("size_bytes"),
+            "name": file_data.get("name"),
+            "project_id": file_data.get("project_id"),
+            "job_id": file_data.get("job_id"),
+        }
+
+        res = await run_in_threadpool(
+            lambda: db.table("files")
+                .insert(payload)
+                .execute()
+        )
+
+        if res and res.data:
+            logger.info("[create_artifact_file] Artifact file created", file_id=res.data[0]["id"])
+            return res.data[0]
+
+        return None
+    except Exception as e:
+        logger.error("[create_artifact_file] Error", error=str(e), exc_info=True)
+        return None

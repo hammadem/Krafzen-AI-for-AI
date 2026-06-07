@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS public.exports (
+CREATE TABLE IF NOT EXISTS public.export_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   requested_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -18,8 +18,10 @@ CREATE TABLE IF NOT EXISTS public.exports (
   errors JSONB,                                  -- error details if failed
   artifact_file_id UUID,                         -- file id once export is complete
   compliance_record_id UUID,                     -- set by Kiruthika's contracts system
+  compliance_preset_id TEXT,
   idempotency_key TEXT NOT NULL UNIQUE,          -- prevents duplicate export requests
-  metadata JSONB,                                -- stage, preset_id, artifact_urls etc
+  metadata JSONB NOT NULL DEFAULT '{}',          -- stage, preset_id, artifact_urls etc
+  error_code TEXT,
   error_message TEXT,                            -- human readable error
   bucket TEXT,                                   -- storage bucket
   file_path TEXT,                                -- path to exported file

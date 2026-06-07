@@ -5,11 +5,9 @@ from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
 from app.utils.logger import logger
+from app.schemas.export_contracts import ExportStatus
 
-VALID_STATUSES = (
-    "queued", "processing", "validating",
-    "completed", "failed", "requires_review", "cancelled"
-)
+
 
 
 # CREATE EXPORT
@@ -19,6 +17,7 @@ async def create_export(
     idempotency_key: str,
     user_id: str,
     source_job_id: Optional[str] = None,
+    compliance_preset_id: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None
 ) -> Optional[Dict[str, Any]]:
     if not _valid_uuid(project_id):
@@ -34,7 +33,7 @@ async def create_export(
         
         # idempotency check
         existing = await run_in_threadpool(
-            lambda: db.table("exports")
+            lambda: db.table("export_jobs")
         .select("id, status")
         .eq("idempotency_key", idempotency_key)
         .maybe_single()
@@ -57,9 +56,11 @@ async def create_export(
             payload["source_job_id"] = source_job_id
         if metadata:
             payload["metadata"] = metadata
+        if compliance_preset_id:
+            payload["compliance_preset_id"] = compliance_preset_id
 
         res = await run_in_threadpool(
-            lambda: db.table("exports")
+            lambda: db.table("export_jobs")
                 .insert(payload)
                 .execute()
         )
@@ -83,7 +84,7 @@ async def get_export(export_id: str, user_id: str) -> Optional[Dict[str, Any]]:
 
     try:
         res = await run_in_threadpool(
-            lambda: db.table("exports")
+            lambda: db.table("export_jobs")
                 .select("*")
                 .eq("id", export_id)
                 .maybe_single()
@@ -119,7 +120,7 @@ async def get_project_exports(
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
 
         res = await run_in_threadpool(
-            lambda: db.table("exports")
+            lambda: db.table("export_jobs")
                 .select("*")
                 .eq("project_id", project_id)
                 .order("created_at", desc=True)
@@ -145,7 +146,7 @@ async def update_export_status(
         raise HTTPException(status_code=400, detail={"error": "Invalid export_id"})
 
     status = update_data.get("status")
-    if status and status not in VALID_STATUSES:
+    if status and status not in [s.value for s in ExportStatus]:
         raise HTTPException(status_code=400, detail={"error": f"Invalid status: {status}"})
 
     try:
@@ -155,7 +156,7 @@ async def update_export_status(
         payload["updated_at"] = datetime.now(timezone.utc).isoformat()
 
         res = await run_in_threadpool(
-            lambda: db.table("exports")
+            lambda: db.table("export_jobs")
                 .update(payload)
                 .eq("id", export_id)
                 .execute()
@@ -170,4 +171,37 @@ async def update_export_status(
         raise
     except Exception as e:
         logger.error("[update_export_status] Error", error=str(e), exc_info=True)
+        raise HTTPException(status_code=500, detail={"error": "Server error"})
+
+
+# GET EXPORT ARTIFACT
+async def get_export_artifact(export_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    if not _valid_uuid(export_id):
+        raise HTTPException(status_code=400, detail={"error": "Invalid export_id"})
+
+    try:
+        export = await get_export(export_id, user_id)
+
+        if not export.get("artifact_file_id"):
+            raise HTTPException(status_code=404, detail={"error": "No artifact available for this export"})
+
+        artifact_file_id = export["artifact_file_id"]
+
+        res = await run_in_threadpool(
+            lambda: db.table("files")
+                .select("*")
+                .eq("id", artifact_file_id)
+                .maybe_single()
+                .execute()
+        )
+
+        if not res or not res.data:
+            raise HTTPException(status_code=404, detail={"error": "Artifact file not found"})
+
+        return res.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[get_export_artifact] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
