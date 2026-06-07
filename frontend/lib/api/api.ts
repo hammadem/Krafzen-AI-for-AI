@@ -2,9 +2,9 @@ import { apiClient } from "@/lib/api/utils";
 
 const FILE_URLS = {
     POST: () => `/api/v1/files`,
-    GET_A_FILE: (fileId: string) => `/api/v1/jobs/files/${fileId}`,
+    GET_A_FILE: (fileId: string) => `/api/v1/files/${fileId}`,
     GET_ALL_FILES: (jobId: string) => `/api/v1/files?job_id=${jobId}`,
-    UPDATE: (fileId: string) => `/api/v1/jobs/files/${fileId}`,
+    UPDATE: (fileId: string) => `/api/v1/files/${fileId}`,
     DELETE: (fileId: string) => `/api/v1/files/${fileId}`,
 } as const;
 
@@ -24,7 +24,7 @@ const PROJECT_URLS = {
     GET_ALL_PROJECTS: (userId: string, page = 1, limit = 20) => `/api/v1/projects?user_id=${userId}&page=${page}&limit=${limit}`,
     // Archived projects (Yehor — `archived` flag/endpoint pending; page degrades to empty)
     GET_ARCHIVED: (userId: string) => `/api/v1/projects?user_id=${userId}&archived=true`,
-    UPDATE: (projectId: string) => `/api/v1/jobs/projects/${projectId}`,
+    UPDATE: (projectId: string) => `/api/v1/projects/${projectId}`,
     DELETE: (projectId: string) => `/api/v1/projects/${projectId}`,
 } as const;
 

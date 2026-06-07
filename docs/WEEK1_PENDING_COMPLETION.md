@@ -94,12 +94,12 @@ Apply in order on shared Supabase (coordinate with team; no intern runs prod DB)
 
 | # | Task | Priority | Branch |
 |---|------|----------|--------|
-| Y1 | Remove **migration TODO stubs** in `project_queries.py` (`image_url`, `dwg_url` return `None`) after K1 runs | P0 | `feat/week1-…` |
-| Y2 | **Baseline API contract doc** with sample payloads (projects, files, profile, jobs) | P1 | `backend/docs/` |
-| Y3 | **401/403 response shape** consistent across routes (audit + fix stragglers) | P1 | `feat/week1-…` |
-| Y4 | **Role from DB** — currently stub `"member"` in `user_routes.py` / `permissions.py` | 🟡 | **Week 1:** document stub; **real RBAC:** ⏭️ Week 2 with `003` |
-| Y5 | Align **storage path conventions** with Tazwar (written ack in PR or doc) | P1 | Comment in Y2 doc |
-| Y6 | Verify **no route mismatch** vs `frontend/lib/api/api.ts` (grep + quick manual test) | P0 | `feat/week1-…` |
+| Y1 | Remove **migration TODO stubs** in `project_queries.py` (`image_url`, `dwg_url` return `None`) after K1 runs | P0 | `feat/week1-…` | ✅ Code ready; verify after K1 |
+| Y2 | **Baseline API contract doc** with sample payloads (projects, files, profile, jobs) | P1 | `backend/docs/` | ✅ |
+| Y3 | **401/403 response shape** consistent across routes (audit + fix stragglers) | P1 | `feat/week1-…` | ✅ Jobs + profile routes |
+| Y4 | **Role from DB** — currently stub `"member"` in `user_routes.py` / `permissions.py` | 🟡 | **Week 1:** document stub; **real RBAC:** ⏭️ Week 2 with `003` | ✅ Documented |
+| Y5 | Align **storage path conventions** with Tazwar (written ack in PR or doc) | P1 | Comment in Y2 doc | ✅ |
+| Y6 | Verify **no route mismatch** vs `frontend/lib/api/api.ts` (grep + quick manual test) | P0 | `feat/week1-…` | ✅ Audit doc + path fixes |
 
 ### Do not count as Week 1 gaps (already on branch, Week 2 scope)
 

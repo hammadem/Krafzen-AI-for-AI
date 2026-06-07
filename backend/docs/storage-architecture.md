@@ -111,6 +111,6 @@ After Tazwar uploads a CAD file, the public URL is stored directly on the projec
 | `dxf_url`   | Public Supabase URL | Tazwar via PATCH /projects/{id} |
 | `dwg_url`   | Public Supabase URL | Tazwar via PATCH /projects/{id} |
 | `ifc_url`   | Public Supabase URL | TODO:                           |
-| `image_url` | Public Supabase URL | TODO: migration pending         |
+| `image_url` | Public Supabase URL | Yehor persists via PATCH `/projects/{id}` |
 
 ---

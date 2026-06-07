@@ -27,7 +27,7 @@ async def create_job_route(
 ):
     result = await create_job_query(job.model_dump(), user)
     if not result or result.get("error"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Job creation failed"))
+        raise HTTPException(status_code=400, detail={"error": result.get("error", "Job creation failed")})
     return result
 
 
@@ -47,7 +47,7 @@ async def get_job_route(
 ):
     job = await get_job(job_id, user)
     if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+        raise HTTPException(status_code=404, detail={"error": "Job not found"})
     return job
 
 
@@ -70,7 +70,7 @@ async def delete_job_route(
 ):
     deleted = await delete_job(job_id, user)
     if not deleted:
-        raise HTTPException(status_code=400, detail="Job deletion failed")
+        raise HTTPException(status_code=400, detail={"error": "Job deletion failed"})
     return {"message": "Job deleted successfully"}
 
 
@@ -87,7 +87,7 @@ async def advance_job_status_route(
     """
     result = await advance_job_status(job_id, body.status, user, body.error_message)
     if not result or result.get("error"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Status transition failed"))
+        raise HTTPException(status_code=400, detail={"error": result.get("error", "Status transition failed")})
     return result
 
 
@@ -102,5 +102,5 @@ async def retry_job_route(
     """
     result = await retry_job(job_id, user)
     if not result or result.get("error"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Retry failed"))
+        raise HTTPException(status_code=400, detail={"error": result.get("error", "Retry failed")})
     return result
