@@ -63,6 +63,19 @@ const COMPLIANCE_URLS = {
     GET_VALIDATION: (exportId: string) => `/api/v1/exports/${exportId}/validation`,
 } as const;
 
+// Architecture contracts (Kiruthikha — architecture_routes.py, /api/v1/contracts/*).
+// Frozen source-of-truth shapes the Week 2 frontend aligns to:
+//  - export-progress-contract → the export history/progress item shape (exports page)
+//  - validation-template      → ExportValidationPayload shape (compliance UI)
+//  - export-lifecycle         → states / terminal / retryable sets
+//  - jurisdictions            → jurisdiction metadata for compliance
+const CONTRACT_URLS = {
+    EXPORT_PROGRESS: () => `/api/v1/contracts/export-progress-contract`,
+    VALIDATION_TEMPLATE: () => `/api/v1/contracts/validation-template`,
+    EXPORT_LIFECYCLE: () => `/api/v1/contracts/export-lifecycle`,
+    JURISDICTIONS: () => `/api/v1/contracts/jurisdictions`,
+} as const;
+
 // Workspace + member + invite management (Yehor — Week 2 Step 2 backend).
 const WORKSPACE_URLS = {
     GET_MINE: () => `/api/v1/workspaces/me`,
@@ -306,6 +319,19 @@ export async function getExportValidation(
     exportId: string
 ) {
     return apiClient("GET", COMPLIANCE_URLS.GET_VALIDATION(exportId), user);
+}
+
+// Architecture contracts (/api/v1/contracts/*) — frozen shapes the frontend aligns
+// to. These return field specs/labels, not row data; useful for verifying the
+// export history + compliance UIs stay in sync with the backend source of truth.
+export async function getExportProgressContract(user: User | null) {
+    return apiClient("GET", CONTRACT_URLS.EXPORT_PROGRESS(), user);
+}
+export async function getValidationTemplate(user: User | null) {
+    return apiClient("GET", CONTRACT_URLS.VALIDATION_TEMPLATE(), user);
+}
+export async function getJurisdictions(user: User | null) {
+    return apiClient("GET", CONTRACT_URLS.JURISDICTIONS(), user);
 }
 
 // CAD templates gallery (Yehor — endpoint pending). Optional category filter.

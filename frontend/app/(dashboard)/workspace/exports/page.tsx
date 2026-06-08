@@ -10,8 +10,10 @@ import { useAuth } from "@/context/AuthContext";
 import { formatDate } from "@/lib/utils";
 import { toast } from "react-toastify";
 
-// Shape matches Yehor's ExportResponse (export service). Statuses/formats per
-// export_contracts.py. Download = signed URL for artifact_file_id (private bucket).
+// Aligned to the frozen contract: GET /api/v1/contracts/export-progress-contract
+// (architecture_routes.py) + ExportResponse in export_contracts.py. Fields,
+// status_labels, in-progress + retryable sets all match that contract.
+// Download = signed URL for artifact_file_id (private bucket).
 // Open with Kiruthikha/Yehor: user-wide list endpoint + frontend retry path.
 
 type ExportStatus =

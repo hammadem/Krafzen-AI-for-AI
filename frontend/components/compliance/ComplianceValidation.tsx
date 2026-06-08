@@ -1,10 +1,11 @@
 "use client";
 
 // Step 5 — Compliance Validation UI.
-// Displays an export's validation results (ExportValidationPayload): issues
-// grouped by category into expandable sections, severity badges + counts,
-// approval (review_state), jurisdiction metadata, actionable suggested fixes,
-// and severity/category filters.
+// Aligned to the frozen contract: GET /api/v1/contracts/validation-template
+// (ExportValidationPayload) + ValidationIssue in export_contracts.py.
+// Displays an export's validation results: issues grouped by category into
+// expandable sections, severity badges + counts, approval (review_state),
+// jurisdiction metadata, actionable suggested fixes, and severity/category filters.
 // Drop-in:  <ComplianceValidation exportId={export.id} />
 
 import { useState, useMemo } from "react";
