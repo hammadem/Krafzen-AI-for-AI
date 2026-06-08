@@ -28,6 +28,19 @@ from app.schemas.export_contracts import (
     ValidationIssue,
     ExportValidationPayload,
     ExportLifecycleContract,
+    ExportCreate,
+    ExportResponse,
+    ExportListResponse,
+    ExportProgressContract,
+    ExportProgressFieldSpec,
+    ExportStageCatalog,
+    StageGateRule,
+    PipelineStage,
+    PreflightReport,
+    PostflightReport,
+    RevitElementMapping,
+    RevitPackageManifest,
+    RevitCompatibilitySpec,
 )
 
 __all__ = [
@@ -51,5 +64,18 @@ __all__ = [
     "ValidationIssue",
     "ExportValidationPayload",
     "ExportLifecycleContract",
+    "ExportCreate",
+    "ExportResponse",
+    "ExportListResponse",
+    "ExportProgressContract",
+    "ExportProgressFieldSpec",
+    "ExportStageCatalog",
+    "StageGateRule",
+    "PipelineStage",
+    "PreflightReport",
+    "PostflightReport",
+    "RevitElementMapping",
+    "RevitPackageManifest",
+    "RevitCompatibilitySpec",
 ]
 

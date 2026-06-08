@@ -1,7 +1,8 @@
-"""Shared export/compliance contracts for Week 1 architecture alignment."""
+"""Shared export/compliance contracts for Week 1–2 architecture alignment."""
 
+from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -120,5 +121,165 @@ class ExportLifecycleContract(BaseModel):
             ExportStatus.FAILED,
             ExportStatus.CANCELLED,
         ]
+    )
+
+
+# ── Week 2: persistence + frontend progress contract (Yehor / Sunny) ──────────
+
+
+class ExportCreate(BaseModel):
+    """Request body for POST /api/v1/exports (Yehor persistence layer)."""
+
+    project_id: str
+    format: ExportFormat
+    source_job_id: Optional[str] = None
+    idempotency_key: str = Field(..., min_length=8, max_length=128)
+    compliance_preset_id: Optional[str] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ExportResponse(BaseModel):
+    """
+    Canonical export row for list/detail APIs and Sunny PR #55 export history UI.
+    `file_path` is denormalized from linked files.path for display/download wiring.
+    """
+
+    id: str
+    project_id: str
+    format: ExportFormat
+    status: ExportStatus
+    progress_percent: int = Field(default=0, ge=0, le=100)
+    retry_count: int = Field(default=0, ge=0)
+    artifact_file_id: Optional[str] = None
+    compliance_record_id: Optional[str] = None
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    file_path: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ExportListResponse(BaseModel):
+    exports: List[ExportResponse] = Field(default_factory=list)
+    total: int = 0
+
+
+class ExportProgressFieldSpec(BaseModel):
+    """Documents one field in ExportResponse for frontend contract sync."""
+
+    name: str
+    type: str
+    required: bool
+    description: str
+
+
+class ExportProgressContract(BaseModel):
+    """
+    Frontend export progress/error contract (Sunny week2 step4+).
+    Mirrors export_contracts enums — no page-specific payload variants.
+    """
+
+    response_fields: List[ExportProgressFieldSpec]
+    status_labels: Dict[str, str]
+    in_progress_states: List[ExportStatus]
+    retryable_states: List[ExportStatus]
+    terminal_states: List[ExportStatus]
+    download_via: str = Field(
+        default="artifact_file_id",
+        description="Use files signed-url endpoint with this id when status=completed.",
+    )
+    retry_endpoint: str = Field(default="POST /api/v1/exports/{export_id}/retry")
+    validation_endpoint: str = Field(default="GET /api/v1/exports/{export_id}/validation")
+
+
+# ── Week 2: pipeline stage gates (Tazwar worker) ────────────────────────────
+
+
+class PipelineStage(str, Enum):
+    VALIDATION_PRECHECK = "validation_precheck"
+    PREPROCESSING = "preprocessing"
+    GEOMETRY_TRANSFORMATION = "geometry_transformation"
+    METADATA_INJECTION = "metadata_injection"
+    EXPORT_GENERATION = "export_generation"
+    INTEGRITY_VERIFICATION = "integrity_verification"
+    ARTIFACT_STORAGE = "artifact_storage"
+
+
+class StageGateRule(BaseModel):
+    stage: PipelineStage
+    entry_status: ExportStatus
+    exit_status: ExportStatus
+    on_failure_status: ExportStatus = ExportStatus.FAILED
+    requires_preflight: bool = False
+    requires_postflight: bool = False
+    description: str
+
+
+class ExportStageCatalog(BaseModel):
+    """Entry/exit rules for export pipeline stages — worker must not skip gates."""
+
+    stages: List[StageGateRule]
+    max_retries_default: int = 3
+    requires_idempotency_key: bool = True
+
+
+# ── Week 2: validation preflight / postflight framework ─────────────────────
+
+
+class PreflightReport(BaseModel):
+    export_id: Optional[str] = None
+    can_proceed: bool
+    issues: List[ValidationIssue] = Field(default_factory=list)
+    checked_at_stage: PipelineStage = PipelineStage.VALIDATION_PRECHECK
+
+
+class PostflightReport(BaseModel):
+    export_id: Optional[str] = None
+    passed: bool
+    requires_review: bool = False
+    issues: List[ValidationIssue] = Field(default_factory=list)
+    checked_at_stage: PipelineStage = PipelineStage.INTEGRITY_VERIFICATION
+
+
+# ── Week 2: Revit-compatible package mapping (Phase 1 — no native .rvt) ─────
+
+
+class RevitElementMapping(BaseModel):
+    krafzen_type: str
+    revit_category: str
+    revit_family_hint: Optional[str] = None
+    parameter_map: Dict[str, str] = Field(default_factory=dict)
+
+
+class RevitPackageManifest(BaseModel):
+    """
+    Metadata bundle for revit_package format.
+    Plugin Phase 2 consumes this JSON; MVP stores it alongside DXF/IFC/DWG artifacts.
+    """
+
+    package_version: str = "1.0"
+    source_export_id: str
+    project_id: str
+    levels: List[str] = Field(default_factory=list)
+    element_mappings: List[RevitElementMapping] = Field(default_factory=list)
+    geometry_ref: Optional[str] = Field(
+        default=None,
+        description="Pointer to canonical ExportModel JSON or artifact file id.",
+    )
+    compliance_record_id: Optional[str] = None
+
+
+class RevitCompatibilitySpec(BaseModel):
+    phase: str = Field(default="1", description="1 = metadata package only; 2 = native add-in")
+    native_rvt_generation: bool = False
+    supported_revit_versions: List[str] = Field(
+        default_factory=lambda: ["2022", "2023", "2024", "2025"]
+    )
+    package_format: str = "revit_package"
+    element_mappings: List[RevitElementMapping] = Field(default_factory=list)
+    example_manifest: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Sample revit_package JSON bundle shape for Yehor/Tazwar artifact metadata.",
     )
 

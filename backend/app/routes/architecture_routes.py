@@ -1,18 +1,25 @@
-"""Week 1 architecture contract endpoints for cross-team alignment."""
+"""Week 1–2 architecture contract endpoints for cross-team alignment."""
 
 from fastapi import APIRouter
 
+from app.core.export_stage_catalog import REVIT_ELEMENT_MAPPINGS
 from app.schemas import (
     ApprovalState,
     CompliancePresetsResponse,
     ExportFormat,
     ExportLifecycleContract,
+    ExportProgressContract,
+    ExportProgressFieldSpec,
+    ExportStageCatalog,
     ExportValidationPayload,
     ExportStatus,
     JurisdictionContractsResponse,
     JurisdictionSummary,
     CompliancePresetSummary,
+    RevitCompatibilitySpec,
+    RevitElementMapping,
 )
+from app.services.export_pipeline_service import get_stage_catalog
 
 router = APIRouter(prefix="/contracts", tags=["Architecture Contracts"])
 
@@ -103,5 +110,111 @@ async def get_workflow_spec() -> dict:
             "frontend_owner": "Sunny",
         },
         "supported_formats": ["dxf", "ifc", "dwg", "revit_package"],
+    }
+
+
+@router.get("/export-stages", response_model=ExportStageCatalog)
+async def get_export_stage_gates() -> ExportStageCatalog:
+    """Week 2: pipeline stage entry/exit rules for Tazwar worker — do not skip gates."""
+    return get_stage_catalog()
+
+
+@router.get("/export-progress-contract", response_model=ExportProgressContract)
+async def get_export_progress_contract() -> ExportProgressContract:
+    """Week 2: frozen frontend export history/progress shape (Sunny PR #55 alignment)."""
+    lifecycle = ExportLifecycleContract()
+    status_labels = {
+        ExportStatus.QUEUED.value: "Queued",
+        ExportStatus.PROCESSING.value: "Processing",
+        ExportStatus.VALIDATING.value: "Validating",
+        ExportStatus.REQUIRES_REVIEW.value: "Requires review",
+        ExportStatus.COMPLETED.value: "Completed",
+        ExportStatus.FAILED.value: "Failed",
+        ExportStatus.CANCELLED.value: "Cancelled",
+    }
+    return ExportProgressContract(
+        response_fields=[
+            ExportProgressFieldSpec(
+                name="id", type="uuid", required=True, description="export_jobs primary key"
+            ),
+            ExportProgressFieldSpec(
+                name="project_id", type="uuid", required=True, description="Parent project"
+            ),
+            ExportProgressFieldSpec(
+                name="format", type="enum", required=True, description="dxf|ifc|dwg|revit_package"
+            ),
+            ExportProgressFieldSpec(
+                name="status", type="enum", required=True, description="Lifecycle status"
+            ),
+            ExportProgressFieldSpec(
+                name="progress_percent",
+                type="integer",
+                required=True,
+                description="0–100 while processing/validating",
+            ),
+            ExportProgressFieldSpec(
+                name="retry_count", type="integer", required=True, description="Retry attempts"
+            ),
+            ExportProgressFieldSpec(
+                name="artifact_file_id",
+                type="uuid",
+                required=False,
+                description="Link to files row; use signed URL for download",
+            ),
+            ExportProgressFieldSpec(
+                name="error_message", type="string", required=False, description="Failure detail"
+            ),
+            ExportProgressFieldSpec(
+                name="file_path",
+                type="string",
+                required=False,
+                description="Denormalized files.path for display",
+            ),
+            ExportProgressFieldSpec(
+                name="created_at", type="datetime", required=True, description="Row created"
+            ),
+        ],
+        status_labels=status_labels,
+        in_progress_states=[ExportStatus.PROCESSING, ExportStatus.VALIDATING],
+        retryable_states=lifecycle.retryable_states,
+        terminal_states=lifecycle.terminal_states,
+    )
+
+
+@router.get("/revit-compatibility-mapping", response_model=RevitCompatibilitySpec)
+async def get_revit_compatibility_mapping() -> RevitCompatibilitySpec:
+    """Week 2: Revit package metadata mapping — Phase 1 (no native .rvt generation)."""
+    return RevitCompatibilitySpec(
+        element_mappings=[RevitElementMapping(**m) for m in REVIT_ELEMENT_MAPPINGS],
+        example_manifest={
+            "package_version": "1.0",
+            "source_export_id": "example-export-id",
+            "project_id": "example-project-id",
+            "levels": ["Level 1"],
+            "geometry_ref": "files/{artifact_file_id}",
+            "compliance_record_id": "optional-uuid",
+            "element_mappings": REVIT_ELEMENT_MAPPINGS,
+        },
+    )
+
+
+@router.get("/preflight-template")
+async def get_preflight_template() -> dict:
+    """Week 2: preflight report shape for worker integration."""
+    return {
+        "can_proceed": True,
+        "checked_at_stage": "validation_precheck",
+        "issues": [],
+    }
+
+
+@router.get("/postflight-template")
+async def get_postflight_template() -> dict:
+    """Week 2: postflight report shape for worker integration."""
+    return {
+        "passed": True,
+        "requires_review": False,
+        "checked_at_stage": "integrity_verification",
+        "issues": [],
     }
 
