@@ -3,10 +3,13 @@ Activity feed service — KRAFZEN AI
 Owner: Tazwar
 
 Records export lifecycle events for the activity feed.
-Coordinate with Sunny on payload structure before finalizing.
+Payload shape finalized with Sunny (Week 2):
+  - message: human-readable string rendered as feed main line
+  - metadata: {project_name, status, format (nice-to-have), source}
+  - actor: {display_name, avatar_url} joined inline
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 
 from fastapi.concurrency import run_in_threadpool
@@ -20,16 +23,19 @@ async def record_event(
     project_id: str,
     actor_user_id: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    message: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Insert a single activity record.
-    event_name must be in the export.* namespace per event taxonomy.
+    message: human-readable string for Sunny's feed main line.
+    metadata should include: project_name, status, format (optional), source.
     """
     payload = {
         "event_name": event_name,
         "job_id": job_id,
         "project_id": project_id,
         "actor_user_id": actor_user_id,
+        "message": message or _default_message(event_name),
         "metadata": metadata or {},
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -50,22 +56,65 @@ async def record_event(
 
 async def get_project_activity(
     project_id: str,
+    user_id: str,          # required — Yehor confirmed service role bypasses RLS
     limit: int = 50,
-) -> list:
+) -> List[Dict[str, Any]]:
     """
-    Fetch recent activity for a project, most recent first.
-    Used by Sunny's frontend activity feed — coordinate payload shape with him.
+    Fetch recent activity for a project with actor info joined inline.
+    Explicit ownership check required (service role client bypasses RLS).
+    Sunny's feed expects: event_name, message, created_at, actor.display_name, actor.avatar_url.
     """
     try:
+        # Ownership check — same pattern as job_queries._user_owns_project
+        owns = await run_in_threadpool(
+            lambda: db.table("projects")
+                .select("id")
+                .eq("id", project_id)
+                .eq("user_id", user_id)
+                .maybe_single()
+                .execute()
+        )
+        if not owns or not owns.data:
+            logger.warning("[activity_service] Ownership check failed", project_id=project_id, user_id=user_id[:8])
+            return []
+
+        # Fetch events with actor profile joined
         response = await run_in_threadpool(
             lambda: db.table("activity_events")
-                .select("*")
+                .select("*, profiles(display_name, avatar_url)")
                 .eq("project_id", project_id)
                 .order("created_at", desc=True)
                 .limit(limit)
                 .execute()
         )
-        return response.data if response and response.data else []
+        rows = response.data if response and response.data else []
+        return [_shape_activity_row(r) for r in rows]
     except Exception as e:
         logger.error("[activity_service] Failed to fetch activity", project_id=project_id, error=str(e), exc_info=True)
         return []
+
+
+def _shape_activity_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Flatten actor profile into the row for Sunny's frontend.
+    Returns: event_name, message, created_at, actor {display_name, avatar_url}, metadata.
+    """
+    profile = row.pop("profiles", None) or {}
+    row["actor"] = {
+        "user_id": row.get("actor_user_id"),
+        "display_name": profile.get("display_name"),
+        "avatar_url": profile.get("avatar_url"),
+    }
+    return row
+
+
+def _default_message(event_name: str) -> str:
+    """Fallback human-readable message when caller doesn't supply one."""
+    return {
+        "export.queued": "Export queued",
+        "export.processing": "Export started",
+        "export.validating": "Validating export",
+        "export.completed": "Export completed",
+        "export.failed": "Export failed",
+        "export.requires_review": "Export needs manual review",
+    }.get(event_name, event_name)

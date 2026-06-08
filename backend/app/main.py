@@ -11,9 +11,11 @@ from app.core.logging_config import init_sentry
 from app.utils.error_handler import add_exception_handlers
 from app.routes.activity_routes import router as activity_router
 from app.routes.notification_routes import router as notification_router
+from app.services.worker_service import _poll_export_jobs
 from app.api import health, transcriber
 from app.db.supabase_client import db
 import logging
+import asyncio
 import sys
 
 logger = logging.getLogger(__name__)
@@ -219,6 +221,10 @@ async def rebuild_openapi_schema():
             logger.error("DWG: ODA bundle bootstrap failed: %s", oda_err, exc_info=True)
 
     threading.Thread(target=_bootstrap_oda_bundle, daemon=True, name="oda-bundle-bootstrap").start()
+
+    # Start background export job poller (Kiruthika Week 2 direction)
+    asyncio.create_task(_poll_export_jobs())
+    logger.info("[startup] Export job poller registered")
 
 # Init logging / Sentry / error handlers
 init_sentry(settings.SENTRY_DSN)

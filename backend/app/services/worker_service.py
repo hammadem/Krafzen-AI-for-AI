@@ -41,7 +41,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
         if not result or result.get("error"):
             logger.error("[worker] Failed to advance to PROCESSING", job_id=job_id, error=(result or {}).get("error"))
             return
-        await emit_export_event("export.processing", job_id, project_id, actor_user_id=system_user.get("user_id"))
+        await emit_export_event("export.processing", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export started")
 
         # === PROCESSING STAGE ===
         # TODO Week 2 Step 1: call into Kiruthika's export pipeline here
@@ -54,7 +54,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
                 job_id, ExportStatus.FAILED, system_user,
                 error_message="Export timed out after processing stage"
             )
-            await emit_export_event("export.failed", job_id, project_id, actor_user_id=system_user.get("user_id"))
+            await emit_export_event("export.failed", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export timed out.")
             await emit_notification(job_id, project_id, "export_failed", "Export timed out.")
             return
 
@@ -62,7 +62,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
         result = await advance_job_status(job_id, ExportStatus.VALIDATING, system_user)
         if not result or result.get("error"):
             raise RuntimeError((result or {}).get("error"))
-        await emit_export_event("export.validating", job_id, project_id, actor_user_id=system_user.get("user_id"))
+        await emit_export_event("export.validating", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Validating export")
 
         # === VALIDATION STAGE ===
         # TODO: call Kiruthika's validation engine here
@@ -72,7 +72,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
 
         if requires_review:
             await advance_job_status(job_id, ExportStatus.REQUIRES_REVIEW, system_user)
-            await emit_export_event("export.requires_review", job_id, project_id, actor_user_id=system_user.get("user_id"))
+            await emit_export_event("export.requires_review", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export needs manual review")
             await emit_notification(job_id, project_id, "export_requires_review", "Export needs manual review.")
             return
 
@@ -81,7 +81,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
                 job_id, ExportStatus.FAILED, system_user,
                 error_message="Validation failed"
             )
-            await emit_export_event("export.failed", job_id, project_id, actor_user_id=system_user.get("user_id"))
+            await emit_export_event("export.failed", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export validation failed")
             await emit_notification(job_id, project_id, "export_failed", "Export validation failed.")
             return
 
@@ -89,7 +89,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
         result = await advance_job_status(job_id, ExportStatus.COMPLETED, system_user)
         if not result or result.get("error"):
             raise RuntimeError((result or {}).get("error"))
-        await emit_export_event("export.completed", job_id, project_id, actor_user_id=system_user.get("user_id"))
+        await emit_export_event("export.completed", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export completed")
         await emit_notification(job_id, project_id, "export_completed", "Your export is ready.")
 
     except Exception as e:
@@ -98,7 +98,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
             job_id, ExportStatus.FAILED, system_user,
             error_message=f"Unexpected worker error: {str(e)}"
         )
-        await emit_export_event("export.failed", job_id, project_id, actor_user_id=system_user.get("user_id"))
+        await emit_export_event("export.failed", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export failed unexpectedly.")
         await emit_notification(job_id, project_id, "export_failed", "Export failed unexpectedly.")
 
 
@@ -110,13 +110,14 @@ async def _run_export_pipeline(job: Dict[str, Any]) -> None:
     await asyncio.sleep(2)  # simulate async work
 
 
-async def emit_export_event(event_name: str, job_id: str, project_id: str, actor_user_id: str | None = None) -> None:
+async def emit_export_event(event_name: str, job_id: str, project_id: str, actor_user_id: Optional[str] = None, message: Optional[str] = None,) -> None:
     logger.info("[worker] Emitting event", event_name=event_name, job_id=job_id, project_id=project_id)
     await _record_activity_event(
         event_name=event_name,
         job_id=job_id,
         project_id=project_id,
         actor_user_id=actor_user_id,
+        message=message,
         metadata={"source": "worker"},
     )
 
@@ -149,3 +150,54 @@ async def emit_notification(job_id: str, project_id: str, event_type: str, messa
         )
     except Exception as e:
         logger.error("[worker] emit_notification failed", error=str(e), exc_info=True)
+
+
+async def _poll_export_jobs() -> None:
+    """
+    Background poller — runs as a startup asyncio task.
+    Polls export_jobs for QUEUED rows every WORKER_POLL_INTERVAL_SECONDS.
+    Registered in main.py startup via asyncio.create_task().
+    """
+    logger.info("[worker] Export job poller started")
+    while True:
+        try:
+            response = await run_in_threadpool(
+                lambda: db.table("export_jobs")
+                    .select("*")
+                    .eq("status", ExportStatus.QUEUED.value)
+                    .order("created_at", asc=True)
+                    .limit(5)
+                    .execute()
+            )
+            jobs = response.data if response and response.data else []
+            for job in jobs:
+                # system_user = requesting user, not a service account
+                # Use requested_by from export_jobs row; fall back to project owner
+                user_id = job.get("requested_by") or await _resolve_project_owner(job.get("project_id"))
+                if not user_id:
+                    logger.warning("[worker] Could not resolve user_id for job", job_id=job.get("id"))
+                    continue
+                system_user = {"user_id": user_id}
+                asyncio.create_task(process_export_job(job, system_user))
+        except Exception as e:
+            logger.error("[worker] Poller error", error=str(e), exc_info=True)
+
+        await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
+
+
+async def _resolve_project_owner(project_id: Optional[str]) -> Optional[str]:
+    """Fallback: look up project owner when requested_by is absent."""
+    if not project_id:
+        return None
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("projects")
+                .select("user_id")
+                .eq("id", project_id)
+                .maybe_single()
+                .execute()
+        )
+        return (response.data or {}).get("user_id") if response else None
+    except Exception as e:
+        logger.error("[worker] _resolve_project_owner failed", project_id=project_id, error=str(e), exc_info=True)
+        return None

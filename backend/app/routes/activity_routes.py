@@ -11,8 +11,8 @@ async def list_activity(
     limit: int = Query(default=50, le=100),
     user=Depends(require_auth),
 ):
-    """
-    Return recent activity events for a project.
-    Sunny's frontend polls this for the live activity feed.
-    """
-    return await get_project_activity(project_id, limit=limit)
+    return await get_project_activity(
+        project_id=project_id,
+        user_id=user["user_id"],
+        limit=limit,
+    )

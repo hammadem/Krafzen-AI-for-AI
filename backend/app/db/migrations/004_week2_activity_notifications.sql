@@ -43,3 +43,5 @@ CREATE POLICY "Users view own notifications" ON notifications
 DROP POLICY IF EXISTS "Users update own notifications" ON notifications;
 CREATE POLICY "Users update own notifications" ON notifications
     FOR UPDATE USING (auth.uid() = user_id);
+
+ALTER TABLE activity_events ADD COLUMN IF NOT EXISTS message TEXT;
