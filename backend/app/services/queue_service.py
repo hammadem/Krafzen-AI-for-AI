@@ -118,11 +118,11 @@ async def enqueue_job(
         "transcript": transcript,
     }
     result = await create_job_query(job_data, user)
-    if result and not result.get("error"):
-        logger.info(
-            "[enqueue_job] Job enqueued",
-            job_id=result.get("id"),
+    if not result or result.get("error"):
+        logger.warning(
+            "[enqueue_job] Job creation failed",
             project_id=project_id,
+            error=(result or {}).get("error"),
         )
     return result
 
