@@ -25,8 +25,7 @@ async def get_user_profile(request: Request, user_data: dict = Depends(require_a
             "email": profile["email"], # Placeholder or fetch from Auth service if possible, or just ignore. 
             # Note: auth middleware only returns user_id. We'd need to fetch user details from Supabase Auth API if email is needed repeatedly.
             # But frontend has the email from session.
-            **role_data,
-            #"role": "member",  # TODO: hardcoded until role system is built in Step 
+            "role": role_data["role"],  # TODO:pending migrations, after fetch from workspace table 
             "plan_tier": sub.get("plan_tier"),
             "remaining_minutes": sub.get("remaining_minutes"),
             "total_minutes_purchased": sub.get("total_minutes_purchased", 0),

@@ -234,11 +234,14 @@ async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:
             return False
         
         # delete from Storage
-        await run_in_threadpool(
-            lambda: db.storage.from_(file["bucket"]).remove([file["path"]])
-        )
+        try:
+            await run_in_threadpool(
+                lambda: db.storage.from_(file["bucket"]).remove([file["path"]]))
+        except Exception as e:
+            logger.error("[delete_file] Storage delete failed", file_id=file_id, error=str(e))
+            raise HTTPException(status_code=500, detail={"error": "Failed to delete file from storage"})
 
-        # delete from DB
+        # delete from DB only when storage delete succeeded
         response = await run_in_threadpool(
             lambda: db.table("files")
                 .delete()
@@ -259,3 +262,47 @@ async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:
         logger.error("[delete_file] Error", file_id=file_id, error=str(e), exc_info=True)
         return False
     
+# GET SIGNED URL
+async def get_signed_url(file_id: str, user: Dict[str, Any]) -> Optional[str]:
+    file = await get_file(file_id, user)
+    if not file:
+        return None
+    
+    try:
+        res = await run_in_threadpool(
+            lambda: db.storage.from_(file["bucket"]).create_signed_url(file["path"], 3600)
+        )
+        return res.get("signedURL") or res.get("signed_url")
+    except Exception as e:
+        logger.error("[get_signed_url] Error", file_id=file_id, error=str(e), exc_info=True)
+        return None
+    
+    
+# CREATE ARTIFACT FILE (called after Tazwar uploads export to storage)
+async def create_artifact_file(file_data: Dict[str, Any], user_id: str) -> Optional[Dict[str, Any]]:
+    try:
+        payload = {
+            "bucket": file_data.get("bucket", "dxf-files"),
+            "path": file_data.get("path"),
+            "file_type": file_data.get("file_type", "dxf"),
+            "mime_type": file_data.get("mime_type"),
+            "size_bytes": file_data.get("size_bytes"),
+            "name": file_data.get("name"),
+            "project_id": file_data.get("project_id"),
+            "job_id": file_data.get("job_id"),
+        }
+
+        res = await run_in_threadpool(
+            lambda: db.table("files")
+                .insert(payload)
+                .execute()
+        )
+
+        if res and res.data:
+            logger.info("[create_artifact_file] Artifact file created", file_id=res.data[0]["id"])
+            return res.data[0]
+
+        return None
+    except Exception as e:
+        logger.error("[create_artifact_file] Error", error=str(e), exc_info=True)
+        return None

@@ -102,17 +102,19 @@ from app.routes import (
     activity_routes,
     notification_routes,
     export_validation_routes,
+    invite_routes,
+    export_routes,
 )
 
 # ... (middle of file)
-
+print("✅ Registering User Routes...")
 # Include API routers
 app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"])
 app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"])
 app.include_router(payment_routes.router, prefix="/api/v1", tags=["Payments"])
-print("✅ Registering User Routes...")
+
 app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
 app.include_router(architecture_routes.router, prefix="/api/v1", tags=["Architecture Contracts"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
@@ -122,6 +124,8 @@ app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"
 app.include_router(activity_router, prefix="/api/v1", tags=["Activity"])
 app.include_router(notification_router, prefix="/api/v1", tags=["Notifications"])
 app.include_router(export_validation_routes.router, prefix="/api/v1", tags=["Export Validation"])
+app.include_router(invite_routes.router, prefix="/api/v1", tags=["Invites"])
+app.include_router(export_routes.router, prefix="/api/v1", tags=["Exports"])
 
 # Parser module removed from build system as requested
 # (Previously imported app.api.parser here)

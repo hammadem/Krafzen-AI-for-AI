@@ -21,6 +21,8 @@ class WorkspaceMemberResponse(BaseModel):
     workspace_id: str
     user_id: str
     role: str
+    email: Optional[str] = None
+    display_name: Optional[str] = None
     joined_at: Optional[datetime] = None
 
     class Config:

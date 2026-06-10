@@ -3,31 +3,9 @@ from datetime import datetime
 from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
 from app.utils.logger import logger
+from app.utils.validators import _user_owns_project
 import uuid  
 
-# Enhanced helper with logging
-async def _user_owns_project(project_id: str, user_id: str) -> bool:
-    try:
-        result = await run_in_threadpool(
-            lambda: db.table("projects")
-                .select("user_id")
-                .eq("id", project_id)
-                .maybe_single()
-                .execute()
-        )
-
-        if not result or not result.data:
-            logger.warning("[_user_owns_project] Project not found", project_id=project_id)
-            return False
-
-        owns = result.data["user_id"] == user_id
-        if not owns:
-            logger.warning("[_user_owns_project] Unauthorized access attempt", project_id=project_id, user_id=user_id[:8] + "...")  #Truncate for privacy
-        return owns
-
-    except Exception as e:
-        logger.error("[_user_owns_project] Query error", project_id=project_id, error=str(e), exc_info=True)
-        return False
 
 # CREATE JOB
 async def create_job(job_data: Dict[str, Any], user: Dict[str, Any]) -> Optional[Dict[str, Any]]:

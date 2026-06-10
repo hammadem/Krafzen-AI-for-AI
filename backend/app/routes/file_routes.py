@@ -5,7 +5,8 @@ from app.db.queries.file_queries import (
     get_files,
     get_file,
     update_file,
-    delete_file
+    delete_file,
+    get_signed_url
 )
 from app.models.file_model import FileCreate, FileUpdate, FileResponse
 from app.middlewares.auth import require_auth
@@ -65,3 +66,15 @@ async def delete_file_route(
     if not deleted:
         raise HTTPException(status_code=400, detail={"error": "File deletion failed"})
     return {"message": "File deleted successfully"}
+
+
+@router.get("/{file_id}/signed-url")
+async def get_signed_url_route(
+    file_id: str,
+    user=Depends(require_auth)
+):
+    url = await get_signed_url(file_id, user)
+    if not url:
+        raise HTTPException(status_code=404, detail={"error": "Could not generate signed URL"})
+    return {"signed_url": url, "expires_in": 3600}
+

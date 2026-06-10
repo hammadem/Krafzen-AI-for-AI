@@ -25,6 +25,7 @@ class FileUpdate(BaseModel):
     #file_url: Optional[str] = Field(None, description="Updated file URL")
     file_type: Optional[str] = Field(None, description="Updated file type")
     path: Optional[str] = None
+    name: Optional[str] = None
 
 # class FileInDB(FileBase):
 #     """Internal DB model"""
@@ -42,6 +43,7 @@ class FileResponse(BaseModel):
     bucket: str
     path: str
     file_type: str
+    name: Optional[str] = None
     mime_type: Optional[str] = None
     size_bytes: Optional[int] = None
     created_at: Optional[datetime] = None
