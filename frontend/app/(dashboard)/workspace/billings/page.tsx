@@ -21,7 +21,7 @@ export default function Billings() {
 
     return (
         <>
-            <div className="text-white w-[80%] flex flex-col md:flex-row md:h-[86vh] gap-4 bg-[#191919]">
+            <div className="text-white w-full md:w-[80%] flex flex-col md:flex-row md:h-[86vh] gap-4 bg-[#191919] p-2 md:p-0">
 
                 <div className="md:w-[70%] p-4 gap-6 flex flex-col overflow-y-auto custom-scrollbar2">
 
@@ -56,7 +56,7 @@ export default function Billings() {
                     <span className="bg-[#494949] flex items-between justify-between px-6 py-10 flex-col gap-6 rounded-[10px]">
 
                         <span className="flex w-full items-center justify-between">
-                            <h1 className="text-white font-semibold text-[4vh]">Billing History</h1>
+                            <h1 className="text-white font-semibold text-xl sm:text-[4vh]">Billing History</h1>
                             <span className="flex items-center gap-4">
                                 <Download className="w-[20px] h-[20px] cursor-pointer hover:scale-110" />
                                 <p className="font-semibold">Download all</p>
@@ -116,7 +116,7 @@ export default function Billings() {
                 </div>
 
                 <div className="md:w-[40%] p-4 flex flex-col py-14  overflow-y-auto custom-scrollbar2">
-                    <h1 className="text-white font-semibold text-[4vh]">Compare Plans</h1>
+                    <h1 className="text-white font-semibold text-2xl sm:text-[4vh]">Compare Plans</h1>
                     <Accordion
                         type="single"
                         collapsible

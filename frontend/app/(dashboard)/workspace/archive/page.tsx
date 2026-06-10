@@ -46,7 +46,7 @@ export default function ArchivePage() {
             <div className="text-white flex p-4 flex-col items-center justify-start gap-6 w-full bg-[#06080d] overflow-y-auto custom-scrollbar2">
                 <div className="w-full max-w-4xl px-4 gap-4 flex flex-col">
 
-                    <h1 className="text-white font-semibold text-[4vh]">Archive</h1>
+                    <h1 className="text-white font-semibold text-2xl sm:text-[4vh]">Archive</h1>
                     <p className="text-[#8F8F8F]">Projects you&apos;ve archived. Restore or review them anytime.</p>
 
                     {/* Search */}

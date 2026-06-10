@@ -7,8 +7,9 @@ describe("Exports components", () => {
         renderWithAuth(<Exports />);
 
         expect(screen.getAllByText(/Exports/i)[0]).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/Search exports.../i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/Search by file or project.../i)).toBeInTheDocument();
         expect(screen.getByText(/All Formats/i)).toBeInTheDocument();
+        expect(screen.getByText(/All Statuses/i)).toBeInTheDocument();
 
     })
 })
