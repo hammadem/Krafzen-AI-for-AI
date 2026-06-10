@@ -53,6 +53,16 @@ def test_compliance_presets_contract(client):
     assert first["default_approval_state"] == "pending_review"
 
 
+def test_export_model_contract(client):
+    response = client.get("/api/v1/contracts/export-model")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["metadata"]["schema_version"] == 1
+    assert data["metadata"]["project_id"]
+    assert len(data["elements"]) >= 1
+    assert data["elements"][0]["krafzen_id"]
+
+
 def test_workflow_spec_contract(client):
     response = client.get("/api/v1/contracts/workflow-spec")
     assert response.status_code == 200

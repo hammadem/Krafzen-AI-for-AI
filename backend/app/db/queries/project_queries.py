@@ -18,9 +18,6 @@ async def create_project(project_data: ProjectCreate, user: Dict[str, Any]) -> O
             "user_id": user["user_id"],
             "input_text": project_data.input_text,
             "parsed_json": None,
-            "image_url": None, #TODO : migration pending
-            "dxf_url": None,
-            "dwg_url": None, #TODO : migration pending
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
 

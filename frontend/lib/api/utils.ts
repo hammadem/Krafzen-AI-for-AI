@@ -63,20 +63,48 @@ export async function apiClient(
         } else {
             // FastAPI returns 401/4xx with { detail: string | { error: string } }
             const detail = data?.detail;
-            const message =
+            const serverMessage =
                 typeof detail === "string"
                     ? detail
                     : detail && typeof detail === "object" && "error" in detail
                         ? (detail as { error?: string }).error
                         : data?.message;
-            result = {
-                ok: response.ok,
-                data: null,
-                error: {
-                    type: "APIERROR",
-                    message: message || `Request failed (${response.status})`,
-                },
-            };
+
+            // SU5 — centralized error handling. Normalize auth/forbidden failures
+            // in one place so pages get a consistent AppError + the right UX.
+            if (response.status === 401) {
+                // Session invalid/expired → bounce to login once (client-side only,
+                // and never when already on the login page, to avoid a redirect loop).
+                if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+                    window.location.href = "/login";
+                }
+                result = {
+                    ok: false,
+                    data: null,
+                    error: {
+                        type: "AUTH",
+                        message: serverMessage || "Your session has expired. Please log in again.",
+                    },
+                };
+            } else if (response.status === 403) {
+                result = {
+                    ok: false,
+                    data: null,
+                    error: {
+                        type: "APIERROR",
+                        message: serverMessage || "You don't have permission to do this.",
+                    },
+                };
+            } else {
+                result = {
+                    ok: false,
+                    data: null,
+                    error: {
+                        type: "APIERROR",
+                        message: serverMessage || `Request failed (${response.status})`,
+                    },
+                };
+            }
         }
 
         return result;

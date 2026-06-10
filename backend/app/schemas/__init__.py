@@ -42,6 +42,7 @@ from app.schemas.export_contracts import (
     RevitPackageManifest,
     RevitCompatibilitySpec,
 )
+from app.schemas.export_model import ExportModel, ExportModelElement, ExportModelMetadata, ElementType
 
 __all__ = [
     "TranscriptionRequest",
@@ -77,5 +78,9 @@ __all__ = [
     "RevitElementMapping",
     "RevitPackageManifest",
     "RevitCompatibilitySpec",
+    "ExportModel",
+    "ExportModelElement",
+    "ExportModelMetadata",
+    "ElementType",
 ]
 

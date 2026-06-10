@@ -36,4 +36,4 @@ async def get_user_profile(request: Request, user_data: dict = Depends(require_a
         }
     except Exception as e:
         logger.error(f"Profile fetch error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch profile")
+        raise HTTPException(status_code=500, detail={"error": "Failed to fetch profile"})
