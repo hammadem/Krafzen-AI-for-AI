@@ -12,6 +12,8 @@ from typing import Any, Dict, Optional
 from app.db.queries.job_queries import create_job as create_job_query, get_job, update_job
 from app.schemas.export_contracts import ExportStatus
 from app.utils.logger import logger
+from app.db.queries.export_queries import get_export_job, update_export_status as _update_export_status
+from fastapi import HTTPException
 
 # ── Contract-derived constants (do not redefine these) ──────────────────────
 TERMINAL_STATES: frozenset[ExportStatus] = frozenset({
@@ -156,3 +158,38 @@ async def retry_job(
         }
 
     return await advance_job_status(job_id, ExportStatus.QUEUED, user)
+
+
+async def advance_export_status(
+    export_id: str,
+    next_status: ExportStatus,
+    user: Dict[str, Any],
+    error_message: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    export = await get_export_job(export_id, user["user_id"])
+    if not export:
+        return {"error": f"Export {export_id} not found or unauthorized"}
+
+    try:
+        current = ExportStatus(export["status"])
+    except ValueError:
+        logger.error("[advance_export_status] non-contract status", export_id=export_id, current_status=export["status"])
+        return {"error": f"Export has non-contract status '{export['status']}'"}
+
+    if not is_valid_transition(current, next_status):
+        allowed = [s.value for s in VALID_TRANSITIONS[current]]
+        logger.warning("[advance_export_status] Invalid transition", export_id=export_id, from_status=current.value, to_status=next_status.value, allowed=allowed)
+        return {"error": f"Invalid transition: {current.value} → {next_status.value}. Allowed: {allowed}"}
+
+    update_data: Dict[str, Any] = {"status": next_status.value}
+    if error_message and next_status == ExportStatus.FAILED:
+        update_data["error_message"] = error_message
+
+    try:
+        result = await _update_export_status(export_id, update_data, user["user_id"])
+    except HTTPException as e:
+        return {"error": e.detail.get("error") if isinstance(e.detail, dict) else str(e.detail)}
+
+    if result and not result.get("error"):
+        logger.info("[advance_export_status] Transition successful", export_id=export_id, from_status=current.value, to_status=next_status.value)
+    return result

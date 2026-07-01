@@ -4,19 +4,20 @@ Owner: Tazwar
 
 Consumes jobs in QUEUED state and drives them through the export lifecycle.
 Coordinates with:
-  - queue_service.py (advance_job_status)
+  - queue_service.py (advance_export_status)
   - activity_service.py (emit export.* events)
   - notification_service.py (trigger in-app notifications)
   - job_queries.py (DB reads)
 """
 
 import asyncio
+
 from typing import Any, Dict, Optional
 from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
 from app.db.queries.job_queries import get_jobs
 from app.db.queries.project_queries import get_project
-from app.services.queue_service import advance_job_status
+from app.services.queue_service import advance_export_status
 from app.schemas.export_contracts import ExportStatus, PipelineStage
 from app.services.export_pipeline_service import (
     run_export_generation,
@@ -44,13 +45,13 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
         preflight = await run_preflight_gate(job)
         if not preflight.can_proceed:
             msg = preflight.issues[0].message if preflight.issues else "Preflight validation failed"
-            await advance_job_status(job_id, ExportStatus.FAILED, system_user, error_message=msg)
+            await advance_export_status(job_id, ExportStatus.FAILED, system_user, error_message=msg)
             await emit_export_event("export.failed", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Preflight validation failed")
             await emit_notification(job_id, project_id, "export_failed", msg)
             return
 
         # QUEUED → PROCESSING
-        result = await advance_job_status(job_id, ExportStatus.PROCESSING, system_user)
+        result = await advance_export_status(job_id, ExportStatus.PROCESSING, system_user)
         if not result or result.get("error"):
             logger.error("[worker] Failed to advance to PROCESSING", job_id=job_id, error=(result or {}).get("error"))
             return
@@ -61,7 +62,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
             await asyncio.wait_for(_run_export_pipeline(job), timeout=JOB_TIMEOUT_SECONDS)
         except asyncio.TimeoutError:
             logger.warning("[worker] Job timed out", job_id=job_id)
-            await advance_job_status(
+            await advance_export_status(
                 job_id, ExportStatus.FAILED, system_user,
                 error_message="Export timed out after processing stage"
             )
@@ -70,7 +71,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
             return
 
         # PROCESSING → VALIDATING
-        result = await advance_job_status(job_id, ExportStatus.VALIDATING, system_user)
+        result = await advance_export_status(job_id, ExportStatus.VALIDATING, system_user)
         if not result or result.get("error"):
             raise RuntimeError((result or {}).get("error"))
         await emit_export_event("export.validating", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Validating export")
@@ -79,19 +80,19 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
         postflight = await run_postflight_gate(job)
         if not postflight.passed:
             msg = postflight.issues[0].message if postflight.issues else "Validation failed"
-            await advance_job_status(job_id, ExportStatus.FAILED, system_user, error_message=msg)
+            await advance_export_status(job_id, ExportStatus.FAILED, system_user, error_message=msg)
             await emit_export_event("export.failed", job_id, project_id, actor_user_id=system_user.get("user_id"), message=msg)
             await emit_notification(job_id, project_id, "export_failed", msg)
             return
 
         if postflight.requires_review:
-            await advance_job_status(job_id, ExportStatus.REQUIRES_REVIEW, system_user)
+            await advance_export_status(job_id, ExportStatus.REQUIRES_REVIEW, system_user)
             await emit_export_event("export.requires_review", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export needs manual review")
             await emit_notification(job_id, project_id, "export_requires_review", "Export needs manual review.")
             return
 
         # VALIDATING → COMPLETED
-        result = await advance_job_status(job_id, ExportStatus.COMPLETED, system_user)
+        result = await advance_export_status(job_id, ExportStatus.COMPLETED, system_user)
         if not result or result.get("error"):
             raise RuntimeError((result or {}).get("error"))
         await emit_export_event("export.completed", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export completed")
@@ -99,7 +100,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
 
     except Exception as e:
         logger.error("[worker] Unexpected error processing job", job_id=job_id, error=str(e), exc_info=True)
-        await advance_job_status(
+        await advance_export_status(
             job_id, ExportStatus.FAILED, system_user,
             error_message=f"Unexpected worker error: {str(e)}"
         )
