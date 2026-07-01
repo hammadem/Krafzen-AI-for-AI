@@ -170,7 +170,7 @@ async def _poll_export_jobs() -> None:
                 lambda: db.table("export_jobs")
                     .select("*")
                     .eq("status", ExportStatus.QUEUED.value)
-                    .order("created_at", asc=True)
+                    .order("created_at", desc=False)
                     .limit(5)
                     .execute()
             )
