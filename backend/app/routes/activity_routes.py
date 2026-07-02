@@ -3,7 +3,7 @@ from typing import List
 
 from app.middlewares.auth import require_auth
 from app.models.activity_model import ActivityEventResponse
-from app.services.activity_service import get_project_activity
+from app.services.activity_service import get_project_activity, get_workspace_activity
 
 router = APIRouter(prefix="/activity", tags=["Activity"])
 

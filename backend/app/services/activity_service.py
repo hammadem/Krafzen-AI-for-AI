@@ -94,6 +94,38 @@ async def get_project_activity(
         return []
 
 
+async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    """v1 rollup via membership proxy (no projects.workspace_id yet, per Kiruthika).
+    Caveat: a member's activity on projects unrelated to this workspace can leak
+    in until projects.workspace_id lands — acceptable for dashboard v1, not exact."""
+    try:
+        is_member = await run_in_threadpool(
+            lambda: db.table("workspace_members").select("user_id")
+                .eq("workspace_id", workspace_id).eq("user_id", user_id)
+                .maybe_single().execute()
+        )
+        if not is_member or not is_member.data:
+            logger.warning("[activity_service] Not a workspace member", workspace_id=workspace_id, user_id=user_id[:8])
+            return []
+
+        members_res = await run_in_threadpool(
+            lambda: db.table("workspace_members").select("user_id").eq("workspace_id", workspace_id).execute()
+        )
+        member_ids = [m["user_id"] for m in (members_res.data or [])]
+        if not member_ids:
+            return []
+
+        response = await run_in_threadpool(
+            lambda: db.table("activity_events").select("*, profiles(display_name, avatar_url)")
+                .in_("actor_user_id", member_ids).order("created_at", desc=True).limit(limit).execute()
+        )
+        rows = response.data if response and response.data else []
+        return [_shape_activity_row(r) for r in rows]
+    except Exception as e:
+        logger.error("[activity_service] Failed to fetch workspace activity", workspace_id=workspace_id, error=str(e), exc_info=True)
+        return []
+
+
 def _shape_activity_row(row: Dict[str, Any]) -> Dict[str, Any]:
     """
     Flatten actor profile into the row for Sunny's frontend.
