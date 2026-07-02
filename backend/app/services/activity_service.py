@@ -45,12 +45,12 @@ async def record_event(
             lambda: db.table("activity_events").insert(payload).execute()
         )
         if response and response.data:
-            logger.info("[activity_service] Event recorded", event=event_name, job_id=job_id)
+            logger.info("[activity_service] Event recorded", event_name=event_name, job_id=job_id)
             return response.data[0]
-        logger.warning("[activity_service] Insert returned no data", event=event_name)
+        logger.warning("[activity_service] Insert returned no data", event_name=event_name)
         return None
     except Exception as e:
-        logger.error("[activity_service] Failed to record event", event=event_name, error=str(e), exc_info=True)
+        logger.error("[activity_service] Failed to record event", event_name=event_name, error=str(e), exc_info=True)
         return None
 
 
@@ -81,7 +81,7 @@ async def get_project_activity(
         # Fetch events with actor profile joined
         response = await run_in_threadpool(
             lambda: db.table("activity_events")
-                .select("*, profiles(display_name, avatar_url)")
+                .select("*")
                 .eq("project_id", project_id)
                 .order("created_at", desc=True)
                 .limit(limit)
@@ -99,11 +99,10 @@ def _shape_activity_row(row: Dict[str, Any]) -> Dict[str, Any]:
     Flatten actor profile into the row for Sunny's frontend.
     Returns: event_name, message, created_at, actor {display_name, avatar_url}, metadata.
     """
-    profile = row.pop("profiles", None) or {}
     row["actor"] = {
         "user_id": row.get("actor_user_id"),
-        "display_name": profile.get("display_name"),
-        "avatar_url": profile.get("avatar_url"),
+        "display_name": None,  # default to None if not found
+        "avatar_url": None,
     }
     return row
 

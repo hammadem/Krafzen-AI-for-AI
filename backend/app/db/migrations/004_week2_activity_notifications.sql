@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS activity_events (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     event_name TEXT NOT NULL,              -- e.g. "export.completed"
-    job_id UUID REFERENCES jobs(id) ON DELETE SET NULL,
+    job_id UUID REFERENCES export_jobs(id) ON DELETE SET NULL,
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     actor_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     type TEXT NOT NULL,                    -- e.g. "export_completed"
     message TEXT NOT NULL,
-    job_id UUID REFERENCES jobs(id) ON DELETE SET NULL,
+    job_id UUID REFERENCES export_jobs(id) ON DELETE SET NULL,
     project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
