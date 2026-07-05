@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboard } from "@/context/DashboardContext";
 import { getAProject } from "@/lib/api/api";
-import { Check, Copy, Mic } from "lucide-react";
+import { AlertCircle, Check, Copy, Mic, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -40,7 +40,6 @@ export default function ProjectUI({ slug }: { slug: string }) {
                     setStatus("success");
                 }
             } catch (err) {
-                console.log(err);
                 if (isMounted) {
                     setStatus("error");
                     setApiError({
@@ -66,21 +65,41 @@ export default function ProjectUI({ slug }: { slug: string }) {
     if (status === "error") {
         return (
             <div className="flex flex-col items-center justify-center w-full h-full gap-4 text-white">
-                <p>{apiError?.message ?? "Something went wrong"}</p>
-
+                <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
+                    <AlertCircle className="w-8 h-8 text-red-400" />
+                </div>
+                <div className="text-center">
+                    <h3 className="text-white font-medium">Failed to load project</h3>
+                    <p className="text-[#94a3b8] text-sm mt-1">
+                        {apiError?.message ?? "Something went wrong. Please try again."}
+                    </p>
+                </div>
                 <Button
                     type="reset"
                     onClick={() => setRetryCount((c) => c + 1)}
-                    className=""
+                    className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white hover:bg-white/10 transition-all"
                 >
-                    Retry
+                    <RefreshCw className="w-4 h-4" />
+                    Try again
                 </Button>
             </div>
         );
     }
 
-
-    if (!currentProject) return <div className="flex items-center justify-center text-white w-full h-full"><h1>Loading...</h1></div>
+    if (status === "inprogress" || !currentProject) {
+        return (
+            <div className="w-full h-full flex flex-col gap-6 p-8 bg-black">
+                {/* User message skeleton */}
+                <div className="flex justify-end">
+                    <div className="skeleton h-16 w-[60%] rounded-[15px]" />
+                </div>
+                {/* AI response skeleton */}
+                <div className="flex justify-start">
+                    <div className="skeleton h-24 w-[70%] rounded-[15px]" />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>

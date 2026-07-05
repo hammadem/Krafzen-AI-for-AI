@@ -4,6 +4,7 @@ Test suite for Jobs CRUD endpoints
 
 import pytest
 from httpx import AsyncClient
+from unittest.mock import AsyncMock, patch
 from app.main import app
 
 BASE_URL = "/api/v1/jobs"
@@ -12,18 +13,26 @@ BASE_URL = "/api/v1/jobs"
 @pytest.mark.asyncio
 async def test_create_job():
     """Test job creation"""
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        payload = {
-            "project_id": "00000000-0000-0000-0000-000000000001",
-            "status": "pending",
-            "transcript": "This is a test transcript",
-            "error_message": None
-        }
-        response = await ac.post(BASE_URL + "/", json=payload)
-        assert response.status_code in [200, 201]
-        data = response.json()
-        assert isinstance(data, list)
-        assert "project_id" in data[0]
+    payload = {
+        "project_id": "00000000-0000-0000-0000-000000000001",
+        "status": "queued",
+        "transcript": "This is a test transcript",
+        "error_message": None,
+    }
+    created_job = {
+        "id": "00000000-0000-0000-0000-000000000002",
+        **payload,
+        "created_at": None,
+        "updated_at": None,
+    }
+
+    with patch("app.routes.job_routes.create_job_query", AsyncMock(return_value=created_job)):
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            response = await ac.post(BASE_URL + "/", json=payload)
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["project_id"] == payload["project_id"]
 
 
 @pytest.mark.asyncio

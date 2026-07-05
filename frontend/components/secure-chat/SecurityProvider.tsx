@@ -17,6 +17,12 @@ export function SecurityProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const initSecurity = async () => {
+            if (!window.crypto?.subtle) {
+                console.warn("Web Crypto encryption is unavailable on this origin; secure-chat encryption is disabled.");
+                setIsReady(true);
+                return;
+            }
+
             try {
                 // In a real "Zero-Leak" app, we might derive this from a user password 
                 // or a server-sent ephemeral token, but here we generate a fresh session key.

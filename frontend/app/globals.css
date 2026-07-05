@@ -38,6 +38,20 @@
 
 :root {
   --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --cyan-400: #54e3b5;
+  --cyan-500: #3fc89c;
+  --cyan-600: #2aa882;
+  --mint-soft: rgba(84, 227, 181, 0.12);
+  --text-muted: rgba(148, 163, 184, 0.55);
+  --border-mint: rgba(84, 227, 181, 0.22);
+  --border-strong: rgba(255, 255, 255, 0.10);
+  --bg-primary: #06080d;
+  --bg-secondary: #0a0e17;
+  --bg-elevated: #0d121d;
+  --shadow-mint: 0 0 20px rgba(84, 227, 181, 0.15);
   --background: #06080d;
   --foreground: #f0f4f8;
   --card: rgba(12, 17, 28, 0.7);
@@ -138,6 +152,154 @@ button {
   /* scrollbar width */
 }
 
+/* ── Design System: Loading Skeleton ── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.10) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Design System: Status Badges ── */
+.badge-active   { background: rgba(84,227,181,0.10); color: #54e3b5; }
+.badge-trial    { background: rgba(251,191,36,0.10);  color: #fbbf24; }
+.badge-inactive { background: rgba(248,113,113,0.10); color: #f87171; }
+
+/* ── Design System: Table ── */
+.kz-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  color: #f0f4f8;
+}
+
+.kz-table thead {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.kz-table thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.55);
+  white-space: nowrap;
+}
+
+.kz-table tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.15s ease;
+}
+
+.kz-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.kz-table tbody td {
+  padding: 14px 16px;
+  color: rgba(203, 213, 225, 0.78);
+  vertical-align: middle;
+}
+
+.kz-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* ── Design System: Modal ── */
+.kz-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: modal-fade-in 0.15s ease;
+}
+
+.kz-modal {
+  background: #0a0e17;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 28px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  animation: modal-slide-up 0.2s ease;
+}
+
+.kz-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.kz-modal-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #f0f4f8;
+}
+
+.kz-modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: rgba(148, 163, 184, 0.55);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kz-modal-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f0f4f8;
+}
+
+.kz-modal-body {
+  color: rgba(203, 213, 225, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.kz-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-slide-up {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 h1,
 p,
 h2,
@@ -145,4 +307,147 @@ h3,
 h4,
 h5 {
   overflow-wrap: anywhere;
+}
+
+/* ─── Skeleton Loading ─────────────────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Table Utilities ──────────────────────────────────────────── */
+.kz-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.kz-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-mint);
+}
+
+.kz-table td {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--foreground);
+  border-bottom: 1px solid var(--border);
+}
+
+.kz-table tr:last-child td {
+  border-bottom: none;
+}
+
+.kz-table tr:hover td {
+  background: rgba(84, 227, 181, 0.03);
+}
+
+/* ─── Modal Overlay ────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mint);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: var(--shadow-mint);
+}
+
+/* ─── Typography Tokens ────────────────────────────────────────── */
+:root {
+  --text-xs:   11px;
+  --text-sm:   13px;
+  --text-base: 14px;
+  --text-md:   16px;
+  --text-lg:   18px;
+  --text-xl:   22px;
+  --text-2xl:  28px;
+  --text-3xl:  36px;
+
+  --font-regular: 400;
+  --font-medium:  500;
+  --font-semibold: 600;
+  --font-bold:    700;
+
+  --leading-tight:  1.25;
+  --leading-normal: 1.5;
+  --leading-loose:  1.75;
+}
+
+/* ─── Spacing Scale ────────────────────────────────────────────── */
+:root {
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+}
+
+/* ─── Status Badges ────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.04em;
+}
+
+.badge-success {
+  background: rgba(84, 227, 181, 0.12);
+  color: var(--cyan-400);
+  border: 1px solid rgba(84, 227, 181, 0.22);
+}
+
+.badge-pending {
+  background: rgba(251, 191, 36, 0.10);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.20);
+}
+
+.badge-error {
+  background: rgba(239, 68, 68, 0.10);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.20);
+}
+
+.badge-muted {
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text-muted);
+  border: 1px solid rgba(148, 163, 184, 0.12);
 }

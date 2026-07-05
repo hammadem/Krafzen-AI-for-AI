@@ -61,6 +61,8 @@ export global {
         plan_requests_remaining?: number;
         plan_requests_total?: number;  // plan's included requests (e.g. 10000 for Enterprise)
         trial_end_date?: string | null;  // ISO date; used for "Trial: X days left"
+        /** Workspace role. Week 1: stub (defaults to "owner"); real roles in Week 2. */
+        role?: "owner" | "admin" | "member" | "viewer" | string;
     }
 
     interface Settings {

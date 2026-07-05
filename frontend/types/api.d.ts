@@ -45,12 +45,54 @@ interface JobDetails {
     updated_at: string;
 }
 
+// Matches Yehor's FileResponse (files_routes). Bucket is private — use the
+// signed-url endpoint for an openable link; `name` is the display label.
 interface FileDetails {
-    created_at: string;
-    file_type: string | null;
-    file_url: string | null;
-    id: string
-    job_id: string,
+    id: string;
+    job_id: string;
+    project_id: string | null;
+    bucket: string;
+    path: string;
+    name?: string | null;
+    file_type: string;
+    mime_type: string | null;
+    size_bytes: number | null;
+    created_at: string | null;
+}
+
+interface SignedUrlResponse {
+    signed_url: string;
+    expires_in: number;
+}
+
+// Compliance / validation (export_contracts.py: ValidationIssue, ExportValidationPayload).
+type ValidationSeverity = "warning" | "error" | "critical";
+type ValidationCategory =
+    | "geometry"
+    | "dimension"
+    | "zoning"
+    | "occupancy"
+    | "structure"
+    | "export_integrity";
+type ApprovalState = "pending_review" | "approved" | "rejected";
+
+interface ValidationIssue {
+    category: ValidationCategory | string;
+    severity: ValidationSeverity | string;
+    code: string;
+    message: string;
+    element_ref?: string | null;
+    suggested_fix?: string | null;
+    jurisdiction?: string | null;
+    rule_version?: string | null;
+    review_state?: ApprovalState | string | null;
+}
+
+interface ExportValidationPayload {
+    export_id?: string | null;
+    status: string;
+    format: string;
+    issues: ValidationIssue[];
 }
 
 interface JobReqType {
@@ -81,3 +123,36 @@ interface CreateFileReq {
     file_type: string
 }
 
+
+// ---- Week 2 Step 3: Workspace member + invite management (Yehor's endpoints) ----
+
+type WorkspaceRole = "admin" | "member" | "viewer";
+
+interface WorkspaceInfo {
+    id: string;
+    name?: string | null;
+}
+
+interface WorkspaceMember {
+    user_id: string;
+    role: string;
+    id?: string;
+    workspace_id?: string;
+    joined_at?: string | null;
+    // Identity fields — pending on Yehor adding them to MemberResponse.
+    // UI renders them when present, degrades to user_id otherwise.
+    email?: string | null;
+    display_name?: string | null;
+}
+
+interface WorkspaceInvite {
+    id: string;
+    workspace_id: string;
+    email: string;
+    invited_by: string;
+    role: string;
+    token: string;
+    status: "pending" | "accepted" | "revoked" | "expired";
+    expires_at: string;
+    created_at: string | null;
+}

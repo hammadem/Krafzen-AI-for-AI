@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { DashRoutes } from "@/context/DashboardContext";
 import { PricingPlans } from "@/lib/data";
 import { classNames } from "@/lib/utils";
-import { CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings } from "lucide-react";
+import { Activity, Archive, CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChangeEvent } from "react";
@@ -70,6 +70,28 @@ export function NavLinks({ setCurrentRoute }: { setCurrentRoute: (value: Partial
                 aria-label="Link to Settings"
                 href="/workspace/settings"
                 className="flex gap-4 items-center cursor-pointer" ><Settings />Settings</Link>
+
+            <Link
+                onClick={() => setCurrentRoute({ activity: "activity" })}
+                aria-label="Link to Activity"
+                href="/workspace/activity"
+                className="flex gap-4 items-center cursor-pointer" >
+                <Activity />Activity
+            </Link>
+            <Link
+                onClick={() => setCurrentRoute({ members: "members" })}
+                aria-label="Link to Members"
+                href="/workspace/members"
+                className="flex gap-4 items-center cursor-pointer" >
+                <Users />Members
+            </Link>
+            <Link
+                onClick={() => setCurrentRoute({ archive: "archive" })}
+                aria-label="Link to Archive"
+                href="/workspace/archive"
+                className="flex gap-4 items-center cursor-pointer" >
+                <Archive />Archive
+            </Link>
 
             <Separator className="bg-[#919191] h-[1px] mt-2" />
         </div>
@@ -198,7 +220,7 @@ export function ExportHistory({ ind, currentExp }: { ind: number, currentExp: nu
     )
 }
 
-export function Projects({ createProject, setProjectName }: { createProject: () => void, setProjectName: (value: string) => void }) {
+export function Projects({ createProject, setProjectName, projects = [] }: { createProject: () => void, setProjectName: (value: string) => void, projects?: ProjectDetails[] }) {
     return (
         <div className="w-full text-white flex flex-col gap-4">
             <h1 className="font-semibold flex gap-4 px-4"><FolderIcon /> Projects</h1>
@@ -209,7 +231,6 @@ export function Projects({ createProject, setProjectName }: { createProject: () 
                     <DialogContent className="sm:max-w-[425px] bg-[#191919] text-white border-0 z-999999999!">
                         <DialogHeader>
                             <DialogTitle>Project Name</DialogTitle>
-
                         </DialogHeader>
                         <div className="grid gap-4 text-white">
                             <div className="grid gap-3">
@@ -226,10 +247,21 @@ export function Projects({ createProject, setProjectName }: { createProject: () 
                     </DialogContent>
                 </Dialog>
 
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer" />file_name_1</p>
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer" />file_name_2</p>
-                <p className="flex text-[2vh] text-[#8F8F8F] w-[50%] items-center justify-around"><FileText className="hover:scale-120 cursor-pointer" />file_name_3</p>
+                {projects.length === 0 ? (
+                    <p className="text-[#8F8F8F] text-[2vh] text-center px-4">No projects yet. Create one above!</p>
+                ) : (
+                    projects.slice(0, 5).map((project) => (
+                        <Link
+                            key={project.id}
+                            href={`/workspace/id/${project.id}`}
+                            className="flex text-[2vh] text-[#8F8F8F] w-[90%] items-center gap-2 hover:text-white transition-colors truncate"
+                        >
+                            <FileText className="w-4 h-4 shrink-0" />
+                            <span className="truncate">{project.input_text || "Untitled Project"}</span>
+                        </Link>
+                    ))
+                )}
             </span>
-        </div >
+        </div>
     )
 }

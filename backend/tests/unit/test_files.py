@@ -4,6 +4,7 @@ Test suite for Files CRUD endpoints
 
 import pytest
 from httpx import AsyncClient
+from unittest.mock import AsyncMock, patch
 from app.main import app
 
 BASE_URL = "/api/v1/files"
@@ -12,36 +13,46 @@ BASE_URL = "/api/v1/files"
 @pytest.mark.asyncio
 async def test_create_file():
     """Test file creation"""
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        payload = {
-            "job_id": "00000000-0000-0000-0000-000000000001",
-            "file_url": "https://example.com/test.dxf",
-            "file_type": "dxf"
-        }
-        response = await ac.post(BASE_URL + "/", json=payload)
-        assert response.status_code in [201, 400]  # 201 for success, 400 for validation errors
-        if response.status_code == 201:
-            data = response.json()
-            assert isinstance(data, dict)
-            assert "file_url" in data
-            assert "job_id" in data
-            assert "id" in data
+    payload = {
+        "job_id": "00000000-0000-0000-0000-000000000001",
+        "path": "test/test.dxf",
+        "file_type": "dxf"
+    }
+    created = {
+        "id": "00000000-0000-0000-0000-000000000002",
+        **payload,
+        "bucket": "dxf-files",
+    }
+    with patch("app.routes.file_routes.create_file", AsyncMock(return_value=created)):
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            response = await ac.post(BASE_URL + "/", json=payload)
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["path"] == payload["path"]
+    assert data["job_id"] == payload["job_id"]
+    assert "id" in data
 
 
 @pytest.mark.asyncio
 async def test_create_file_with_default_type():
     """Test file creation without file_type (should use default 'dxf')"""
-    async with AsyncClient(app=app, base_url="http://test") as ac:
-        payload = {
-            "job_id": "00000000-0000-0000-0000-000000000001",
-            "file_url": "https://example.com/test.dxf"
-            # file_type not provided - should use default
-        }
-        response = await ac.post(BASE_URL + "/", json=payload)
-        assert response.status_code in [201, 400]
-        if response.status_code == 201:
-            data = response.json()
-            assert data.get("file_type") == "dxf"  # Should use default
+    payload = {
+        "job_id": "00000000-0000-0000-0000-000000000001",
+        "path": "test/test.dxf"
+    }
+    created = {
+        "id": "00000000-0000-0000-0000-000000000002",
+        **payload,
+        "bucket": "dxf-files",
+        "file_type": "dxf",
+    }
+    with patch("app.routes.file_routes.create_file", AsyncMock(return_value=created)):
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            response = await ac.post(BASE_URL + "/", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["file_type"] == "dxf"
 
 
 @pytest.mark.asyncio
@@ -85,4 +96,3 @@ async def test_delete_file():
         if response.status_code == 200:
             data = response.json()
             assert "message" in data
-

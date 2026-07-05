@@ -54,7 +54,9 @@ frontend/.env.production.local
 # Database/Logs
 *.log
 *.sql.backup
-supabase/  # Local Supabase mocks if any
+/backups/
+supabase/.branches/
+supabase/.temp/
 
 # OS/Editor
 .DS_Store
@@ -81,6 +83,10 @@ backend/test_audio.wav
 backend/tests/*.wav
 backend/tests/*.mp3
 backend/tests/*.m4a
+backend/tests/**/*.wav
+backend/tests/**/*.mp3
+backend/tests/**/*.m4a
+backend/tests/**/test_output/
 
 # AI/ML datasets (too large for git)
 ai-ml/**/dataset/cadllm_raw/

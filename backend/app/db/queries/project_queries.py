@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone  
 from fastapi.concurrency import run_in_threadpool
-
+from fastapi import HTTPException
 from app.db.supabase_client import db
 from app.utils.logger import logger
 from app.models.project_model import ProjectCreate, ProjectUpdate
@@ -18,9 +18,6 @@ async def create_project(project_data: ProjectCreate, user: Dict[str, Any]) -> O
             "user_id": user["user_id"],
             "input_text": project_data.input_text,
             "parsed_json": None,
-            "image_url": None,
-            "dxf_url": None,
-            "dwg_url": None,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -42,20 +39,21 @@ async def create_project(project_data: ProjectCreate, user: Dict[str, Any]) -> O
         return None  
 
 # GET ALL PROJECTS FOR THE LOGGED-IN USER
-async def get_projects(user: Dict[str, Any]) -> List[Dict[str, Any]]:  
+async def get_projects(user: Dict[str, Any], page: int = 1, limit: int = 10, status: Optional[str] = None) -> List[Dict[str, Any]]:  
     if not user or "user_id" not in user:
         logger.warning("[get_projects] Invalid user context")
         return []
 
     try:
         user_id = user["user_id"]  
+        offset = (page - 1) * limit
 
-        response = await run_in_threadpool(
-            lambda: db.table("projects")
-                .select("*")
-                .eq("user_id", user_id)
-                .execute()
-        )
+        def build_query():
+            query = db.table("projects").select("*").eq("user_id", user_id)
+            if status:
+                query = query.eq("status", status)
+            return query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+        response = await run_in_threadpool(build_query)
 
         projects = response.data if (response and response.data) else []
         logger.debug(f"[get_projects] Retrieved {len(projects)} projects for user {user_id[:8]}...")
@@ -95,10 +93,12 @@ async def get_project(project_id: str, user: Dict[str, Any]) -> Optional[Dict[st
         # enforce project ownership
         if project["user_id"] != user["user_id"]:
             logger.warning("[get_project] Unauthorized access attempt", project_id=project_id)
-            return None
+            raise HTTPException(status_code = 403, detail = {"error": "Access denied"})
 
         return project
-
+    
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("[get_project] Error", project_id=project_id, error=str(e), exc_info=True)
         return None

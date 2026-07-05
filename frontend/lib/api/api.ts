@@ -1,11 +1,17 @@
 import { apiClient } from "@/lib/api/utils";
 
+// Files (Yehor — files_routes). Worker uploads to storage + POSTs metadata;
+// frontend only GET/rename/delete + fetch a signed URL for preview/download.
 const FILE_URLS = {
-    POST: () => `/api/v1/files`,
-    GET_A_FILE: (fileId: string) => `/api/v1/jobs/files/${fileId}`,
-    GET_ALL_FILES: (jobId: string) => `/api/v1/files?job_id=${jobId}`,
-    UPDATE: (fileId: string) => `/api/v1/jobs/files/${fileId}`,
+    POST: () => `/api/v1/files/`,
+    GET_A_FILE: (fileId: string) => `/api/v1/files/${fileId}`,
+    GET_ALL_FILES: (jobId: string) => `/api/v1/files/?job_id=${jobId}`,
+    UPDATE: (fileId: string) => `/api/v1/files/${fileId}`,
     DELETE: (fileId: string) => `/api/v1/files/${fileId}`,
+    // Bucket is private — get a short-lived signed URL for preview/download.
+    SIGNED_URL: (fileId: string) => `/api/v1/files/${fileId}/signed-url`,
+    // Note: no browser upload endpoint — Yehor confirmed the worker uploads to
+    // storage and POSTs the metadata. The frontend only reads/manages files.
 } as const;
 
 const JOB_URLS = {
@@ -21,10 +27,112 @@ const PROJECT_URLS = {
     GET_USER: () => `/auth/v1/user`,
     POST: () => `/api/v1/projects`,
     GET_A_PROJECT: (projectId: string) => `/api/v1/projects/${projectId}`,
-    GET_ALL_PROJECTS: (userId: string) => `/api/v1/projects?user_id=${userId}`,
-    UPDATE: (projectId: string) => `/api/v1/jobs/projects/${projectId}`,
+    GET_ALL_PROJECTS: (userId: string, page = 1, limit = 20) => `/api/v1/projects?user_id=${userId}&page=${page}&limit=${limit}`,
+    // Archived projects (Yehor — `archived` flag/endpoint pending; page degrades to empty)
+    GET_ARCHIVED: (userId: string) => `/api/v1/projects?user_id=${userId}&archived=true`,
+    UPDATE: (projectId: string) => `/api/v1/projects/${projectId}`,
     DELETE: (projectId: string) => `/api/v1/projects/${projectId}`,
 } as const;
+
+// Dashboard routes (Tazwar — dashboard_routes.py)
+const DASHBOARD_URLS = {
+    GET_ACTIVITY: () => `/api/v1/dashboard/activity`,
+    GET_NOTIFICATIONS: (query = "") => `/api/v1/dashboard/notifications${query}`,
+    // PATCH .../{notification_id}/read → returns { id, read: true } (confirmed w/ Tazwar)
+    MARK_NOTIFICATION_READ: (id: string) => `/api/v1/dashboard/notifications/${id}/read`,
+    GET_WORKSPACE_SUMMARY: () => `/api/v1/dashboard/workspace-summary`,
+    GET_MEMBERS: () => `/api/v1/dashboard/members`,
+} as const;
+
+// Templates (Yehor — endpoint not live yet; page degrades to empty state until it ships)
+const TEMPLATE_URLS = {
+    GET_ALL: (query = "") => `/api/v1/templates${query}`,
+} as const;
+
+// Exports (Kiruthikha — Step 4 enriches this; endpoint pending, page degrades to empty)
+const EXPORT_URLS = {
+    GET_ALL: (userId: string) => `/api/v1/exports?user_id=${userId}`,
+    // Retry a failed/cancelled export (lifecycle: failed|cancelled → queued).
+    // Path pending Kiruthikha's confirmation — she owns the export service.
+    RETRY: (exportId: string) => `/api/v1/exports/${exportId}/retry`,
+} as const;
+
+// Compliance validation for an export (export.compliance_record_id links them).
+// Shape = ExportValidationPayload. Path pending Kiruthikha/Fareez confirmation.
+const COMPLIANCE_URLS = {
+    GET_VALIDATION: (exportId: string) => `/api/v1/exports/${exportId}/validation`,
+} as const;
+
+// Architecture contracts (Kiruthikha — architecture_routes.py, /api/v1/contracts/*).
+// Frozen source-of-truth shapes the Week 2 frontend aligns to:
+//  - export-progress-contract → the export history/progress item shape (exports page)
+//  - validation-template      → ExportValidationPayload shape (compliance UI)
+//  - export-lifecycle         → states / terminal / retryable sets
+//  - jurisdictions            → jurisdiction metadata for compliance
+const CONTRACT_URLS = {
+    EXPORT_PROGRESS: () => `/api/v1/contracts/export-progress-contract`,
+    VALIDATION_TEMPLATE: () => `/api/v1/contracts/validation-template`,
+    EXPORT_LIFECYCLE: () => `/api/v1/contracts/export-lifecycle`,
+    JURISDICTIONS: () => `/api/v1/contracts/jurisdictions`,
+} as const;
+
+// Workspace + member + invite management (Yehor — Week 2 Step 2 backend).
+const WORKSPACE_URLS = {
+    GET_MINE: () => `/api/v1/workspaces/me`,
+    GET_ONE: (wsId: string) => `/api/v1/workspaces/${wsId}`,
+    GET_MEMBERS: (wsId: string, page = 1, pageSize = 50) =>
+        `/api/v1/workspaces/${wsId}/members?page=${page}&page_size=${pageSize}`,
+    MEMBER: (wsId: string, userId: string) => `/api/v1/workspaces/${wsId}/members/${userId}`,
+    CREATE_INVITE: (wsId: string) => `/api/v1/workspaces/${wsId}/invites`,
+    GET_INVITES: (wsId: string) => `/api/v1/workspaces/${wsId}/invites`,
+    REVOKE_INVITE: (wsId: string, inviteId: string) =>
+        `/api/v1/workspaces/${wsId}/invites/${inviteId}/revoke`,
+    VALIDATE_INVITE: (token: string) =>
+        `/api/v1/workspaces/invites/validate?token=${encodeURIComponent(token)}`,
+} as const;
+
+// Current user's workspace (use to get workspace_id on page load).
+export async function getMyWorkspace(user: User | null) {
+    return apiClient("GET", WORKSPACE_URLS.GET_MINE(), user);
+}
+// Paginated member list for a workspace.
+export async function getWorkspaceMembers(
+    user: User | null,
+    wsId: string,
+    page = 1,
+    pageSize = 50
+) {
+    return apiClient("GET", WORKSPACE_URLS.GET_MEMBERS(wsId, page, pageSize), user);
+}
+// Change a member's role.
+export async function updateMemberRole(
+    user: User | null,
+    wsId: string,
+    userId: string,
+    role: string
+) {
+    return apiClient("PATCH", WORKSPACE_URLS.MEMBER(wsId, userId), user, { role });
+}
+// Remove a member from the workspace.
+export async function removeWorkspaceMember(user: User | null, wsId: string, userId: string) {
+    return apiClient("DELETE", WORKSPACE_URLS.MEMBER(wsId, userId), user);
+}
+// Create an invite. Backend blocks duplicates while one is pending (409).
+export async function createInvite(
+    user: User | null,
+    wsId: string,
+    body: { email: string; role: string }
+) {
+    return apiClient("POST", WORKSPACE_URLS.CREATE_INVITE(wsId), user, body);
+}
+// List all invites for a workspace.
+export async function getWorkspaceInvites(user: User | null, wsId: string) {
+    return apiClient("GET", WORKSPACE_URLS.GET_INVITES(wsId), user);
+}
+// Revoke a pending invite.
+export async function revokeInvite(user: User | null, wsId: string, inviteId: string) {
+    return apiClient("PATCH", WORKSPACE_URLS.REVOKE_INVITE(wsId, inviteId), user);
+}
 
 // Text to CAD maker api
 const GPT_PARSERS = {
@@ -72,15 +180,16 @@ export async function createAFile(
 };
 export async function getAFile(
     user: User | null,
-    jobId: string
+    fileId: string
 ) {
-    return apiClient("GET", FILE_URLS.GET_A_FILE(jobId), user);
+    return apiClient("GET", FILE_URLS.GET_A_FILE(fileId), user);
 };
+// List all files attached to a job (Step 2 file manager reads this).
 export async function getAllFiles(
     user: User | null,
-    userId: string
+    jobId: string
 ) {
-    return apiClient("GET", FILE_URLS.GET_ALL_FILES(userId), user);
+    return apiClient("GET", FILE_URLS.GET_ALL_FILES(jobId), user);
 };
 export async function deleteAFile(
     user: User | null,
@@ -88,12 +197,20 @@ export async function deleteAFile(
 ) {
     return apiClient("DELETE", FILE_URLS.DELETE(fileId), user);
 };
-export async function updateAFile(
+// Rename a file's display label (Yehor adding `name` field; PATCH { name }).
+export async function renameAFile(
     user: User | null,
     fileId: string,
-    data: string
+    name: string
 ) {
-    return apiClient("PATCH", FILE_URLS.UPDATE(fileId), user, data);
+    return apiClient("PATCH", FILE_URLS.UPDATE(fileId), user, { name });
+}
+// Short-lived signed URL for previewing/downloading a private-bucket file.
+export async function getFileSignedUrl(
+    user: User | null,
+    fileId: string
+) {
+    return apiClient("GET", FILE_URLS.SIGNED_URL(fileId), user);
 }
 
 // Can create a prompt from here also
@@ -112,9 +229,11 @@ export async function getAProject(
 };
 export async function getAllProjects(
     user: User | null,
-    userId: string
+    userId: string,
+    page = 1,
+    limit = 20
 ) {
-    return apiClient("GET", PROJECT_URLS.GET_ALL_PROJECTS(userId), user);
+    return apiClient("GET", PROJECT_URLS.GET_ALL_PROJECTS(userId, page, limit), user);
 };
 export async function deleteAProject(
     user: User | null,
@@ -122,12 +241,108 @@ export async function deleteAProject(
 ) {
     return apiClient("DELETE", PROJECT_URLS.DELETE(projectId), user);
 };
+export async function getArchivedProjects(
+    user: User | null,
+    userId: string
+) {
+    return apiClient("GET", PROJECT_URLS.GET_ARCHIVED(userId), user);
+};
 export async function updateAProject(
     user: User | null,
     projectId: string,
     data: string
 ) {
     return apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, data);
+}
+
+
+// Activity feed for the dashboard (auth-scoped by Bearer token)
+export async function getDashboardActivity(
+    user: User | null
+) {
+    return apiClient("GET", DASHBOARD_URLS.GET_ACTIVITY(), user);
+}
+
+// Notifications (auth-scoped). Supports unread_only + limit.
+export async function getDashboardNotifications(
+    user: User | null,
+    opts?: { unreadOnly?: boolean; limit?: number }
+) {
+    const qs = new URLSearchParams();
+    if (opts?.unreadOnly) qs.set("unread_only", "true");
+    if (opts?.limit) qs.set("limit", String(opts.limit));
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return apiClient("GET", DASHBOARD_URLS.GET_NOTIFICATIONS(query), user);
+}
+
+// Mark a single notification as read
+export async function markNotificationRead(
+    user: User | null,
+    notificationId: string
+) {
+    return apiClient("PATCH", DASHBOARD_URLS.MARK_NOTIFICATION_READ(notificationId), user);
+}
+
+// Workspace summary counts
+export async function getWorkspaceSummary(
+    user: User | null
+) {
+    return apiClient("GET", DASHBOARD_URLS.GET_WORKSPACE_SUMMARY(), user);
+}
+
+// Workspace members (Week 1: returns authed user as owner only)
+export async function getDashboardMembers(
+    user: User | null
+) {
+    return apiClient("GET", DASHBOARD_URLS.GET_MEMBERS(), user);
+}
+
+// Export history (Kiruthikha — endpoint pending; Step 4 adds statuses/retry/metadata).
+export async function getExports(
+    user: User | null,
+    userId: string
+) {
+    return apiClient("GET", EXPORT_URLS.GET_ALL(userId), user);
+}
+
+// Retry a failed/cancelled export (Kiruthikha — retry path pending confirmation).
+export async function retryExport(
+    user: User | null,
+    exportId: string
+) {
+    return apiClient("POST", EXPORT_URLS.RETRY(exportId), user);
+}
+
+// Compliance validation results for an export (Kiruthikha/Fareez — path pending).
+export async function getExportValidation(
+    user: User | null,
+    exportId: string
+) {
+    return apiClient("GET", COMPLIANCE_URLS.GET_VALIDATION(exportId), user);
+}
+
+// Architecture contracts (/api/v1/contracts/*) — frozen shapes the frontend aligns
+// to. These return field specs/labels, not row data; useful for verifying the
+// export history + compliance UIs stay in sync with the backend source of truth.
+export async function getExportProgressContract(user: User | null) {
+    return apiClient("GET", CONTRACT_URLS.EXPORT_PROGRESS(), user);
+}
+export async function getValidationTemplate(user: User | null) {
+    return apiClient("GET", CONTRACT_URLS.VALIDATION_TEMPLATE(), user);
+}
+export async function getJurisdictions(user: User | null) {
+    return apiClient("GET", CONTRACT_URLS.JURISDICTIONS(), user);
+}
+
+// CAD templates gallery (Yehor — endpoint pending). Optional category filter.
+export async function getTemplates(
+    user: User | null,
+    opts?: { category?: string }
+) {
+    const qs = new URLSearchParams();
+    if (opts?.category && opts.category !== "all") qs.set("category", opts.category);
+    const query = qs.toString() ? `?${qs.toString()}` : "";
+    return apiClient("GET", TEMPLATE_URLS.GET_ALL(query), user);
 }
 
 
