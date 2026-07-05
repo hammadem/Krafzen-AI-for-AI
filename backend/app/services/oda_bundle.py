@@ -730,14 +730,26 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
     root = backend_root()
     raw = getattr(settings, "DWG_ODA_DEB_URL", None) or os.environ.get("DWG_ODA_DEB_URL") or ""
     url = _sanitize_deb_url(raw)
+    r2 = _r2_download_config()
 
     if not force:
         exe, _, _ = _read_bundle(root)
         if exe:
-            ensure_headless_qt_plugins(root)
-            return True
+            if ensure_headless_qt_plugins(root):
+                return True
+            if url or r2:
+                logger.warning(
+                    "DWG: existing ODA bundle is incomplete; refreshing it from the configured source"
+                )
+                force = True
+            else:
+                _last_oda_error = (
+                    "Existing ODA bundle is missing compatible Qt platform plugins and no refresh "
+                    "source is configured. Set R2 ODA credentials or DWG_ODA_DEB_URL on Render."
+                )
+                logger.error(_last_oda_error)
+                return False
 
-    r2 = _r2_download_config()
     if not url and not r2:
         _last_oda_error = (
             "Neither R2 API credentials nor DWG_ODA_DEB_URL is configured. "
@@ -800,6 +812,10 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         _write_manifest(root, _find_oda_binary(bdir) or oda_bin)
         exe, _, _ = _read_bundle(root)
         if exe:
+            if not ensure_headless_qt_plugins(root):
+                raise RuntimeError(
+                    "Downloaded ODA bundle is missing compatible Qt platform plugins"
+                )
             logger.info("ODA bundle ready at %s", exe)
             return True
         raise RuntimeError("ODA bundle install finished but manifest is invalid")
@@ -811,11 +827,11 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
             url,
         )
         logger.error("Failed to ensure ODA bundle: %s", _last_oda_error, exc_info=True)
-        return bool(_read_bundle(root)[0])
+        return False if force else bool(_read_bundle(root)[0])
     except Exception as e:
         _last_oda_error = str(e)
         logger.error("Failed to ensure ODA bundle: %s", e, exc_info=True)
-        return bool(_read_bundle(root)[0])
+        return False if force else bool(_read_bundle(root)[0])
     finally:
         deb_local.unlink(missing_ok=True)
 

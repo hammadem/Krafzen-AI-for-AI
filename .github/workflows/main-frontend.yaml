@@ -1,6 +1,6 @@
 # Not fully ready yet
 
-name: Lint, Test, Build & Deploy Frontend (Production)
+name: Lint, Test & Build Frontend (Production)
 
 # Deploy only on push to main (includes when a PR is merged into main)
 on:
@@ -12,7 +12,7 @@ on:
       - 'vercel.json'
 
 jobs:
-  production-deploy:
+  production-validation:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     environment: Production
@@ -50,50 +50,10 @@ jobs:
           cd frontend
           npm run build
 
-        # This is to check if the secrets are availaible in the provided repo
-      - name: Debug Vercel secrets
-        run: |
-          echo "VERCEL_TOKEN set? ${{ secrets.VERCEL_TOKEN != '' }}"
-          echo "VERCEL_ORG_ID set? ${{ secrets.VERCEL_ORG_ID != '' }}"
-          echo "VERCEL_PROJECT_ID set? ${{ secrets.VERCEL_PROJECT_ID != '' }}"
-
-      - name: Deploy to Vercel (Production)
-        if: success()
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          # Run from repo root (vercel.json lives here)
-          cd "$GITHUB_WORKSPACE"
-
-          if [ -z "$VERCEL_PROJECT_ID" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_TOKEN" ]; then
-            echo "::error::VERCEL_PROJECT_ID, VERCEL_ORG_ID, and VERCEL_TOKEN must be set in GitHub Settings → Environments → Production → Environment secrets"
-            exit 1
-          fi
-
-          # 1. Install CLI
-          npm install -g vercel
-
-          # 2. No .vercel – use env vars so CLI uses VERCEL_ORG_ID + VERCEL_PROJECT_ID
-          echo "🧹 Removing any .vercel link..."
-          rm -rf .vercel frontend/.vercel
-
-          # 3. Hide .git so CLI doesn't complain
-          echo "🙈 Hiding .git directory..."
-          mv .git .git_temp
-
-          # 4. Deploy using env vars (VERCEL_ORG_ID + VERCEL_PROJECT_ID skip project lookup; --project removed in CLI 50.x)
-          export VERCEL_ORG_ID VERCEL_PROJECT_ID VERCEL_TOKEN
-          echo "🚀 Deploying to Production..."
-          vercel deploy --prod --token="$VERCEL_TOKEN" --yes
-
-          # 5. Restore .git
-          mv .git_temp .git
-          echo "✅ Production deployment complete"
+      - name: Confirm Vercel Git deployment ownership
+        run: echo "Vercel Git integration deploys successful main-branch builds to production."
 
 
 # To Be Done Yet 
 # Add NPM caching for faster builds
 # while in production add manual approoval gates or github inbuilt approovals
-

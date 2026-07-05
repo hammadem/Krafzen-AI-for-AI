@@ -333,6 +333,26 @@ export default function WorkspaceLayout() {
     }
   };
 
+  const handleDxfExport = async () => {
+    if (!lastImage) return;
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const blob = await downloadDesignFile(lastImage, 'dxf', undefined, session?.access_token);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `design_${currentSessionId}.dxf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      alert('Failed to export DXF');
+    }
+  };
+
   const handleDownloadImage = async () => {
     if (!lastImage) return;
     try {
@@ -628,7 +648,7 @@ export default function WorkspaceLayout() {
               <button className="workspace-tool-btn" title="Download Image" aria-label="Download Image" onClick={handleDownloadImage} disabled={!lastImage}>
                 <ImageIcon className="w-4 h-4" />
               </button>
-              <button className="workspace-tool-btn" title="Export DXF" aria-label="Export DXF" onClick={handleExport} disabled={!lastImage}>
+              <button className="workspace-tool-btn" title="Export DXF" aria-label="Export DXF" onClick={handleDxfExport} disabled={!lastImage}>
                 <Download className="w-4 h-4" />
               </button>
               <button 

@@ -55,9 +55,15 @@ jobs:
     
     - name: Test staging health endpoint
       run: |
-        sleep 10
-        curl -f ${{ secrets.RENDER_STAGING_URL }}/health/ || echo "Staging health check failed - service may be starting"
-        curl -f ${{ secrets.RENDER_STAGING_URL }}/health/detailed || echo "Staging detailed health check failed"
+        for attempt in {1..30}; do
+          if curl -fsS ${{ secrets.RENDER_STAGING_URL }}/health/dwg >/dev/null && \
+             curl -fsS ${{ secrets.RENDER_STAGING_URL }}/openapi.json | grep -q '"/api/v1/exports/"'; then
+            exit 0
+          fi
+          sleep 10
+        done
+        echo "Staging deployment did not expose Week 2 routes with a ready DWG runtime"
+        exit 1
 
   deploy-production:
     needs: backend-tests
@@ -79,6 +85,12 @@ jobs:
     
     - name: Test production health endpoint
       run: |
-        sleep 10
-        curl -f ${{ secrets.RENDER_PRODUCTION_URL }}/health/ || echo "Production health check failed - service may be starting"
-        curl -f ${{ secrets.RENDER_PRODUCTION_URL }}/health/detailed || echo "Production detailed health check failed"
+        for attempt in {1..30}; do
+          if curl -fsS ${{ secrets.RENDER_PRODUCTION_URL }}/health/dwg >/dev/null && \
+             curl -fsS ${{ secrets.RENDER_PRODUCTION_URL }}/openapi.json | grep -q '"/api/v1/exports/"'; then
+            exit 0
+          fi
+          sleep 10
+        done
+        echo "Production deployment did not expose Week 2 routes with a ready DWG runtime"
+        exit 1

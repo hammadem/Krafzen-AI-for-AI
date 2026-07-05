@@ -3,6 +3,7 @@ Health check endpoints
 """
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from datetime import datetime
 import time
 from app.services.supabase_service import supabase_service
@@ -64,3 +65,19 @@ async def detailed_health_check():
         }
     }
 
+
+@router.get("/dwg")
+async def dwg_health_check():
+    """Verify that the production ODA bundle includes a usable Qt platform plugin."""
+    from app.services.oda_bundle import ensure_oda_bundle, get_last_oda_error
+    from app.services.dwg_converter_service import dwg_converter_service
+
+    ready = ensure_oda_bundle() and dwg_converter_service.is_configured()
+    payload = {
+        "status": "healthy" if ready else "unavailable",
+        "service": "DWG converter",
+        "detail": None if ready else get_last_oda_error(),
+    }
+    if ready:
+        return payload
+    return JSONResponse(status_code=503, content=payload)
