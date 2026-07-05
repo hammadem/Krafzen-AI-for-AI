@@ -13,7 +13,30 @@ on:
       - 'backend/**'
 
 jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run backend tests
+      run: |
+        cd backend
+        python -m pytest -q
+
   deploy-staging:
+    needs: backend-tests
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/staging'
     environment: staging
@@ -37,6 +60,7 @@ jobs:
         curl -f ${{ secrets.RENDER_STAGING_URL }}/health/detailed || echo "Staging detailed health check failed"
 
   deploy-production:
+    needs: backend-tests
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     environment: Production
@@ -58,4 +82,3 @@ jobs:
         sleep 10
         curl -f ${{ secrets.RENDER_PRODUCTION_URL }}/health/ || echo "Production health check failed - service may be starting"
         curl -f ${{ secrets.RENDER_PRODUCTION_URL }}/health/detailed || echo "Production detailed health check failed"
-

@@ -1,0 +1,9 @@
+alter table public.compliance_exceptions enable row level security;
+alter table public.compliance_presets enable row level security;
+alter table public.compliance_rules enable row level security;
+alter table public.export_jobs enable row level security;
+alter table public.jurisdictions enable row level security;
+alter table public.project_compliance_records enable row level security;
+alter table public.workspace_invites enable row level security;
+alter table public.workspace_members enable row level security;
+alter table public.workspaces enable row level security;

@@ -27,7 +27,6 @@ async def require_auth(authorization: str = Header(None)) -> Dict[str, Any]:
 
     payload = decode_supabase_token(token)
     if not payload:
-        import logging
         logging.getLogger(__name__).error("Token decode failed or returned None")
         raise HTTPException(
             status_code=401,
@@ -45,7 +44,7 @@ async def require_auth(authorization: str = Header(None)) -> Dict[str, Any]:
         )
     issuer = payload.get("iss", "").rstrip("/")
 
-    expected_base = f"https://{settings.SUPABASE_PROJECT_ID}.supabase.co"
+    expected_base = settings.SUPABASE_URL.rstrip("/")
 
     # Normalize issuer for check (handle trailing slash mismatch)
     if not issuer.startswith(expected_base):

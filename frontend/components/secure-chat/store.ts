@@ -94,7 +94,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     ...session.messages,
                     {
                         ...message,
-                        id: message.id ?? crypto.randomUUID(),
+                        id: message.id ?? generateSessionId(),
                         timestamp: Date.now()
                     }
                 ]

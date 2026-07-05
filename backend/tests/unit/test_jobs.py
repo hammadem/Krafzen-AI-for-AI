@@ -15,7 +15,7 @@ async def test_create_job():
     async with AsyncClient(app=app, base_url="http://test") as ac:
         payload = {
             "project_id": "00000000-0000-0000-0000-000000000001",
-            "status": "pending",
+            "status": "queued",
             "transcript": "This is a test transcript",
             "error_message": None
         }
