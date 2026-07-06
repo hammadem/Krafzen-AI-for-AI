@@ -65,6 +65,19 @@ interface SignedUrlResponse {
     expires_in: number;
 }
 
+interface ExportDetails {
+    id: string;
+    project_id: string;
+    format: string;
+    status: string;
+    progress_percent?: number | null;
+    retry_count?: number | null;
+    artifact_file_id: string | null;
+    error_message: string | null;
+    file_path: string | null;
+    created_at: string;
+}
+
 // Compliance / validation (export_contracts.py: ValidationIssue, ExportValidationPayload).
 type ValidationSeverity = "warning" | "error" | "critical";
 type ValidationCategory =
@@ -113,7 +126,7 @@ interface ParsedAudio {
 
 interface ApiRes {
     ok: boolean,
-    data: ParsedAudio | ProjectDetails | JobReqType | FileDetails | null | ProjectDetails[] | FileDetails[] | JobDetails | JobDetails[] | GPT_PARSED_INSRUCTION_SUCCESS
+    data: ParsedAudio | ProjectDetails | JobReqType | FileDetails | null | ProjectDetails[] | FileDetails[] | JobDetails | JobDetails[] | ExportDetails[] | GPT_PARSED_INSRUCTION_SUCCESS
     error: AppError
 }
 

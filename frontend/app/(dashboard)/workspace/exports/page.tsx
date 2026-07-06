@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { FileDown, SearchIcon, RefreshCw, AlertCircle, Download, RotateCcw, Loader2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import NavHeader from "@/components/NavHeader";
-import { getExports, retryExport, getFileSignedUrl } from "@/lib/api/api";
+import { getUserExports, retryExport, getFileSignedUrl } from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useAuth } from "@/context/AuthContext";
 import { formatDate } from "@/lib/utils";
@@ -76,7 +76,7 @@ export default function Exports() {
         refetch,
         setData,
     } = useApiResource<ExportItem[]>({
-        fetcher: (u) => getExports(u, u.userId ?? ""),
+        fetcher: (u) => getUserExports(u),
         select: (raw) => {
             if (Array.isArray(raw)) return raw as unknown as ExportItem[];
             if (raw && typeof raw === "object" && "exports" in raw) {
