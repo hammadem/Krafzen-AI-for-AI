@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getAllProjects } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
-import { apiCache } from "@/lib/api/cache";
+import { deleteCacheByPrefix } from "@/lib/api/cache";
 
 const DEFAULT_LIMIT = 20;
 
@@ -50,7 +50,9 @@ export function useFetchProjects(initialPage = 1) {
 
     const forceRefetch = useCallback(() => {
         if (!user) return;
-        apiCache.delete(`GET:/api/v1/projects?user_id=${user?.userId}`);
+        // Clear every cached projects-list page (any params) so a freshly created/updated
+        // project shows immediately — robust to page/limit/URL changes, unlike an exact key.
+        deleteCacheByPrefix(`GET:/api/v1/projects`);
         fetchProjects(page);
     }, [user, fetchProjects, page]);
 

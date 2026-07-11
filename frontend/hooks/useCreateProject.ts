@@ -55,7 +55,7 @@ export function useCreateProject(
                     setInput("");
                     setFile("");
                 }
-                router.push(`/dashboard/id/${project.id} `);
+                router.push(`/workspace/id/${project.id}`);
             } else {
                 setStatus("error");
                 setApiError(error);
