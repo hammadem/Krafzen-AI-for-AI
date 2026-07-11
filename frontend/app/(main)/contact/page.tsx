@@ -22,7 +22,7 @@ export default function ContactPage() {
 
                 <div className="contact-grid">
                     <a
-                        href="https://calendly.com/khadija-krafzen/30min"
+                        href="https://calendly.com/khadija-krafzen/10mins"
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={openCalendly}
@@ -37,7 +37,7 @@ export default function ContactPage() {
                             </svg>
                         </span>
                         <span>
-                            <span className="clabel">Book a 30‑min demo</span><br />
+                            <span className="clabel">Book a 10‑min demo</span><br />
                             <span className="csub">Best for evaluations and enterprise discussions</span>
                         </span>
                     </a>

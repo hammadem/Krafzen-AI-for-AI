@@ -7,7 +7,7 @@ export default function CaseStudiesPage() {
         if (typeof window !== 'undefined' && window.Calendly && typeof window.Calendly.initPopupWidget === 'function') {
             e.preventDefault();
             // @ts-expect-error: Calendly is loaded via external script
-            window.Calendly.initPopupWidget({ url: 'https://calendly.com/khadija-krafzen/30min' });
+            window.Calendly.initPopupWidget({ url: 'https://calendly.com/khadija-krafzen/10mins' });
             return false;
         }
         return true;
@@ -128,8 +128,8 @@ export default function CaseStudiesPage() {
 
                 <div className="cta-box">
                     <h3>Ready to add your firm to the list?</h3>
-                    <p>30 minutes with our team is enough to see whether Krafzen AI fits your workflow. No deck — we&apos;ll generate something you actually need.</p>
-                    <a href="https://calendly.com/khadija-krafzen/30min" target="_blank" rel="noopener noreferrer" onClick={openCalendly} className="cta-btn">
+                    <p>10 minutes with our team is enough to see whether Krafzen AI fits your workflow. No deck — we&apos;ll generate something you actually need.</p>
+                    <a href="https://calendly.com/khadija-krafzen/10mins" target="_blank" rel="noopener noreferrer" onClick={openCalendly} className="cta-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                             <line x1="16" y1="2" x2="16" y2="6" />

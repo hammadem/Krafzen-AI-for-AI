@@ -443,7 +443,7 @@ export default function NewLanding() {
       </main>
 
       {/* Modals */}
-      <CalendlyBooking isOpen={showCalendly} onClose={() => setShowCalendly(false)} calendlyUrl="https://calendly.com/khadija-krafzen/30min" />
+      <CalendlyBooking isOpen={showCalendly} onClose={() => setShowCalendly(false)} calendlyUrl="https://calendly.com/khadija-krafzen/10mins" />
       {paymentModal && <StripePaymentModal isOpen={paymentModal.open} onClose={() => setPaymentModal(null)} {...paymentModal} />}
     </div>
   );

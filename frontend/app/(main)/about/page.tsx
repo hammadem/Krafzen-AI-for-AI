@@ -50,7 +50,7 @@ export default function AboutPage() {
 
                 <div className="cta-box">
                     <h3>Want to see Krafzen AI in action?</h3>
-                    <p>Book a 30‑minute walkthrough with our team. No deck, no sales pitch — we&apos;ll generate something you actually need.</p>
+                    <p>Book a 10‑minute walkthrough with our team. No deck, no sales pitch — we&apos;ll generate something you actually need.</p>
                     <button 
                         onClick={() => setShowCalendly(true)}
                         className="cta-btn border-0"

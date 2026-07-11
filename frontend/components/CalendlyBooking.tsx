@@ -13,7 +13,7 @@ interface CalendlyBookingProps {
 export default function CalendlyBooking({
     isOpen,
     onClose,
-    calendlyUrl = "https://calendly.com/khadija-krafzen/30min",
+    calendlyUrl = "https://calendly.com/khadija-krafzen/10mins",
 }: CalendlyBookingProps) {
     const [loading, setLoading] = useState(true);
 
@@ -40,7 +40,7 @@ export default function CalendlyBooking({
                         Book a Demo
                     </DialogTitle>
                     <p className="text-sm text-gray-400 mt-1">
-                        Schedule a 30-minute product demonstration
+                        Schedule a 10-minute product demonstration
                     </p>
                 </DialogHeader>
 
