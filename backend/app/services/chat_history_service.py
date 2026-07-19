@@ -10,11 +10,30 @@ class ChatHistoryService:
     """
     
     async def create_session(self, user_id: str, title: str = "New Chat") -> str:
-        """Creates a new chat session and returns its ID."""
+        """Creates a new chat session, backed by a projects row, and returns the session ID."""
         try:
+            # 1. Create the backing project first (reuses the proven projects insert:
+            #user_id from token, which GET /projects filters on — so it will appear in the list)
+            project_id = None
+            try:
+                project_payload = {
+                    "user_id": user_id,
+                    "input_text": title,
+                }
+                project_response = db.table("projects").insert(project_payload).execute()
+                if project_response.data:
+                    project_id = project_response.data[0]["id"]
+                else:
+                    logger.warning("[create_session] project insert returned no data; session will have null project_id")
+            except Exception as e:
+                # Don't fail the whole session/generate if the project bridge fails — log and continue
+                logger.error(f"[create_session] project bridge insert failed: {e}", exc_info=True)
+                    
+            # 2. Create the chat session, linked to that project
             data = {
                 "user_id": user_id,
-                "title": title
+                "title": title,
+                "project_id": project_id,
             }
             response = db.table("chat_sessions").insert(data).execute()
             if response.data:
