@@ -262,6 +262,17 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             compliance=compliance_payload,
         )
         message_id = assistant_msg.get("id") if assistant_msg else None
+        # 5b. Project persistence bridge — link a project on first successful generate.
+        # Uses the real user prompt as input_text; reuses existing project on repeat generates.
+        try:
+            await chat_history_service.ensure_project_for_session(
+                session_id=session_id,
+                user_id=user_id,
+                input_text=request.message,
+            )
+        except Exception as bridge_err:
+            # Non-fatal: generation already succeeded, don't fail the request over the bridge.
+            logger.error(f"[generate] project bridge failed: {bridge_err}", exc_info=True)
 
         # 6. Deduct Request - ONLY AFTER SUCCESSFUL COMPLETION
         # This ensures users are not charged if any error occurred above
