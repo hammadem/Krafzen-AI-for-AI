@@ -8,13 +8,13 @@ class ChatHistoryService:
     """
     Service to manage persistent chat history in Supabase.
     """
-    
+
     async def create_session(self, user_id: str, title: str = "New Chat") -> str:
         """Creates a new chat session and returns its ID."""
         try:
             data = {
                 "user_id": user_id,
-                "title": title
+                "title": title,
             }
             response = db.table("chat_sessions").insert(data).execute()
             if response.data:
@@ -23,6 +23,36 @@ class ChatHistoryService:
         except Exception as e:
             logger.error(f"Error creating chat session: {e}", exc_info=True)
             raise e
+
+    async def ensure_project_for_session(self, session_id: str, user_id: str, input_text: str) -> Optional[str]:
+        """
+        On first successful generate, create a projects row for this session and link it.
+        If the session already has a project_id, reuse it (idempotent — no duplicates on repeat generates).
+        """
+        try:
+            # 1. If linked project already exists, return it.
+            existing = db.table("chat_sessions").select("project_id").eq("id", session_id).limit(1).execute()
+            if existing.data and existing.data[0].get("project_id"):
+                return existing.data[0]["project_id"]
+
+            # 2. No project yet — create one from the real user prompt.
+            project_payload = {
+                "user_id": user_id,
+                "input_text": input_text,
+            }
+            project_response = db.table("projects").insert(project_payload).execute()
+            if not project_response.data:
+                logger.warning("[ensure_project_for_session] project insert returned no data")
+                return None
+            project_id = project_response.data[0]["id"]
+
+            # 3. Link it back to the session.
+            db.table("chat_sessions").update({"project_id": project_id}).eq("id", session_id).execute()
+            logger.info(f"[ensure_project_for_session] linked project {project_id} to session {session_id}")
+            return project_id
+        except Exception as e:
+            logger.error(f"[ensure_project_for_session] failed: {e}", exc_info=True)
+            return None
 
     async def get_user_sessions(self, user_id: str) -> List[Dict[str, Any]]:
         """Retrieves all chat sessions for a user, ordered by recent update."""
@@ -109,11 +139,11 @@ class ChatHistoryService:
             if compliance is not None:
                 data["compliance"] = compliance
             response = db.table("chat_messages").insert(data).execute()
-            
+
             # Update session's updated_at timestamp
             from datetime import datetime
             db.table("chat_sessions").update({"updated_at": datetime.now().isoformat()}).eq("id", session_id).execute()
-            
+
             if response.data:
                 return response.data[0]
             return {}
@@ -139,14 +169,14 @@ class ChatHistoryService:
             if not any(s['id'] == session_id for s in sessions):
                 logger.warning(f"Session {session_id} not found for user {user_id}")
                 return False
-            
+
             # Update the title
             from datetime import datetime
             response = db.table("chat_sessions").update({
                 "title": title,
                 "updated_at": datetime.now().isoformat()
             }).eq("id", session_id).execute()
-            
+
             return response.data is not None
         except Exception as e:
             logger.error(f"Error updating session title: {e}", exc_info=True)
