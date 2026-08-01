@@ -8,7 +8,7 @@ class ChatHistoryService:
     """
     Service to manage persistent chat history in Supabase.
     """
-    
+
     async def create_session(self, user_id: str, title: str = "New Chat") -> str:
         """Creates a new chat session and returns its ID."""
         try:
@@ -23,7 +23,7 @@ class ChatHistoryService:
         except Exception as e:
             logger.error(f"Error creating chat session: {e}", exc_info=True)
             raise e
-        
+
     async def ensure_project_for_session(self, session_id: str, user_id: str, input_text: str) -> Optional[str]:
         """
         On first successful generate, create a projects row for this session and link it.
@@ -139,11 +139,11 @@ class ChatHistoryService:
             if compliance is not None:
                 data["compliance"] = compliance
             response = db.table("chat_messages").insert(data).execute()
-            
+
             # Update session's updated_at timestamp
             from datetime import datetime
             db.table("chat_sessions").update({"updated_at": datetime.now().isoformat()}).eq("id", session_id).execute()
-            
+
             if response.data:
                 return response.data[0]
             return {}
@@ -169,14 +169,14 @@ class ChatHistoryService:
             if not any(s['id'] == session_id for s in sessions):
                 logger.warning(f"Session {session_id} not found for user {user_id}")
                 return False
-            
+
             # Update the title
             from datetime import datetime
             response = db.table("chat_sessions").update({
                 "title": title,
                 "updated_at": datetime.now().isoformat()
             }).eq("id", session_id).execute()
-            
+
             return response.data is not None
         except Exception as e:
             logger.error(f"Error updating session title: {e}", exc_info=True)
