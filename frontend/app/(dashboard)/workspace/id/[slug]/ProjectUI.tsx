@@ -61,18 +61,6 @@ export default function ProjectUI({ slug }: { slug: string }) {
         };
     }, [user, slug, retryCount, setCurrentProject, setUserAction]);
 
-    const renderProjectPayload = () => {
-        if (!currentProject) return null;
-        if (currentProject.parsed_json == null) {
-            return "Generated project metadata is not available yet.";
-        }
-        if (typeof currentProject.parsed_json === "string") {
-            return currentProject.parsed_json;
-        }
-        return JSON.stringify(currentProject.parsed_json, null, 2);
-    };
-
-
     if (status === "error") {
         return (
             <div className="flex flex-col items-center justify-center w-full h-full gap-4 text-white">
@@ -167,9 +155,6 @@ export default function ProjectUI({ slug }: { slug: string }) {
                                             No generated image is linked to this project yet.
                                         </p>
                                     )}
-                                    <pre className="mt-4 whitespace-pre-wrap break-words text-white text-sm leading-6">
-                                        {renderProjectPayload()}
-                                    </pre>
                                 </div>
                             </div>
 
