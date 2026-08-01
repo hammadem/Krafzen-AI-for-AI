@@ -269,6 +269,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
                 session_id=session_id,
                 user_id=user_id,
                 input_text=request.message,
+                image_url=image_url,
+                parsed_json={"cad_dsl": cad_dsl},
             )
         except Exception as bridge_err:
             # Non-fatal: generation already succeeded, don't fail the request over the bridge.

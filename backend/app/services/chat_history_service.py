@@ -24,7 +24,14 @@ class ChatHistoryService:
             logger.error(f"Error creating chat session: {e}", exc_info=True)
             raise e
 
-    async def ensure_project_for_session(self, session_id: str, user_id: str, input_text: str) -> Optional[str]:
+    async def ensure_project_for_session(
+        self,
+        session_id: str,
+        user_id: str,
+        input_text: str,
+        image_url: Optional[str] = None,
+        parsed_json: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
         """
         On first successful generate, create a projects row for this session and link it.
         If the session already has a project_id, reuse it (idempotent — no duplicates on repeat generates).
@@ -33,13 +40,25 @@ class ChatHistoryService:
             # 1. If linked project already exists, return it.
             existing = db.table("chat_sessions").select("project_id").eq("id", session_id).limit(1).execute()
             if existing.data and existing.data[0].get("project_id"):
-                return existing.data[0]["project_id"]
+                project_id = existing.data[0]["project_id"]
+                update_payload: Dict[str, Any] = {}
+                if image_url:
+                    update_payload["image_url"] = image_url
+                if parsed_json is not None:
+                    update_payload["parsed_json"] = parsed_json
+                if update_payload:
+                    db.table("projects").update(update_payload).eq("id", project_id).execute()
+                return project_id
 
             # 2. No project yet — create one from the real user prompt.
             project_payload = {
                 "user_id": user_id,
                 "input_text": input_text,
             }
+            if image_url:
+                project_payload["image_url"] = image_url
+            if parsed_json is not None:
+                project_payload["parsed_json"] = parsed_json
             project_response = db.table("projects").insert(project_payload).execute()
             if not project_response.data:
                 logger.warning("[ensure_project_for_session] project insert returned no data")

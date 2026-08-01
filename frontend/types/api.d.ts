@@ -26,6 +26,8 @@ interface ApiReqJob {
 interface ProjectDetails {
     created_at: string;
     dxf_url: string | null;
+    dwg_url?: string | null;
+    image_url?: string | null;
     id: string;
     input_text: string;
     parsed_json: JSON | null; // add here type when server starts responding 

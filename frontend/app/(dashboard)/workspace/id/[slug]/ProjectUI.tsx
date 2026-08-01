@@ -39,7 +39,7 @@ export default function ProjectUI({ slug }: { slug: string }) {
                     setCurrentProject(data as ProjectDetails);
                     setStatus("success");
                 }
-            } catch (err) {
+            } catch {
                 if (isMounted) {
                     setStatus("error");
                     setApiError({
@@ -60,6 +60,17 @@ export default function ProjectUI({ slug }: { slug: string }) {
             isMounted = false;
         };
     }, [user, slug, retryCount, setCurrentProject, setUserAction]);
+
+    const renderProjectPayload = () => {
+        if (!currentProject) return null;
+        if (currentProject.parsed_json == null) {
+            return "Generated project metadata is not available yet.";
+        }
+        if (typeof currentProject.parsed_json === "string") {
+            return currentProject.parsed_json;
+        }
+        return JSON.stringify(currentProject.parsed_json, null, 2);
+    };
 
 
     if (status === "error") {
@@ -144,7 +155,21 @@ export default function ProjectUI({ slug }: { slug: string }) {
 
                             <div className="flex self-start flex-col justify-start gap-4 bg-black mb-1 mt-[4vh]">
                                 <div className="bg-[#434343] p-6 w-[90%] sm:w-[80%] rounded-[15px] flex flex-col self-end sm:self-start">
-                                    <h1 className="text-white text-[2vh]">{currentProject?.parsed_json != null ? currentProject?.parsed_json.toString() : `Server responded with ${currentProject?.parsed_json}`}</h1>
+                                    {currentProject?.image_url ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            src={currentProject.image_url}
+                                            alt={currentProject.input_text || "Generated project"}
+                                            className="w-full rounded-xl border border-white/10 bg-black object-contain"
+                                        />
+                                    ) : (
+                                        <p className="text-[#94a3b8] text-sm">
+                                            No generated image is linked to this project yet.
+                                        </p>
+                                    )}
+                                    <pre className="mt-4 whitespace-pre-wrap break-words text-white text-sm leading-6">
+                                        {renderProjectPayload()}
+                                    </pre>
                                 </div>
                             </div>
 
