@@ -4,7 +4,6 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { LayoutTemplate, SearchIcon } from "lucide-react";
 import { useState, useMemo } from "react";
 import Image from "next/image";
-import NavHeader from "@/components/NavHeader";
 import { getTemplates } from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -59,8 +58,7 @@ export default function Templates() {
     }, [templates, search, category]);
 
     return (
-        <div className="min-h-screen bg-[#06080d] text-white pb-20">
-        <NavHeader currentNav="Templates" />
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#06080d] text-white pb-20">
         <div className="text-white flex p-4 flex-col items-center justify-start gap-6 w-full bg-[#06080d] overflow-y-auto custom-scrollbar2">
             <div className="w-full max-w-4xl px-4 gap-4 flex flex-col">
 

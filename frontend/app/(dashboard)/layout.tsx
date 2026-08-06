@@ -1,7 +1,8 @@
 "use client";
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
+import AppShell from "@/components/app-shell/AppShell";
 
 export default function Layout({
   children,
@@ -10,6 +11,7 @@ export default function Layout({
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -29,10 +31,13 @@ export default function Layout({
     return null; // Or a loading spinner while redirecting
   }
 
-  return (
-    <>
-      {children}
-    </>
-  )
+  // The design editor keeps its own full-screen layout (canvas + panels); the
+  // shared app shell wraps every other workspace page (projects, archive, etc.).
+  const isEditor = pathname === "/workspace" || pathname.startsWith("/workspace/id");
+  if (isEditor) {
+    return <>{children}</>;
+  }
+
+  return <AppShell>{children}</AppShell>;
 }
 

@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "react-toastify";
 import { Loader2, Upload, Bell, Globe, Zap, Shield, Key } from "lucide-react";
-import NavHeader from "@/components/NavHeader";
 
 function trialDaysLeft(trialEndDate: string): number {
     try {
@@ -137,8 +136,7 @@ export default function WorkspaceSettingsPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#06080d] text-white pb-20">
-            <NavHeader currentNav="Workspace Settings" />
+        <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#06080d] text-white pb-20">
 
             <div className="max-w-4xl mx-auto px-4 py-12 space-y-8">
                 {/* Profile & Account Card */}
