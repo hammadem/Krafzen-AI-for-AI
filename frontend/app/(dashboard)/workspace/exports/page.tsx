@@ -3,7 +3,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileDown, SearchIcon, RefreshCw, AlertCircle, Download, RotateCcw, Loader2 } from "lucide-react";
 import { useState, useMemo } from "react";
-import NavHeader from "@/components/NavHeader";
 import { getUserExports, retryExport, getFileSignedUrl } from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useAuth } from "@/context/AuthContext";
@@ -143,9 +142,8 @@ export default function Exports() {
     };
 
     return (
-        <div className="min-h-screen bg-[#06080d] text-white pb-20">
-            <NavHeader currentNav="Exports" />
-            <div className="text-white flex p-4 flex-col items-center justify-start gap-6 w-full bg-[#06080d] overflow-y-auto custom-scrollbar2">
+        <div className="flex-1 flex flex-col overflow-y-auto custom-scrollbar">
+            <div className="text-white flex p-6 sm:p-8 flex-col items-center justify-start gap-6 w-full">
                 <div className="w-full max-w-5xl px-4 gap-4 flex flex-col">
 
                     <div>
