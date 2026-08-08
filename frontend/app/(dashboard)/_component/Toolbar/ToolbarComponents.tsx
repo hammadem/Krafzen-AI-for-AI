@@ -1,8 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { classNames } from "@/lib/utils";
-import { ArrowUp, Plus } from "lucide-react";
-import Image from "next/image";
+import { ArrowUp, Mic, Plus } from "lucide-react";
 import { ChangeEvent, useRef, useState } from "react";
 import { InputGroupCustom } from "./ChatInput";
 import FilePreview from "./FilePreview";
@@ -104,20 +103,18 @@ export function InputToolbar({
                                 input === ""
                                     ?
                                     <>
-                                        <span
-                                            className="cursor-pointer"
+                                        <button
+                                            type="button"
+                                            aria-label="Record voice prompt"
+                                            className="flex h-10 w-10 items-center justify-center rounded-full text-black transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50"
+                                            disabled={user === null}
                                             onClick={() => {
                                                 if (user !== null) startRecording();
                                             }}
                                         >
-                                            <Image
-                                                src="/dashboard/dashmicrecord.svg"
-                                                width={45}
-                                                height={45}
-                                                alt="Mic To Record"
-                                            />
-                                        </span>
-                                        <span className="text-sm font-medium bg-white">Speak</span>
+                                            <Mic className="h-5 w-5" />
+                                        </button>
+                                        <span className="text-sm font-medium text-black">Speak</span>
                                     </>
                                     :
                                     <Button
