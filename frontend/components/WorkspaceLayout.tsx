@@ -701,9 +701,9 @@ export default function WorkspaceLayout() {
           ) : canvasViewMode === 'chat' ? (
             <div className="workspace-chat-view-container custom-scrollbar">
               <div className="workspace-chat-view-inner">
-                {displayMessages.map((message) => (
+                {displayMessages.map((message, index) => (
                   <div
-                    key={message.id}
+                    key={`${message.id}-${message.role}-${index}`}
                     className={`workspace-chat-message-row ${message.role === 'user' ? 'user-row' : 'assistant-row'}`}
                   >
                     <Avatar className="w-8 h-8 shrink-0">
@@ -1092,9 +1092,9 @@ export default function WorkspaceLayout() {
                 </div>
 
                 <div ref={threadMessagesRef} className="workspace-thread-messages custom-scrollbar">
-                  {displayMessages.map((msg) => (
+                  {displayMessages.map((msg, index) => (
                     <div 
-                      key={msg.id} 
+                      key={`${msg.id}-${msg.role}-${index}`}
                       className={`workspace-msg ${msg.role === 'user' ? 'user' : 'assistant'} ${selectedMessageId === msg.id ? 'active border-cyan-400 bg-cyan-400/[0.03]' : ''}`}
                       onClick={() => {
                         if (msg.imageUrl) {
@@ -1433,7 +1433,7 @@ export default function WorkspaceLayout() {
                     
                     return (
                       <div 
-                        key={msg.id} 
+                        key={`${msg.id}-${i}`}
                         onClick={() => { setSelectedMessageId(msg.id); setCanvasViewMode('2d'); }}
                         className={`p-2.5 rounded-lg bg-white/5 border transition-all cursor-pointer group ${isActive ? 'border-cyan-400 bg-cyan-400/[0.03]' : 'border-white/5 hover:border-cyan-400/30'}`}
                       >

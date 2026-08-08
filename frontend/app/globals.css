@@ -79,6 +79,31 @@
   --sidebar-accent-foreground: #54e3b5;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: #54e3b5;
+
+  /* ---- CEO reference design tokens (krafzen-product/style-guide.html) ---- */
+  --text-primary: #f0f4f8;
+  --text-secondary: rgba(203, 213, 225, 0.78);
+  --bg-card: rgba(12, 17, 28, 0.7);
+  --bg-card-hover: rgba(18, 25, 42, 0.8);
+  --bg-input: rgba(255, 255, 255, 0.03);
+  --border-default: rgba(255, 255, 255, 0.06);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.6);
+  /* app shell dimensions */
+  --rail-w: 280px;
+  --right-w: 320px;
+  --topbar-h: 56px;
+  /* status badges (project state / export lifecycle) */
+  --status-active-bg: rgba(84, 227, 181, 0.12);   --status-active-border: rgba(84, 227, 181, 0.32);   --status-active-fg: #54e3b5;
+  --status-complete-bg: rgba(111, 168, 255, 0.12); --status-complete-border: rgba(111, 168, 255, 0.32); --status-complete-fg: #6fa8ff;
+  --status-draft-bg: rgba(148, 163, 184, 0.14);    --status-draft-border: rgba(148, 163, 184, 0.28);    --status-draft-fg: #cbd5e1;
+  --status-review-bg: rgba(245, 184, 64, 0.12);    --status-review-border: rgba(245, 184, 64, 0.32);    --status-review-fg: #f5b840;
+  /* code-compliance badges */
+  --code-irc-bg: rgba(84, 227, 181, 0.12);  --code-irc-border: rgba(84, 227, 181, 0.32);  --code-irc-fg: #54e3b5;
+  --code-iecc-bg: rgba(127, 217, 122, 0.12);--code-iecc-border: rgba(127, 217, 122, 0.32);--code-iecc-fg: #7fd97a;
+  --code-ibc-bg: rgba(111, 168, 255, 0.12); --code-ibc-border: rgba(111, 168, 255, 0.32); --code-ibc-fg: #6fa8ff;
+  --code-ada-bg: rgba(200, 156, 255, 0.12); --code-ada-border: rgba(200, 156, 255, 0.32); --code-ada-fg: #c89cff;
+  --code-nfpa-bg: rgba(255, 139, 122, 0.12);--code-nfpa-border: rgba(255, 139, 122, 0.32);--code-nfpa-fg: #ff8b7a;
 }
 
 @layer base {
@@ -106,6 +131,11 @@ button {
 }
 
 /* custom-scrollbar */
+/* Firefox ignores ::-webkit-scrollbar, so set the standard properties too */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #ffffff #111111;
+}
 .custom-scrollbar::-webkit-scrollbar {
   width: 3px;
   /* scrollbar width */
@@ -126,6 +156,10 @@ button {
   background-color: #666;
 }
 
+.custom-scrollbar1 {
+  scrollbar-width: thin;
+  scrollbar-color: gray #ffffff;
+}
 .custom-scrollbar1::-webkit-scrollbar {
   width: 3px;
   /* scrollbar width */
@@ -147,28 +181,19 @@ button {
 }
 
 /* custom-scrollbar */
+/* hidden scrollbar — Firefox equivalent of the 0px webkit width below */
+.custom-scrollbar2 {
+  scrollbar-width: none;
+}
 .custom-scrollbar2::-webkit-scrollbar {
   width: 0px;
   /* scrollbar width */
 }
 
-/* ── Design System: Loading Skeleton ── */
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.04) 25%,
-    rgba(255, 255, 255, 0.10) 50%,
-    rgba(255, 255, 255, 0.04) 75%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s infinite;
-  border-radius: 6px;
-}
-
-@keyframes skeleton-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
+/* ── Design System: Loading Skeleton ──
+   Single source of truth lives below under "Skeleton Loading" (one .skeleton +
+   one @keyframes). A duplicate definition here was dead code and was removed so
+   every skeleton across the app shimmers identically. */
 
 /* ── Design System: Status Badges ── */
 .badge-active   { background: rgba(84,227,181,0.10); color: #54e3b5; }

@@ -19,7 +19,7 @@ describe("Projects components", () => {
         expect(
             screen.getByText(/Manage and organize your AI-generated CAD designs./i)
         ).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(/Filter projects.../i)).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/Search projects.../i)).toBeInTheDocument();
         expect(screen.getByText(/Start a Project/i)).toBeInTheDocument();
     });
 });

@@ -1,5 +1,5 @@
 "use client";
-import { RefreshCw, AlertCircle, FolderKanban, Activity, AlertTriangle } from "lucide-react";
+import { RefreshCw, AlertCircle, FolderKanban, Activity, AlertTriangle, Users } from "lucide-react";
 import { getMyWorkspace, getWorkspaceSummary } from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import MemberManagement from "@/components/members/MemberManagement";
@@ -47,6 +47,7 @@ export default function MembersPage() {
               { label: "Needs attention", value: summary.requires_attention, icon: AlertTriangle },
           ]
         : [];
+    const noWorkspaceYet = wsError && wsErr?.message?.toLowerCase().includes("no workspace");
 
     return (
         <div className="text-white flex p-4 flex-col items-stretch sm:items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
@@ -87,7 +88,22 @@ export default function MembersPage() {
                 )}
 
                 {/* Workspace failed to resolve */}
-                {wsError && !wsLoading && (
+                {wsError && !wsLoading && noWorkspaceYet && (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl">
+                        <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
+                            <Users className="w-7 h-7 text-[#54e3b5]/70" />
+                        </div>
+                        <div className="text-center">
+                            <h3 className="text-white font-semibold">No workspace members yet</h3>
+                            <p className="text-[#94a3b8] text-sm mt-1 max-w-md">
+                                Team workspace setup is not enabled for this account yet. Your project generation
+                                flow can still be tested from the workspace.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {wsError && !wsLoading && !noWorkspaceYet && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
                             <AlertCircle className="w-8 h-8 text-red-400" />
