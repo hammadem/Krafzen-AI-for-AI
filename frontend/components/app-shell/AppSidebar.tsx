@@ -10,7 +10,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
-    FolderKanban, Archive, Activity, FileDown, Users, Bell, CreditCard,
+    FolderKanban, Archive, Activity, FileDown, Users, Bell,
     Upload, ClipboardCheck, Box, Ruler, Settings, Plus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -24,7 +24,9 @@ const MAIN: NavItem[] = [
     { label: "Exports", href: "/workspace/exports", icon: FileDown },
     { label: "Members", href: "/workspace/members", icon: Users },
     { label: "Notifications", href: "/workspace/notifications", icon: Bell },
-    { label: "Billing", href: "/workspace/billings", icon: CreditCard },
+    // Billing hidden until the Stripe integration ships (CEO request, 2026-08) — the page
+    // isn't functional yet (billing history / payment methods / upgrade flow). To restore:
+    // re-add the `CreditCard` import and { label: "Billing", href: "/workspace/billings", icon: CreditCard }.
 ];
 
 // Upcoming CAD/BIM track — visible but disabled until backend contracts exist.
