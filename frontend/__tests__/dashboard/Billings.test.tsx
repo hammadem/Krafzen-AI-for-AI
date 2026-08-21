@@ -3,15 +3,14 @@ import { screen } from "@testing-library/react"
 import { renderWithAuth } from "../test-utils";
 
 describe("Billings components", () => {
-    it("renders the Billing section", () => {
+    // Billing is hidden until the Stripe integration ships (CEO request, 2026-08) — the route
+    // now renders a "coming soon" placeholder instead of the non-functional full page.
+    it("renders the Billing coming-soon placeholder", () => {
         renderWithAuth(<Billings />);
 
-        expect(screen.getAllByText(/Billing/i)[0]).toBeInTheDocument();
-        expect(screen.getAllByText(/Current Plan/i)[0]).toBeInTheDocument();
-
-        expect(screen.getAllByText(/Billing History/i)[0]).toBeInTheDocument();
-        expect(screen.getByText(/Download all/i)).toBeInTheDocument();
-
-        expect(screen.getAllByText(/Payment Methods/i)[0]).toBeInTheDocument();
+        expect(screen.getByText(/Billing is coming soon/i)).toBeInTheDocument();
+        expect(
+            screen.getByText(/payment methods will be available here shortly/i)
+        ).toBeInTheDocument();
     })
 })

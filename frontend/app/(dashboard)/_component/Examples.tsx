@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { DashRoutes } from "@/context/DashboardContext";
 import { PricingPlans } from "@/lib/data";
 import { classNames } from "@/lib/utils";
-import { Activity, Archive, CreditCardIcon, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings, Users } from "lucide-react";
+import { Activity, Archive, Download, DownloadCloud, ExpandIcon, FileText, Folder, FolderIcon, FolderPlus, HomeIcon, Lightbulb, LucideLayoutTemplate, RefreshCcw, RotateCw, Settings, Users } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChangeEvent } from "react";
@@ -60,11 +60,7 @@ export function NavLinks({ setCurrentRoute }: { setCurrentRoute: (value: Partial
                 className="flex gap-4 items-center cursor-pointer" >
                 <ExpandIcon />Exports
             </Link>
-            <Link
-                onClick={() => setCurrentRoute({ billing: "billing" })}
-                aria-label="Link to Billing"
-                href="/workspace/billings"
-                className="flex gap-4 items-center cursor-pointer" ><CreditCardIcon />Billing</Link>
+            {/* Billing link hidden until Stripe billing ships (CEO request, 2026-08) */}
             <Link
                 onClick={() => setCurrentRoute({ settings: "settings" })}
                 aria-label="Link to Settings"

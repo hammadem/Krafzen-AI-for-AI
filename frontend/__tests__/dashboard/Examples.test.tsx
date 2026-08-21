@@ -25,7 +25,7 @@ describe("Example components", () => {
         expect(screen.getByRole("link", { name: /Projects/i })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /Templates/i })).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /Exports/i })).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: /Billing/i })).toBeInTheDocument();
+        // Billing link removed — hidden until Stripe billing ships (CEO request, 2026-08)
         expect(screen.getByRole("link", { name: /Settings/i })).toBeInTheDocument();
 
     });
