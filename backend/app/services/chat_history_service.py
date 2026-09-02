@@ -83,21 +83,83 @@ class ChatHistoryService:
             logger.error(f"Error fetching sessions: {e}")
             return []
 
-    async def get_session_messages(self, session_id: str) -> List[Dict[str, Any]]:
-        """Retrieves all messages for a specific session, with feedback attached."""
+    async def get_session_messages(
+        self,
+        session_id: str,
+        limit: Optional[int] = 30,
+        before: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Retrieves paginated messages for a specific session ordered chronologically,
+        with feedback attached and diagnostic timing metrics.
+        """
+        import time
+        t_start = time.perf_counter()
+        metrics = {}
+
         try:
-            response = db.table("chat_messages").select("*").eq("session_id", session_id).order("created_at").execute()
-            messages = response.data or []
-            if not messages:
-                return []
-            message_ids = [m["id"] for m in messages]
-            feedback_map = await self._get_feedback_for_message_ids(message_ids)
-            for m in messages:
-                m["feedback"] = feedback_map.get(m["id"])
-            return messages
+            t_query_start = time.perf_counter()
+            query = db.table("chat_messages").select("*").eq("session_id", session_id)
+
+            if before:
+                cursor_timestamp = before
+                # If before is a UUID message ID, retrieve its created_at timestamp
+                if len(before) == 36 and "-" in before:
+                    cursor_row = db.table("chat_messages").select("created_at").eq("id", before).limit(1).execute()
+                    if cursor_row.data:
+                        cursor_timestamp = cursor_row.data[0]["created_at"]
+                query = query.lt("created_at", cursor_timestamp)
+
+            # Order DESC to get the newest messages up to (limit + 1)
+            query = query.order("created_at", desc=True)
+
+            fetch_limit = (limit + 1) if (limit is not None and limit > 0) else 10000
+            query = query.limit(fetch_limit)
+
+            response = query.execute()
+            raw_messages = response.data or []
+
+            t_query_end = time.perf_counter()
+            metrics["db_query_ms"] = round((t_query_end - t_query_start) * 1000, 2)
+
+            has_more = False
+            if limit is not None and limit > 0 and len(raw_messages) > limit:
+                has_more = True
+                raw_messages = raw_messages[:limit]
+
+            # Reverse to chronological order (oldest first in chunk)
+            messages = list(reversed(raw_messages))
+
+            next_cursor = messages[0]["id"] if (has_more and messages) else None
+
+            # Attach message feedback
+            t_fb_start = time.perf_counter()
+            if messages:
+                message_ids = [m["id"] for m in messages]
+                feedback_map = await self._get_feedback_for_message_ids(message_ids)
+                for m in messages:
+                    m["feedback"] = feedback_map.get(m["id"])
+            t_fb_end = time.perf_counter()
+            metrics["feedback_query_ms"] = round((t_fb_end - t_fb_start) * 1000, 2)
+
+            t_total_end = time.perf_counter()
+            metrics["total_ms"] = round((t_total_end - t_start) * 1000, 2)
+
+            return {
+                "messages": messages,
+                "has_more": has_more,
+                "next_cursor": next_cursor,
+                "metrics": metrics,
+            }
         except Exception as e:
-            logger.error(f"Error fetching messages: {e}")
-            return []
+            logger.error(f"Error fetching messages: {e}", exc_info=True)
+            return {
+                "messages": [],
+                "has_more": False,
+                "next_cursor": None,
+                "metrics": {"error": str(e)},
+            }
+
 
     async def _get_feedback_for_message_ids(self, message_ids: List[str]) -> Dict[str, Dict[str, Any]]:
         """Returns a map of message_id -> { reaction, reason } for the given message IDs."""

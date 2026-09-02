@@ -29,6 +29,8 @@ interface ChatContextType {
     currentSessionId: string | null;
     isLoading: boolean;
     isLoadingMessages: boolean;
+    hasMoreMessages: boolean;
+    loadMoreMessages: () => Promise<void>;
     inputValue: string;
     setInputValue: (val: string) => void;
     setCurrentSessionId: (id: string | null) => void;
@@ -144,10 +146,10 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                     if (mostRecentSessionId) {
                         setIsLoadingMessages(true);
                         try {
-                            const msgs = await import("@/lib/api/chat").then(mod => mod.fetchSessionMessages(mostRecentSessionId, user.access_token!));
+                            const res = await import("@/lib/api/chat").then(mod => mod.fetchSessionMessages(mostRecentSessionId, user.access_token!, 30));
 
                             // Convert API messages to Store messages (include feedback)
-                            const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string }; compliance?: CompliancePayload | null }) => ({
+                            const storeMessages = res.messages.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string }; compliance?: CompliancePayload | null }) => ({
                                 id: m.id,
                                 role: m.role as 'user' | 'assistant' | 'system',
                                 content: m.content || "",
@@ -157,7 +159,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                                 compliance: m.compliance ?? undefined,
                             }));
 
-                            useChatStore.getState().appendMessages(mostRecentSessionId, storeMessages);
+                            useChatStore.getState().setSessionMessages(mostRecentSessionId, storeMessages, res.has_more, res.next_cursor);
                             useChatStore.getState().switchSession(mostRecentSessionId);
                         } catch (err) {
                             console.error("Failed to load initial session messages:", err);
@@ -219,7 +221,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
     const handleSwitchSession = async (id: string | null) => {
         if (!id) return;
         
-        // Switch to the session immediately
+        // Switch to the session immediately (Instant cache display)
         switchSession(id);
         
         // Load messages if not already loaded
@@ -227,10 +229,10 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
         if (session && session.messages.length === 0 && user?.access_token) {
             setIsLoadingMessages(true);
             try {
-                const msgs = await fetchSessionMessages(id, user.access_token);
+                const res = await fetchSessionMessages(id, user.access_token, 30);
                 
                 // Convert API messages to Store messages (include feedback)
-                const storeMessages = msgs.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string }; compliance?: CompliancePayload | null }) => ({
+                const storeMessages = res.messages.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string }; compliance?: CompliancePayload | null }) => ({
                     id: m.id,
                     role: m.role as 'user' | 'assistant' | 'system',
                     content: m.content || "",
@@ -240,15 +242,37 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                     compliance: m.compliance ?? undefined,
                 }));
                 
-                useChatStore.getState().appendMessages(id, storeMessages);
+                useChatStore.getState().setSessionMessages(id, storeMessages, res.has_more, res.next_cursor);
             } catch (err) {
                 console.error("Failed to load session messages:", err);
             } finally {
                 setIsLoadingMessages(false);
             }
         } else {
-            // If messages are already loaded, ensure loading state is false
+            // If messages are already cached in store, render instantly without blocking spinner
             setIsLoadingMessages(false);
+        }
+    };
+
+    const loadMoreMessages = async () => {
+        if (!activeSessionId || !activeSession?.hasMore || !user?.access_token) return;
+        const cursor = activeSession.nextCursor || activeSession.messages[0]?.id;
+        if (!cursor) return;
+
+        try {
+            const res = await fetchSessionMessages(activeSessionId, user.access_token, 30, cursor);
+            const storeMessages = res.messages.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string }; compliance?: CompliancePayload | null }) => ({
+                id: m.id,
+                role: m.role as 'user' | 'assistant' | 'system',
+                content: m.content || "",
+                imageUrl: m.image_url,
+                timestamp: new Date(m.created_at).getTime(),
+                feedback: m.feedback,
+                compliance: m.compliance ?? undefined,
+            }));
+            useChatStore.getState().prependMessages(activeSessionId, storeMessages, res.has_more, res.next_cursor);
+        } catch (err) {
+            console.error("Failed to load older messages:", err);
         }
     };
 
@@ -402,6 +426,8 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 currentSessionId: activeSessionId,
                 isLoading: isGenerating, // Now correctly scoped to active session
                 isLoadingMessages,
+                hasMoreMessages: activeSession?.hasMore ?? false,
+                loadMoreMessages,
                 inputValue,
                 setInputValue,
                 setCurrentSessionId: handleSwitchSession,

@@ -131,11 +131,30 @@ export interface SessionMessageFromApi {
     compliance?: CompliancePayload | null;
 }
 
-export async function fetchSessionMessages(sessionId: string, token: string): Promise<SessionMessageFromApi[]> {
+export interface PaginatedSessionMessages {
+    messages: SessionMessageFromApi[];
+    has_more: boolean;
+    next_cursor?: string | null;
+}
+
+export async function fetchSessionMessages(
+    sessionId: string,
+    token: string,
+    limit: number = 30,
+    before?: string
+): Promise<PaginatedSessionMessages> {
     const headers = { 'Authorization': `Bearer ${token}` };
-    const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/history/${sessionId}`, { headers });
+    let url = `${getApiBaseUrl()}/api/v1/chat/history/${sessionId}?limit=${limit}`;
+    if (before) {
+        url += `&before=${encodeURIComponent(before)}`;
+    }
+    const res = await fetch(url, { headers });
     if (!res.ok) throw new Error("Failed to fetch messages");
-    return res.json();
+    const data = await res.json();
+    if (Array.isArray(data)) {
+        return { messages: data, has_more: false, next_cursor: null };
+    }
+    return data;
 }
 
 export async function submitMessageFeedback(

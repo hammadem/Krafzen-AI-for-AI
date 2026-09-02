@@ -27,6 +27,8 @@ export interface ChatSession {
     lastActive: number
     isBackground: boolean // Logic to handle background socket/RTC connections
     isGenerating?: boolean // Per-session loading state
+    hasMore?: boolean // Cursor pagination: whether older messages exist
+    nextCursor?: string | null // Cursor message ID or timestamp for loading older messages
 }
 
 interface ChatState {
@@ -44,9 +46,11 @@ interface ChatState {
     // Cleanup
     clearAllSessions: () => void
 
-    // Persist Hydration
+    // Persist Hydration & Pagination
     setSessions: (sessions: Record<string, ChatSession>) => void
     appendMessages: (sessionId: string, messages: Message[]) => void
+    setSessionMessages: (sessionId: string, messages: Message[], hasMore?: boolean, nextCursor?: string | null) => void
+    prependMessages: (sessionId: string, messages: Message[], hasMore?: boolean, nextCursor?: string | null) => void
     setMessageFeedback: (sessionId: string, messageId: string, feedback: MessageFeedback) => void
 }
 
@@ -165,6 +169,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     [sessionId]: {
                         ...session,
                         messages: [...session.messages, ...messages]
+                    }
+                }
+            }
+        })
+    },
+
+    setSessionMessages: (sessionId, messages, hasMore = false, nextCursor = null) => {
+        set((state) => {
+            const session = state.sessions[sessionId];
+            if (!session) return state;
+            return {
+                sessions: {
+                    ...state.sessions,
+                    [sessionId]: {
+                        ...session,
+                        messages,
+                        hasMore,
+                        nextCursor
+                    }
+                }
+            }
+        })
+    },
+
+    prependMessages: (sessionId, messages, hasMore = false, nextCursor = null) => {
+        set((state) => {
+            const session = state.sessions[sessionId];
+            if (!session) return state;
+            // Avoid duplicate message insertion if any
+            const existingIds = new Set(session.messages.map((m) => m.id));
+            const uniqueNewMessages = messages.filter((m) => !existingIds.has(m.id));
+            return {
+                sessions: {
+                    ...state.sessions,
+                    [sessionId]: {
+                        ...session,
+                        messages: [...uniqueNewMessages, ...session.messages],
+                        hasMore,
+                        nextCursor
                     }
                 }
             }
