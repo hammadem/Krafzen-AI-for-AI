@@ -148,7 +148,7 @@ export const PricingPlans: PricingPlans = {
     {
       type: "Starter",
       price: "$149",
-      stripeLink: "https://buy.stripe.com/9B6cN53rB8FTgPL3HY4wM09",
+      stripeLink: "https://buy.stripe.com/00w5kD1iCfwy86Z4QWabK00",
       features: [
         "Includes 50 drawings per month",
         "15 free workspace requests when you sign up (no card)",
@@ -163,7 +163,7 @@ export const PricingPlans: PricingPlans = {
     {
       type: "Professional",
       price: "$499",
-      stripeLink: "https://buy.stripe.com/3cIeVdbY76xL6b7diy4wM0a",
+      stripeLink: "https://buy.stripe.com/00w9AT8L40BEdrj2IOabK02",
       features: [
         "Includes 300 drawings per month",
         "15 free workspace requests when you sign up (no card)",
@@ -178,7 +178,7 @@ export const PricingPlans: PricingPlans = {
     {
       type: "Enterprise",
       price: "$1,499",
-      stripeLink: "https://buy.stripe.com/bJebJ13rBf4heHDceu4wM0b",
+      stripeLink: "https://buy.stripe.com/00waEXaTcgACcnfabgabK01",
       features: [
         "Includes 2,000 drawings per month",
         "15 free workspace requests when you sign up (no card)",

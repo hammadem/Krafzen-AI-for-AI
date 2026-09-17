@@ -1,12 +1,9 @@
 "use client";
 import React, { useState } from 'react';
-import { Check, Shield, Zap, Globe, MessageSquare, Layers, Loader2 } from 'lucide-react';
+import { Check, Shield, Zap, Globe, MessageSquare, Layers } from 'lucide-react';
 import CalendlyBooking from '@/components/CalendlyBooking';
-import StripePaymentModal from '@/components/StripePaymentModal';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { createCheckoutSession } from '@/lib/api/payment';
-import { toast } from 'react-toastify';
 
 interface PricingPlan {
     id: string;
@@ -44,7 +41,7 @@ const pricingPlans: PricingPlan[] = [
         cta: "Get Started",
         featured: false,
         links: {
-            monthly: "https://buy.stripe.com/9B6cN53rB8FTgPL3HY4wM09",
+            monthly: "https://buy.stripe.com/00w5kD1iCfwy86Z4QWabK00",
             annual: "https://buy.stripe.com/cNi7sL8LV7BP8jfemC4wM0c"
         }
     },
@@ -68,7 +65,7 @@ const pricingPlans: PricingPlan[] = [
         featured: true,
         popular: true,
         links: {
-            monthly: "https://buy.stripe.com/3cIeVdbY76xL6b7diy4wM0a",
+            monthly: "https://buy.stripe.com/00w9AT8L40BEdrj2IOabK02",
             annual: "https://buy.stripe.com/00w3cvbY77BP42ZemC4wM0d"
         }
     },
@@ -92,7 +89,7 @@ const pricingPlans: PricingPlan[] = [
         cta: "Get Started",
         featured: false,
         links: {
-            monthly: "https://buy.stripe.com/bJebJ13rBf4heHDceu4wM0b",
+            monthly: "https://buy.stripe.com/00waEXaTcgACcnfabgabK01",
             annual: "https://buy.stripe.com/00w3cvd2b9JX6b7diy4wM0e"
         }
     },
@@ -123,15 +120,6 @@ export default function PricingPage() {
     const router = useRouter();
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
     const [isCalendlyOpen, setIsCalendlyOpen] = useState(false);
-    const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-    const [paymentModal, setPaymentModal] = useState<{
-        open: boolean;
-        planName: string;
-        planDisplayName: string;
-        amount: string;
-        billingCycle: 'monthly' | 'annual';
-        colorTheme: string;
-    } | null>(null);
 
     const handlePlanAction = (plan: PricingPlan) => {
         if (plan.id === 'enterprise_plus') {
@@ -144,20 +132,8 @@ export default function PricingPage() {
             return;
         }
 
-        let theme = "green";
-        if (plan.id === "professional") theme = "blue";
-        if (plan.id === "enterprise") theme = "yellow";
-
-        const amount = billingCycle === 'monthly' ? plan.monthlyPrice : plan.annualPrice;
-
-        setPaymentModal({
-            open: true,
-            planName: plan.id,
-            planDisplayName: plan.name,
-            amount: amount,
-            billingCycle: billingCycle,
-            colorTheme: theme
-        });
+        const paymentLink = plan.links?.[billingCycle];
+        if (paymentLink) window.open(paymentLink, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -229,15 +205,12 @@ export default function PricingPage() {
 
                             <button
                                 onClick={() => handlePlanAction(plan)}
-                                disabled={loadingPlan !== null}
                                 className={`w-full py-3 rounded-xl font-bold text-sm transition-all mb-8 flex items-center justify-center gap-2 ${plan.featured
                                         ? 'bg-gradient-to-r from-[#54e3b5] to-[#3fc89c] text-zinc-950 hover:shadow-[0_0_30px_rgba(84,227,181,0.4)]'
                                         : 'bg-white/10 text-white hover:bg-white/20'
-                                    } disabled:opacity-50`}
+                                    }`}
                             >
-                                {loadingPlan === plan.id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : plan.cta}
+                                {plan.cta}
                             </button>
 
                             <ul className="space-y-4 text-left">
@@ -272,13 +245,6 @@ export default function PricingPage() {
                 onClose={() => setIsCalendlyOpen(false)}
             />
 
-            {paymentModal && (
-                <StripePaymentModal
-                    isOpen={paymentModal.open}
-                    onClose={() => setPaymentModal(null)}
-                    {...paymentModal}
-                />
-            )}
         </div>
     );
 }

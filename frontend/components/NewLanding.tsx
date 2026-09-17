@@ -5,7 +5,6 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import CalendlyBooking from './CalendlyBooking';
-import StripePaymentModal from './StripePaymentModal';
 import { 
   ChevronRight, Mic, ShieldCheck, Zap, Layers, Globe, Mail, Linkedin, Twitter, 
   Calendar, ArrowRight, ChevronDown, Check, Box, Eye, FileText, Smartphone, 
@@ -21,14 +20,6 @@ export default function NewLanding() {
   const [showCalendly, setShowCalendly] = useState(false);
   const [monthly, setMonthly] = useState(true);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [paymentModal, setPaymentModal] = useState<{
-    open: boolean;
-    planName: string;
-    planDisplayName: string;
-    amount: string;
-    billingCycle: "monthly" | "annual";
-    colorTheme: string;
-  } | null>(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 40);
@@ -67,20 +58,20 @@ export default function NewLanding() {
 
   const stripeLinks: Record<string, { monthly: string; annual: string }> = {
     starter: {
-      monthly: "https://buy.stripe.com/9B6cN53rB8FTgPL3HY4wM09",
+      monthly: "https://buy.stripe.com/00w5kD1iCfwy86Z4QWabK00",
       annual: "https://buy.stripe.com/cNi7sL8LV7BP8jfemC4wM0c"
     },
     professional: {
-      monthly: "https://buy.stripe.com/3cIeVdbY76xL6b7diy4wM0a",
+      monthly: "https://buy.stripe.com/00w9AT8L40BEdrj2IOabK02",
       annual: "https://buy.stripe.com/00w3cvbY77BP42ZemC4wM0d"
     },
     enterprise: {
-      monthly: "https://buy.stripe.com/bJebJ13rBf4heHDceu4wM0b",
+      monthly: "https://buy.stripe.com/00waEXaTcgACcnfabgabK01",
       annual: "https://buy.stripe.com/00w3cvd2b9JX6b7diy4wM0e"
     }
   };
 
-  const handlePlanSelect = (plan: string, amount: string, theme: string) => {
+  const handlePlanSelect = (plan: string) => {
     if (plan === 'enterprise_plus') {
       setShowCalendly(true);
       return;
@@ -91,14 +82,8 @@ export default function NewLanding() {
       return;
     }
     
-    setPaymentModal({
-      open: true,
-      planName: plan,
-      planDisplayName: plan.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      amount: amount,
-      billingCycle: monthly ? "monthly" : "annual",
-      colorTheme: theme
-    });
+    const paymentLink = stripeLinks[plan]?.[monthly ? "monthly" : "annual"];
+    if (paymentLink) window.open(paymentLink, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -312,7 +297,7 @@ export default function NewLanding() {
                   ))}
                 </ul>
                 <button 
-                  onClick={() => handlePlanSelect('starter', monthly ? '$149' : '$1490', 'green')}
+                  onClick={() => handlePlanSelect('starter')}
                   className="w-full py-3 bg-white/5 text-white border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 transition-all"
                 >
                   Get Started
@@ -337,7 +322,7 @@ export default function NewLanding() {
                   ))}
                 </ul>
                 <button 
-                  onClick={() => handlePlanSelect('professional', monthly ? '$499' : '$4990', 'blue')}
+                  onClick={() => handlePlanSelect('professional')}
                   className="w-full py-3 bg-[#54e3b5] text-[#06080d] rounded-xl text-xs font-bold hover:shadow-[0_0_30px_rgba(84,227,181,0.3)] transition-all"
                 >
                   Get Started
@@ -361,7 +346,7 @@ export default function NewLanding() {
                   ))}
                 </ul>
                 <button 
-                  onClick={() => handlePlanSelect('enterprise', monthly ? '$1,499' : '$14,990', 'yellow')}
+                  onClick={() => handlePlanSelect('enterprise')}
                   className="w-full py-3 bg-white/5 text-white border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 transition-all"
                 >
                   Get Started
@@ -444,7 +429,6 @@ export default function NewLanding() {
 
       {/* Modals */}
       <CalendlyBooking isOpen={showCalendly} onClose={() => setShowCalendly(false)} calendlyUrl="https://calendly.com/khadija-krafzen/10mins" />
-      {paymentModal && <StripePaymentModal isOpen={paymentModal.open} onClose={() => setPaymentModal(null)} {...paymentModal} />}
     </div>
   );
 }
