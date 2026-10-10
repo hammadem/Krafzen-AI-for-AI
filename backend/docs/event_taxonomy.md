@@ -7,6 +7,57 @@ All events emitted by worker_service.py and activity_service.py.
 
 ---
 
+## Audit event contract
+
+`activity_events` is the append-only audit store. Its canonical fields are:
+`event_id`, `organization_id`, `actor_user_id`, `action`, `entity_type`,
+`entity_id`, `project_id`, `timestamp`, and `metadata`. `organization_id`
+references a workspace; `entity_id` is intentionally polymorphic so event
+records survive deletion of the referenced entity. `timestamp` is stored as
+UTC `timestamptz`.
+
+The table retains `id`, `event_name`, `job_id`, and `created_at` as compatibility
+columns. The shared activity service writes both shapes, and API responses
+include both canonical audit fields and legacy activity-feed aliases.
+`export.*` events use `entity_type="export_job"` and the existing
+`export_jobs.id` as `entity_id`.
+
+Audit rows cannot be directly updated, deleted, or truncated. Foreign-key
+cleanup may null relationship columns when a referenced workspace, project,
+user, or export job is deleted; the audit event, action, timestamp, and generic
+entity reference remain. Normal application users have read-only access;
+inserts are performed by the backend service role. Historical events are not
+assigned to a workspace automatically because projects do not currently have
+a workspace relationship; those events remain available in project activity.
+
+### Standard action names
+
+| Entity | Actions |
+|---------|---------|
+| `file` | `file.uploaded`, `file.updated`, `file.renamed`, `file.version_created`, `file.exported`, `file.archived`, `file.restored`, `file.deleted` |
+| `ai_review` | `ai.review_started`, `ai.review_completed`, `ai.review_failed` |
+| `ai_generation` | `ai.generation_started`, `ai.generation_completed`, `ai.generation_failed` |
+| `ai_suggestion` | `ai.suggestion_accepted`, `ai.suggestion_rejected` |
+| `revision` | `revision.created`, `revision.approved`, `revision.rejected`, `revision.restored` |
+| `member` | `member.invited`, `member.joined`, `member.removed`, `member.role_changed` |
+| `permission` | `permission.changed` |
+
+Use `file.renamed` only when its display name changes; use `file.updated` for
+other file metadata changes. `file.exported` records inclusion of a file in an
+export. Emit `file.deleted` in the same transaction as a hard deletion (before
+removing the file row), or after the soft-delete state change commits. The
+event's generic entity reference is not a file foreign key, so deletion will
+not cascade to its audit history. Export-job lifecycle actions (`export.queued`, `export.processing`,
+`export.validating`, `export.completed`, `export.failed`, and
+`export.requires_review`) remain supported for compatibility with the current
+worker.
+
+Action values are text rather than a database enum so new actions can be added
+without a schema migration. Event names describe completed actions or state
+changes, not commands that have yet to run.
+
+---
+
 ## Namespaces
 
 | Namespace       | Owner   | Description                              |

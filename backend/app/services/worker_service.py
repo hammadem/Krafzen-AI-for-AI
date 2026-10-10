@@ -119,8 +119,9 @@ async def _run_export_pipeline(job: Dict[str, Any]) -> None:
 async def emit_export_event(event_name: str, job_id: str, project_id: str, actor_user_id: Optional[str] = None, message: Optional[str] = None,) -> None:
     logger.info("[worker] Emitting event", event_name=event_name, job_id=job_id, project_id=project_id)
     await _record_activity_event(
-        event_name=event_name,
-        job_id=job_id,
+        action=event_name,
+        entity_type="export_job",
+        entity_id=job_id,
         project_id=project_id,
         actor_user_id=actor_user_id,
         message=message,
