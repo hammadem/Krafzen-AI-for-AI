@@ -1,14 +1,17 @@
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone  
-from fastapi.concurrency import run_in_threadpool
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
 from fastapi import HTTPException
+from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
-from app.utils.logger import logger
 from app.models.project_model import ProjectCreate, ProjectUpdate
-import uuid  
+from app.utils.logger import logger
+
 
 # CREATE PROJECT
-async def create_project(project_data: ProjectCreate, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def create_project(project_data: ProjectCreate, user: dict[str, Any]) -> dict[str, Any] | None:
     if not user or "user_id" not in user:
         logger.warning("[create_project] Invalid user context")
         return None
@@ -18,7 +21,7 @@ async def create_project(project_data: ProjectCreate, user: Dict[str, Any]) -> O
             "user_id": user["user_id"],
             "input_text": project_data.input_text,
             "parsed_json": None,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         response = await run_in_threadpool(
@@ -39,7 +42,7 @@ async def create_project(project_data: ProjectCreate, user: Dict[str, Any]) -> O
         return None  
 
 # GET ALL PROJECTS FOR THE LOGGED-IN USER
-async def get_projects(user: Dict[str, Any], page: int = 1, limit: int = 10, status: Optional[str] = None) -> List[Dict[str, Any]]:  
+async def get_projects(user: dict[str, Any], page: int = 1, limit: int = 10, status: str | None = None) -> list[dict[str, Any]]:  
     if not user or "user_id" not in user:
         logger.warning("[get_projects] Invalid user context")
         return []
@@ -64,7 +67,7 @@ async def get_projects(user: Dict[str, Any], page: int = 1, limit: int = 10, sta
         return []
 
 # GET SINGLE PROJECT
-async def get_project(project_id: str, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def get_project(project_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
     if not user or "user_id" not in user:
         logger.warning("[get_project] Invalid user context")
         return None
@@ -104,7 +107,7 @@ async def get_project(project_id: str, user: Dict[str, Any]) -> Optional[Dict[st
         return None
 
 # UPDATE PROJECT
-async def update_project(project_id: str, update_data: ProjectUpdate, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:  
+async def update_project(project_id: str, update_data: ProjectUpdate, user: dict[str, Any]) -> dict[str, Any] | None:  
     if not user or "user_id" not in user:
         logger.warning("[update_project] Invalid user context")
         return None
@@ -124,7 +127,7 @@ async def update_project(project_id: str, update_data: ProjectUpdate, user: Dict
             return None
 
         payload = update_data.model_dump(exclude_unset=True)
-        payload["updated_at"] = datetime.now(timezone.utc).isoformat()  #Timezone
+        payload["updated_at"] = datetime.now(UTC).isoformat()  #Timezone
 
         if not payload:  #Guard for empty updates
             logger.warning("[update_project] No fields to update", project_id=project_id)
@@ -148,7 +151,7 @@ async def update_project(project_id: str, update_data: ProjectUpdate, user: Dict
         return None
 
 # DELETE PROJECT
-async def delete_project(project_id: str, user: Dict[str, Any]) -> bool:  
+async def delete_project(project_id: str, user: dict[str, Any]) -> bool:  
     #User guard
     if not user or "user_id" not in user:
         logger.warning("[delete_project] Invalid user context")

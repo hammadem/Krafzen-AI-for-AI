@@ -1,16 +1,16 @@
+
 from fastapi import APIRouter, Depends
-from typing import List
-from app.middlewares.auth import require_auth
-from app.models.export_model import ExportCreate, ExportStatusUpdate, ExportResponse
-from app.db.queries.file_queries import get_signed_url
+
 from app.db.queries.export_queries import (
     create_export,
     get_export,
+    get_export_artifact,
     get_project_exports,
     update_export_status,
-    get_export_artifact,
-    
 )
+from app.db.queries.file_queries import get_signed_url
+from app.middlewares.auth import require_auth
+from app.models.export_model import ExportCreate, ExportResponse, ExportStatusUpdate
 
 router = APIRouter(prefix="/exports", tags=["Exports"])
 
@@ -64,7 +64,7 @@ async def get_export_artifact_route(
 
 
 # LIST EXPORTS FOR PROJECT
-@router.get("/project/{project_id}", response_model=List[ExportResponse])
+@router.get("/project/{project_id}", response_model=list[ExportResponse])
 async def list_project_exports_route(
     project_id: str,
     user=Depends(require_auth)

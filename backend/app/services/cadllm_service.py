@@ -5,12 +5,8 @@ This service uses the Hugging Face Inference API to call a fine-tuned model
 that enhances basic architectural descriptions into detailed prompts for image generation.
 """
 
-import os
 import logging
-import tempfile
-from typing import Optional, Tuple
-from pathlib import Path
-import io
+import os
 import time
 
 try:
@@ -30,7 +26,6 @@ except ImportError:
 HF_AVAILABLE = HF_HUB_AVAILABLE or REQUESTS_AVAILABLE
 
 from app.core.config import settings
-
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +68,7 @@ class CADLLMService:
             if self.sdk_type == "gradio":
                 if not base_url.endswith("/api/predict"):
                      # Remove /generate if user accidentally left it from docker config
-                     if base_url.endswith("/generate"):
-                         base_url = base_url[:-9]
+                     base_url = base_url.removesuffix("/generate")
                      self._endpoint_url = f"{base_url}/api/predict"
                 else:
                     self._endpoint_url = base_url

@@ -1,6 +1,7 @@
-from typing import List, Dict, Any, Optional
-from app.db.supabase_client import db
 import logging
+from typing import Any
+
+from app.db.supabase_client import db
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,9 @@ class ChatHistoryService:
         session_id: str,
         user_id: str,
         input_text: str,
-        image_url: Optional[str] = None,
-        parsed_json: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
+        image_url: str | None = None,
+        parsed_json: dict[str, Any] | None = None,
+    ) -> str | None:
         """
         On first successful generate, create a projects row for this session and link it.
         If the session already has a project_id, reuse it (idempotent — no duplicates on repeat generates).
@@ -41,7 +42,7 @@ class ChatHistoryService:
             existing = db.table("chat_sessions").select("project_id").eq("id", session_id).limit(1).execute()
             if existing.data and existing.data[0].get("project_id"):
                 project_id = existing.data[0]["project_id"]
-                update_payload: Dict[str, Any] = {}
+                update_payload: dict[str, Any] = {}
                 if image_url:
                     update_payload["image_url"] = image_url
                 if parsed_json is not None:
@@ -73,7 +74,7 @@ class ChatHistoryService:
             logger.error(f"[ensure_project_for_session] failed: {e}", exc_info=True)
             return None
 
-    async def get_user_sessions(self, user_id: str) -> List[Dict[str, Any]]:
+    async def get_user_sessions(self, user_id: str) -> list[dict[str, Any]]:
         """Retrieves all chat sessions for a user, ordered by recent update."""
         try:
             # Order by updated_at descending
@@ -83,7 +84,7 @@ class ChatHistoryService:
             logger.error(f"Error fetching sessions: {e}")
             return []
 
-    async def get_session_messages(self, session_id: str) -> List[Dict[str, Any]]:
+    async def get_session_messages(self, session_id: str) -> list[dict[str, Any]]:
         """Retrieves all messages for a specific session, with feedback attached."""
         try:
             response = db.table("chat_messages").select("*").eq("session_id", session_id).order("created_at").execute()
@@ -99,7 +100,7 @@ class ChatHistoryService:
             logger.error(f"Error fetching messages: {e}")
             return []
 
-    async def _get_feedback_for_message_ids(self, message_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    async def _get_feedback_for_message_ids(self, message_ids: list[str]) -> dict[str, dict[str, Any]]:
         """Returns a map of message_id -> { reaction, reason } for the given message IDs."""
         if not message_ids:
             return {}
@@ -123,7 +124,7 @@ class ChatHistoryService:
             logger.error(f"Error checking message ownership: {e}")
             return False
 
-    async def upsert_feedback(self, message_id: str, user_id: str, reaction: str, reason: Optional[str] = None) -> bool:
+    async def upsert_feedback(self, message_id: str, user_id: str, reaction: str, reason: str | None = None) -> bool:
         """Set or update feedback for a message. Returns True on success."""
         if reaction not in ("up", "down"):
             return False
@@ -144,9 +145,9 @@ class ChatHistoryService:
         session_id: str,
         role: str,
         content: str,
-        image_url: Optional[str] = None,
-        compliance: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        image_url: str | None = None,
+        compliance: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Adds a message to a session. Optional ``compliance`` stores IRC screening JSON on assistant rows."""
         try:
             data = {

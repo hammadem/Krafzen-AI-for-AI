@@ -2,13 +2,15 @@
 Health check endpoints
 """
 
+import time
+from datetime import datetime
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from datetime import datetime
-import time
-from app.services.supabase_service import supabase_service
+
 from app.core.config import settings
 from app.db.supabase_client import db
+from app.services.supabase_service import supabase_service
 
 router = APIRouter()
 
@@ -69,8 +71,8 @@ async def detailed_health_check():
 @router.get("/dwg")
 async def dwg_health_check():
     """Verify that the production ODA bundle includes a usable Qt platform plugin."""
-    from app.services.oda_bundle import ensure_oda_bundle, get_last_oda_error
     from app.services.dwg_converter_service import dwg_converter_service
+    from app.services.oda_bundle import ensure_oda_bundle, get_last_oda_error
 
     ready = ensure_oda_bundle() and dwg_converter_service.is_configured()
     payload = {

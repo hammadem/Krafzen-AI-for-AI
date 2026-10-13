@@ -2,11 +2,12 @@
 Gemini transcription service using Google Gemini 1.5 Flash
 """
 
+import logging
 import os
 import tempfile
-import logging
-from typing import Optional, Tuple
+
 import google.generativeai as genai
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,8 @@ class GeminiTranscriptionService:
         self, 
         file_input, # bytes or UploadFile
         filename: str,
-        language: Optional[str] = "en"
-    ) -> Tuple[str, Optional[str], Optional[float]]:
+        language: str | None = "en"
+    ) -> tuple[str, str | None, float | None]:
         """
         Transcribe audio file using Gemini API
         
@@ -73,7 +74,7 @@ class GeminiTranscriptionService:
                         temp_file.write(chunk)
                 temp_file.flush()
             
-            logger.info(f"Uploading audio file to Gemini...")
+            logger.info("Uploading audio file to Gemini...")
             
             # Upload file to Gemini
             upload_ref = genai.upload_file(temp_file_path, mime_type=f"audio/{file_ext if file_ext != 'mp3' else 'mpeg'}")
@@ -99,7 +100,7 @@ class GeminiTranscriptionService:
             
         except Exception as e:
             logger.error(f"Gemini Transcription failed: {e}")
-            raise Exception(f"Transcription failed: {str(e)}")
+            raise Exception(f"Transcription failed: {e!s}")
             
         finally:
             # Clean up local temp file

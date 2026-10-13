@@ -1,9 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
-from app.services.subscription_service import subscription_service
-from app.middlewares.auth import require_auth
-from app.services.user_service import get_user_email
-from app.core.permissions import get_role_payload
 import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from app.core.permissions import get_role_payload
+from app.middlewares.auth import require_auth
+from app.services.subscription_service import subscription_service
+from app.services.user_service import get_user_email
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

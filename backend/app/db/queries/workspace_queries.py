@@ -1,14 +1,15 @@
-from typing import Optional, List, Dict, Any
-import uuid
+from typing import Any
+
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
 from app.utils.logger import logger
 from app.utils.validators import _valid_uuid
 
 
 #GET WORKSPACE
-async def get_workspace(workspace_id:str, user_id: str) -> Optional[Dict[str, Any]]:
+async def get_workspace(workspace_id:str, user_id: str) -> dict[str, Any] | None:
     if not _valid_uuid(workspace_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid workspace_id"})
     try: 
@@ -47,7 +48,7 @@ async def get_workspace(workspace_id:str, user_id: str) -> Optional[Dict[str, An
     
 
 # GET USER'S WORKSPACE (owner or member)
-async def get_my_workspace(user_id: str) -> Optional[Dict[str, Any]]:
+async def get_my_workspace(user_id: str) -> dict[str, Any] | None:
     try:
         # check if user is an owner first
         res = await run_in_threadpool(
@@ -95,7 +96,7 @@ async def get_my_workspace(user_id: str) -> Optional[Dict[str, Any]]:
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
 #LIST MEMBERS OF A WORKSPACE
-async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,page_size: int = 20) ->Dict[str, Any]:
+async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,page_size: int = 20) ->dict[str, Any]:
     if not _valid_uuid(workspace_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid workspace_id"})
     try: 
@@ -142,7 +143,7 @@ async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,pa
         raise HTTPException(status_code=500, detail={"error": "Server error"})
     
 # UPDATE MEMBER ROLE
-async def update_role_member(workspace_id: str, target_user_id: str, new_role: str, user_id: str) -> Optional[Dict[str, Any]]:
+async def update_role_member(workspace_id: str, target_user_id: str, new_role: str, user_id: str) -> dict[str, Any] | None:
     if not _valid_uuid(workspace_id) or not _valid_uuid(target_user_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid ID format"})
     

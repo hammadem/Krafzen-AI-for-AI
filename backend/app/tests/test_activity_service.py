@@ -113,6 +113,37 @@ async def test_record_event_writes_canonical_and_legacy_shapes(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_record_audit_event_persists_requested_audit_fields(monkeypatch):
+    fake_db = FakeDatabase()
+    monkeypatch.setattr(activity_service, "db", fake_db)
+
+    async def run_inline(function):
+        return function()
+
+    monkeypatch.setattr(activity_service, "run_in_threadpool", run_inline)
+
+    event = await activity_service.record_audit_event(
+        actor_user_id="00000000-0000-0000-0000-000000000004",
+        organization_id="00000000-0000-0000-0000-000000000005",
+        project_id="00000000-0000-0000-0000-000000000006",
+        action="file.renamed",
+        entity_type="file",
+        entity_id="00000000-0000-0000-0000-000000000007",
+        metadata={"old_name": "plan.dxf", "new_name": "floor-plan.dxf"},
+    )
+
+    row = fake_db.activity_table.payload
+    assert row["actor_user_id"] == event["actor_user_id"]
+    assert row["organization_id"] == event["organization_id"]
+    assert row["project_id"] == event["project_id"]
+    assert row["action"] == event["action"] == "file.renamed"
+    assert row["entity_type"] == event["entity_type"] == "file"
+    assert row["entity_id"] == event["entity_id"] == "00000000-0000-0000-0000-000000000007"
+    assert row["timestamp"] == event["timestamp"]
+    assert row["metadata"] == event["metadata"]
+
+
+@pytest.mark.asyncio
 async def test_record_event_maps_legacy_export_arguments(monkeypatch):
     fake_db = FakeDatabase()
     monkeypatch.setattr(activity_service, "db", fake_db)

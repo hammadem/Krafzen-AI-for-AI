@@ -8,54 +8,54 @@ can score when text explicitly states dimensions (even if vision extraction miss
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 _WIDTH_RE = re.compile(r"\b(\d{2})\s*[\"\u2033″]")
 _FT_IN_PAIR_RE = re.compile(
     r"(\d+)\s*[-']?\s*(\d+)\s*[\"\u2033″]\s*[x×]\s*(\d+)\s*[-']?\s*(\d+)\s*[\"\u2033″]",
-    re.I,
+    re.IGNORECASE,
 )
 # Typical CAD strings: 14'-0" x 12'-0" (prime between ft and inches)
 _FT_PRIME_PAIR_RE = re.compile(
     r"(\d+)\s*'\s*-?\s*(\d+)\s*[\"\u2033″]\s*[x×]\s*(\d+)\s*'\s*-?\s*(\d+)\s*[\"\u2033″]",
-    re.I,
+    re.IGNORECASE,
 )
 _FT_SIMPLE_PAIR_RE = re.compile(
     r"(\d+(?:\.\d+)?)\s*ft\s*(?:by|[x×])\s*(\d+(?:\.\d+)?)\s*ft",
-    re.I,
+    re.IGNORECASE,
 )
 _CEILING_RE = re.compile(
     r"(?:ceiling|ceil\.?)\s*(?:height)?\s*[:\s]*(\d+)\s*[-']?\s*(\d+)\s*[\"\u2033″]",
-    re.I,
+    re.IGNORECASE,
 )
 _CEILING_FT_RE = re.compile(
     r"(?:ceiling|ceil\.?)\s*(?:height)?\s*[:\s]*(\d+)\s*(?:ft|'(?!\d))",
-    re.I,
+    re.IGNORECASE,
 )
 _EGRESS_NEAR_RE = re.compile(
     r"(?:egress|clear\s+opening)[^\n]{0,120}?(\d+(?:\.\d+)?)\s*(?:sq\.?\s*)?(?:ft|sq\s*ft)",
-    re.I,
+    re.IGNORECASE,
 )
 # WxH in inches on the same line as egress / net clear callouts → sq ft (width × height / 144).
 _INCH_PAIR_RE = re.compile(
     r"(\d{1,2})\s*[\"\u2033″]\s*(?:[wW]\s*)?[x×]\s*(\d{1,2})\s*[\"\u2033″]",
-    re.I,
+    re.IGNORECASE,
 )
 _EGRESS_LINE_HINT = re.compile(
     r"(?:egress|net\s+clear|clear\s+opening|opening\s+for\s+screening)",
-    re.I,
+    re.IGNORECASE,
 )
 _STAIR_RISE_RE = re.compile(
     r"(?:rise|r\.)\s*[:\s]*(\d+(?:\.\d+)?)\s*[\"\u2033″]",
-    re.I,
+    re.IGNORECASE,
 )
 _STAIR_TREAD_RE = re.compile(
     r"(?:tread|t\.)\s*[:\s]*(\d+(?:\.\d+)?)\s*[\"\u2033″]",
-    re.I,
+    re.IGNORECASE,
 )
 
 
-def _dims_ft_in_to_area_sqft(snippet: str) -> Optional[float]:
+def _dims_ft_in_to_area_sqft(snippet: str) -> float | None:
     for rx in (_FT_PRIME_PAIR_RE, _FT_IN_PAIR_RE):
         m = rx.search(snippet)
         if m:
@@ -68,10 +68,10 @@ def _dims_ft_in_to_area_sqft(snippet: str) -> Optional[float]:
     return None
 
 
-def _extract_bedroom_area_sqft(full_text: str) -> Optional[float]:
+def _extract_bedroom_area_sqft(full_text: str) -> float | None:
     """Prefer dimensions in the same region as the word bedroom."""
     text = full_text.replace("\u201d", '"').replace("\u201c", '"')
-    for match in re.finditer(r"bedroom", text, re.I):
+    for match in re.finditer(r"bedroom", text, re.IGNORECASE):
         start = max(0, match.start() - 60)
         end = min(len(text), match.end() + 220)
         chunk = text[start:end]
@@ -79,13 +79,13 @@ def _extract_bedroom_area_sqft(full_text: str) -> Optional[float]:
         if area:
             return area
     # Fallback: first plausible dimension pair in full text if bedroom mentioned anywhere
-    if re.search(r"bedroom", text, re.I):
+    if re.search(r"bedroom", text, re.IGNORECASE):
         area = _dims_ft_in_to_area_sqft(text)
         return area
     return None
 
 
-def _extract_ceiling_ft(full_text: str) -> Optional[float]:
+def _extract_ceiling_ft(full_text: str) -> float | None:
     text = full_text.replace("\u201d", '"').replace("\u201c", '"')
     m = _CEILING_RE.search(text)
     if m:
@@ -96,10 +96,10 @@ def _extract_ceiling_ft(full_text: str) -> Optional[float]:
         return float(m2.group(1))
     # Loose phrases: "9 ft ceilings", "9-foot ceiling", "ceilings 9 ft"
     for rx in (
-        re.compile(r"\b(\d+)\s+ft\s+(?:ceil(?:ings)?)\b", re.I),
-        re.compile(r"\b(\d+)\s*'\s+(?:ceil(?:ings)?)\b", re.I),
-        re.compile(r"\b(\d+)\s*-\s*(?:foot|feet)\s+(?:ceil(?:ing)?)\b", re.I),
-        re.compile(r"\b(?:ceil(?:ings)?)\s+(?:of|at|around|~)?\s*(\d+)\s*(?:ft|')\b", re.I),
+        re.compile(r"\b(\d+)\s+ft\s+(?:ceil(?:ings)?)\b", re.IGNORECASE),
+        re.compile(r"\b(\d+)\s*'\s+(?:ceil(?:ings)?)\b", re.IGNORECASE),
+        re.compile(r"\b(\d+)\s*-\s*(?:foot|feet)\s+(?:ceil(?:ing)?)\b", re.IGNORECASE),
+        re.compile(r"\b(?:ceil(?:ings)?)\s+(?:of|at|around|~)?\s*(\d+)\s*(?:ft|')\b", re.IGNORECASE),
     ):
         mm = rx.search(text)
         if mm:
@@ -107,12 +107,12 @@ def _extract_ceiling_ft(full_text: str) -> Optional[float]:
     return None
 
 
-def _door_widths_in(text: str) -> List[float]:
+def _door_widths_in(text: str) -> list[float]:
     seen = set()
-    out: List[float] = []
+    out: list[float] = []
     width_patterns = (
         _WIDTH_RE,
-        re.compile(r"\b(\d{2})\s*(?:inch(?:es)?)\b", re.I),
+        re.compile(r"\b(\d{2})\s*(?:inch(?:es)?)\b", re.IGNORECASE),
     )
     for rx in width_patterns:
         for m in rx.finditer(text):
@@ -128,19 +128,19 @@ def _inch_pair_to_sqft(w_in: float, h_in: float) -> float:
     return round(w_in * h_in / 144.0, 4)
 
 
-def _egress_areas_from_explicit_sqft(text: str) -> List[float]:
-    areas: List[float] = []
+def _egress_areas_from_explicit_sqft(text: str) -> list[float]:
+    areas: list[float] = []
     for m in _EGRESS_NEAR_RE.finditer(text):
         areas.append(float(m.group(1)))
     return areas
 
 
-def _egress_areas_from_inch_pairs_in_egress_lines(text: str) -> List[float]:
+def _egress_areas_from_inch_pairs_in_egress_lines(text: str) -> list[float]:
     """
     Infer opening sq ft from WxH in inches on lines that mention egress / net clear / opening.
     Handles both '18\" W x 36\" H ... NET CLEAR' and 'egress ... 18\" x 36\"'.
     """
-    areas: List[float] = []
+    areas: list[float] = []
     for line in text.replace("\u201d", '"').replace("\u201c", '"').splitlines():
         if not _EGRESS_LINE_HINT.search(line):
             continue
@@ -152,7 +152,7 @@ def _egress_areas_from_inch_pairs_in_egress_lines(text: str) -> List[float]:
     return areas
 
 
-def _egress_areas_sqft(text: str) -> List[float]:
+def _egress_areas_sqft(text: str) -> list[float]:
     explicit = _egress_areas_from_explicit_sqft(text)
     inch_derived = _egress_areas_from_inch_pairs_in_egress_lines(text)
     return explicit + inch_derived
@@ -160,21 +160,21 @@ def _egress_areas_sqft(text: str) -> List[float]:
 
 _BEDROOM_AB_SQFT_RE = re.compile(
     r"(?:bedroom\s+([AB]))\s*[^0-9\n]{0,45}?~?\s*\*?\*?(\d+)\s*(?:sq\.?\s*)?(?:ft|sf)\b",
-    re.I,
+    re.IGNORECASE,
 )
 
 
-def _labeled_bedroom_areas(blob: str) -> List[tuple[str, float]]:
-    out: List[tuple[str, float]] = []
+def _labeled_bedroom_areas(blob: str) -> list[tuple[str, float]]:
+    out: list[tuple[str, float]] = []
     for m in _BEDROOM_AB_SQFT_RE.finditer(blob):
         out.append((f"Bedroom {m.group(1)}", float(m.group(2))))
     return out
 
 
-def _bedroom_ab_dims_areas(blob: str) -> List[tuple[str, float]]:
+def _bedroom_ab_dims_areas(blob: str) -> list[tuple[str, float]]:
     text = blob.replace("\u201d", '"').replace("\u201c", '"')
-    out: List[tuple[str, float]] = []
-    for m in re.finditer(r"(?:bedroom\s+([AB]))", text, re.I):
+    out: list[tuple[str, float]] = []
+    for m in re.finditer(r"(?:bedroom\s+([AB]))", text, re.IGNORECASE):
         chunk = text[m.start() : m.start() + 220]
         area = _dims_ft_in_to_area_sqft(chunk)
         if area is not None:
@@ -182,7 +182,7 @@ def _bedroom_ab_dims_areas(blob: str) -> List[tuple[str, float]]:
     return out
 
 
-def _stairs_from_text(text: str) -> Optional[Dict[str, Optional[float]]]:
+def _stairs_from_text(text: str) -> dict[str, float | None] | None:
     rise_m = _STAIR_RISE_RE.search(text)
     tread_m = _STAIR_TREAD_RE.search(text)
     if not rise_m and not tread_m:
@@ -193,12 +193,12 @@ def _stairs_from_text(text: str) -> Optional[Dict[str, Optional[float]]]:
     }
 
 
-def merge_heuristic_layout(llm_raw: Any, user_prompt: str, cad_dsl: str) -> Dict[str, Any]:
+def merge_heuristic_layout(llm_raw: Any, user_prompt: str, cad_dsl: str) -> dict[str, Any]:
     """
     Merge Gemini JSON with regex/heuristic fills. Never removes LLM fields;
     only fills missing metrics useful for IRC MVP checks.
     """
-    base: Dict[str, Any] = dict(llm_raw) if isinstance(llm_raw, dict) else {}
+    base: dict[str, Any] = dict(llm_raw) if isinstance(llm_raw, dict) else {}
     blob = f"{user_prompt or ''}\n{cad_dsl or ''}"
 
     area = _extract_bedroom_area_sqft(blob)
@@ -207,7 +207,7 @@ def merge_heuristic_layout(llm_raw: Any, user_prompt: str, cad_dsl: str) -> Dict
     egress_h = _egress_areas_sqft(blob)
     stair_d = _stairs_from_text(blob)
 
-    hr_list: List[Dict[str, Any]] = []
+    hr_list: list[dict[str, Any]] = []
     labeled_pairs = _labeled_bedroom_areas(blob)
     dim_ab = _bedroom_ab_dims_areas(blob)
     if labeled_pairs:
@@ -221,7 +221,7 @@ def merge_heuristic_layout(llm_raw: Any, user_prompt: str, cad_dsl: str) -> Dict
         if area_one is not None or ceil_ft is not None:
             hr_list.append({"name": "Bedroom", "area_sqft": area_one, "ceiling_ft": ceil_ft})
 
-    rooms: List[Dict[str, Any]] = list(base.get("rooms") or [])
+    rooms: list[dict[str, Any]] = list(base.get("rooms") or [])
     if hr_list:
         for hr in hr_list:
             key = (hr.get("name") or "").strip().lower()
@@ -237,7 +237,7 @@ def merge_heuristic_layout(llm_raw: Any, user_prompt: str, cad_dsl: str) -> Dict
             if not merged_into_existing:
                 rooms.append(dict(hr))
 
-    doors_llm: List[Dict[str, Any]] = list(base.get("doors_inches") or [])
+    doors_llm: list[dict[str, Any]] = list(base.get("doors_inches") or [])
     existing = {d.get("width_in") for d in doors_llm if d.get("width_in") is not None}
     for w in doors_h:
         if w not in existing:

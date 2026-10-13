@@ -44,10 +44,9 @@ a workspace relationship; those events remain available in project activity.
 
 Use `file.renamed` only when its display name changes; use `file.updated` for
 other file metadata changes. `file.exported` records inclusion of a file in an
-export. Emit `file.deleted` in the same transaction as a hard deletion (before
-removing the file row), or after the soft-delete state change commits. The
-event's generic entity reference is not a file foreign key, so deletion will
-not cascade to its audit history. Export-job lifecycle actions (`export.queued`, `export.processing`,
+export. `file.deleted` is recorded before hard-deleting the file row; its generic
+entity reference is not a file foreign key, so deletion will not cascade to its
+audit history. Export-job lifecycle actions (`export.queued`, `export.processing`,
 `export.validating`, `export.completed`, `export.failed`, and
 `export.requires_review`) remain supported for compatibility with the current
 worker.
@@ -72,7 +71,8 @@ changes, not commands that have yet to run.
 
 ## `export.*`
 
-Emitted by `worker_service.emit_export_event()` → persisted via `activity_service.record_event()`.
+Emitted by `worker_service.emit_export_event()` → persisted via
+`activity_service.record_audit_event()`.
 
 | Event                    | Trigger                                      |
 |--------------------------|----------------------------------------------|
@@ -145,14 +145,28 @@ Owned by Yehor. Documented here for cross-team reference.
 
 ## `file.*`
 
-Owned by Yehor. Tazwar wires these into activity feed in Week 3 Step 3.
+File-row creation records `file.uploaded`; a new row explicitly created with a
+version greater than 1 also records `file.version_created`. File metadata edits
+record `file.renamed` when the display name changes and `file.updated` for
+other changed fields. Archive/restore endpoints record the corresponding state
+transition. Export artifacts record `file.exported` when saved through the
+artifact-file persistence helper.
 
-| Event           | Trigger                   |
-|-----------------|---------------------------|
-| `file.uploaded` | File stored in Supabase   |
-| `file.deleted`  | File removed              |
-| `file.renamed`  | File metadata updated     |
-| `upload.failed` | Storage write failed      |
+Every event uses `entity_type="file"` and includes file ID, display name, file
+type, version, project ID, and actor user ID in metadata. The canonical event
+columns separately store actor, project, and UTC timestamp. Apply
+`011_file_activity_lifecycle.sql` before using version or archive behavior.
+
+| Event                  | Trigger                                      |
+|------------------------|----------------------------------------------|
+| `file.uploaded`        | File row successfully created                |
+| `file.updated`         | Non-name file metadata changed               |
+| `file.renamed`         | Display name changed                         |
+| `file.version_created`| File row created with version greater than 1|
+| `file.exported`        | Export artifact persisted                    |
+| `file.archived`        | File moved to archived state                 |
+| `file.restored`        | Archived file restored                       |
+| `file.deleted`         | File row hard-deleted                        |
 
 ### Sample payload — `file.uploaded`
 ```json
@@ -162,9 +176,12 @@ Owned by Yehor. Tazwar wires these into activity feed in Week 3 Step 3.
   "actor_user_id": "cccccccc-0000-0000-0000-000000000003",
   "metadata": {
     "file_id": "dddddddd-0000-0000-0000-000000000004",
+    "file_name": "project_bb_20260605_143000.dxf",
     "file_type": "dxf",
-    "bucket": "dxf-files",
-    "path": "cccccccc-0000-0000-0000-000000000003/bbbbbbbb-0000-0000-0000-000000000002/project_bb_20260605_143000.dxf"
+    "file_id": "dddddddd-0000-0000-0000-000000000004",
+    "version": 1,
+    "project_id": "bbbbbbbb-0000-0000-0000-000000000002",
+    "user_id": "cccccccc-0000-0000-0000-000000000003"
   },
   "created_at": "2026-06-05T14:30:05Z"
 }

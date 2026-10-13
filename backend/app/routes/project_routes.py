@@ -1,14 +1,15 @@
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List, Optional
+
+from app.db.queries.project_queries import create_project as create_project_query
 from app.db.queries.project_queries import (
-    create_project as create_project_query,
-    get_projects,
+    delete_project,
     get_project,
+    get_projects,
     update_project,
-    delete_project
 )
-from app.models.project_model import ProjectCreate, ProjectUpdate, ProjectOut
 from app.middlewares.auth import require_auth
+from app.models.project_model import ProjectCreate, ProjectOut, ProjectUpdate
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -24,12 +25,12 @@ async def create_project_route(
     return result
 
 
-@router.get("/", response_model=List[ProjectOut])
+@router.get("/", response_model=list[ProjectOut])
 async def list_projects(
     user: dict = Depends(require_auth),
     page : int = Query(default=1, ge=1),
     limit: int = Query(default=10,ge=1,le=100),
-    status: Optional[str] = Query(default=None)
+    status: str | None = Query(default=None)
 ):
     projects = await get_projects(user, page = page, limit = limit, status=status)
     return projects

@@ -2,18 +2,16 @@
 Transcriber API endpoints for voice-to-text conversion
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends
-from app.middlewares.auth import require_auth
-from fastapi.responses import JSONResponse
-from typing import Optional
-from app.services.gemini_transcription_service import gemini_transcription_service
-from app.schemas.transcription import (
-    TranscriptionRequest,
-    TranscriptionResponse,
-    TranscriptionError
-)
-from datetime import datetime
 import logging
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+
+from app.middlewares.auth import require_auth
+from app.schemas.transcription import (
+    TranscriptionResponse,
+)
+from app.services.gemini_transcription_service import gemini_transcription_service
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +20,7 @@ router = APIRouter()
 @router.post("/transcribe", response_model=TranscriptionResponse, dependencies=[Depends(require_auth)])
 async def transcribe_audio(
     file: UploadFile = File(...),
-    language: Optional[str] = Query("en", description="Language code (ISO 639-1)")
+    language: str | None = Query("en", description="Language code (ISO 639-1)")
 ):
     """
     Transcribe audio file to text using Google Gemini
@@ -70,7 +68,7 @@ async def transcribe_audio(
 @router.post("/transcribe-url", response_model=TranscriptionResponse, dependencies=[Depends(require_auth)])
 async def transcribe_from_url(
     audio_url: str = Query(..., description="URL of the audio file"),
-    language: Optional[str] = Query("en", description="Language code (ISO 639-1)")
+    language: str | None = Query("en", description="Language code (ISO 639-1)")
 ):
     """
     Transcribe audio from URL

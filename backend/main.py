@@ -1,6 +1,5 @@
 """Compatibility entry point for hosts configured with ``uvicorn main:app``."""
 
-from app.main import app
 
 
 if __name__ == "__main__":

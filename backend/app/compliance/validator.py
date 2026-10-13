@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from app.compliance.models import ComplianceResult, ComplianceViolation, LayoutExtract
 
@@ -12,7 +12,7 @@ DISCLAIMER = (
 )
 
 
-def _load_rules() -> Dict[str, Any]:
+def _load_rules() -> dict[str, Any]:
     with open(_RULES_PATH, encoding="utf-8") as f:
         return json.load(f)
 
@@ -40,7 +40,7 @@ def validate_us_irc_baseline(layout: LayoutExtract, raw_for_response: bool = Tru
     jid = rules_doc["jurisdiction_id"]
     label = rules_doc["label"]
 
-    violations: List[ComplianceViolation] = []
+    violations: list[ComplianceViolation] = []
     passed = 0
     applicable = 0
 
@@ -171,7 +171,7 @@ def validate_us_irc_baseline(layout: LayoutExtract, raw_for_response: bool = Tru
     )
 
 
-def parse_layout_from_llm_dict(data: Dict[str, Any]) -> LayoutExtract:
+def parse_layout_from_llm_dict(data: dict[str, Any]) -> LayoutExtract:
     """Coerce arbitrary JSON dict from Gemini into LayoutExtract."""
     if not isinstance(data, dict):
         return LayoutExtract()

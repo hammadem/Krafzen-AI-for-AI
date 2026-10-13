@@ -1,10 +1,14 @@
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone  
-from fastapi.concurrency import run_in_threadpool
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
 from fastapi import HTTPException
+from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
+from app.services.activity_service import record_audit_event
 from app.utils.logger import logger
-import uuid  
+
 
 # check if job belongs to user's project(helper)
 async def _user_owns_job(job_id: str, user_id: str) -> bool:
@@ -45,7 +49,7 @@ async def _user_owns_job(job_id: str, user_id: str) -> bool:
         return False
 
 # CREATE FILE (saves metadata to DB, path must come from whoever uploaded to Storage)
-async def create_file(file_data: Dict[str, Any], user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any] | None:
     if not user or "user_id" not in user:
         logger.warning("[create_file] Invalid user context")
         return {"error": "Invalid user context"}
@@ -68,17 +72,33 @@ async def create_file(file_data: Dict[str, Any], user: Dict[str, Any]) -> Option
         if not owns:
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
 
+        job_res = await run_in_threadpool(
+            lambda: db.table("jobs")
+                .select("project_id")
+                .eq("id", job_id)
+                .maybe_single()
+                .execute()
+        )
+        if not job_res or not job_res.data:
+            return {"error": "Job not found"}
+        resolved_project_id = job_res.data.get("project_id")
+        if project_id and project_id != resolved_project_id:
+            raise HTTPException(status_code=400, detail={"error": "Project does not match job"})
+
+        path = file_data.get("path")
         payload = {
             "job_id": job_id,
             "bucket": file_data.get("bucket", "krafzen-files"),
-            "path": file_data.get("path"),
+            "path": path,
             "file_type": file_data.get("file_type", "dxf"),
             "mime_type": file_data.get("mime_type"),
             "size_bytes": file_data.get("size_bytes"),
+            "name": file_data.get("name") or (path.rsplit("/", 1)[-1] if path else None),
+            "version": file_data.get("version", 1),
         }
 
-        if project_id:
-            payload["project_id"] = project_id
+        if resolved_project_id:
+            payload["project_id"] = resolved_project_id
 
         response = await run_in_threadpool(
             lambda: db.table("files")
@@ -87,8 +107,14 @@ async def create_file(file_data: Dict[str, Any], user: Dict[str, Any]) -> Option
             )
 
         if response and response.data:
-            logger.info("[create_file] File created successfully", file_id=response.data[0]["id"])
-            return response.data[0]
+            created_file = response.data[0]
+            await _record_file_activity("file.uploaded", created_file, user["user_id"])
+            if created_file.get("version", 1) > 1:
+                await _record_file_activity(
+                    "file.version_created", created_file, user["user_id"]
+                )
+            logger.info("[create_file] File created successfully", file_id=created_file["id"])
+            return created_file
         
         logger.warning("[create_file] Insert failed")
         return None
@@ -102,7 +128,7 @@ async def create_file(file_data: Dict[str, Any], user: Dict[str, Any]) -> Option
 
 
 # LIST FILES
-async def get_files(job_id: str, user: Dict[str, Any]) -> List[Dict[str, Any]]:
+async def get_files(job_id: str, user: dict[str, Any]) -> list[dict[str, Any]]:
     if not user or "user_id" not in user:
         logger.warning("[get_files] Invalid user context")
         return []
@@ -123,6 +149,7 @@ async def get_files(job_id: str, user: Dict[str, Any]) -> List[Dict[str, Any]]:
             lambda: db.table("files")
                 .select("*")
                 .eq("job_id", job_id)
+                .is_("archived_at", "null")
                 .execute()
         )
 
@@ -135,7 +162,7 @@ async def get_files(job_id: str, user: Dict[str, Any]) -> List[Dict[str, Any]]:
         return []
 
 # GET SINGLE FILE
-async def get_file(file_id: str, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:  
+async def get_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:  
     if not user or "user_id" not in user:
         logger.warning("[get_file] Invalid user context")
         return None
@@ -173,7 +200,7 @@ async def get_file(file_id: str, user: Dict[str, Any]) -> Optional[Dict[str, Any
         return None
 
 # UPDATE FILE
-async def update_file(file_id: str, update_data: Dict[str, Any], user: Dict[str, Any]) -> Optional[Dict[str, Any]]:  
+async def update_file(file_id: str, update_data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any] | None:  
     if not user or "user_id" not in user:
         logger.warning("[update_file] Invalid user context")
         return {"error": "Invalid user context"}
@@ -203,8 +230,32 @@ async def update_file(file_id: str, update_data: Dict[str, Any], user: Dict[str,
         )
 
         if response and hasattr(response, "data") and response.data:
-            logger.info("[update_file] File updated successfully", file_id=file_id) 
-            return response.data[0]
+            updated_file = response.data[0]
+            old_name = file.get("name") or _file_name(file)
+            new_name = updated_file.get("name") or _file_name(updated_file)
+            name_changed = old_name != new_name
+            if name_changed:
+                await _record_file_activity(
+                    "file.renamed",
+                    updated_file,
+                    user["user_id"],
+                    old_name=old_name,
+                    new_name=new_name,
+                )
+            changed_fields = sorted(
+                field
+                for field in payload
+                if field != "name" and file.get(field) != updated_file.get(field)
+            )
+            if changed_fields:
+                await _record_file_activity(
+                    "file.updated",
+                    updated_file,
+                    user["user_id"],
+                    changed_fields=changed_fields,
+                )
+            logger.info("[update_file] File updated successfully", file_id=file_id)
+            return updated_file
 
         logger.warning("[update_file] Update failed", file_id=file_id) 
         return {"error": f"File with id {file_id} not found"}
@@ -216,7 +267,7 @@ async def update_file(file_id: str, update_data: Dict[str, Any], user: Dict[str,
         return {"error": "Unexpected server error"}
 
 # DELETE FILE
-async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:  
+async def delete_file(file_id: str, user: dict[str, Any]) -> bool:  
     if not user or "user_id" not in user:
         logger.warning("[delete_file] Invalid user context")
         return False
@@ -241,14 +292,15 @@ async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:
             logger.error("[delete_file] Storage delete failed", file_id=file_id, error=str(e))
             raise HTTPException(status_code=500, detail={"error": "Failed to delete file from storage"})
 
-        # delete from DB only when storage delete succeeded
+        # Persist the audit row before removing the entity it refers to.
+        await _record_file_activity("file.deleted", file, user["user_id"])
+
         response = await run_in_threadpool(
             lambda: db.table("files")
                 .delete()
                 .eq("id", file_id)
                 .execute()
         )
-
         success = bool(response and hasattr(response, "data") and response.data)
         if success:
             logger.info("[delete_file] File deleted successfully", file_id=file_id) 
@@ -261,9 +313,95 @@ async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:
     except Exception as e:
         logger.error("[delete_file] Error", file_id=file_id, error=str(e), exc_info=True)
         return False
+
+
+async def archive_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
+    file = await get_file(file_id, user)
+    if not file:
+        return None
+    if file.get("archived_at"):
+        return file
+
+    archived_at = datetime.now(UTC).isoformat()
+    response = await run_in_threadpool(
+        lambda: db.table("files")
+            .update({"archived_at": archived_at})
+            .eq("id", file_id)
+            .execute()
+    )
+    if not response or not response.data:
+        return None
+
+    archived_file = response.data[0]
+    await _record_file_activity("file.archived", archived_file, user["user_id"])
+    return archived_file
+
+
+async def restore_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
+    file = await get_file(file_id, user)
+    if not file:
+        return None
+    if not file.get("archived_at"):
+        return file
+
+    response = await run_in_threadpool(
+        lambda: db.table("files")
+            .update({"archived_at": None})
+            .eq("id", file_id)
+            .execute()
+    )
+    if not response or not response.data:
+        return None
+
+    restored_file = response.data[0]
+    await _record_file_activity("file.restored", restored_file, user["user_id"])
+    return restored_file
+
+
+async def _record_file_activity(
+    action: str,
+    file: dict[str, Any],
+    actor_user_id: str,
+    **details: Any,
+) -> None:
+    project_id = file.get("project_id")
+    metadata: dict[str, Any] = {
+        "file_id": file["id"],
+        "file_name": _file_name(file),
+        "file_type": file.get("file_type"),
+        "version": file.get("version", 1),
+        "project_id": project_id,
+        "user_id": actor_user_id,
+    }
+    metadata.update({key: value for key, value in details.items() if value is not None})
+    try:
+        await record_audit_event(
+            action=action,
+            entity_type="file",
+            entity_id=file["id"],
+            actor_user_id=actor_user_id,
+            project_id=project_id,
+            metadata=metadata,
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": f"File state changed but {action} audit event could not be recorded",
+                "entity_id": file["id"],
+            },
+        ) from error
+
+
+def _file_name(file: dict[str, Any]) -> str | None:
+    name = file.get("name")
+    if name:
+        return name
+    path = file.get("path")
+    return path.rsplit("/", 1)[-1] if path else None
     
 # GET SIGNED URL
-async def get_signed_url(file_id: str, user: Dict[str, Any]) -> Optional[str]:
+async def get_signed_url(file_id: str, user: dict[str, Any]) -> str | None:
     file = await get_file(file_id, user)
     if not file:
         return None
@@ -279,7 +417,7 @@ async def get_signed_url(file_id: str, user: Dict[str, Any]) -> Optional[str]:
     
     
 # CREATE ARTIFACT FILE (called after Tazwar uploads export to storage)
-async def create_artifact_file(file_data: Dict[str, Any], user_id: str) -> Optional[Dict[str, Any]]:
+async def create_artifact_file(file_data: dict[str, Any], user_id: str) -> dict[str, Any] | None:
     try:
         payload = {
             "bucket": file_data.get("bucket", "dxf-files"),
@@ -299,8 +437,22 @@ async def create_artifact_file(file_data: Dict[str, Any], user_id: str) -> Optio
         )
 
         if res and res.data:
-            logger.info("[create_artifact_file] Artifact file created", file_id=res.data[0]["id"])
-            return res.data[0]
+            artifact = res.data[0]
+            source_file_id = file_data.get("source_file_id")
+            event_file = {
+                **artifact,
+                "id": source_file_id or artifact["id"],
+                "name": file_data.get("source_file_name") or artifact.get("name"),
+            }
+            await _record_file_activity(
+                "file.exported",
+                event_file,
+                user_id,
+                export_format=artifact.get("file_type"),
+                artifact_file_id=artifact["id"],
+            )
+            logger.info("[create_artifact_file] Artifact file created", file_id=artifact["id"])
+            return artifact
 
         return None
     except Exception as e:

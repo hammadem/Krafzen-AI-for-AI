@@ -2,7 +2,10 @@
 
 from app.compliance.extraction_fallback import merge_heuristic_layout
 from app.compliance.models import DoorExtract, LayoutExtract, RoomExtract, StairsExtract
-from app.compliance.validator import parse_layout_from_llm_dict, validate_us_irc_baseline
+from app.compliance.validator import (
+    parse_layout_from_llm_dict,
+    validate_us_irc_baseline,
+)
 
 
 def test_passing_bedroom_and_door():

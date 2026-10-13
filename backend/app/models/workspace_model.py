@@ -1,6 +1,7 @@
-from typing import Optional, List
 from datetime import datetime
+
 from pydantic import BaseModel
+
 
 class WorkspaceCreate(BaseModel):
     name:str
@@ -11,7 +12,7 @@ class WorkspaceResponse(BaseModel):
     name: str
     owner_id: str
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
     
     class Config:
         from_attributes = True
@@ -21,9 +22,9 @@ class WorkspaceMemberResponse(BaseModel):
     workspace_id: str
     user_id: str
     role: str
-    email: Optional[str] = None
-    display_name: Optional[str] = None
-    joined_at: Optional[datetime] = None
+    email: str | None = None
+    display_name: str | None = None
+    joined_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -34,7 +35,7 @@ class MemberRoleUpdate(BaseModel):
 
 
 class PaginatedMembersResponse(BaseModel):
-    members: List[WorkspaceMemberResponse]
+    members: list[WorkspaceMemberResponse]
     total: int
     page: int
     page_size: int

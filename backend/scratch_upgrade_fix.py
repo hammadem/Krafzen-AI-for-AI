@@ -1,6 +1,8 @@
 import asyncio
+
 from app.db.supabase_client import db
 from app.services.subscription_service import subscription_service
+
 
 async def fix():
     print('Fetching users with active starter plan and 0 requests...')

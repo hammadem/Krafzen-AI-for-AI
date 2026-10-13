@@ -1,8 +1,8 @@
 import json
 import logging
-from typing import Optional
 
 import google.generativeai as genai
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -90,7 +90,7 @@ class GeminiService:
         prompt: str,
         original_prompt: str = None,
         previous_image_url: str = None,
-        drawing_standard: Optional[str] = None,
+        drawing_standard: str | None = None,
     ) -> str:
         """
         Generates an image based on the prompt using the configured Gemini Image model.
@@ -157,7 +157,7 @@ class GeminiService:
             logger.info(f"Generating image with model {settings.GEMINI_IMAGE_MODEL}...")
             
             # Configure safety settings to strict minimal blocking (CAD drawings are safe)
-            from google.generativeai.types import HarmCategory, HarmBlockThreshold
+            from google.generativeai.types import HarmBlockThreshold, HarmCategory
             safety_settings = {
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -174,10 +174,11 @@ class GeminiService:
             # We can download and convert the previous image to include in the prompt context
             if previous_image_url:
                 try:
+                    import base64
+                    import io
+
                     import httpx
                     from PIL import Image
-                    import io
-                    import base64
                     
                     image_data = None
                     if previous_image_url.startswith("data:"):

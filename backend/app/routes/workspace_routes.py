@@ -1,17 +1,18 @@
 from fastapi import APIRouter, Depends, Query
+
+from app.db.queries.workspace_queries import (
+    get_my_workspace,
+    get_workspace,
+    get_workspace_members,
+    remove_member,
+    update_role_member,
+)
 from app.middlewares.auth import require_auth
 from app.models.workspace_model import (
-    WorkspaceResponse,
-    WorkspaceMemberResponse,
     MemberRoleUpdate,
-    PaginatedMembersResponse
-)
-from app.db.queries.workspace_queries import (
-    get_workspace,
-    get_my_workspace,
-    get_workspace_members,
-    update_role_member,
-    remove_member
+    PaginatedMembersResponse,
+    WorkspaceMemberResponse,
+    WorkspaceResponse,
 )
 
 router = APIRouter(prefix="/workspaces", tags=["Workspaces"])

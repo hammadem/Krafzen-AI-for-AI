@@ -4,18 +4,20 @@ Owner: Tazwar — covers VALID_TRANSITIONS, is_valid_transition, terminal/retrya
 These are unit tests; DB calls are mocked.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from app.schemas.export_contracts import ExportStatus
 from app.services.queue_service import (
+    RETRYABLE_STATES,
+    TERMINAL_STATES,
+    VALID_TRANSITIONS,
     advance_job_status,
     enqueue_job,
-    retry_job,
     is_valid_transition,
-    VALID_TRANSITIONS,
-    TERMINAL_STATES,
-    RETRYABLE_STATES,
+    retry_job,
 )
-from app.schemas.export_contracts import ExportStatus
 
 MOCK_USER = {"user_id": "00000000-0000-0000-0000-000000000099"}
 MOCK_JOB_ID = "00000000-0000-0000-0000-000000000001"

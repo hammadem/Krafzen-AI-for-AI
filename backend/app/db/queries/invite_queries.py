@@ -1,15 +1,17 @@
-from typing import Optional, Dict, Any, List
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+
+from app.db.queries.workspace_queries import get_workspace
 from app.db.supabase_client import db
 from app.utils.logger import logger
-from app.db.queries.workspace_queries import get_workspace
 from app.utils.validators import _valid_uuid
 
 
 #CREATE INVITE
-async def create_invite(workspace_id: str, email: str, role: str, user_id: str) -> Optional[Dict[str, Any]]:
+async def create_invite(workspace_id: str, email: str, role: str, user_id: str) -> dict[str, Any] | None:
     if not _valid_uuid(workspace_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid workspace_id"})
     if role not in ("admin", "member", "viewer"):
@@ -98,7 +100,7 @@ async def revoke_invite(invite_id: str ,user_id: str) -> bool:
     
 
 #VALIDATE INVITE
-async def validate_invite(token: str) -> Dict[str, Any]:
+async def validate_invite(token: str) -> dict[str, Any]:
     if not _valid_uuid(token):
         return {"valid": False, "message": "Invalid token format"}
 
@@ -123,7 +125,7 @@ async def validate_invite(token: str) -> Dict[str, Any]:
             return {"valid": False, "message": "Invite already accepted"}
 
         expires_at = datetime.fromisoformat(invite["expires_at"].replace("Z", "+00:00"))
-        if datetime.now(timezone.utc) > expires_at:
+        if datetime.now(UTC) > expires_at:
             await run_in_threadpool(
                 lambda: db.table("workspace_invites")
                     .update({"status": "expired"})
@@ -146,7 +148,7 @@ async def validate_invite(token: str) -> Dict[str, Any]:
         
 
 #LIST ALL INVITES 
-async def get_workspace_invites(workspace_id: str,user_id: str) -> List[Dict[str, Any]]:
+async def get_workspace_invites(workspace_id: str,user_id: str) -> list[dict[str, Any]]:
     if not _valid_uuid(workspace_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid workspace_id"})
 

@@ -1,7 +1,9 @@
 """JWT and password security utilities."""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+
 import jwt
 from passlib.context import CryptContext
+
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -42,7 +44,7 @@ def decode_supabase_token(token: str):
 
 def create_access_token(data: dict, expires_minutes: int = 30):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
+    expire = datetime.now(UTC) + timedelta(minutes=expires_minutes)
     to_encode.update({"exp": expire})
 
     encoded_jwt = jwt.encode(

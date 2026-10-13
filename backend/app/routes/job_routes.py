@@ -1,22 +1,19 @@
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException, Header, Query, Depends
-from typing import List, Optional
-from app.db.queries.job_queries import (
-    create_job as create_job_query,
-    get_jobs,
-    get_job,
-    update_job,
-    delete_job
-)
-from app.models.job_model import JobCreate, JobUpdate, JobResponse
+
+from app.db.queries.job_queries import create_job as create_job_query
+from app.db.queries.job_queries import delete_job, get_job, get_jobs, update_job
 from app.middlewares.auth import require_auth
-from app.services.queue_service import advance_job_status, enqueue_job, retry_job
+from app.models.job_model import JobCreate, JobResponse, JobUpdate
 from app.schemas.export_contracts import ExportStatus
+from app.services.queue_service import advance_job_status, retry_job
 from app.utils.logger import logger
+
 
 class StatusAdvanceRequest(BaseModel):
     status: ExportStatus
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -33,7 +30,7 @@ async def create_job_route(
     return result
 
 
-@router.get("/", response_model=List[JobResponse])
+@router.get("/", response_model=list[JobResponse])
 async def list_jobs(
     project_id: str = Query(..., description="Filter jobs by project_id"),
     user=Depends(require_auth)

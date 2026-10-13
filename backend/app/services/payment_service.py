@@ -1,7 +1,9 @@
-import stripe
-from app.core.config import settings
-from app.services.subscription_service import subscription_service, PLAN_CONFIG
 import logging
+
+import stripe
+
+from app.core.config import settings
+from app.services.subscription_service import PLAN_CONFIG, subscription_service
 
 logger = logging.getLogger(__name__)
 
@@ -210,10 +212,10 @@ class PaymentService:
             event = stripe.Webhook.construct_event(
                 payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
             )
-        except ValueError as e:
+        except ValueError:
             # Invalid payload
             raise Exception("Invalid payload")
-        except stripe.error.SignatureVerificationError as e:
+        except stripe.error.SignatureVerificationError:
             # Invalid signature
             raise Exception("Invalid signature")
 
@@ -368,8 +370,9 @@ class PaymentService:
         if user_id:
             logger.info(f"Subscription canceled for user {user_id}")
             # Update status to canceled in database
-            from app.db.supabase_client import db
             from datetime import datetime
+
+            from app.db.supabase_client import db
             
             db.table("user_subscriptions").update({
                 "subscription_status": "canceled",
@@ -411,8 +414,9 @@ class PaymentService:
                 if user_id:
                     logger.warning(f"Payment failed for user {user_id}")
                     # Update status to past_due
-                    from app.db.supabase_client import db
                     from datetime import datetime
+
+                    from app.db.supabase_client import db
                     
                     db.table("user_subscriptions").update({
                         "subscription_status": "past_due",

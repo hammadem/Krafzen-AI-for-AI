@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Any
-from app.db.supabase_client import db
-from app.core.config import settings
 import logging
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from app.core.config import settings
+from app.db.supabase_client import db
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class SubscriptionService:
     def __init__(self):
         self.table = "user_subscriptions"
 
-    def _is_free_signup_tier(self, sub: Dict[str, Any]) -> bool:
+    def _is_free_signup_tier(self, sub: dict[str, Any]) -> bool:
         """Account has never subscribed; uses signup free request pool."""
         plan = (sub.get("plan_name") or "free").lower()
         st = (sub.get("subscription_status") or "inactive").lower()
@@ -74,7 +75,7 @@ class SubscriptionService:
             return False
         return not sub.get("stripe_subscription_id")
 
-    def _is_paid_subscriber(self, sub: Dict[str, Any]) -> bool:
+    def _is_paid_subscriber(self, sub: dict[str, Any]) -> bool:
         """Active paid Stripe subscription (package requests only)."""
         plan = (sub.get("plan_name") or "free").lower()
         if plan == "free":
@@ -84,7 +85,7 @@ class SubscriptionService:
         st = (sub.get("subscription_status") or "inactive").lower()
         return st in ("active", "trial", "past_due")
 
-    async def get_subscription(self, user_id: str) -> Dict[str, Any]:
+    async def get_subscription(self, user_id: str) -> dict[str, Any]:
         """
         Get user subscription details including remaining requests.
         If no record exists (should be created by trigger), creates one.
@@ -116,7 +117,7 @@ class SubscriptionService:
             logger.error(f"Error fetching subscription for {user_id}: {e}")
             raise e
 
-    async def _check_trial_expiry(self, subscription: Dict[str, Any]) -> None:
+    async def _check_trial_expiry(self, subscription: dict[str, Any]) -> None:
         """
         Legacy: app-side trial period after old plan-based trials. Safe no-op for new flow (status active on subscribe).
         """
@@ -140,7 +141,7 @@ class SubscriptionService:
         stripe_customer_id: str = None,
         stripe_subscription_id: str = None,
         payment_completed: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Activate a paid plan after Stripe checkout. No per-plan trial requests; package pool only.
         Signup free pool (trial_requests_*) is cleared on subscribe.
@@ -154,7 +155,7 @@ class SubscriptionService:
             plan_requests = plan_config["requests"]
             plan_requests_remaining = plan_requests if payment_completed else 0
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             if billing_cycle.lower() == "monthly":
                 plan_reset_date = now + timedelta(days=30)
             else:
@@ -190,7 +191,7 @@ class SubscriptionService:
             logger.error(f"Error starting subscription for {user_id}: {e}")
             raise e
 
-    async def activate_subscription(self, user_id: str) -> Dict[str, Any]:
+    async def activate_subscription(self, user_id: str) -> dict[str, Any]:
         """Set subscription to active (e.g. Stripe webhook)."""
         try:
             update_data = {
@@ -207,7 +208,7 @@ class SubscriptionService:
             logger.error(f"Error activating subscription for {user_id}: {e}")
             raise e
 
-    async def check_request_balance(self, user_id: str) -> Dict[str, Any]:
+    async def check_request_balance(self, user_id: str) -> dict[str, Any]:
         """
         Free signup tier: only signup free requests (trial_requests_*).
         Paid subscriber: only package requests (plan_requests_*).
@@ -242,7 +243,7 @@ class SubscriptionService:
             "trial_end_date": sub.get("trial_end_date"),
         }
 
-    async def deduct_request(self, user_id: str) -> Dict[str, Any]:
+    async def deduct_request(self, user_id: str) -> dict[str, Any]:
         """Deduct one request from the appropriate pool (signup free vs package)."""
         try:
             current_sub = await self.get_subscription(user_id)
@@ -290,7 +291,7 @@ class SubscriptionService:
             logger.error(f"Error deducting request for {user_id}: {e}")
             raise e
 
-    async def activate_plan_requests(self, user_id: str) -> Dict[str, Any]:
+    async def activate_plan_requests(self, user_id: str) -> dict[str, Any]:
         """Grant package requests (mock dev helper)."""
         try:
             current_sub = await self.get_subscription(user_id)
@@ -311,7 +312,7 @@ class SubscriptionService:
             logger.error(f"Error activating plan requests for {user_id}: {e}")
             raise e
 
-    async def reset_plan_requests(self, user_id: str) -> Dict[str, Any]:
+    async def reset_plan_requests(self, user_id: str) -> dict[str, Any]:
         """Reset plan requests on successful recurring invoice payment."""
         try:
             current_sub = await self.get_subscription(user_id)
@@ -326,9 +327,9 @@ class SubscriptionService:
             plan_requests = plan_config.get("requests", 0)
 
             if billing_cycle == "monthly":
-                next_reset = datetime.now(timezone.utc) + timedelta(days=30)
+                next_reset = datetime.now(UTC) + timedelta(days=30)
             else:
-                next_reset = datetime.now(timezone.utc) + timedelta(days=365)
+                next_reset = datetime.now(UTC) + timedelta(days=365)
 
             update_data = {
                 "plan_requests_remaining": plan_requests,

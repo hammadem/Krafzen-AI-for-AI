@@ -3,16 +3,17 @@ Dashboard endpoints — activity feed + workspace summary.
 Owner: Tazwar (queue_owner). Feeds Sunny's UI shells (Step 4/5).
 """
 
-from fastapi import APIRouter, Depends, Query, HTTPException
-from typing import List, Optional
-from pydantic import BaseModel
 from datetime import datetime
-from app.middlewares.auth import require_auth
-from app.schemas.export_contracts import ExportStatus
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+
 from app.db.queries.job_queries import get_jobs
 from app.db.queries.project_queries import get_projects
-from app.utils.queue_monitor import get_queue_health
+from app.middlewares.auth import require_auth
+from app.schemas.export_contracts import ExportStatus
 from app.utils.logger import logger
+from app.utils.queue_monitor import get_queue_health
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -21,13 +22,13 @@ class ActivityEvent(BaseModel):
     job_id: str
     project_id: str
     status: ExportStatus
-    occurred_at: Optional[datetime]
+    occurred_at: datetime | None
     event_type: str        # "status_change" always for now; extendable
     message: str           # human-readable label for the notification UI
 
 
 class ActivityFeedResponse(BaseModel):
-    events: List[ActivityEvent]
+    events: list[ActivityEvent]
     total: int
 
 
@@ -65,7 +66,7 @@ _ATTENTION_STATES = {
 
 @router.get("/activity", response_model=ActivityFeedResponse)
 async def get_activity_feed(
-    project_id: Optional[str] = Query(None, description="Filter to a specific project"),
+    project_id: str | None = Query(None, description="Filter to a specific project"),
     limit: int = Query(20, ge=1, le=100),
     user=Depends(require_auth),
 ):
@@ -182,12 +183,12 @@ class NotificationItem(BaseModel):
     title: str                 # e.g. "Export completed"
     message: str               # same human label as activity feed
     read: bool                 # always False on creation; toggled via PATCH below
-    created_at: Optional[datetime]
+    created_at: datetime | None
     type: str                  # "success" | "error" | "warning" | "info"
 
 
 class NotificationsResponse(BaseModel):
-    notifications: List[NotificationItem]
+    notifications: list[NotificationItem]
     total: int
 
 
@@ -285,13 +286,13 @@ async def mark_notification_read(
 
 class MemberItem(BaseModel):
     user_id: str
-    email: Optional[str] = None
-    display_name: Optional[str] = None
+    email: str | None = None
+    display_name: str | None = None
     role: str = "member"       # "owner" | "member" — extend when roles table exists
 
 
 class MembersResponse(BaseModel):
-    members: List[MemberItem]
+    members: list[MemberItem]
     total: int
 
 
@@ -324,11 +325,11 @@ async def get_workspace_members(user=Depends(require_auth)):
 class QueueHealthResponse(BaseModel):
     counts_by_status: dict
     stuck_jobs: int
-    stuck_job_ids: List[str]
+    stuck_job_ids: list[str]
     unknown_status_rows: int
     threshold_minutes: int
     assessed_at: str
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @router.get("/queue-health", response_model=QueueHealthResponse)

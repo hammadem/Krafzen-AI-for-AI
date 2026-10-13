@@ -6,7 +6,7 @@ Do not add format-specific top-level fields; nest under `elements` or `metadata`
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -31,12 +31,12 @@ class Point3D(BaseModel):
 class ExportModelMetadata(BaseModel):
     project_id: str
     schema_version: int = Field(default=1, description="ExportModel schema version.")
-    jurisdiction_id: Optional[str] = None
-    compliance_preset_id: Optional[str] = None
-    rule_version: Optional[str] = None
-    source_job_id: Optional[str] = None
+    jurisdiction_id: str | None = None
+    compliance_preset_id: str | None = None
+    rule_version: str | None = None
+    source_job_id: str | None = None
     units: str = Field(default="imperial", description="imperial | metric")
-    extra: Dict[str, Any] = Field(default_factory=dict)
+    extra: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExportModelElement(BaseModel):
@@ -45,17 +45,17 @@ class ExportModelElement(BaseModel):
     """
 
     krafzen_id: str = Field(..., description="Stable Krafzen element id.")
-    revit_id: Optional[str] = Field(default=None, description="Populated after Revit sync (Phase 2).")
+    revit_id: str | None = Field(default=None, description="Populated after Revit sync (Phase 2).")
     element_type: ElementType
-    name: Optional[str] = None
-    level_id: Optional[str] = Field(default=None, description="Reference to level krafzen_id.")
-    parent_id: Optional[str] = None
-    geometry: Dict[str, Any] = Field(
+    name: str | None = None
+    level_id: str | None = Field(default=None, description="Reference to level krafzen_id.")
+    parent_id: str | None = None
+    geometry: dict[str, Any] = Field(
         default_factory=dict,
         description="Abstract geometry: points, polylines, bounds, or solid refs.",
     )
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    relationships: Dict[str, List[str]] = Field(
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    relationships: dict[str, list[str]] = Field(
         default_factory=dict,
         description="Adjacency/links, e.g. {'hosted_by': ['wall-1']}.",
     )
@@ -65,7 +65,7 @@ class ExportModel(BaseModel):
     """Single canonical model snapshot passed to exporters and compliance checks."""
 
     metadata: ExportModelMetadata
-    elements: List[ExportModelElement] = Field(default_factory=list)
+    elements: list[ExportModelElement] = Field(default_factory=list)
 
 
 def example_export_model() -> ExportModel:

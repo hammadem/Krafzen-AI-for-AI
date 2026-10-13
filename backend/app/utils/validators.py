@@ -1,7 +1,10 @@
 import uuid
-from app.db.supabase_client import db
+
 from fastapi.concurrency import run_in_threadpool
+
+from app.db.supabase_client import db
 from app.utils.logger import logger
+
 
 # Validates that a string is a proper UUID format
 # Used across queries to prevent invalid DB lookups

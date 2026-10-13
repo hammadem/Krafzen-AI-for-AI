@@ -10,31 +10,32 @@ Legacy payload shape finalized with Sunny (Week 2):
   - actor: {display_name, avatar_url} joined inline
 """
 
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
 from app.utils.logger import logger
 
 
 async def record_event(
-    event_name: Optional[str] = None,
-    job_id: Optional[str] = None,
-    project_id: Optional[str] = None,
-    actor_user_id: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-    message: Optional[str] = None,
+    event_name: str | None = None,
+    job_id: str | None = None,
+    project_id: str | None = None,
+    actor_user_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    message: str | None = None,
     *,
-    action: Optional[str] = None,
-    entity_type: Optional[str] = None,
-    entity_id: Optional[str] = None,
-    organization_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    action: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    organization_id: str | None = None,
+) -> dict[str, Any]:
     """
-    Append one audit event. The old event_name/job_id arguments remain supported
-    while callers migrate to action/entity_type/entity_id.
+    Backward-compatible activity writer. New callers should use
+    record_audit_event with explicit entity fields.
     """
     resolved_action = action or event_name
     if not resolved_action:
@@ -55,26 +56,63 @@ async def record_event(
     if not resolved_entity_id:
         raise ValueError("An audit event entity_id is required")
 
+    return await record_audit_event(
+        actor_user_id=actor_user_id,
+        organization_id=organization_id,
+        project_id=project_id,
+        action=resolved_action,
+        entity_type=resolved_entity_type,
+        entity_id=resolved_entity_id,
+        metadata=event_metadata,
+        message=message,
+        legacy_job_id=job_id,
+    )
+
+
+async def record_audit_event(
+    *,
+    action: str,
+    entity_type: str,
+    entity_id: str,
+    actor_user_id: str | None = None,
+    organization_id: str | None = None,
+    project_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    message: str | None = None,
+    legacy_job_id: str | None = None,
+) -> dict[str, Any]:
+    """Append a canonical audit event and return its stored representation.
+
+    Use ``actor_user_id=None`` for automated/system actions. ``entity_id`` is
+    polymorphic; ``entity_type`` identifies the referenced entity kind.
+    """
+    if not action or not action.strip():
+        raise ValueError("An audit event action is required")
+    if not entity_type or not entity_type.strip():
+        raise ValueError("An audit event entity_type is required")
+    if not entity_id:
+        raise ValueError("An audit event entity_id is required")
+
     event_id = str(uuid4())
-    timestamp = datetime.now(timezone.utc).isoformat()
-    legacy_job_id = job_id
-    if legacy_job_id is None and resolved_entity_type == "export_job":
-        legacy_job_id = resolved_entity_id
+    timestamp = datetime.now(UTC).isoformat()
+    event_metadata = metadata or {}
+    if legacy_job_id is None and entity_type == "export_job":
+        legacy_job_id = entity_id
 
     payload = {
         "event_id": event_id,
         "id": event_id,
-        "action": resolved_action,
-        "event_name": resolved_action,
-        "entity_type": resolved_entity_type,
-        "entity_id": resolved_entity_id,
+        "action": action,
+        "event_name": action,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
         "organization_id": organization_id,
         "timestamp": timestamp,
         "created_at": timestamp,
         "job_id": legacy_job_id,
         "project_id": project_id,
         "actor_user_id": actor_user_id,
-        "message": message or _default_message(resolved_action),
+        "message": message or _default_message(action),
         "metadata": event_metadata,
     }
 
@@ -85,16 +123,16 @@ async def record_event(
         if response and response.data:
             logger.info(
                 "[activity_service] Event recorded",
-                action=resolved_action,
-                entity_id=resolved_entity_id,
+                action=action,
+                entity_id=entity_id,
             )
             return _shape_activity_row(response.data[0])
         raise RuntimeError("Activity event insert returned no data")
     except Exception as e:
         logger.error(
             "[activity_service] Failed to record event",
-            action=resolved_action,
-            entity_id=resolved_entity_id,
+            action=action,
+            entity_id=entity_id,
             error=str(e),
             exc_info=True,
         )
@@ -105,7 +143,7 @@ async def get_project_activity(
     project_id: str,
     user_id: str,          # required — Yehor confirmed service role bypasses RLS
     limit: int = 50,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Fetch recent activity for a project with actor info joined inline.
     Explicit ownership check required (service role client bypasses RLS).
@@ -141,7 +179,7 @@ async def get_project_activity(
         return []
 
 
-async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
     """Fetch only events assigned to this workspace for a verified member."""
     try:
         is_member = await run_in_threadpool(
@@ -165,7 +203,7 @@ async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 5
         return []
 
 
-def _shape_activity_row(row: Dict[str, Any]) -> Dict[str, Any]:
+def _shape_activity_row(row: dict[str, Any]) -> dict[str, Any]:
     """
     Return canonical audit fields and legacy aliases for existing feed clients.
     """
@@ -206,8 +244,8 @@ def _shape_activity_row(row: Dict[str, Any]) -> Dict[str, Any]:
 def _entity_type_for(
     action: str,
     *,
-    job_id: Optional[str],
-    project_id: Optional[str],
+    job_id: str | None,
+    project_id: str | None,
 ) -> str:
     if action.startswith("file."):
         return "file"
@@ -232,7 +270,7 @@ def _entity_type_for(
     return "legacy_event"
 
 
-def _metadata_entity_id(action: str, metadata: Dict[str, Any]) -> Optional[str]:
+def _metadata_entity_id(action: str, metadata: dict[str, Any]) -> str | None:
     generic_id = metadata.get("entity_id")
     if generic_id:
         return str(generic_id)

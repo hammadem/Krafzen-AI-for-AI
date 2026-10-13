@@ -11,21 +11,22 @@ Coordinates with:
 """
 
 import asyncio
+from typing import Any
 
-from typing import Any, Dict, Optional
 from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
-from app.db.queries.job_queries import get_jobs
-from app.db.queries.project_queries import get_project
-from app.services.queue_service import advance_export_status
 from app.schemas.export_contracts import ExportStatus, PipelineStage
+from app.services.activity_service import record_audit_event
 from app.services.export_pipeline_service import (
     run_export_generation,
     run_postflight_gate,
     run_preflight_gate,
 )
-from app.services.activity_service import record_event as _record_activity_event
-from app.services.notification_service import create_notification as _create_notification
+from app.services.notification_service import (
+    create_notification as _create_notification,
+)
+from app.services.queue_service import advance_export_status
 from app.utils.logger import logger
 
 WORKER_POLL_INTERVAL_SECONDS = 5
@@ -33,7 +34,7 @@ JOB_TIMEOUT_SECONDS = 120
 MAX_RETRY_COUNT = 3  # coordinate this value with Kiruthika's export pipeline
 
 
-async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -> None:
+async def process_export_job(job: dict[str, Any], system_user: dict[str, Any]) -> None:
     """
     Drive a single job through: QUEUED → PROCESSING → VALIDATING → COMPLETED (or FAILED).
     Emits activity events and notifications at each transition.
@@ -60,7 +61,7 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
         # === PROCESSING STAGE ===
         try:
             await asyncio.wait_for(_run_export_pipeline(job), timeout=JOB_TIMEOUT_SECONDS)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("[worker] Job timed out", job_id=job_id)
             await advance_export_status(
                 job_id, ExportStatus.FAILED, system_user,
@@ -102,13 +103,13 @@ async def process_export_job(job: Dict[str, Any], system_user: Dict[str, Any]) -
         logger.error("[worker] Unexpected error processing job", job_id=job_id, error=str(e), exc_info=True)
         await advance_export_status(
             job_id, ExportStatus.FAILED, system_user,
-            error_message=f"Unexpected worker error: {str(e)}"
+            error_message=f"Unexpected worker error: {e!s}"
         )
         await emit_export_event("export.failed", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export failed unexpectedly.")
         await emit_notification(job_id, project_id, "export_failed", "Export failed unexpectedly.")
 
 
-async def _run_export_pipeline(job: Dict[str, Any]) -> None:
+async def _run_export_pipeline(job: dict[str, Any]) -> None:
     """Kiruthika export pipeline hook (Week 2)."""
     meta_patch = await run_export_generation(job)
     if meta_patch:
@@ -116,9 +117,9 @@ async def _run_export_pipeline(job: Dict[str, Any]) -> None:
         job["metadata"]["stage"] = PipelineStage.EXPORT_GENERATION.value
 
 
-async def emit_export_event(event_name: str, job_id: str, project_id: str, actor_user_id: Optional[str] = None, message: Optional[str] = None,) -> None:
+async def emit_export_event(event_name: str, job_id: str, project_id: str, actor_user_id: str | None = None, message: str | None = None,) -> None:
     logger.info("[worker] Emitting event", event_name=event_name, job_id=job_id, project_id=project_id)
-    await _record_activity_event(
+    await record_audit_event(
         action=event_name,
         entity_type="export_job",
         entity_id=job_id,
@@ -192,7 +193,7 @@ async def _poll_export_jobs() -> None:
         await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
 
 
-async def _resolve_project_owner(project_id: Optional[str]) -> Optional[str]:
+async def _resolve_project_owner(project_id: str | None) -> str | None:
     """Fallback: look up project owner when requested_by is absent."""
     if not project_id:
         return None

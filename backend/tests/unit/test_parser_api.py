@@ -1,7 +1,6 @@
-from fastapi.testclient import TestClient
-
 from app.api.parser import router
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 def test_parser_status_placeholder():

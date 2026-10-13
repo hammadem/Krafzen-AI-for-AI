@@ -3,8 +3,8 @@ Test suite for Jobs CRUD endpoints
 """
 
 import pytest
-from httpx import AsyncClient
 from app.main import app
+from httpx import AsyncClient
 
 BASE_URL = "/api/v1/jobs"
 

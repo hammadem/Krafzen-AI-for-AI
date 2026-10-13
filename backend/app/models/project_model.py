@@ -1,27 +1,29 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel
+
 
 class ProjectCreate(BaseModel): 
     input_text: str
 
 class ProjectUpdate(BaseModel):
-    input_text: Optional[str] = None
-    parsed_json: Optional[Dict[str, Any]] = None
-    image_url: Optional[str] = None
-    dxf_url: Optional[str] = None
-    dwg_url: Optional[str] = None
+    input_text: str | None = None
+    parsed_json: dict[str, Any] | None = None
+    image_url: str | None = None
+    dxf_url: str | None = None
+    dwg_url: str | None = None
 
 class ProjectOut(BaseModel):
     id: str
     user_id: str
     input_text: str
-    parsed_json: Optional[Dict[str, Any]] = None
-    image_url: Optional[str] = None
-    dxf_url: Optional[str] = None
-    dwg_url: Optional[str] = None
+    parsed_json: dict[str, Any] | None = None
+    image_url: str | None = None
+    dxf_url: str | None = None
+    dwg_url: str | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True  # Allows ORM-ish mapping

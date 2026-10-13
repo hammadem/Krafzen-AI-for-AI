@@ -2,10 +2,11 @@
 Test suite for Files CRUD endpoints
 """
 
-import pytest
-from httpx import AsyncClient
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from app.main import app
+from httpx import AsyncClient
 
 BASE_URL = "/api/v1/files"
 

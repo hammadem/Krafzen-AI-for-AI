@@ -7,10 +7,11 @@ Table: notifications (see migration 004_week2_activity_notifications.sql)
 Coordinate with Sunny: she reads GET /notifications and unread count.
 """
 
-from typing import Any, Dict, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
 from app.utils.logger import logger
 
@@ -26,10 +27,10 @@ async def create_notification(
     user_id: str,
     notification_type: str,
     message: str,
-    job_id: Optional[str] = None,
-    project_id: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-) -> Optional[Dict[str, Any]]:
+    job_id: str | None = None,
+    project_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     """
     Insert a new unread notification for a user.
     """
@@ -44,7 +45,7 @@ async def create_notification(
         "project_id": project_id,
         "metadata": metadata or {},
         "is_read": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
     try:

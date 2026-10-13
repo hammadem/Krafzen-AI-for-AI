@@ -15,7 +15,6 @@ import subprocess
 import tarfile
 import threading
 from pathlib import Path
-from typing import Optional, Tuple
 
 _bundle_lock = threading.Lock()
 
@@ -39,10 +38,10 @@ _DEBIAN_OGL_DEB_URLS = (
 )
 # Cloudflare R2 presigned URLs: max expiry is 7 days (604800 seconds), not 30 days.
 _R2_PRESIGN_MAX_SECONDS = 604_800
-_last_oda_error: Optional[str] = None
+_last_oda_error: str | None = None
 
 
-def get_last_oda_error() -> Optional[str]:
+def get_last_oda_error() -> str | None:
     """Human-readable reason the last bundle download/install failed (for API errors)."""
     return _last_oda_error
 
@@ -61,7 +60,7 @@ def backend_root() -> Path:
     return here
 
 
-def bundle_dir(root: Optional[Path] = None) -> Path:
+def bundle_dir(root: Path | None = None) -> Path:
     return (root or backend_root()) / _BUNDLE_DIR_NAME
 
 
@@ -94,7 +93,7 @@ def _prepend_ld_path(env: dict[str, str], extra_dirs: list[str]) -> None:
     env["LD_LIBRARY_PATH"] = f"{prefix}{sep}{prev}" if prev else prefix
 
 
-def _ogl_runtime_lib_dir(bdir: Path) -> Optional[str]:
+def _ogl_runtime_lib_dir(bdir: Path) -> str | None:
     lib_dir = bdir / "_ogl_runtime" / "usr/lib/x86_64-linux-gnu"
     if lib_dir.is_dir() and (
         (lib_dir / "libOpenGL.so.0").exists() or any(lib_dir.glob("libOpenGL.so*"))
@@ -151,7 +150,7 @@ def _bundle_extra_ld_dirs(bdir: Path) -> list[str]:
     return dirs
 
 
-def _find_file_in_tree(root: Path, filename: str) -> Optional[Path]:
+def _find_file_in_tree(root: Path, filename: str) -> Path | None:
     for path in root.rglob(filename):
         if path.is_file():
             return path
@@ -166,7 +165,7 @@ def _qt6_runtime_root(bdir: Path) -> Path:
     return bdir / "_qt6_runtime"
 
 
-def _qt6_runtime_paths(bdir: Path) -> Tuple[Optional[str], Optional[str]]:
+def _qt6_runtime_paths(bdir: Path) -> tuple[str | None, str | None]:
     """Deprecated: do not load Debian libQt6Gui (Qt 6.4) alongside ODA's libQt6Core."""
     return None, None
 
@@ -199,7 +198,7 @@ def _linux_prefer_xvfb() -> bool:
     return True
 
 
-def _oda_platforms_dir(root: Path) -> Optional[Path]:
+def _oda_platforms_dir(root: Path) -> Path | None:
     """
     Qt platforms/ folder ODA actually uses (next to ODAFileConverter_* ELF).
     Must match: .oda_bundle/usr/bin/ODAFileConverter_27.1.0.0/plugins/platforms
@@ -245,7 +244,7 @@ def _install_vendored_qt_headless_plugins(platforms_dir: Path) -> bool:
     return installed and _has_headless_qt_plugin(platforms_dir)
 
 
-def ensure_headless_qt_plugins(root: Optional[Path] = None) -> bool:
+def ensure_headless_qt_plugins(root: Path | None = None) -> bool:
     """Point Qt at ODA's platforms/ (xcb and/or ODA-shipped offscreen). Never mix Debian Qt libs."""
     root = root or backend_root()
     bdir = bundle_dir(root)
@@ -355,7 +354,7 @@ def _ensure_headless_qt_plugins_from_deb(bdir: Path, platforms: Path) -> bool:
     return _has_headless_qt_plugin(platforms)
 
 
-def _ensure_xvfb_bundle(bdir: Path) -> Optional[str]:
+def _ensure_xvfb_bundle(bdir: Path) -> str | None:
     """Ensure bundled Xvfb exists (build artifact or runtime deb extract)."""
     bin_path = bdir / "xvfb" / "usr" / "bin" / "Xvfb"
     if bin_path.is_file():
@@ -385,7 +384,7 @@ def _ensure_xvfb_bundle(bdir: Path) -> Optional[str]:
     return None
 
 
-def _find_qt_platforms_dir(bdir: Path) -> Optional[str]:
+def _find_qt_platforms_dir(bdir: Path) -> str | None:
     """Directory containing libq*.so platform plugins (e.g. .../plugins/platforms)."""
     root = backend_root()
     oda_plat = _oda_platforms_dir(root)
@@ -408,7 +407,7 @@ def _find_qt_platforms_dir(bdir: Path) -> Optional[str]:
     return str(candidates[0].resolve())
 
 
-def _read_bundle(root: Path) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def _read_bundle(root: Path) -> tuple[str | None, str | None, str | None]:
     rel_file = bundle_dir(root) / _MANIFEST
     ld_file = bundle_dir(root) / _LD_PATH_FILE
     if not rel_file.is_file():
@@ -465,7 +464,7 @@ def _is_elf_executable(path: Path) -> bool:
         return False
 
 
-def _find_oda_binary(extract_root: Path) -> Optional[Path]:
+def _find_oda_binary(extract_root: Path) -> Path | None:
     """
     Return the real ODA ELF binary, not usr/bin/ODAFileConverter (a shell wrapper
   that execs hardcoded /usr/bin/ODAFileConverter_* paths).
@@ -549,7 +548,7 @@ def _extract_deb_ar_tar(deb_path: Path, dest: Path) -> bool:
 def _extract_deb_python(deb_path: Path, dest: Path) -> None:
     """Extract data.tar.* from a .deb using stdlib only (ar + tar/lzma)."""
     dest.mkdir(parents=True, exist_ok=True)
-    data_blob: Optional[bytes] = None
+    data_blob: bytes | None = None
 
     with deb_path.open("rb") as f:
         magic = f.read(8)
@@ -627,7 +626,7 @@ def _hint_for_download_failure(status_code: int, body: str, url: str) -> str:
     return f"HTTP {status_code} downloading .deb"
 
 
-def _r2_download_config() -> Optional[dict[str, str]]:
+def _r2_download_config() -> dict[str, str] | None:
     """R2 S3 API settings (preferred over presigned URL on Render)."""
     access = (
         (getattr(settings, "R2_ACCESS_KEY_ID", None) or "")
@@ -836,7 +835,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         deb_local.unlink(missing_ok=True)
 
 
-def apply_oda_runtime_env(run_env: dict[str, str], root: Optional[Path] = None) -> None:
+def apply_oda_runtime_env(run_env: dict[str, str], root: Path | None = None) -> None:
     """Set LD_LIBRARY_PATH and Qt platform env for headless ODA on Linux."""
     import sys
 
@@ -892,14 +891,14 @@ def _needs_virtual_display(root: Path) -> bool:
     return (p / "libqxcb.so").exists()
 
 
-def _find_xvfb_binary(root: Path) -> Optional[str]:
+def _find_xvfb_binary(root: Path) -> str | None:
     return _ensure_xvfb_bundle(bundle_dir(root))
 
 
 def run_oda_subprocess(
     cmd: list[str],
     env: dict[str, str],
-    root: Optional[Path] = None,
+    root: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """
     Run ODA with correct Qt env. Starts Xvfb directly when only xcb is available
@@ -957,12 +956,12 @@ def run_oda_subprocess(
             xvfb_proc.kill()
 
 
-def wrap_oda_command(cmd: list[str], root: Optional[Path] = None) -> list[str]:
+def wrap_oda_command(cmd: list[str], root: Path | None = None) -> list[str]:
     """Deprecated: use run_oda_subprocess. Kept for tests that only inspect command wrapping."""
     return cmd
 
 
-def resolve_bundled_oda() -> Tuple[Optional[str], Optional[str]]:
+def resolve_bundled_oda() -> tuple[str | None, str | None]:
     """Return (converter_path, ld_library_path_prefix) from .oda_bundle if present."""
     root = backend_root()
     ensure_oda_bundle()

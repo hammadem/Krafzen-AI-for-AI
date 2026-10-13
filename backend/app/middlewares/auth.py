@@ -1,16 +1,18 @@
-from fastapi import Header, HTTPException
-from typing import Optional, Dict, Any
-from pydantic import BaseModel
-from app.core.security import decode_supabase_token
-from app.core.config import settings
 import logging
+from typing import Any
+
+from fastapi import Header, HTTPException
+from pydantic import BaseModel
+
+from app.core.config import settings
+from app.core.security import decode_supabase_token
 
 
 class ErrorResponse(BaseModel):
     error: str
 
 
-async def require_auth(authorization: str = Header(None)) -> Dict[str, Any]:
+async def require_auth(authorization: str = Header(None)) -> dict[str, Any]:
 
     if not authorization:
         raise HTTPException(
@@ -61,8 +63,8 @@ async def require_auth(authorization: str = Header(None)) -> Dict[str, Any]:
 
 
 async def require_auth_optional(
-    authorization: Optional[str] = Header(None)
-) -> Optional[Dict[str, Any]]:
+    authorization: str | None = Header(None)
+) -> dict[str, Any] | None:
     """
     Optional version.
     Returns:

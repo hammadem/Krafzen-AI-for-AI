@@ -1,22 +1,20 @@
 """FastAPI entry point for KRAFZEN AI backend."""
+import asyncio
+import logging
 import re
 import sys
-import sentry_sdk
+
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+
+from app.api import health, transcriber
 from app.core.config import settings
 from app.core.logging_config import init_sentry
-from app.utils.error_handler import add_exception_handlers
 from app.routes.activity_routes import router as activity_router
 from app.routes.notification_routes import router as notification_router
 from app.services.worker_service import _poll_export_jobs
-from app.api import health, transcriber
-from app.db.supabase_client import db
-import logging
-import asyncio
-import sys
+from app.utils.error_handler import add_exception_handlers
 
 logger = logging.getLogger(__name__)
 
@@ -90,20 +88,18 @@ app.add_middleware(WildcardCORSMiddleware)
 
 # Include API routers
 from app.routes import (
-    project_routes,
-    job_routes,
-    file_routes,
-    chat_routes,
-    payment_routes,
-    user_routes,
     architecture_routes,
+    chat_routes,
     dashboard_routes,
-    workspace_routes,
-    activity_routes,
-    notification_routes,
-    export_validation_routes,
-    invite_routes,
     export_routes,
+    export_validation_routes,
+    file_routes,
+    invite_routes,
+    job_routes,
+    payment_routes,
+    project_routes,
+    user_routes,
+    workspace_routes,
 )
 
 # ... (middle of file)
@@ -212,8 +208,8 @@ async def rebuild_openapi_schema():
 
     def _bootstrap_oda_bundle() -> None:
         try:
-            from app.services.oda_bundle import warm_dwg_runtime
             from app.services.dwg_converter_service import dwg_converter_service
+            from app.services.oda_bundle import warm_dwg_runtime
 
             warm_dwg_runtime()
             if dwg_converter_service.is_configured():

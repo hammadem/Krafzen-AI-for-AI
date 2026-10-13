@@ -1,6 +1,8 @@
 """Centralized logging + Sentry integration."""
 import logging
+
 import structlog
+
 from app.core.config import settings
 
 # Basic stdlib setup

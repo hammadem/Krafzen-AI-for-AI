@@ -5,7 +5,7 @@ Called by worker_service during VALIDATION_PRECHECK and INTEGRITY_VERIFICATION s
 Rule execution expands in Week 3+; Week 2 freezes contract shape and gate behavior.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.schemas.export_contracts import (
     ExportFormat,
@@ -24,8 +24,8 @@ def _issue(
     *,
     category: ValidationCategory = ValidationCategory.EXPORT_INTEGRITY,
     severity: ValidationSeverity = ValidationSeverity.ERROR,
-    element_ref: Optional[str] = None,
-    suggested_fix: Optional[str] = None,
+    element_ref: str | None = None,
+    suggested_fix: str | None = None,
 ) -> ValidationIssue:
     return ValidationIssue(
         category=category,
@@ -39,13 +39,13 @@ def _issue(
     )
 
 
-async def run_preflight(export_context: Dict[str, Any]) -> PreflightReport:
+async def run_preflight(export_context: dict[str, Any]) -> PreflightReport:
     """
     Preflight checks before PROCESSING. Blocks worker when can_proceed=False.
     export_context: export_jobs row or jobs row with project_id, format, metadata.
     """
     export_id = export_context.get("id")
-    issues: List[ValidationIssue] = []
+    issues: list[ValidationIssue] = []
 
     if not export_context.get("project_id"):
         issues.append(_issue("EXPORT_MISSING_PROJECT", "Export requires a project_id."))
@@ -73,13 +73,13 @@ async def run_preflight(export_context: Dict[str, Any]) -> PreflightReport:
     )
 
 
-async def run_postflight(export_context: Dict[str, Any]) -> PostflightReport:
+async def run_postflight(export_context: dict[str, Any]) -> PostflightReport:
     """
     Postflight checks after export generation. Sets requires_review when warnings
     exceed threshold; FAILED transitions handled by worker when passed=False.
     """
     export_id = export_context.get("id")
-    issues: List[ValidationIssue] = []
+    issues: list[ValidationIssue] = []
 
     if not export_context.get("artifact_file_id"):
         issues.append(
@@ -119,8 +119,8 @@ def validation_payload_from_report(
     export_id: str,
     export_format: str,
     status: str,
-    issues: List[ValidationIssue],
-) -> Dict[str, Any]:
+    issues: list[ValidationIssue],
+) -> dict[str, Any]:
     """Build ExportValidationPayload-compatible dict for GET /exports/{id}/validation."""
     return {
         "export_id": export_id,

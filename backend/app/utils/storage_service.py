@@ -1,8 +1,8 @@
 """Supabase Storage service for CAD file uploads/downloads."""
 
 import logging
-from typing import Optional
 from datetime import datetime
+
 from app.db.supabase_client import db
 
 logger = logging.getLogger(__name__)
@@ -28,8 +28,8 @@ class StorageService:
         project_id: str,
         user_id: str,
         file_extension: str = "dxf",
-        filename: Optional[str] = None,
-    ) -> Optional[str]:
+        filename: str | None = None,
+    ) -> str | None:
         """Upload a CAD file (DXF/DWG/etc.) and return its public URL."""
         try:
             ext = (file_extension or "dxf").strip(".").lower()
@@ -79,8 +79,8 @@ class StorageService:
         dxf_bytes: bytes,
         project_id: str,
         user_id: str,
-        filename: Optional[str] = None
-    ) -> Optional[str]:
+        filename: str | None = None
+    ) -> str | None:
         """Backward-compatible DXF uploader."""
         return await StorageService.upload_cad_file(
             file_bytes=dxf_bytes,
@@ -91,7 +91,7 @@ class StorageService:
         )
     
     @staticmethod
-    async def get_dxf_file_url(project_id: str, user_id: str) -> Optional[str]:
+    async def get_dxf_file_url(project_id: str, user_id: str) -> str | None:
         """
         Get the public URL for a project's DXF file
         
@@ -136,7 +136,7 @@ class StorageService:
             return None
     
     @staticmethod
-    async def download_dxf_file(project_id: str, user_id: str) -> Optional[bytes]:
+    async def download_dxf_file(project_id: str, user_id: str) -> bytes | None:
         """
         Download DXF file from Supabase Storage
         
@@ -177,7 +177,7 @@ class StorageService:
             return None
 
     @staticmethod
-    async def download_cad_file(project_id: str, user_id: str, file_extension: str) -> Optional[bytes]:
+    async def download_cad_file(project_id: str, user_id: str, file_extension: str) -> bytes | None:
         """Download the latest CAD file by extension for a project."""
         try:
             ext = (file_extension or "").strip(".").lower()

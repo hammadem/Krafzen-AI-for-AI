@@ -1,12 +1,12 @@
-import subprocess
-import os
-import uuid
 import base64
 import logging
+import os
+import subprocess
+import uuid
+from io import BytesIO
+
 import httpx
 from PIL import Image, ImageOps, ImageStat
-from io import BytesIO
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 

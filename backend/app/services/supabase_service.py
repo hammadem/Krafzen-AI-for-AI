@@ -2,17 +2,17 @@
 Supabase service for database operations
 """
 
-from supabase import create_client, Client
+
 from app.core.config import settings
 from app.utils.logger import logger
-from typing import Optional
+from supabase import Client, create_client
 
 
 class SupabaseService:
     """Handles Supabase client initialization and basic operations"""
 
     def __init__(self):
-        self.client: Optional[Client] = None
+        self.client: Client | None = None
         self.init_client()
 
     def init_client(self):
@@ -61,7 +61,7 @@ class SupabaseService:
         except Exception as e:
             return {
                 "status": "error",
-                "message": f"Supabase connection failed: {str(e)}",
+                "message": f"Supabase connection failed: {e!s}",
                 "connected": False
             }
 

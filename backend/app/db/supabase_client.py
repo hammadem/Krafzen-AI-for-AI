@@ -1,12 +1,12 @@
-from typing import Optional
-from supabase import create_client, Client
-from app.core.config import settings
 import logging
+
+from app.core.config import settings
+from supabase import Client, create_client
 
 logger = logging.getLogger(__name__)
 
 class SupabaseClient:
-    _client: Optional[Client] = None
+    _client: Client | None = None
 
     def __getattr__(self, name):
         if self._client is None:
