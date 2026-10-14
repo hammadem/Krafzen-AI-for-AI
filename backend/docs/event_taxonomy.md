@@ -55,6 +55,19 @@ Action values are text rather than a database enum so new actions can be added
 without a schema migration. Event names describe completed actions or state
 changes, not commands that have yet to run.
 
+AI audit metadata contains lifecycle references and non-content attributes
+such as IDs, jurisdiction, stage, and exception class. Prompts, generated CAD
+content, image URLs, and raw exception messages must not be copied into audit
+rows. Suggestion decisions reference the assistant message ID and are accepted
+only for an assistant message owned by the authenticated user.
+
+Revision events are emitted for versioned `files` rows. The file UUID is the
+revision reference, `version` identifies its human-facing version, and approval
+state is persisted on that row. Approve/reject and restore events are written
+only after the corresponding file state update succeeds. Restoring a revision
+means unarchiving that version; it does not overwrite or duplicate stored file
+content.
+
 ---
 
 ## Namespaces
@@ -155,7 +168,8 @@ artifact-file persistence helper.
 Every event uses `entity_type="file"` and includes file ID, display name, file
 type, version, project ID, and actor user ID in metadata. The canonical event
 columns separately store actor, project, and UTC timestamp. Apply
-`011_file_activity_lifecycle.sql` before using version or archive behavior.
+`011_file_activity_lifecycle.sql` and `012_file_revision_approval.sql` before
+using version, archive, or revision approval behavior.
 
 | Event                  | Trigger                                      |
 |------------------------|----------------------------------------------|

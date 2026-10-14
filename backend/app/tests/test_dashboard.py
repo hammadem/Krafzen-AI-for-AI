@@ -57,6 +57,45 @@ async def test_activity_feed_returns_correct_shape():
 
 
 @pytest.mark.asyncio
+async def test_activity_feed_includes_audit_events():
+    audit_event = {
+        "event_id": "00000000-0000-0000-0000-000000000010",
+        "action": "ai.generation_completed",
+        "entity_type": "ai_generation",
+        "entity_id": "00000000-0000-0000-0000-000000000011",
+        "project_id": MOCK_PROJECTS[0]["id"],
+        "timestamp": "2026-10-14T12:00:00+00:00",
+        "actor_user_id": MOCK_USER["user_id"],
+        "message": "AI generation completed",
+        "metadata": {"generation_id": "00000000-0000-0000-0000-000000000011"},
+    }
+    with (
+        patch(
+            "app.routes.dashboard_routes.get_projects",
+            new=AsyncMock(return_value=MOCK_PROJECTS),
+        ),
+        patch(
+            "app.routes.dashboard_routes.get_jobs",
+            new=AsyncMock(return_value=[]),
+        ),
+        patch(
+            "app.routes.dashboard_routes.get_project_activity",
+            new=AsyncMock(return_value=[audit_event]),
+        ),
+        patch("app.middlewares.auth.require_auth", return_value=MOCK_USER),
+    ):
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            resp = await ac.get(BASE + "/activity")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["events"][0]["action"] == "ai.generation_completed"
+    assert data["events"][0]["entity_type"] == "ai_generation"
+    assert data["events"][0]["entity_id"] == audit_event["entity_id"]
+
+
+@pytest.mark.asyncio
 async def test_workspace_summary_counts_by_status():
     with patch("app.routes.dashboard_routes.get_projects", new=AsyncMock(return_value=MOCK_PROJECTS)), \
          patch("app.routes.dashboard_routes.get_jobs", new=AsyncMock(return_value=MOCK_JOBS)), \

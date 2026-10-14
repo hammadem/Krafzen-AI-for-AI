@@ -113,6 +113,9 @@ async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[s
                 await _record_file_activity(
                     "file.version_created", created_file, user["user_id"]
                 )
+            await _record_revision_activity(
+                "revision.created", created_file, user["user_id"]
+            )
             logger.info("[create_file] File created successfully", file_id=created_file["id"])
             return created_file
         
@@ -355,7 +358,44 @@ async def restore_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | N
 
     restored_file = response.data[0]
     await _record_file_activity("file.restored", restored_file, user["user_id"])
+    await _record_revision_activity(
+        "revision.restored", restored_file, user["user_id"]
+    )
     return restored_file
+
+
+async def set_revision_approval(
+    file_id: str,
+    approval_state: str,
+    user: dict[str, Any],
+) -> dict[str, Any] | None:
+    if approval_state not in {"approved", "rejected"}:
+        raise ValueError("Revision approval state must be approved or rejected")
+
+    file = await get_file(file_id, user)
+    if not file:
+        return None
+    if file.get("approval_state") == approval_state:
+        return file
+
+    reviewed_at = datetime.now(UTC).isoformat()
+    response = await run_in_threadpool(
+        lambda: db.table("files")
+            .update({
+                "approval_state": approval_state,
+                "reviewed_by": user["user_id"],
+                "reviewed_at": reviewed_at,
+            })
+            .eq("id", file_id)
+            .execute()
+    )
+    if not response or not response.data:
+        return None
+
+    updated_file = response.data[0]
+    action = "revision.approved" if approval_state == "approved" else "revision.rejected"
+    await _record_revision_activity(action, updated_file, user["user_id"])
+    return updated_file
 
 
 async def _record_file_activity(
@@ -388,6 +428,35 @@ async def _record_file_activity(
             status_code=500,
             detail={
                 "error": f"File state changed but {action} audit event could not be recorded",
+                "entity_id": file["id"],
+            },
+        ) from error
+
+
+async def _record_revision_activity(
+    action: str,
+    file: dict[str, Any],
+    actor_user_id: str,
+) -> None:
+    try:
+        await record_audit_event(
+            action=action,
+            entity_type="revision",
+            entity_id=file["id"],
+            actor_user_id=actor_user_id,
+            project_id=file.get("project_id"),
+            metadata={
+                "revision_id": file["id"],
+                "file_id": file["id"],
+                "version": file.get("version", 1),
+                "approval_state": file.get("approval_state", "pending_review"),
+            },
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": f"Revision state changed but {action} audit event could not be recorded",
                 "entity_id": file["id"],
             },
         ) from error

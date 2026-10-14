@@ -1,5 +1,8 @@
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from app.db.queries.file_queries import (
     archive_file,
@@ -9,12 +12,17 @@ from app.db.queries.file_queries import (
     get_files,
     get_signed_url,
     restore_file,
+    set_revision_approval,
     update_file,
 )
 from app.middlewares.auth import require_auth
 from app.models.file_model import FileCreate, FileResponse, FileUpdate
 
 router = APIRouter(prefix="/files", tags=["Files"])
+
+
+class RevisionDecisionRequest(BaseModel):
+    decision: Literal["approved", "rejected"]
 
 
 @router.post("/", response_model=FileResponse, status_code=201)
@@ -91,6 +99,18 @@ async def restore_file_route(
     if not restored:
         raise HTTPException(status_code=404, detail={"error": "File not found"})
     return restored
+
+
+@router.post("/{file_id}/revision-decision", response_model=FileResponse)
+async def set_revision_decision_route(
+    file_id: str,
+    request: RevisionDecisionRequest,
+    user=Depends(require_auth),
+):
+    revision = await set_revision_approval(file_id, request.decision, user)
+    if not revision:
+        raise HTTPException(status_code=404, detail={"error": "Revision not found"})
+    return revision
 
 
 @router.get("/{file_id}/signed-url")

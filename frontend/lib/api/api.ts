@@ -263,6 +263,36 @@ export async function getDashboardActivity(
     return apiClient("GET", DASHBOARD_URLS.GET_ACTIVITY(), user);
 }
 
+export async function recordSuggestionDecision(
+    user: User | null,
+    messageId: string,
+    decision: "accepted" | "rejected"
+) {
+    return apiClient(
+        "POST",
+        `/api/v1/chat/message/${messageId}/suggestion-decision`,
+        user,
+        { decision }
+    );
+}
+
+export async function setRevisionDecision(
+    user: User | null,
+    revisionId: string,
+    decision: "approved" | "rejected"
+) {
+    return apiClient(
+        "POST",
+        `/api/v1/files/${revisionId}/revision-decision`,
+        user,
+        { decision }
+    );
+}
+
+export async function restoreFileRevision(user: User | null, revisionId: string) {
+    return apiClient("POST", `/api/v1/files/${revisionId}/restore`, user);
+}
+
 // Notifications (auth-scoped). Supports unread_only + limit.
 export async function getDashboardNotifications(
     user: User | null,

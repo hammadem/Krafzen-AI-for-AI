@@ -3,15 +3,17 @@ Dashboard endpoints — activity feed + workspace summary.
 Owner: Tazwar (queue_owner). Feeds Sunny's UI shells (Step 4/5).
 """
 
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.db.queries.job_queries import get_jobs
 from app.db.queries.project_queries import get_projects
 from app.middlewares.auth import require_auth
 from app.schemas.export_contracts import ExportStatus
+from app.services.activity_service import get_project_activity
 from app.utils.logger import logger
 from app.utils.queue_monitor import get_queue_health
 
@@ -19,12 +21,18 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 class ActivityEvent(BaseModel):
-    job_id: str
+    job_id: str | None = None
     project_id: str
-    status: ExportStatus
+    status: str | None = None
     occurred_at: datetime | None
-    event_type: str        # "status_change" always for now; extendable
-    message: str           # human-readable label for the notification UI
+    event_type: str
+    message: str
+    event_id: str | None = None
+    action: str | None = None
+    entity_type: str | None = None
+    entity_id: str | None = None
+    actor_user_id: str | None = None
+    metadata: dict = Field(default_factory=dict)
 
 
 class ActivityFeedResponse(BaseModel):
@@ -71,29 +79,30 @@ async def get_activity_feed(
     user=Depends(require_auth),
 ):
     """
-    Recent job lifecycle events for the authenticated user.
-    Ordered by most recent first. Used by Sunny's activity feed / notifications UI.
+    Recent job and audit lifecycle events for the authenticated user's projects.
+    Ordered by most recent first for the Activity Feed UI.
     """
     try:
-        # get_jobs filters by project_id and scopes to user via RLS
+        projects = await get_projects(user)
         if project_id:
-            raw_jobs = await get_jobs(project_id, user)
-        else:
-            # fetch all projects first, then gather jobs across them
-            projects = await get_projects(user)
-            raw_jobs = []
-            for p in projects:
-                jobs = await get_jobs(p["id"], user)
-                raw_jobs.extend(jobs)
+            projects = [project for project in projects if project["id"] == project_id]
 
-        # sort by updated_at descending, apply limit
-        raw_jobs.sort(
-            key=lambda j: j.get("updated_at") or j.get("created_at") or "",
-            reverse=True,
+        # The project list is already authenticated and scoped to this user.
+        # Activity reads additionally verify each project's ownership because the
+        # audit database client uses the service role.
+        project_jobs = await asyncio.gather(
+            *(get_jobs(project["id"], user) for project in projects)
         )
-        raw_jobs = raw_jobs[:limit]
+        raw_jobs = [job for jobs in project_jobs for job in jobs]
 
-        events = []
+        project_activity = await asyncio.gather(
+            *(
+                get_project_activity(project["id"], user["user_id"], limit=limit)
+                for project in projects
+            )
+        )
+
+        events: list[ActivityEvent] = []
         for job in raw_jobs:
             try:
                 status = ExportStatus(job["status"])
@@ -108,6 +117,30 @@ async def get_activity_feed(
                 message=_STATUS_LABELS.get(status, status.value),
             ))
 
+        for project_events in project_activity:
+            for event in project_events:
+                action = event.get("action") or event.get("event_name")
+                if not action or not event.get("project_id"):
+                    continue
+                events.append(ActivityEvent(
+                    job_id=event.get("job_id"),
+                    project_id=event["project_id"],
+                    occurred_at=event.get("timestamp") or event.get("created_at"),
+                    event_type=action,
+                    message=event.get("message") or action,
+                    event_id=event.get("event_id") or event.get("id"),
+                    action=action,
+                    entity_type=event.get("entity_type"),
+                    entity_id=event.get("entity_id"),
+                    actor_user_id=event.get("actor_user_id"),
+                    metadata=event.get("metadata") or {},
+                ))
+
+        events.sort(
+            key=lambda event: event.occurred_at.timestamp() if event.occurred_at else 0,
+            reverse=True,
+        )
+        events = events[:limit]
         return ActivityFeedResponse(events=events, total=len(events))
 
     except Exception as e:

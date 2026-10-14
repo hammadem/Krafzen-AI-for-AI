@@ -47,6 +47,9 @@ class FileResponse(BaseModel):
     name: str | None = None
     version: int = 1
     archived_at: datetime | None = None
+    approval_state: str = "pending_review"
+    reviewed_by: str | None = None
+    reviewed_at: datetime | None = None
     mime_type: str | None = None
     size_bytes: int | None = None
     created_at: datetime | None = None

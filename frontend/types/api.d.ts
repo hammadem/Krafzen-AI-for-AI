@@ -57,6 +57,10 @@ interface FileDetails {
     path: string;
     name?: string | null;
     file_type: string;
+    version?: number;
+    approval_state?: ApprovalState;
+    reviewed_by?: string | null;
+    reviewed_at?: string | null;
     mime_type: string | null;
     size_bytes: number | null;
     created_at: string | null;

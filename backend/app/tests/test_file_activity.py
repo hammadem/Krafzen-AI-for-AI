@@ -49,8 +49,11 @@ async def test_create_file_records_upload_with_authoritative_project():
         )
 
     assert result == file_row
-    record_event.assert_awaited_once()
-    event = record_event.await_args.kwargs
+    assert [call.kwargs["action"] for call in record_event.await_args_list] == [
+        "file.uploaded",
+        "revision.created",
+    ]
+    event = record_event.await_args_list[0].kwargs
     assert event["action"] == "file.uploaded"
     assert event["entity_type"] == "file"
     assert event["entity_id"] == FILE_ID
@@ -59,6 +62,15 @@ async def test_create_file_records_upload_with_authoritative_project():
     assert event["metadata"]["file_name"] == "floor-plan.dwg"
     assert event["metadata"]["file_type"] == "dwg"
     assert event["metadata"]["file_id"] == FILE_ID
+    revision_event = record_event.await_args_list[1].kwargs
+    assert revision_event["entity_type"] == "revision"
+    assert revision_event["entity_id"] == FILE_ID
+    assert revision_event["metadata"] == {
+        "revision_id": FILE_ID,
+        "file_id": FILE_ID,
+        "version": 1,
+        "approval_state": "pending_review",
+    }
 
 
 @pytest.mark.asyncio
@@ -145,8 +157,9 @@ async def test_create_file_records_version_event_for_new_version():
     assert [call.kwargs["action"] for call in record_event.await_args_list] == [
         "file.uploaded",
         "file.version_created",
+        "revision.created",
     ]
-    assert record_event.await_args_list[1].kwargs["metadata"]["version"] == 2
+    assert record_event.await_args_list[2].kwargs["metadata"]["version"] == 2
 
 
 @pytest.mark.asyncio
@@ -185,7 +198,46 @@ async def test_archive_and_restore_record_state_transitions():
     assert [call.kwargs["action"] for call in record_event.await_args_list] == [
         "file.archived",
         "file.restored",
+        "revision.restored",
     ]
+
+
+@pytest.mark.asyncio
+async def test_revision_approval_persists_state_and_emits_reference_only_event():
+    file_row = {
+        "id": FILE_ID,
+        "job_id": JOB_ID,
+        "project_id": PROJECT_ID,
+        "version": 3,
+        "approval_state": "pending_review",
+    }
+    approved_file = {
+        **file_row,
+        "approval_state": "approved",
+        "reviewed_by": USER_ID,
+    }
+    with (
+        patch.object(file_queries, "get_file", AsyncMock(return_value=file_row)),
+        patch.object(
+            file_queries,
+            "run_in_threadpool",
+            AsyncMock(return_value=SimpleNamespace(data=[approved_file])),
+        ),
+        patch.object(
+            file_queries, "record_audit_event", AsyncMock(return_value={})
+        ) as record_event,
+    ):
+        result = await file_queries.set_revision_approval(
+            FILE_ID, "approved", {"user_id": USER_ID}
+        )
+
+    assert result == approved_file
+    event = record_event.await_args.kwargs
+    assert event["action"] == "revision.approved"
+    assert event["entity_id"] == FILE_ID
+    assert event["metadata"]["version"] == 3
+    assert "path" not in event["metadata"]
+    assert "name" not in event["metadata"]
 
 
 @pytest.mark.asyncio

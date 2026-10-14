@@ -1,23 +1,82 @@
 "use client";
 import { memo, useMemo, useState } from "react";
 import { Activity, RefreshCw, AlertCircle, Search } from "lucide-react";
-import { getDashboardActivity } from "@/lib/api/api";
+import {
+    getDashboardActivity,
+    restoreFileRevision,
+    setRevisionDecision,
+} from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
+import { useAuth } from "@/context/AuthContext";
 
 // Wired to Tazwar's endpoint (dashboard_routes.py):
 // GET /api/v1/dashboard/activity  (auth-scoped by Bearer token, no user_id param)
-// Response shape: { events: [{ job_id, project_id, status, occurred_at, event_type, message }], total }
+// Includes both current job status and the canonical file/AI/revision audit events.
 
 interface ActivityEvent {
-    job_id: string;
+    job_id?: string | null;
     project_id: string;
-    status: string;
-    occurred_at: string;
+    status?: string | null;
+    occurred_at?: string | null;
     event_type: string;
     message: string;
+    event_id?: string | null;
+    action?: string | null;
+    entity_type?: string | null;
+    entity_id?: string | null;
 }
 
-const ActivityRow = memo(function ActivityRow({ event }: { event: ActivityEvent }) {
+const ActivityRow = memo(function ActivityRow({
+    event,
+    onChanged,
+    currentDecision,
+    isRestored,
+}: {
+    event: ActivityEvent;
+    onChanged: () => void;
+    currentDecision: "approved" | "rejected" | null;
+    isRestored: boolean;
+}) {
+    const { user } = useAuth();
+    const [working, setWorking] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
+    const [decision, setDecision] = useState<"approved" | "rejected" | null>(null);
+
+    const decideRevision = async (value: "approved" | "rejected") => {
+        if (!event.entity_id) return;
+        setWorking(true);
+        setActionError(null);
+        try {
+            const result = await setRevisionDecision(user, event.entity_id, value);
+            if (!result.ok) {
+                throw new Error(result.error?.message || "Could not update revision.");
+            }
+            setDecision(value);
+            onChanged();
+        } catch (error) {
+            setActionError(error instanceof Error ? error.message : "Could not update revision.");
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const restoreRevision = async () => {
+        if (!event.entity_id) return;
+        setWorking(true);
+        setActionError(null);
+        try {
+            const result = await restoreFileRevision(user, event.entity_id);
+            if (!result.ok) {
+                throw new Error(result.error?.message || "Could not restore revision.");
+            }
+            onChanged();
+        } catch (error) {
+            setActionError(error instanceof Error ? error.message : "Could not restore revision.");
+        } finally {
+            setWorking(false);
+        }
+    };
+
     return (
         <div className="bg-[#0a0e17] border border-white/10 rounded-2xl p-4 flex items-start gap-4 hover:border-[#54e3b5]/30 transition-colors">
             <div className="w-10 h-10 rounded-full bg-[#54e3b5]/10 flex items-center justify-center shrink-0 border border-[#54e3b5]/20">
@@ -26,9 +85,41 @@ const ActivityRow = memo(function ActivityRow({ event }: { event: ActivityEvent 
             <div className="flex flex-col gap-1 flex-1 min-w-0">
                 <p className="text-white text-sm font-medium">{event.message}</p>
                 <span className="text-[#8F8F8F] text-xs capitalize font-mono">
-                    {event.event_type} · {event.status}
+                    {event.event_type}
+                    {event.status ? ` · ${event.status}` : ""}
                     {event.occurred_at ? ` · ${new Date(event.occurred_at).toLocaleString()}` : ""}
                 </span>
+                {event.event_type === "revision.created" && event.entity_id && (
+                    <div className="flex items-center gap-2 pt-2">
+                        <button
+                            type="button"
+                            disabled={working || decision !== null || currentDecision !== null}
+                            onClick={() => void decideRevision("approved")}
+                            className="rounded-md border border-emerald-400/20 px-2.5 py-1 text-xs text-emerald-300 hover:bg-emerald-400/10 disabled:opacity-50"
+                        >
+                            {(decision || currentDecision) === "approved" ? "Approved" : "Approve"}
+                        </button>
+                        <button
+                            type="button"
+                            disabled={working || decision !== null || currentDecision !== null}
+                            onClick={() => void decideRevision("rejected")}
+                            className="rounded-md border border-amber-400/20 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-400/10 disabled:opacity-50"
+                        >
+                            {(decision || currentDecision) === "rejected" ? "Rejected" : "Reject"}
+                        </button>
+                    </div>
+                )}
+                {event.event_type === "file.archived" && event.entity_id && !isRestored && (
+                    <button
+                        type="button"
+                        disabled={working}
+                        onClick={() => void restoreRevision()}
+                        className="mt-2 rounded-md border border-white/10 px-2.5 py-1 text-xs text-[#54e3b5] hover:bg-white/5 disabled:opacity-50"
+                    >
+                        {working ? "Restoring…" : "Restore revision"}
+                    </button>
+                )}
+                {actionError && <p role="alert" className="text-xs text-red-300">{actionError}</p>}
             </div>
         </div>
     );
@@ -61,6 +152,32 @@ export default function ActivityPage() {
                 (e.event_type || "").toLowerCase().includes(q)
         );
     }, [activities, query]);
+    const revisionDecisions = useMemo(() => {
+        const decisions = new Map<string, "approved" | "rejected">();
+        for (const event of activities) {
+            if (
+                event.entity_id &&
+                (event.event_type === "revision.approved" || event.event_type === "revision.rejected") &&
+                !decisions.has(event.entity_id)
+            ) {
+                decisions.set(
+                    event.entity_id,
+                    event.event_type === "revision.approved" ? "approved" : "rejected"
+                );
+            }
+        }
+        return decisions;
+    }, [activities]);
+    const restoredRevisionIds = useMemo(
+        () =>
+            new Set(
+                activities
+                    .filter((event) => event.event_type === "revision.restored" && event.entity_id)
+                    .map((event) => event.entity_id)
+                    .filter((entityId): entityId is string => Boolean(entityId))
+            ),
+        [activities]
+    );
 
     return (
         <div className="flex-1 flex flex-col p-8 gap-6 overflow-y-auto custom-scrollbar">
@@ -123,7 +240,13 @@ export default function ActivityPage() {
             {!isLoading && !isError && visible.length > 0 && (
                 <div className="flex flex-col gap-3 animate-in fade-in-0 duration-300">
                     {visible.map((event, index) => (
-                        <ActivityRow key={`${event.job_id}-${index}`} event={event} />
+                        <ActivityRow
+                            key={event.event_id || `${event.job_id || event.event_type}-${event.occurred_at || index}-${index}`}
+                            event={event}
+                            onChanged={() => void refetch()}
+                            currentDecision={event.entity_id ? revisionDecisions.get(event.entity_id) ?? null : null}
+                            isRestored={event.entity_id ? restoredRevisionIds.has(event.entity_id) : false}
+                        />
                     ))}
                 </div>
             )}
