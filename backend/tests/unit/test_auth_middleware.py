@@ -1,9 +1,8 @@
 import jwt
 import pytest
-from fastapi import HTTPException
-
 from app.core.config import settings
 from app.middlewares.auth import require_auth
+from fastapi import HTTPException
 
 
 @pytest.mark.asyncio

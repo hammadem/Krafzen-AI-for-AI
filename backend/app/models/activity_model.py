@@ -1,21 +1,23 @@
-from typing import Any, Dict, Optional
 from datetime import datetime
+from typing import Any
+
 from pydantic import BaseModel
 
 
 class ActivityActor(BaseModel):
-    user_id: Optional[str] = None
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
+    user_id: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
 
 
 class ActivityEventResponse(BaseModel):
     id: str
     event_name: str
-    job_id: Optional[str] = None
-    project_id: Optional[str] = None
-    actor_user_id: Optional[str] = None
-    message: Optional[str] = None
-    metadata: Dict[str, Any] = {}
+    job_id: str | None = None
+    project_id: str | None = None
+    workspace_id: str | None = None
+    actor_user_id: str | None = None
+    message: str | None = None
+    metadata: dict[str, Any] = {}
     created_at: datetime
-    actor: Optional[ActivityActor] = None
+    actor: ActivityActor | None = None

@@ -3,7 +3,8 @@ Instruction Validator Service for validating and enriching parsed CAD instructio
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any
+
 from app.schemas.parser import ParsedInstruction
 
 logger = logging.getLogger(__name__)
@@ -19,13 +20,12 @@ class InstructionValidator:
     
     def __init__(self):
         """Initialize the instruction validator"""
-        pass
     
     def validate_and_enrich(
         self,
-        instructions: List[ParsedInstruction],
+        instructions: list[ParsedInstruction],
         original_text: str
-    ) -> List[ParsedInstruction]:
+    ) -> list[ParsedInstruction]:
         """
         Validate instructions and add missing elements if needed.
         
@@ -51,7 +51,7 @@ class InstructionValidator:
         
         return enriched
     
-    def _analyze_instructions(self, instructions: List[ParsedInstruction]) -> Dict[str, int]:
+    def _analyze_instructions(self, instructions: list[ParsedInstruction]) -> dict[str, int]:
         """Analyze instructions to count entity types"""
         counts = {
             'rectangles': 0,
@@ -78,10 +78,10 @@ class InstructionValidator:
     
     def _identify_missing_elements(
         self,
-        instructions: List[ParsedInstruction],
+        instructions: list[ParsedInstruction],
         original_text: str,
-        entity_counts: Dict[str, int]
-    ) -> List[ParsedInstruction]:
+        entity_counts: dict[str, int]
+    ) -> list[ParsedInstruction]:
         """
         Identify missing elements based on original text and entity patterns.
         
@@ -166,10 +166,10 @@ class InstructionValidator:
     
     def _generate_missing_elements(
         self,
-        instructions: List[ParsedInstruction],
+        instructions: list[ParsedInstruction],
         original_text: str,
         text_lower: str
-    ) -> List[ParsedInstruction]:
+    ) -> list[ParsedInstruction]:
         """
         Generate missing elements based on detected patterns in the original text.
         
@@ -239,7 +239,7 @@ class InstructionValidator:
                 return (float(point[0]), float(point[1]))
         return default
     
-    def _extract_dimension(self, text: str, pattern: str) -> Optional[float]:
+    def _extract_dimension(self, text: str, pattern: str) -> float | None:
         """Extract dimension value from text using regex pattern"""
         import re
         match = re.search(pattern, text, re.IGNORECASE)
@@ -250,25 +250,25 @@ class InstructionValidator:
                 pass
         return None
     
-    def _is_large_rectangle(self, params: Dict[str, Any]) -> bool:
+    def _is_large_rectangle(self, params: dict[str, Any]) -> bool:
         """Check if rectangle is large (likely a wall/room boundary)"""
         width = abs(float(params.get('width', 0)))
         height = abs(float(params.get('height', 0)))
         return width > 3000 or height > 3000
     
-    def _is_medium_rectangle(self, params: Dict[str, Any]) -> bool:
+    def _is_medium_rectangle(self, params: dict[str, Any]) -> bool:
         """Check if rectangle is medium-sized (likely a cabinet/fixture)"""
         width = abs(float(params.get('width', 0)))
         height = abs(float(params.get('height', 0)))
         return 200 <= width <= 2000 or 200 <= height <= 2000
     
-    def _is_appliance_size(self, params: Dict[str, Any]) -> bool:
+    def _is_appliance_size(self, params: dict[str, Any]) -> bool:
         """Check if rectangle is appliance-sized"""
         width = abs(float(params.get('width', 0)))
         height = abs(float(params.get('height', 0)))
         return 600 <= width <= 1200 and 600 <= height <= 1200
     
-    def _is_short_line(self, params: Dict[str, Any]) -> bool:
+    def _is_short_line(self, params: dict[str, Any]) -> bool:
         """Check if line is short (likely a door/window frame)"""
         start = params.get('start', {})
         end = params.get('end', {})

@@ -6,15 +6,15 @@ Yehor export_jobs + artifact handoff land; stage metadata is written for postfli
 """
 
 import asyncio
-from typing import Any, Dict
+from typing import Any
 
 from app.core.export_stage_catalog import EXPORT_STAGE_CATALOG
 from app.schemas.export_contracts import PipelineStage
-from app.services.export_validation_service import run_preflight, run_postflight
+from app.services.export_validation_service import run_postflight, run_preflight
 from app.utils.logger import logger
 
 
-async def run_export_generation(job: Dict[str, Any]) -> Dict[str, Any]:
+async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
     """
     PROCESSING stage: existing format exporters plug in here (Week 2+).
     Returns metadata patch to merge onto export_jobs.metadata.
@@ -34,7 +34,7 @@ async def run_export_generation(job: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-async def run_preflight_gate(export_context: Dict[str, Any]):
+async def run_preflight_gate(export_context: dict[str, Any]):
     """Run preflight; worker should fail job if can_proceed is False."""
     report = await run_preflight(export_context)
     if not report.can_proceed:
@@ -46,7 +46,7 @@ async def run_preflight_gate(export_context: Dict[str, Any]):
     return report
 
 
-async def run_postflight_gate(export_context: Dict[str, Any]):
+async def run_postflight_gate(export_context: dict[str, Any]):
     """Run postflight; worker uses passed/requires_review for status routing."""
     return await run_postflight(export_context)
 

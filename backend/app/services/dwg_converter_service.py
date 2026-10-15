@@ -1,12 +1,11 @@
 import logging
 import os
 import shutil
-import subprocess
-import sys
 import tempfile
 import uuid
 from dataclasses import dataclass
-from typing import Optional, Tuple
+
+import ezdxf
 
 from app.core.config import settings
 from app.services.oda_bundle import (
@@ -15,7 +14,6 @@ from app.services.oda_bundle import (
     resolve_bundled_oda,
     run_oda_subprocess,
 )
-import ezdxf
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +38,7 @@ class DwgConverterService:
         self._converter_cmd = (getattr(settings, "DWG_CONVERTER_CMD", None) or "").strip()
         self._converter_type = (getattr(settings, "DWG_CONVERTER_TYPE", None) or "ODA").strip().upper()
 
-    def _resolve_converter_cmd_and_ld(self) -> Tuple[Optional[str], Optional[str]]:
+    def _resolve_converter_cmd_and_ld(self) -> tuple[str | None, str | None]:
         """
         Resolve ODA executable and optional LD_LIBRARY_PATH prefix (bundled .deb on Render).
         """
@@ -70,7 +68,7 @@ class DwgConverterService:
     def is_configured(self) -> bool:
         return bool(self._resolve_converter_cmd_and_ld()[0])
 
-    def convert_dxf_path_to_dwg(self, dxf_path: str, *, output_filename: Optional[str] = None) -> DwgConvertResult:
+    def convert_dxf_path_to_dwg(self, dxf_path: str, *, output_filename: str | None = None) -> DwgConvertResult:
         if not self.is_configured():
             detail = get_last_oda_error()
             msg = (

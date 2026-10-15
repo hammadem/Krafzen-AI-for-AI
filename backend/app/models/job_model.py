@@ -1,6 +1,7 @@
-from typing import Optional
 from datetime import datetime
+
 from pydantic import BaseModel, Field
+
 from app.schemas.export_contracts import ExportStatus
 
 
@@ -10,8 +11,8 @@ class JobBase(BaseModel):
         default=ExportStatus.QUEUED,
         description="Job lifecycle status — must align with /api/v1/contracts/export-lifecycle"
     )
-    transcript: Optional[str] = Field(None, description="Job transcript text or notes")
-    error_message: Optional[str] = Field(None, description="Error details if job failed")
+    transcript: str | None = Field(None, description="Job transcript text or notes")
+    error_message: str | None = Field(None, description="Error details if job failed")
 
 
 class JobCreate(JobBase):
@@ -19,18 +20,18 @@ class JobCreate(JobBase):
 
 
 class JobUpdate(BaseModel):
-    status: Optional[ExportStatus] = Field(
+    status: ExportStatus | None = Field(
         None,
         description="Contract-aligned status only — see /api/v1/contracts/export-lifecycle"
     )
-    transcript: Optional[str] = None
-    error_message: Optional[str] = None
+    transcript: str | None = None
+    error_message: str | None = None
 
 
 class JobInDB(JobBase):
     id: str
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True

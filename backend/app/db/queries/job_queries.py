@@ -1,14 +1,16 @@
-from typing import List, Dict, Any, Optional
+import uuid
 from datetime import datetime
+from typing import Any
+
 from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
 from app.utils.logger import logger
 from app.utils.validators import _user_owns_project
-import uuid  
 
 
 # CREATE JOB
-async def create_job(job_data: Dict[str, Any], user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def create_job(job_data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any] | None:
     #User guard
     if not user or "user_id" not in user:
         logger.warning("[create_job] Invalid user context")
@@ -57,7 +59,7 @@ async def create_job(job_data: Dict[str, Any], user: Dict[str, Any]) -> Optional
         return {"error": "Unexpected server error"}
 
 # LIST JOBS
-async def get_jobs(project_id: str, user: Dict[str, Any]) -> List[Dict[str, Any]]:
+async def get_jobs(project_id: str, user: dict[str, Any]) -> list[dict[str, Any]]:
     #User guard
     if not user or "user_id" not in user:
         logger.warning("[get_jobs] Invalid user context")
@@ -85,7 +87,7 @@ async def get_jobs(project_id: str, user: Dict[str, Any]) -> List[Dict[str, Any]
         return []
 
 # GET SINGLE JOB
-async def get_job(job_id: str, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def get_job(job_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
     #User guard
     if not user or "user_id" not in user:
         logger.warning("[get_job] Invalid user context")
@@ -118,7 +120,7 @@ async def get_job(job_id: str, user: Dict[str, Any]) -> Optional[Dict[str, Any]]
         return None
 
 # UPDATE JOB
-async def update_job(job_id: str, update_data: Dict[str, Any], user: Dict[str, Any]) -> Optional[Dict[str, Any]]: 
+async def update_job(job_id: str, update_data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any] | None: 
     #User guard
     if not user or "user_id" not in user:
         logger.warning("[update_job] Invalid user context")
@@ -154,7 +156,7 @@ async def update_job(job_id: str, update_data: Dict[str, Any], user: Dict[str, A
         return {"error": str(e)}
 
 # DELETE JOB
-async def delete_job(job_id: str, user: Dict[str, Any]) -> bool:  
+async def delete_job(job_id: str, user: dict[str, Any]) -> bool:  
     if not user or "user_id" not in user:
         logger.warning("[delete_job] Invalid user context")
         return False

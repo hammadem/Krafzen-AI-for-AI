@@ -3,9 +3,11 @@ Tests for dashboard endpoints: activity feed, workspace summary, notifications, 
 Owner: Tazwar
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from httpx import AsyncClient
+
 from app.main import app
 from app.schemas.export_contracts import ExportStatus
 

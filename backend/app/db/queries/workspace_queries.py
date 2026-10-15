@@ -1,14 +1,16 @@
-from typing import Optional, List, Dict, Any
-import uuid
+from typing import Any
+
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
+from app.services.activity_service import record_workspace_event
 from app.utils.logger import logger
 from app.utils.validators import _valid_uuid
 
 
 #GET WORKSPACE
-async def get_workspace(workspace_id:str, user_id: str) -> Optional[Dict[str, Any]]:
+async def get_workspace(workspace_id:str, user_id: str) -> dict[str, Any] | None:
     if not _valid_uuid(workspace_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid workspace_id"})
     try: 
@@ -47,7 +49,7 @@ async def get_workspace(workspace_id:str, user_id: str) -> Optional[Dict[str, An
     
 
 # GET USER'S WORKSPACE (owner or member)
-async def get_my_workspace(user_id: str) -> Optional[Dict[str, Any]]:
+async def get_my_workspace(user_id: str) -> dict[str, Any] | None:
     try:
         # check if user is an owner first
         res = await run_in_threadpool(
@@ -95,7 +97,7 @@ async def get_my_workspace(user_id: str) -> Optional[Dict[str, Any]]:
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
 #LIST MEMBERS OF A WORKSPACE
-async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,page_size: int = 20) ->Dict[str, Any]:
+async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,page_size: int = 20) ->dict[str, Any]:
     if not _valid_uuid(workspace_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid workspace_id"})
     try: 
@@ -142,7 +144,7 @@ async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,pa
         raise HTTPException(status_code=500, detail={"error": "Server error"})
     
 # UPDATE MEMBER ROLE
-async def update_role_member(workspace_id: str, target_user_id: str, new_role: str, user_id: str) -> Optional[Dict[str, Any]]:
+async def update_role_member(workspace_id: str, target_user_id: str, new_role: str, user_id: str) -> dict[str, Any] | None:
     if not _valid_uuid(workspace_id) or not _valid_uuid(target_user_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid ID format"})
     
@@ -154,6 +156,21 @@ async def update_role_member(workspace_id: str, target_user_id: str, new_role: s
 
         if workspace["owner_id"] != user_id:
             raise HTTPException(status_code=403, detail={"error": "Only owner can update roles"})
+
+        member_res = await run_in_threadpool(
+            lambda: db.table("workspace_members")
+                .select("*")
+                .eq("workspace_id", workspace_id)
+                .eq("user_id", target_user_id)
+                .maybe_single()
+                .execute()
+        )
+        if not member_res or not member_res.data:
+            raise HTTPException(status_code=404, detail={"error": "Member not found"})
+
+        previous_role = member_res.data["role"]
+        if previous_role == new_role:
+            return member_res.data
         
         res = await run_in_threadpool(
             lambda: db.table("workspace_members")
@@ -166,6 +183,25 @@ async def update_role_member(workspace_id: str, target_user_id: str, new_role: s
         if not res or not res.data:
             raise HTTPException(status_code=404, detail={"error": "Member not found"})
 
+        metadata = {
+            "target_user_id": target_user_id,
+            "from_role": previous_role,
+            "to_role": new_role,
+        }
+        await record_workspace_event(
+            event_name="team.role_changed",
+            workspace_id=workspace_id,
+            actor_user_id=user_id,
+            metadata=metadata,
+            message=f"Workspace member {target_user_id} role changed from {previous_role.title()} to {new_role.title()}.",
+        )
+        await record_workspace_event(
+            event_name="permissions.permission_changed",
+            workspace_id=workspace_id,
+            actor_user_id=user_id,
+            metadata=metadata,
+            message=f"Workspace permissions changed for member {target_user_id} from {previous_role.title()} to {new_role.title()}.",
+        )
         return res.data[0]
     except HTTPException:
         raise
@@ -196,9 +232,30 @@ async def remove_member(workspace_id: str,target_user_id: str,user_id: str) -> b
                 .execute()
         )
 
-        return bool(res and res.data)
+        if not res or not res.data:
+            return False
+
+        metadata = {
+            "target_user_id": target_user_id,
+            "role": res.data[0].get("role"),
+        }
+        await record_workspace_event(
+            event_name="team.member_removed",
+            workspace_id=workspace_id,
+            actor_user_id=user_id,
+            metadata=metadata,
+            message=f"Workspace member {target_user_id} was removed.",
+        )
+        await record_workspace_event(
+            event_name="permissions.access_revoked",
+            workspace_id=workspace_id,
+            actor_user_id=user_id,
+            metadata=metadata,
+            message=f"Workspace access was revoked for member {target_user_id}.",
+        )
+        return True
     except HTTPException:
         raise
     except Exception as e:
         logger.error("[remove_member] Error", error=str(e), exc_info=True)
-        return False
+        raise HTTPException(status_code=500, detail={"error": "Server error"})

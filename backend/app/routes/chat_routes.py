@@ -1,27 +1,32 @@
-from fastapi import APIRouter, HTTPException, Depends, Request, BackgroundTasks
-from fastapi.responses import FileResponse
-from typing import Optional, Dict, Any
 import asyncio
-
-
-from app.models.chat_model import(
-    ChatRequest,ChatResponse, DxfRequest, DesignFileRequest,
-    CreateSessionRequest, UpdateSessionTitleRequest, MessageFeedbackRequest
-)
-
-from app.compliance.models import LayoutExtract
-from app.compliance.extraction_fallback import merge_heuristic_layout
-from app.compliance.validator import parse_layout_from_llm_dict, validate_us_irc_baseline
-from app.services.cadllm_service import cadllm_service
-from app.services.gemini_service import gemini_service
-from app.services.chat_history_service import chat_history_service
-from app.services.subscription_service import subscription_service
-from app.core.config import settings
 import logging
 import os
-import uuid
+from typing import Any
 
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import FileResponse
+
+from app.compliance.extraction_fallback import merge_heuristic_layout
+from app.compliance.models import LayoutExtract
+from app.compliance.validator import (
+    parse_layout_from_llm_dict,
+    validate_us_irc_baseline,
+)
+from app.core.config import settings
 from app.middlewares.auth import require_auth
+from app.models.chat_model import (
+    ChatRequest,
+    ChatResponse,
+    CreateSessionRequest,
+    DesignFileRequest,
+    DxfRequest,
+    MessageFeedbackRequest,
+    UpdateSessionTitleRequest,
+)
+from app.services.cadllm_service import cadllm_service
+from app.services.chat_history_service import chat_history_service
+from app.services.gemini_service import gemini_service
+from app.services.subscription_service import subscription_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -210,7 +215,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         if previous_image_url:
             logger.info("Found previous image in history.")
 
-        compliance_payload: Optional[Dict[str, Any]] = None
+        compliance_payload: dict[str, Any] | None = None
         run_compliance = (
             settings.COMPLIANCE_US_IRC_ENABLED
             and request.jurisdiction == "US_IRC_BASELINE"
@@ -306,7 +311,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         raise
     except Exception as e:
         # Log error and raise without charging the user
-        logger.error(f"Chat generation error for user {user_id}: {str(e)}, no charge applied", exc_info=True)
+        logger.error(f"Chat generation error for user {user_id}: {e!s}, no charge applied", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat/session")

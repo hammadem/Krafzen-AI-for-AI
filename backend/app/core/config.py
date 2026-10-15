@@ -2,9 +2,9 @@
 Configuration settings for KRAFZEN AI backend
 """
 
-from pydantic_settings import BaseSettings
-from typing import List, Optional
+
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 load_dotenv()
 
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,https://krafzen-ai-staging.vercel.app,https://*.vercel.app,https://staging.krafzen.com,https://www.staging.krafzen.com,https://krafzen.com,https://www.krafzen.com,https://app.krafzen.com"
     
     @property
-    def ALLOWED_ORIGINS_LIST(self) -> List[str]:
+    def ALLOWED_ORIGINS_LIST(self) -> list[str]:
         """Get ALLOWED_ORIGINS as a list"""
         if not self.ALLOWED_ORIGINS:
             return [
@@ -52,9 +52,9 @@ class Settings(BaseSettings):
     GPT_TEMPERATURE: float = 0.3
     
     # Hugging Face Configuration (for CADLLM model)
-    HF_TOKEN: Optional[str] = None
-    HF_MODEL_NAME: Optional[str] = None  # e.g., "username/cad-llm-krafzen"
-    HF_ENDPOINT_URL: Optional[str] = None  # Optional: custom endpoint URL (e.g., Hugging Face Space)
+    HF_TOKEN: str | None = None
+    HF_MODEL_NAME: str | None = None  # e.g., "username/cad-llm-krafzen"
+    HF_ENDPOINT_URL: str | None = None  # Optional: custom endpoint URL (e.g., Hugging Face Space)
     HF_TIMEOUT: int = 180  # Timeout in seconds for API calls
     
     # File Upload Configuration
@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     OLLAMA_MODEL_NAME: str = "fine-tuned-model"
 
     # Gemini Configuration
-    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-2.0-flash-exp" # Keep the smart tex model
     GEMINI_IMAGE_MODEL: str = "models/nano-banana-pro-preview" # Restoring the working image model
 
@@ -80,13 +80,13 @@ class Settings(BaseSettings):
     # Recommended local converter: ODA File Converter (command often: ODAFileConverter)
     DWG_CONVERTER_TYPE: str = "ODA"
     DWG_CONVERTER_CMD: str = ""  # e.g. "ODAFileConverter"
-    DWG_ODA_DEB_URL: Optional[str] = None  # HTTPS presigned URL to Linux x64 .deb (fallback)
+    DWG_ODA_DEB_URL: str | None = None  # HTTPS presigned URL to Linux x64 .deb (fallback)
     # Preferred on Render: direct R2 API download (avoids presign 400 issues)
-    R2_ACCESS_KEY_ID: Optional[str] = None
-    R2_SECRET_ACCESS_KEY: Optional[str] = None
-    R2_ENDPOINT_URL: Optional[str] = None  # e.g. https://<account>.r2.cloudflarestorage.com
-    R2_ODA_BUCKET: Optional[str] = None  # e.g. krafzen-build-private
-    R2_ODA_OBJECT_KEY: Optional[str] = None  # e.g. ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb
+    R2_ACCESS_KEY_ID: str | None = None
+    R2_SECRET_ACCESS_KEY: str | None = None
+    R2_ENDPOINT_URL: str | None = None  # e.g. https://<account>.r2.cloudflarestorage.com
+    R2_ODA_BUCKET: str | None = None  # e.g. krafzen-build-private
+    R2_ODA_OBJECT_KEY: str | None = None  # e.g. ODAFileConverter_QT6_lnxX64_8.3dll_27.1.deb
 
     # External DXF Service (Removed in favor of local Potrace)
     # API_2_CONVERT_KEY / URL removed.
@@ -95,18 +95,18 @@ class Settings(BaseSettings):
     DXF_GENERATION_METHOD: str = "LOCAL"  # LOCAL | API (legacy)
 
     # Stripe
-    STRIPE_SECRET_KEY: Optional[str] = None
-    STRIPE_WEBHOOK_SECRET: Optional[str] = None
-    STRIPE_PRICE_ID_100_MINS: Optional[str] = None  # Price ID for purchasing minutes
+    STRIPE_SECRET_KEY: str | None = None
+    STRIPE_WEBHOOK_SECRET: str | None = None
+    STRIPE_PRICE_ID_100_MINS: str | None = None  # Price ID for purchasing minutes
     STRIPE_LIVE_MODE: bool = False  # True only in Vercel Production; disables mock payments
 
     # Subscription Price IDs
-    STRIPE_PRICE_ID_STARTER_MONTHLY: Optional[str] = None
-    STRIPE_PRICE_ID_STARTER_ANNUAL: Optional[str] = None
-    STRIPE_PRICE_ID_PROFESSIONAL_MONTHLY: Optional[str] = None
-    STRIPE_PRICE_ID_PROFESSIONAL_ANNUAL: Optional[str] = None
-    STRIPE_PRICE_ID_ENTERPRISE_MONTHLY: Optional[str] = None
-    STRIPE_PRICE_ID_ENTERPRISE_ANNUAL: Optional[str] = None
+    STRIPE_PRICE_ID_STARTER_MONTHLY: str | None = None
+    STRIPE_PRICE_ID_STARTER_ANNUAL: str | None = None
+    STRIPE_PRICE_ID_PROFESSIONAL_MONTHLY: str | None = None
+    STRIPE_PRICE_ID_PROFESSIONAL_ANNUAL: str | None = None
+    STRIPE_PRICE_ID_ENTERPRISE_MONTHLY: str | None = None
+    STRIPE_PRICE_ID_ENTERPRISE_ANNUAL: str | None = None
 
     # External Links
     CALENDLY_URL: str = "https://calendly.com/" # Default or empty
@@ -114,7 +114,7 @@ class Settings(BaseSettings):
 
     
     @property
-    def ALLOWED_AUDIO_FORMATS_LIST(self) -> List[str]:
+    def ALLOWED_AUDIO_FORMATS_LIST(self) -> list[str]:
         """Get ALLOWED_AUDIO_FORMATS as a list"""
         if not self.ALLOWED_AUDIO_FORMATS:
             return ["mp3", "wav", "m4a", "ogg", "flac", "webm"]
@@ -129,7 +129,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
     
     # Monitoring
-    SENTRY_DSN: Optional[str] = None
+    SENTRY_DSN: str | None = None
     LOG_LEVEL: str = "INFO"
     
     # Render Configuration (optional)

@@ -7,13 +7,16 @@ Never introduce status strings outside ExportStatus.
 Pipeline stages mirror /api/v1/contracts/workflow-spec pipeline_stages.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
-from app.db.queries.job_queries import create_job as create_job_query, get_job, update_job
+from fastapi import HTTPException
+
+from app.db.queries.export_queries import get_export_job
+from app.db.queries.export_queries import update_export_status as _update_export_status
+from app.db.queries.job_queries import create_job as create_job_query
+from app.db.queries.job_queries import get_job, update_job
 from app.schemas.export_contracts import ExportStatus
 from app.utils.logger import logger
-from app.db.queries.export_queries import get_export_job, update_export_status as _update_export_status
-from fastapi import HTTPException
 
 # ── Contract-derived constants (do not redefine these) ──────────────────────
 TERMINAL_STATES: frozenset[ExportStatus] = frozenset({
@@ -47,9 +50,9 @@ def is_valid_transition(current: ExportStatus, next_status: ExportStatus) -> boo
 async def advance_job_status(
     job_id: str,
     next_status: ExportStatus,
-    user: Dict[str, Any],
-    error_message: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+    user: dict[str, Any],
+    error_message: str | None = None,
+) -> dict[str, Any] | None:
     """
     Transition a job to the next contract-aligned lifecycle status.
     Enforces valid transitions; returns error dict on violation.
@@ -90,7 +93,7 @@ async def advance_job_status(
             )
         }
 
-    update_data: Dict[str, Any] = {"status": next_status.value}
+    update_data: dict[str, Any] = {"status": next_status.value}
     if error_message and next_status == ExportStatus.FAILED:
         update_data["error_message"] = error_message
 
@@ -107,9 +110,9 @@ async def advance_job_status(
 
 async def enqueue_job(
     project_id: str,
-    user: Dict[str, Any],
-    transcript: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+    user: dict[str, Any],
+    transcript: str | None = None,
+) -> dict[str, Any] | None:
     """
     Create a new job at QUEUED status (the only valid starting state).
     Returns the created job dict or an error dict.
@@ -131,8 +134,8 @@ async def enqueue_job(
 
 async def retry_job(
     job_id: str,
-    user: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
+    user: dict[str, Any],
+) -> dict[str, Any] | None:
     """
     Re-queue a FAILED or CANCELLED job. Idempotent if already QUEUED.
     Only valid for retryable states per contract.
@@ -163,9 +166,9 @@ async def retry_job(
 async def advance_export_status(
     export_id: str,
     next_status: ExportStatus,
-    user: Dict[str, Any],
-    error_message: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+    user: dict[str, Any],
+    error_message: str | None = None,
+) -> dict[str, Any] | None:
     export = await get_export_job(export_id, user["user_id"])
     if not export:
         return {"error": f"Export {export_id} not found or unauthorized"}
@@ -181,7 +184,7 @@ async def advance_export_status(
         logger.warning("[advance_export_status] Invalid transition", export_id=export_id, from_status=current.value, to_status=next_status.value, allowed=allowed)
         return {"error": f"Invalid transition: {current.value} → {next_status.value}. Allowed: {allowed}"}
 
-    update_data: Dict[str, Any] = {"status": next_status.value}
+    update_data: dict[str, Any] = {"status": next_status.value}
     if error_message and next_status == ExportStatus.FAILED:
         update_data["error_message"] = error_message
 

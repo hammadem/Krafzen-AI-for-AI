@@ -9,10 +9,11 @@ Payload shape finalized with Sunny (Week 2):
   - actor: {display_name, avatar_url} joined inline
 """
 
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
 from app.utils.logger import logger
 
@@ -21,10 +22,10 @@ async def record_event(
     event_name: str,         # e.g. "export.completed"
     job_id: str,
     project_id: str,
-    actor_user_id: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-    message: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
+    actor_user_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+    message: str | None = None,
+) -> dict[str, Any] | None:
     """
     Insert a single activity record.
     message: human-readable string for Sunny's feed main line.
@@ -37,7 +38,7 @@ async def record_event(
         "actor_user_id": actor_user_id,
         "message": message or _default_message(event_name),
         "metadata": metadata or {},
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
     try:
@@ -54,11 +55,59 @@ async def record_event(
         return None
 
 
+async def record_workspace_event(
+    *,
+    event_name: str,
+    workspace_id: str,
+    actor_user_id: str,
+    metadata: dict[str, Any] | None = None,
+    message: str | None = None,
+) -> dict[str, Any]:
+    """Persist a workspace audit event, failing explicitly if it cannot be stored."""
+    if not event_name or not event_name.strip():
+        raise ValueError("An audit event name is required")
+    if not workspace_id:
+        raise ValueError("A workspace_id is required")
+    if not actor_user_id:
+        raise ValueError("An authenticated actor_user_id is required")
+
+    payload = {
+        "event_name": event_name,
+        "workspace_id": workspace_id,
+        "actor_user_id": actor_user_id,
+        "message": message or _default_message(event_name),
+        "metadata": metadata or {},
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("activity_events").insert(payload).execute()
+        )
+        if response and response.data:
+            logger.info(
+                "[activity_service] Workspace event recorded",
+                event_name=event_name,
+                workspace_id=workspace_id,
+            )
+            return response.data[0]
+        raise RuntimeError("Workspace audit event insert returned no data")
+    except Exception as e:
+        logger.error(
+            "[activity_service] Failed to record workspace event",
+            event_name=event_name,
+            workspace_id=workspace_id,
+            error=str(e),
+            exc_info=True,
+        )
+        raise
+
+
 async def get_project_activity(
     project_id: str,
     user_id: str,          # required — Yehor confirmed service role bypasses RLS
     limit: int = 50,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Fetch recent activity for a project with actor info joined inline.
     Explicit ownership check required (service role client bypasses RLS).
@@ -94,30 +143,31 @@ async def get_project_activity(
         return []
 
 
-async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-    """v1 rollup via membership proxy (no projects.workspace_id yet, per Kiruthika).
-    Caveat: a member's activity on projects unrelated to this workspace can leak
-    in until projects.workspace_id lands — acceptable for dashboard v1, not exact."""
+async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    """Fetch only events assigned to this workspace for an owner or current member."""
     try:
+        workspace_res = await run_in_threadpool(
+            lambda: db.table("workspaces").select("owner_id")
+                .eq("id", workspace_id).maybe_single().execute()
+        )
+        if not workspace_res or not workspace_res.data:
+            logger.warning("[activity_service] Workspace not found", workspace_id=workspace_id)
+            return []
+
         is_member = await run_in_threadpool(
             lambda: db.table("workspace_members").select("user_id")
                 .eq("workspace_id", workspace_id).eq("user_id", user_id)
                 .maybe_single().execute()
         )
-        if not is_member or not is_member.data:
+        is_owner = workspace_res.data["owner_id"] == user_id
+        if not is_owner and (not is_member or not is_member.data):
             logger.warning("[activity_service] Not a workspace member", workspace_id=workspace_id, user_id=user_id[:8])
-            return []
-
-        members_res = await run_in_threadpool(
-            lambda: db.table("workspace_members").select("user_id").eq("workspace_id", workspace_id).execute()
-        )
-        member_ids = [m["user_id"] for m in (members_res.data or [])]
-        if not member_ids:
             return []
 
         response = await run_in_threadpool(
             lambda: db.table("activity_events").select("*, profiles(display_name, avatar_url)")
-                .in_("actor_user_id", member_ids).order("created_at", desc=True).limit(limit).execute()
+                .eq("workspace_id", workspace_id)
+                .order("created_at", desc=True).limit(limit).execute()
         )
         rows = response.data if response and response.data else []
         return [_shape_activity_row(r) for r in rows]
@@ -126,17 +176,22 @@ async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 5
         return []
 
 
-def _shape_activity_row(row: Dict[str, Any]) -> Dict[str, Any]:
+def _shape_activity_row(row: dict[str, Any]) -> dict[str, Any]:
     """
     Flatten actor profile into the row for Sunny's frontend.
     Returns: event_name, message, created_at, actor {display_name, avatar_url}, metadata.
     """
-    row["actor"] = {
-        "user_id": row.get("actor_user_id"),
-        "display_name": None,  # default to None if not found
-        "avatar_url": None,
+    shaped = dict(row)
+    profile = shaped.get("profiles")
+    if isinstance(profile, list):
+        profile = profile[0] if profile else None
+    profile = profile if isinstance(profile, dict) else {}
+    shaped["actor"] = {
+        "user_id": shaped.get("actor_user_id"),
+        "display_name": profile.get("display_name"),
+        "avatar_url": profile.get("avatar_url"),
     }
-    return row
+    return shaped
 
 
 def _default_message(event_name: str) -> str:

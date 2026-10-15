@@ -2,23 +2,29 @@
 DXF Generator API endpoints for converting CAD instructions to DXF files
 """
 
-from fastapi import APIRouter, HTTPException, Body, Response, Depends, Query, UploadFile, File
-from typing import Optional, List
-from app.schemas.parser import (
-    ParsingRequest,
-    ParsingResponse,
-    ParsedInstruction,
-    CADFileType
-)
-from typing import Dict, Any
-from datetime import datetime
 import logging
 import os
 import shutil
-from app.middlewares.auth import require_auth
-from app.utils.storage_service import storage_service
+
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+)
+
 from app.db.queries.project_queries import update_project
+from app.middlewares.auth import require_auth
 from app.models.project_model import ProjectUpdate
+from app.schemas.parser import (
+    CADFileType,
+    ParsingRequest,
+)
+from app.utils.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -63,15 +69,13 @@ except Exception as e:
 
 from app.core.config import settings
 
-
-
 router = APIRouter()
 
 @router.post("/generate-from-audio")
 async def generate_dxf_from_audio(
     file: UploadFile = File(...),
-    language: Optional[str] = Query("en", description="Language code (ISO 639-1)"),
-    units: Optional[str] = Query("inches", description="Units for measurements (inches, feet, mm)")
+    language: str | None = Query("en", description="Language code (ISO 639-1)"),
+    units: str | None = Query("inches", description="Units for measurements (inches, feet, mm)")
 ):
     """
     Generate DXF file related to audio input using the Unified Flow:
@@ -139,7 +143,7 @@ async def generate_dxf_from_audio(
             content=dxf_bytes,
             media_type="application/dxf",
             headers={
-                "Content-Disposition": f'attachment; filename="generated_from_audio.dxf"'
+                "Content-Disposition": 'attachment; filename="generated_from_audio.dxf"'
             }
         )
         
@@ -152,7 +156,7 @@ async def generate_dxf_from_audio(
 @router.post("/generate-from-text")
 async def generate_dxf_from_text(
     request: ParsingRequest = Body(...),
-    use_json_pipeline: Optional[bool] = Query(True, description="Ignored. Uses Unified Flow.")
+    use_json_pipeline: bool | None = Query(True, description="Ignored. Uses Unified Flow.")
 ):
     """
     Generate DXF file from text input using the Unified Flow:
@@ -217,7 +221,7 @@ async def generate_dxf_from_text(
 @router.post("/generate-and-store")
 async def generate_and_store_dxf(
     request: ParsingRequest = Body(...),
-    project_id: Optional[str] = Body(None, description="Project ID to associate the DXF file with"),
+    project_id: str | None = Body(None, description="Project ID to associate the DXF file with"),
     user: dict = Depends(require_auth)
 ):
     """Generate DXF/DWG from text and optionally store on project."""

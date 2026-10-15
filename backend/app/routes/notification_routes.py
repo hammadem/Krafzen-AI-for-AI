@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+
 from app.middlewares.auth import require_auth
 from app.services.notification_service import get_notifications, mark_as_read
 

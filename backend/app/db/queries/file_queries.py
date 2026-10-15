@@ -1,10 +1,12 @@
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone  
-from fastapi.concurrency import run_in_threadpool
+import uuid
+from typing import Any
+
 from fastapi import HTTPException
+from fastapi.concurrency import run_in_threadpool
+
 from app.db.supabase_client import db
 from app.utils.logger import logger
-import uuid  
+
 
 # check if job belongs to user's project(helper)
 async def _user_owns_job(job_id: str, user_id: str) -> bool:
@@ -45,7 +47,7 @@ async def _user_owns_job(job_id: str, user_id: str) -> bool:
         return False
 
 # CREATE FILE (saves metadata to DB, path must come from whoever uploaded to Storage)
-async def create_file(file_data: Dict[str, Any], user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any] | None:
     if not user or "user_id" not in user:
         logger.warning("[create_file] Invalid user context")
         return {"error": "Invalid user context"}
@@ -102,7 +104,7 @@ async def create_file(file_data: Dict[str, Any], user: Dict[str, Any]) -> Option
 
 
 # LIST FILES
-async def get_files(job_id: str, user: Dict[str, Any]) -> List[Dict[str, Any]]:
+async def get_files(job_id: str, user: dict[str, Any]) -> list[dict[str, Any]]:
     if not user or "user_id" not in user:
         logger.warning("[get_files] Invalid user context")
         return []
@@ -135,7 +137,7 @@ async def get_files(job_id: str, user: Dict[str, Any]) -> List[Dict[str, Any]]:
         return []
 
 # GET SINGLE FILE
-async def get_file(file_id: str, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:  
+async def get_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:  
     if not user or "user_id" not in user:
         logger.warning("[get_file] Invalid user context")
         return None
@@ -173,7 +175,7 @@ async def get_file(file_id: str, user: Dict[str, Any]) -> Optional[Dict[str, Any
         return None
 
 # UPDATE FILE
-async def update_file(file_id: str, update_data: Dict[str, Any], user: Dict[str, Any]) -> Optional[Dict[str, Any]]:  
+async def update_file(file_id: str, update_data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any] | None:  
     if not user or "user_id" not in user:
         logger.warning("[update_file] Invalid user context")
         return {"error": "Invalid user context"}
@@ -216,7 +218,7 @@ async def update_file(file_id: str, update_data: Dict[str, Any], user: Dict[str,
         return {"error": "Unexpected server error"}
 
 # DELETE FILE
-async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:  
+async def delete_file(file_id: str, user: dict[str, Any]) -> bool:  
     if not user or "user_id" not in user:
         logger.warning("[delete_file] Invalid user context")
         return False
@@ -263,7 +265,7 @@ async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:
         return False
     
 # GET SIGNED URL
-async def get_signed_url(file_id: str, user: Dict[str, Any]) -> Optional[str]:
+async def get_signed_url(file_id: str, user: dict[str, Any]) -> str | None:
     file = await get_file(file_id, user)
     if not file:
         return None
@@ -279,7 +281,7 @@ async def get_signed_url(file_id: str, user: Dict[str, Any]) -> Optional[str]:
     
     
 # CREATE ARTIFACT FILE (called after Tazwar uploads export to storage)
-async def create_artifact_file(file_data: Dict[str, Any], user_id: str) -> Optional[Dict[str, Any]]:
+async def create_artifact_file(file_data: dict[str, Any], user_id: str) -> dict[str, Any] | None:
     try:
         payload = {
             "bucket": file_data.get("bucket", "dxf-files"),

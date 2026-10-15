@@ -1,19 +1,31 @@
+
 from fastapi import APIRouter, Depends
-from app.middlewares.auth import require_auth
-from app.models.invite_model import (
-    InviteCreate,
-    InviteResponse,
-    InviteValidateResponse
-)
+
 from app.db.queries.invite_queries import (
+    accept_invite,
     create_invite,
+    get_workspace_invites,
     revoke_invite,
     validate_invite,
-    get_workspace_invites
 )
-from typing import List
+from app.middlewares.auth import require_auth
+from app.models.invite_model import (
+    InviteAccept,
+    InviteCreate,
+    InviteResponse,
+    InviteValidateResponse,
+)
 
 router = APIRouter(prefix="/workspaces", tags=["Invites"])
+
+
+@router.post("/invites/accept")
+async def accept_invite_route(
+    body: InviteAccept,
+    user=Depends(require_auth)
+):
+    return await accept_invite(body.token, user["user_id"])
+
 
 #CREATE INVITE
 @router.post("/{workspace_id}/invites",response_model=InviteResponse, status_code=201)
@@ -25,7 +37,7 @@ async def create_invite_route(
     return await create_invite(workspace_id, body.email, body.role, user["user_id"])
 
 # LIST INVITES
-@router.get("/{workspace_id}/invites", response_model=List[InviteResponse])
+@router.get("/{workspace_id}/invites", response_model=list[InviteResponse])
 async def list_invites_route(
     workspace_id: str,
     user=Depends(require_auth)

@@ -1,7 +1,6 @@
-from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 # class FileBase(BaseModel): 
 #     job_id: str = Field(..., description="Foreign key reference to job")
@@ -12,20 +11,20 @@ from pydantic import BaseModel, Field
 class FileCreate(BaseModel):
     """Schema for file creation"""
     job_id: str
-    project_id: Optional[str] = None
+    project_id: str | None = None
     file_type: str = "dxf"
     path: str
-    bucket: Optional[str] = "dxf-files"
-    mime_type: Optional[str] = None
-    size_bytes: Optional[int] = None
+    bucket: str | None = "dxf-files"
+    mime_type: str | None = None
+    size_bytes: int | None = None
 
 
 class FileUpdate(BaseModel):
     """Schema for updating existing file entries"""
     #file_url: Optional[str] = Field(None, description="Updated file URL")
-    file_type: Optional[str] = Field(None, description="Updated file type")
-    path: Optional[str] = None
-    name: Optional[str] = None
+    file_type: str | None = Field(None, description="Updated file type")
+    path: str | None = None
+    name: str | None = None
 
 # class FileInDB(FileBase):
 #     """Internal DB model"""
@@ -39,14 +38,14 @@ class FileUpdate(BaseModel):
 class FileResponse(BaseModel):
     id: str
     job_id: str
-    project_id: Optional[str] = None
+    project_id: str | None = None
     bucket: str
     path: str
     file_type: str
-    name: Optional[str] = None
-    mime_type: Optional[str] = None
-    size_bytes: Optional[int] = None
-    created_at: Optional[datetime] = None
+    name: str | None = None
+    mime_type: str | None = None
+    size_bytes: int | None = None
+    created_at: datetime | None = None
 
     class Config: 
         from_attributes = True

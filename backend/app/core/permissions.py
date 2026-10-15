@@ -5,6 +5,7 @@ TODO: Wire to DB role column once workspace roles migration runs (Week 2).
 
 from enum import Enum
 
+
 class Role(str, Enum):
     ADMIN = "admin"
     MEMBER = "member"

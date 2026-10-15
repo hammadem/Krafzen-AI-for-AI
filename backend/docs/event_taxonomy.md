@@ -16,6 +16,35 @@ All events emitted by worker_service.py and activity_service.py.
 | `export.*`      | Tazwar  | Export job lifecycle (worker-emitted)    |
 | `validation.*`  | Kiruthika | Compliance/preflight/postflight results |
 | `notification.*`| Tazwar  | In-app notification delivery             |
+| `team.*`        | KRAFZEN | Workspace membership and role lifecycle |
+| `permissions.*` | KRAFZEN | Workspace access and role permission changes |
+
+---
+
+## Workspace team and permissions
+
+Workspace events are stored in `activity_events` with `workspace_id` set.
+Their `actor_user_id` is always taken from the authenticated JWT subject
+(`require_auth`); target user IDs and invite tokens are never used as the actor.
+
+| Event | Trigger |
+|---|---|
+| `team.member_invited` | An owner creates an invitation |
+| `team.member_joined` | The invited user accepts using an authenticated account whose email matches the invitation |
+| `team.member_removed` | An owner removes a member |
+| `team.role_changed` | An owner changes a member's role |
+| `permissions.access_granted` | An invitation is accepted and workspace membership is created |
+| `permissions.access_revoked` | An invitation is revoked or an active member is removed |
+| `permissions.permission_changed` | A member's workspace role is changed |
+
+Role-change events include `target_user_id`, `from_role`, and `to_role` in
+metadata. Membership and access events include the target user or invitation
+email and the role involved. A no-op role update does not produce a change event.
+
+Invite acceptance endpoint: `POST /api/v1/workspaces/invites/accept` with
+`{"token": "<invite token>"}` and a valid bearer token for the invited user.
+The server verifies the account email against the invitation before creating
+membership or recording the join event.
 
 ---
 

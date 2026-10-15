@@ -1,15 +1,16 @@
-from fastapi import APIRouter, HTTPException, Query, Header, Depends
-from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from app.db.queries.file_queries import (
     create_file,
-    get_files,
-    get_file,
-    update_file,
     delete_file,
-    get_signed_url
+    get_file,
+    get_files,
+    get_signed_url,
+    update_file,
 )
-from app.models.file_model import FileCreate, FileUpdate, FileResponse
 from app.middlewares.auth import require_auth
+from app.models.file_model import FileCreate, FileResponse, FileUpdate
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -25,7 +26,7 @@ async def create_file_route(
     return result
 
 
-@router.get("/", response_model=List[FileResponse])
+@router.get("/", response_model=list[FileResponse])
 async def list_files(
     job_id: str = Query(..., description="Filter files by job_id"),
     user=Depends(require_auth)

@@ -17,15 +17,15 @@ invite_routes = import_module("app.routes.invite_routes")
 export_routes = import_module("app.routes.export_routes")
 
 __all__ = [
-    "project_routes",
-    "job_routes",
-    "file_routes",
-    "chat_routes",
-    "payment_routes",
-    "user_routes",
     "architecture_routes",
+    "chat_routes",
     "dashboard_routes",
-    "workspace_routes",
+    "export_routes",
+    "file_routes",
     "invite_routes",
-    "export_routes"
+    "job_routes",
+    "payment_routes",
+    "project_routes",
+    "user_routes",
+    "workspace_routes"
 ]

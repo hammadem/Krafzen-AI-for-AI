@@ -2,9 +2,11 @@
 Test suite for Jobs CRUD endpoints
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import AsyncClient
-from unittest.mock import AsyncMock, patch
+
 from app.main import app
 
 BASE_URL = "/api/v1/jobs"

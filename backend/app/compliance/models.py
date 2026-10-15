@@ -1,25 +1,25 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class RoomExtract(BaseModel):
     name: str = ""
-    area_sqft: Optional[float] = None
-    ceiling_ft: Optional[float] = None
+    area_sqft: float | None = None
+    ceiling_ft: float | None = None
 
 
 class DoorExtract(BaseModel):
-    width_in: Optional[float] = None
+    width_in: float | None = None
 
 
 class StairsExtract(BaseModel):
-    rise_in: Optional[float] = None
-    tread_in: Optional[float] = None
+    rise_in: float | None = None
+    tread_in: float | None = None
 
 
 class EgressWindowExtract(BaseModel):
-    area_sqft: Optional[float] = None
+    area_sqft: float | None = None
 
 
 class LayoutExtract(BaseModel):
@@ -27,11 +27,11 @@ class LayoutExtract(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    rooms: List[RoomExtract] = Field(default_factory=list)
-    doors_inches: List[DoorExtract] = Field(default_factory=list)
-    stairs: Optional[StairsExtract] = None
-    egress_windows_sqft: List[EgressWindowExtract] = Field(default_factory=list)
-    notes: Optional[str] = None
+    rooms: list[RoomExtract] = Field(default_factory=list)
+    doors_inches: list[DoorExtract] = Field(default_factory=list)
+    stairs: StairsExtract | None = None
+    egress_windows_sqft: list[EgressWindowExtract] = Field(default_factory=list)
+    notes: str | None = None
 
 
 class ComplianceViolation(BaseModel):
@@ -43,11 +43,11 @@ class ComplianceViolation(BaseModel):
 class ComplianceResult(BaseModel):
     jurisdiction_id: str
     jurisdiction_label: str
-    score_percent: Optional[float] = None
+    score_percent: float | None = None
     status_label: str
     passed_rules: int = 0
     applicable_rules: int = 0
-    violations: List[ComplianceViolation] = Field(default_factory=list)
-    suggestions: List[str] = Field(default_factory=list)
+    violations: list[ComplianceViolation] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
     disclaimer: str
-    layout_extract: Optional[Dict[str, Any]] = None
+    layout_extract: dict[str, Any] | None = None

@@ -1,7 +1,7 @@
 """export_jobs persistence (Yehor) + validation lookups (Kiruthika)."""
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -11,11 +11,10 @@ from app.schemas.export_contracts import ExportStatus
 from app.utils.logger import logger
 from app.utils.validators import _user_owns_project, _valid_uuid
 
-
 # ── Kiruthika: validation endpoint helpers ────────────────────────────────────
 
 
-async def get_export_job(export_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+async def get_export_job(export_id: str, user_id: str) -> dict[str, Any] | None:
     """Fetch export_jobs row if user owns the parent project."""
 
     def _fetch():
@@ -39,7 +38,7 @@ async def get_export_job(export_id: str, user_id: str) -> Optional[Dict[str, Any
 
 async def get_compliance_validation_payload(
     compliance_record_id: str,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Load stored validation_payload from project_compliance_records."""
 
     def _fetch():
@@ -63,10 +62,10 @@ async def create_export(
     format: str,
     idempotency_key: str,
     user_id: str,
-    source_job_id: Optional[str] = None,
-    compliance_preset_id: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-) -> Optional[Dict[str, Any]]:
+    source_job_id: str | None = None,
+    compliance_preset_id: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
     if not _valid_uuid(project_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid project_id"})
 
@@ -124,7 +123,7 @@ async def create_export(
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
 
-async def get_export(export_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+async def get_export(export_id: str, user_id: str) -> dict[str, Any] | None:
     if not _valid_uuid(export_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid export_id"})
 
@@ -152,7 +151,7 @@ async def get_export(export_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
 
-async def get_project_exports(project_id: str, user_id: str) -> List[Dict[str, Any]]:
+async def get_project_exports(project_id: str, user_id: str) -> list[dict[str, Any]]:
     if not _valid_uuid(project_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid project_id"})
 
@@ -180,9 +179,9 @@ async def get_project_exports(project_id: str, user_id: str) -> List[Dict[str, A
 
 async def update_export_status(
     export_id: str,
-    update_data: Dict[str, Any],
+    update_data: dict[str, Any],
     user_id: str,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     if not _valid_uuid(export_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid export_id"})
 
@@ -194,7 +193,7 @@ async def update_export_status(
         await get_export(export_id, user_id)
 
         payload = {k: v for k, v in update_data.items() if v is not None}
-        payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+        payload["updated_at"] = datetime.now(UTC).isoformat()
 
         res = await run_in_threadpool(
             lambda: db.table("export_jobs").update(payload).eq("id", export_id).execute()
@@ -212,7 +211,7 @@ async def update_export_status(
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
 
-async def get_export_artifact(export_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+async def get_export_artifact(export_id: str, user_id: str) -> dict[str, Any] | None:
     if not _valid_uuid(export_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid export_id"})
 

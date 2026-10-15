@@ -3,7 +3,6 @@ import pytest
 from app.main import app
 from app.middlewares.auth import require_auth
 
-
 TEST_USER = {"user_id": "00000000-0000-0000-0000-000000000001"}
 
 
