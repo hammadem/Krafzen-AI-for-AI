@@ -17,6 +17,8 @@ import {
   ChevronsLeft,
   ThumbsUp,
   ThumbsDown,
+  Check,
+  X,
   LayoutGrid,
   Box,
   Code2,
@@ -124,7 +126,8 @@ export default function WorkspaceLayout() {
     deleteSession,
     chatJurisdiction,
     setChatJurisdiction,
-    onMessageFeedback
+    onMessageFeedback,
+    onSuggestionDecision,
   } = useChat();
   const { user, logout, session } = useAuth();
   
@@ -156,6 +159,8 @@ export default function WorkspaceLayout() {
   const [isChatOverlayCollapsed, setIsChatOverlayCollapsed] = useState(false);
   const [feedbackPopoverMessageId, setFeedbackPopoverMessageId] = useState<string | null>(null);
   const [feedbackReason, setFeedbackReason] = useState("");
+  const [suggestionDecisions, setSuggestionDecisions] = useState<Record<string, 'accepted' | 'rejected'>>({});
+  const [suggestionErrors, setSuggestionErrors] = useState<Record<string, string>>({});
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [designDownload, setDesignDownload] = useState<{
     kind: 'dxf' | 'dwg';
@@ -172,6 +177,26 @@ export default function WorkspaceLayout() {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleSuggestionDecision = async (
+    messageId: string,
+    decision: 'accepted' | 'rejected'
+  ) => {
+    try {
+      setSuggestionErrors((current) => {
+        const next = { ...current };
+        delete next[messageId];
+        return next;
+      });
+      await onSuggestionDecision(messageId, decision);
+      setSuggestionDecisions((current) => ({ ...current, [messageId]: decision }));
+    } catch (error) {
+      setSuggestionErrors((current) => ({
+        ...current,
+        [messageId]: error instanceof Error ? error.message : "Could not record the suggestion decision.",
+      }));
+    }
   };
 
   useEffect(() => {
@@ -761,11 +786,50 @@ export default function WorkspaceLayout() {
                             </Dialog>
 
                             {/* Feedback overlay */}
-                            {onMessageFeedback && (
+                            {message.role === 'assistant' && (
                               <div 
                                 className={`absolute top-2 right-2 flex items-center gap-1 z-20 bg-zinc-950/80 backdrop-blur-sm border border-white/10 p-1 rounded-md shadow-lg transition-opacity duration-200 ${message.feedback?.reaction ? 'opacity-100' : 'opacity-0 group-hover/drawing:opacity-100'}`}
                                 onClick={(e) => e.stopPropagation()}
                               >
+                                {message.role === 'assistant' && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={Boolean(suggestionDecisions[message.id])}
+                                      className={`text-xs h-7 px-2 hover:bg-white/10 ${suggestionDecisions[message.id] === 'accepted' ? 'text-emerald-400' : 'text-gray-400 hover:text-white'}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void handleSuggestionDecision(message.id, 'accepted');
+                                      }}
+                                      title="Accept AI suggestion"
+                                      aria-label="Accept AI suggestion"
+                                    >
+                                      <Check className="w-3.5 h-3.5 mr-1" />
+                                      {suggestionDecisions[message.id] === 'accepted' ? 'Accepted' : 'Accept'}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={Boolean(suggestionDecisions[message.id])}
+                                      className={`text-xs h-7 px-2 hover:bg-white/10 ${suggestionDecisions[message.id] === 'rejected' ? 'text-amber-400' : 'text-gray-400 hover:text-white'}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void handleSuggestionDecision(message.id, 'rejected');
+                                      }}
+                                      title="Reject AI suggestion"
+                                      aria-label="Reject AI suggestion"
+                                    >
+                                      <X className="w-3.5 h-3.5 mr-1" />
+                                      {suggestionDecisions[message.id] === 'rejected' ? 'Rejected' : 'Reject'}
+                                    </Button>
+                                    {suggestionErrors[message.id] && (
+                                      <span role="alert" className="text-[10px] text-red-300 px-1">
+                                        {suggestionErrors[message.id]}
+                                      </span>
+                                    )}
+                                  </>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -1003,7 +1067,7 @@ export default function WorkspaceLayout() {
               </div>
 
               {/* Floating Feedback Overlay in 2D/3D Mode */}
-              {(canvasViewMode === '2d' || canvasViewMode === '3d') && onMessageFeedback && activeMessage && (
+              {(canvasViewMode === '2d' || canvasViewMode === '3d') && activeMessage && (
                 <div 
                   className="absolute top-4 right-4 flex items-center gap-1.5 z-20 bg-zinc-950/85 backdrop-blur-sm border border-white/15 p-1 rounded-md shadow-lg"
                   onClick={(e) => e.stopPropagation()}

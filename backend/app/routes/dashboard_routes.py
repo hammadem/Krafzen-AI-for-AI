@@ -34,6 +34,10 @@ class ActivityEvent(BaseModel):
     actor_user_id: str | None = None
     actor_name: str | None = None
     message: str
+    event_id: str | None = None
+    action: str | None = None
+    entity_type: str | None = None
+    entity_id: str | None = None
     metadata: dict = Field(default_factory=dict)
 
 
@@ -111,13 +115,13 @@ async def get_activity_feed(
 
         events: list[ActivityEvent] = []
         recorded_job_statuses = {
-            (str(row.get("job_id")), row.get("event_name"))
+            (str(row.get("job_id")), row.get("event_name") or row.get("action"))
             for row in activity_rows
-            if row.get("job_id") and row.get("event_name")
+            if row.get("job_id") and (row.get("event_name") or row.get("action"))
         }
 
         for row in activity_rows:
-            event_name = row.get("event_name") or "activity.updated"
+            event_name = row.get("event_name") or row.get("action") or "activity.updated"
             row_project_id = row.get("project_id")
             if project_id and str(row_project_id or "") != project_id:
                 continue
@@ -135,6 +139,12 @@ async def get_activity_feed(
                 category=_activity_category(event_name),
                 actor_user_id=str(actor_user_id) if actor_user_id else None,
                 actor_name=actor_names.get(str(actor_user_id)) if actor_user_id else None,
+                event_id=str(row.get("event_id") or row.get("id"))
+                if row.get("event_id") or row.get("id")
+                else None,
+                action=row.get("action") or event_name,
+                entity_type=row.get("entity_type"),
+                entity_id=str(row["entity_id"]) if row.get("entity_id") else None,
                 message=_activity_message(
                     event_name,
                     metadata,
@@ -304,9 +314,9 @@ def _activity_category(event_name: str) -> str:
         return "ai"
     if event_name.startswith("revision."):
         return "revisions"
-    if event_name.startswith("team."):
+    if event_name.startswith(("team.", "member.")):
         return "team"
-    if event_name.startswith("permissions."):
+    if event_name.startswith(("permissions.", "permission.")):
         return "permissions"
     if event_name.startswith("export."):
         return "exports"

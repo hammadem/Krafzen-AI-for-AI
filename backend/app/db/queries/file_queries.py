@@ -1,11 +1,12 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 
 from app.db.supabase_client import db
-from app.services.activity_service import record_file_event
+from app.services.activity_service import record_audit_event
 from app.utils.logger import logger
 
 
@@ -85,15 +86,17 @@ async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[s
         if project_id and project_id != owned_project_id:
             raise HTTPException(status_code=400, detail={"error": "project_id does not match job"})
 
+        path = file_data.get("path")
         payload = {
             "job_id": job_id,
             "project_id": owned_project_id,
             "bucket": file_data.get("bucket", "krafzen-files"),
-            "path": file_data.get("path"),
+            "path": path,
             "file_type": file_data.get("file_type", "dxf"),
             "mime_type": file_data.get("mime_type"),
             "size_bytes": file_data.get("size_bytes"),
-            "name": file_data.get("name"),
+            "name": file_data.get("name") or (path.rsplit("/", 1)[-1] if path else None),
+            "version": file_data.get("version", 1),
         }
 
         response = await run_in_threadpool(
@@ -104,22 +107,15 @@ async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[s
 
         if response and response.data:
             created_file = response.data[0]
-            logger.info("[create_file] File created successfully", file_id=created_file["id"])
-            try:
-                await record_file_event(
-                    event_name="file.uploaded",
-                    file_id=str(created_file["id"]),
-                    project_id=owned_project_id,
-                    job_id=job_id,
-                    actor_user_id=user["user_id"],
-                    metadata={"file_name": _file_name(created_file)},
-                    message=f"Uploaded {_file_name(created_file)}",
+            await _record_file_activity("file.uploaded", created_file, user["user_id"])
+            if created_file.get("version", 1) > 1:
+                await _record_file_activity(
+                    "file.version_created", created_file, user["user_id"]
                 )
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail={"error": "File was created but its activity event could not be recorded"},
-                ) from e
+            await _record_revision_activity(
+                "revision.created", created_file, user["user_id"]
+            )
+            logger.info("[create_file] File created successfully", file_id=created_file["id"])
             return created_file
         
         logger.warning("[create_file] Insert failed")
@@ -155,6 +151,7 @@ async def get_files(job_id: str, user: dict[str, Any]) -> list[dict[str, Any]]:
             lambda: db.table("files")
                 .select("*")
                 .eq("job_id", job_id)
+                .is_("archived_at", "null")
                 .execute()
         )
 
@@ -236,32 +233,31 @@ async def update_file(file_id: str, update_data: dict[str, Any], user: dict[str,
         )
 
         if response and hasattr(response, "data") and response.data:
-            logger.info("[update_file] File updated successfully", file_id=file_id) 
             updated_file = response.data[0]
-            if "name" in payload or "path" in payload:
-                try:
-                    project_id = (
-                        updated_file.get("project_id")
-                        or file.get("project_id")
-                        or await _get_owned_job_project_id(file["job_id"], user["user_id"])
-                    )
-                    await record_file_event(
-                        event_name="file.renamed",
-                        file_id=file_id,
-                        project_id=str(project_id or ""),
-                        job_id=str(updated_file["job_id"]),
-                        actor_user_id=user["user_id"],
-                        metadata={
-                            "previous_name": _file_name(file),
-                            "file_name": _file_name(updated_file),
-                        },
-                        message=f"Renamed {_file_name(file)} to {_file_name(updated_file)}",
-                    )
-                except Exception as e:
-                    raise HTTPException(
-                        status_code=500,
-                        detail={"error": "File was updated but its activity event could not be recorded"},
-                    ) from e
+            old_name = file.get("name") or _file_name(file)
+            new_name = updated_file.get("name") or _file_name(updated_file)
+            name_changed = old_name != new_name
+            if name_changed:
+                await _record_file_activity(
+                    "file.renamed",
+                    updated_file,
+                    user["user_id"],
+                    old_name=old_name,
+                    new_name=new_name,
+                )
+            changed_fields = sorted(
+                field
+                for field in payload
+                if field != "name" and file.get(field) != updated_file.get(field)
+            )
+            if changed_fields:
+                await _record_file_activity(
+                    "file.updated",
+                    updated_file,
+                    user["user_id"],
+                    changed_fields=changed_fields,
+                )
+            logger.info("[update_file] File updated successfully", file_id=file_id)
             return updated_file
 
         logger.warning("[update_file] Update failed", file_id=file_id) 
@@ -299,36 +295,16 @@ async def delete_file(file_id: str, user: dict[str, Any]) -> bool:
             logger.error("[delete_file] Storage delete failed", file_id=file_id, error=str(e))
             raise HTTPException(status_code=500, detail={"error": "Failed to delete file from storage"})
 
-        # delete from DB only when storage delete succeeded
         response = await run_in_threadpool(
             lambda: db.table("files")
                 .delete()
                 .eq("id", file_id)
                 .execute()
         )
-
         success = bool(response and hasattr(response, "data") and response.data)
         if success:
             logger.info("[delete_file] File deleted successfully", file_id=file_id) 
-            try:
-                project_id = (
-                    file.get("project_id")
-                    or await _get_owned_job_project_id(file["job_id"], user["user_id"])
-                )
-                await record_file_event(
-                    event_name="file.deleted",
-                    file_id=file_id,
-                    project_id=str(project_id or ""),
-                    job_id=str(file["job_id"]),
-                    actor_user_id=user["user_id"],
-                    metadata={"file_name": _file_name(file)},
-                    message=f"Deleted {_file_name(file)}",
-                )
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail={"error": "File was deleted but its activity event could not be recorded"},
-                ) from e
+            await _record_file_activity("file.deleted", file, user["user_id"])
         else:
             logger.warning("[delete_file] Delete failed", file_id=file_id)
         return success
@@ -338,6 +314,162 @@ async def delete_file(file_id: str, user: dict[str, Any]) -> bool:
     except Exception as e:
         logger.error("[delete_file] Error", file_id=file_id, error=str(e), exc_info=True)
         return False
+
+
+async def archive_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
+    file = await get_file(file_id, user)
+    if not file:
+        return None
+    if file.get("archived_at"):
+        return file
+
+    archived_at = datetime.now(UTC).isoformat()
+    response = await run_in_threadpool(
+        lambda: db.table("files")
+            .update({"archived_at": archived_at})
+            .eq("id", file_id)
+            .execute()
+    )
+    if not response or not response.data:
+        return None
+
+    archived_file = response.data[0]
+    await _record_file_activity("file.archived", archived_file, user["user_id"])
+    return archived_file
+
+
+async def restore_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
+    file = await get_file(file_id, user)
+    if not file:
+        return None
+    if not file.get("archived_at"):
+        return file
+
+    response = await run_in_threadpool(
+        lambda: db.table("files")
+            .update({"archived_at": None})
+            .eq("id", file_id)
+            .execute()
+    )
+    if not response or not response.data:
+        return None
+
+    restored_file = response.data[0]
+    await _record_file_activity("file.restored", restored_file, user["user_id"])
+    await _record_revision_activity(
+        "revision.restored", restored_file, user["user_id"]
+    )
+    return restored_file
+
+
+async def set_revision_approval(
+    file_id: str,
+    approval_state: str,
+    user: dict[str, Any],
+) -> dict[str, Any] | None:
+    if approval_state not in {"approved", "rejected"}:
+        raise ValueError("Revision approval state must be approved or rejected")
+
+    file = await get_file(file_id, user)
+    if not file:
+        return None
+    if file.get("approval_state") == approval_state:
+        return file
+
+    reviewed_at = datetime.now(UTC).isoformat()
+    response = await run_in_threadpool(
+        lambda: db.table("files")
+            .update({
+                "approval_state": approval_state,
+                "reviewed_by": user["user_id"],
+                "reviewed_at": reviewed_at,
+            })
+            .eq("id", file_id)
+            .execute()
+    )
+    if not response or not response.data:
+        return None
+
+    updated_file = response.data[0]
+    action = "revision.approved" if approval_state == "approved" else "revision.rejected"
+    await _record_revision_activity(action, updated_file, user["user_id"])
+    return updated_file
+
+
+async def _record_file_activity(
+    action: str,
+    file: dict[str, Any],
+    actor_user_id: str,
+    **details: Any,
+) -> None:
+    project_id = file.get("project_id")
+    metadata: dict[str, Any] = {
+        "file_id": file["id"],
+        "file_name": _file_name(file),
+        "file_type": file.get("file_type"),
+        "version": file.get("version", 1),
+        "project_id": project_id,
+        "user_id": actor_user_id,
+    }
+    metadata.update({key: value for key, value in details.items() if value is not None})
+    try:
+        await record_audit_event(
+            action=action,
+            entity_type="file",
+            entity_id=file["id"],
+            actor_user_id=actor_user_id,
+            project_id=project_id,
+            file_id=file["id"],
+            legacy_job_id=str(file["job_id"]),
+            metadata=metadata,
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": f"File state changed but {action} audit event could not be recorded",
+                "entity_id": file["id"],
+            },
+        ) from error
+
+
+async def _record_revision_activity(
+    action: str,
+    file: dict[str, Any],
+    actor_user_id: str,
+) -> None:
+    try:
+        await record_audit_event(
+            action=action,
+            entity_type="revision",
+            entity_id=file["id"],
+            actor_user_id=actor_user_id,
+            project_id=file.get("project_id"),
+            legacy_job_id=str(file["job_id"]),
+            file_id=file["id"],
+            metadata={
+                "revision_id": file["id"],
+                "file_id": file["id"],
+                "version": file.get("version", 1),
+                "approval_state": file.get("approval_state", "pending_review"),
+            },
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": f"Revision state changed but {action} audit event could not be recorded",
+                "entity_id": file["id"],
+            },
+        ) from error
+
+
+def _file_name(file: dict[str, Any]) -> str | None:
+    name = file.get("name")
+    if name:
+        return name
+    path = file.get("path")
+    return path.rsplit("/", 1)[-1] if path else None
     
 # GET SIGNED URL
 async def get_signed_url(file_id: str, user: dict[str, Any]) -> str | None:
@@ -376,8 +508,22 @@ async def create_artifact_file(file_data: dict[str, Any], user_id: str) -> dict[
         )
 
         if res and res.data:
-            logger.info("[create_artifact_file] Artifact file created", file_id=res.data[0]["id"])
-            return res.data[0]
+            artifact = res.data[0]
+            source_file_id = file_data.get("source_file_id")
+            event_file = {
+                **artifact,
+                "id": source_file_id or artifact["id"],
+                "name": file_data.get("source_file_name") or artifact.get("name"),
+            }
+            await _record_file_activity(
+                "file.exported",
+                event_file,
+                user_id,
+                export_format=artifact.get("file_type"),
+                artifact_file_id=artifact["id"],
+            )
+            logger.info("[create_artifact_file] Artifact file created", file_id=artifact["id"])
+            return artifact
 
         return None
     except Exception as e:

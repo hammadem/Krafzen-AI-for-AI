@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { fetchChatHistory, sendChatMessage, deleteChatSession, createChatSession, fetchSessionMessages, updateChatSessionTitle, submitMessageFeedback, type ChatJurisdiction, type CompliancePayload } from "@/lib/api/chat";
+import { recordSuggestionDecision } from "@/lib/api/api";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { Message } from "@/components/ChatInterface";
 import { useChatStore, ChatSession } from "@/components/secure-chat/store";
@@ -38,6 +39,7 @@ interface ChatContextType {
     createNewChat: () => void;
     deleteSession: (id: string) => Promise<void>;
     onMessageFeedback: (messageId: string, reaction: 'up' | 'down', reason?: string) => Promise<void>;
+    onSuggestionDecision: (messageId: string, decision: 'accepted' | 'rejected') => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -394,6 +396,17 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    const handleSuggestionDecision = async (
+        messageId: string,
+        decision: 'accepted' | 'rejected'
+    ) => {
+        if (!user) throw new Error("Sign in to record a suggestion decision.");
+        const result = await recordSuggestionDecision(user, messageId, decision);
+        if (!result.ok) {
+            throw new Error(result.error?.message || "Could not record the suggestion decision.");
+        }
+    };
+
     return (
         <ChatContext.Provider
             value={{
@@ -410,7 +423,8 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 handleSendMessage,
                 createNewChat,
                 deleteSession,
-                onMessageFeedback: handleMessageFeedback
+                onMessageFeedback: handleMessageFeedback,
+                onSuggestionDecision: handleSuggestionDecision,
             }}
         >
             {children}

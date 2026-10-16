@@ -7,6 +7,69 @@ All events emitted by worker_service.py and activity_service.py.
 
 ---
 
+## Audit event contract
+
+`activity_events` is the append-only audit store. Its canonical fields are:
+`event_id`, `organization_id`, `actor_user_id`, `action`, `entity_type`,
+`entity_id`, `project_id`, `timestamp`, and `metadata`. `organization_id`
+references a workspace; `entity_id` is intentionally polymorphic so event
+records survive deletion of the referenced entity. `timestamp` is stored as
+UTC `timestamptz`.
+
+The table retains `id`, `event_name`, `job_id`, and `created_at` as compatibility
+columns. The shared activity service writes both shapes, and API responses
+include both canonical audit fields and legacy activity-feed aliases.
+`export.*` events use `entity_type="export_job"` and the existing
+`export_jobs.id` as `entity_id`.
+
+Audit rows cannot be directly updated, deleted, or truncated. Foreign-key
+cleanup may null relationship columns when a referenced workspace, project,
+user, or export job is deleted; the audit event, action, timestamp, and generic
+entity reference remain. Normal application users have read-only access;
+inserts are performed by the backend service role. Historical events are not
+assigned to a workspace automatically because projects do not currently have
+a workspace relationship; those events remain available in project activity.
+
+### Standard action names
+
+| Entity | Actions |
+|---------|---------|
+| `file` | `file.uploaded`, `file.updated`, `file.renamed`, `file.version_created`, `file.exported`, `file.archived`, `file.restored`, `file.deleted` |
+| `ai_review` | `ai.review_started`, `ai.review_completed`, `ai.review_failed` |
+| `ai_generation` | `ai.generation_started`, `ai.generation_completed`, `ai.generation_failed` |
+| `ai_suggestion` | `ai.suggestion_accepted`, `ai.suggestion_rejected` |
+| `revision` | `revision.created`, `revision.approved`, `revision.rejected`, `revision.restored` |
+| `member` | `member.invited`, `member.joined`, `member.removed`, `member.role_changed` |
+| `permission` | `permission.changed` |
+
+Use `file.renamed` only when its display name changes; use `file.updated` for
+other file metadata changes. `file.exported` records inclusion of a file in an
+export. `file.deleted` is recorded before hard-deleting the file row; its generic
+entity reference is not a file foreign key, so deletion will not cascade to its
+audit history. Export-job lifecycle actions (`export.queued`, `export.processing`,
+`export.validating`, `export.completed`, `export.failed`, and
+`export.requires_review`) remain supported for compatibility with the current
+worker.
+
+Action values are text rather than a database enum so new actions can be added
+without a schema migration. Event names describe completed actions or state
+changes, not commands that have yet to run.
+
+AI audit metadata contains lifecycle references and non-content attributes
+such as IDs, jurisdiction, stage, and exception class. Prompts, generated CAD
+content, image URLs, and raw exception messages must not be copied into audit
+rows. Suggestion decisions reference the assistant message ID and are accepted
+only for an assistant message owned by the authenticated user.
+
+Revision events are emitted for versioned `files` rows. The file UUID is the
+revision reference, `version` identifies its human-facing version, and approval
+state is persisted on that row. Approve/reject and restore events are written
+only after the corresponding file state update succeeds. Restoring a revision
+means unarchiving that version; it does not overwrite or duplicate stored file
+content.
+
+---
+
 ## Namespaces
 
 | Namespace       | Owner   | Description                              |
@@ -70,7 +133,8 @@ deletion; detached events remain readable only to their original actor.
 
 ## `export.*`
 
-Emitted by `worker_service.emit_export_event()` → persisted via `activity_service.record_event()`.
+Emitted by `worker_service.emit_export_event()` → persisted via
+`activity_service.record_audit_event()`.
 
 | Event                    | Trigger                                      |
 |--------------------------|----------------------------------------------|
@@ -143,14 +207,29 @@ Owned by Yehor. Documented here for cross-team reference.
 
 ## `file.*`
 
-Owned by Yehor. Tazwar wires these into activity feed in Week 3 Step 3.
+File-row creation records `file.uploaded`; a new row explicitly created with a
+version greater than 1 also records `file.version_created`. File metadata edits
+record `file.renamed` when the display name changes and `file.updated` for
+other changed fields. Archive/restore endpoints record the corresponding state
+transition. Export artifacts record `file.exported` when saved through the
+artifact-file persistence helper.
 
-| Event           | Trigger                   |
-|-----------------|---------------------------|
-| `file.uploaded` | File stored in Supabase   |
-| `file.deleted`  | File removed              |
-| `file.renamed`  | File metadata updated     |
-| `upload.failed` | Storage write failed      |
+Every event uses `entity_type="file"` and includes file ID, display name, file
+type, version, project ID, and actor user ID in metadata. The canonical event
+columns separately store actor, project, and UTC timestamp. Apply
+`011_file_activity_lifecycle.sql` and `012_file_revision_approval.sql` before
+using version, archive, or revision approval behavior.
+
+| Event                  | Trigger                                      |
+|------------------------|----------------------------------------------|
+| `file.uploaded`        | File row successfully created                |
+| `file.updated`         | Non-name file metadata changed               |
+| `file.renamed`         | Display name changed                         |
+| `file.version_created`| File row created with version greater than 1|
+| `file.exported`        | Export artifact persisted                    |
+| `file.archived`        | File moved to archived state                 |
+| `file.restored`        | Archived file restored                       |
+| `file.deleted`         | File row hard-deleted                        |
 
 ### Sample payload — `file.uploaded`
 ```json
@@ -160,9 +239,12 @@ Owned by Yehor. Tazwar wires these into activity feed in Week 3 Step 3.
   "actor_user_id": "cccccccc-0000-0000-0000-000000000003",
   "metadata": {
     "file_id": "dddddddd-0000-0000-0000-000000000004",
+    "file_name": "project_bb_20260605_143000.dxf",
     "file_type": "dxf",
-    "bucket": "dxf-files",
-    "path": "cccccccc-0000-0000-0000-000000000003/bbbbbbbb-0000-0000-0000-000000000002/project_bb_20260605_143000.dxf"
+    "file_id": "dddddddd-0000-0000-0000-000000000004",
+    "version": 1,
+    "project_id": "bbbbbbbb-0000-0000-0000-000000000002",
+    "user_id": "cccccccc-0000-0000-0000-000000000003"
   },
   "created_at": "2026-06-05T14:30:05Z"
 }

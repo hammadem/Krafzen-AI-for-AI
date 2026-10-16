@@ -13,8 +13,13 @@ import {
     Shield,
     Users,
 } from "lucide-react";
-import { getDashboardActivity } from "@/lib/api/api";
+import {
+    getDashboardActivity,
+    restoreFileRevision,
+    setRevisionDecision,
+} from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
+import { useOptionalAuth } from "@/context/AuthContext";
 
 type ActivityCategory =
     | "files"
@@ -27,6 +32,7 @@ type ActivityCategory =
 
 interface ActivityEvent {
     id: string;
+    event_id?: string | null;
     job_id?: string | null;
     project_id?: string | null;
     project_name?: string | null;
@@ -34,11 +40,13 @@ interface ActivityEvent {
     occurred_at?: string | null;
     event_type: string;
     event_name?: string | null;
+    action?: string | null;
+    entity_type?: string | null;
+    entity_id?: string | null;
     category?: ActivityCategory;
     actor_user_id?: string | null;
     actor_name?: string | null;
     message: string;
-    metadata?: Record<string, unknown>;
 }
 
 const CATEGORIES: { label: string; value: ActivityCategory }[] = [
@@ -53,12 +61,12 @@ const CATEGORIES: { label: string; value: ActivityCategory }[] = [
 
 function categoryFor(event: ActivityEvent): ActivityCategory {
     if (event.category) return event.category;
-    const name = event.event_name || event.event_type || "";
+    const name = event.action || event.event_name || event.event_type || "";
     if (name.startsWith("file.") || name.startsWith("upload.")) return "files";
     if (name.startsWith("ai.")) return "ai";
     if (name.startsWith("revision.")) return "revisions";
-    if (name.startsWith("team.")) return "team";
-    if (name.startsWith("permissions.")) return "permissions";
+    if (name.startsWith("team.") || name.startsWith("member.")) return "team";
+    if (name.startsWith("permissions.") || name.startsWith("permission.")) return "permissions";
     if (name.startsWith("export.") || event.status) return "exports";
     return "all";
 }
@@ -83,7 +91,21 @@ function displayTime(timestamp?: string | null): { time: string; date: string } 
     };
 }
 
-function ActivityRow({ event }: { event: ActivityEvent }) {
+function ActivityRow({
+    event,
+    onChanged,
+    currentDecision,
+    isRestored,
+}: {
+    event: ActivityEvent;
+    onChanged: () => void;
+    currentDecision: "approved" | "rejected" | null;
+    isRestored: boolean;
+}) {
+    const user = useOptionalAuth()?.user ?? null;
+    const [working, setWorking] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
+    const [decision, setDecision] = useState<"approved" | "rejected" | null>(null);
     const actorName = event.actor_name || "Workspace member";
     const category = categoryFor(event);
     const time = displayTime(event.occurred_at);
@@ -95,6 +117,41 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
         category === "permissions" ? Shield :
         category === "exports" ? Download :
         Activity;
+
+    const decideRevision = async (value: "approved" | "rejected") => {
+        if (!event.entity_id) return;
+        setWorking(true);
+        setActionError(null);
+        try {
+            const result = await setRevisionDecision(user, event.entity_id, value);
+            if (!result.ok) {
+                throw new Error(result.error?.message || "Could not update revision.");
+            }
+            setDecision(value);
+            onChanged();
+        } catch (error) {
+            setActionError(error instanceof Error ? error.message : "Could not update revision.");
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const restoreRevision = async () => {
+        if (!event.entity_id) return;
+        setWorking(true);
+        setActionError(null);
+        try {
+            const result = await restoreFileRevision(user, event.entity_id);
+            if (!result.ok) {
+                throw new Error(result.error?.message || "Could not restore revision.");
+            }
+            onChanged();
+        } catch (error) {
+            setActionError(error instanceof Error ? error.message : "Could not restore revision.");
+        } finally {
+            setWorking(false);
+        }
+    };
 
     return (
         <article className="flex gap-4 border-b border-white/10 py-5 last:border-b-0">
@@ -123,6 +180,37 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
                         {event.project_name}
                     </p>
                 )}
+                {event.event_type === "revision.created" && event.entity_id && (
+                    <div className="flex items-center gap-2 pt-2">
+                        <button
+                            type="button"
+                            disabled={working || decision !== null || currentDecision !== null}
+                            onClick={() => void decideRevision("approved")}
+                            className="rounded-md border border-emerald-400/20 px-2.5 py-1 text-xs text-emerald-300 hover:bg-emerald-400/10 disabled:opacity-50"
+                        >
+                            {(decision || currentDecision) === "approved" ? "Approved" : "Approve"}
+                        </button>
+                        <button
+                            type="button"
+                            disabled={working || decision !== null || currentDecision !== null}
+                            onClick={() => void decideRevision("rejected")}
+                            className="rounded-md border border-amber-400/20 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-400/10 disabled:opacity-50"
+                        >
+                            {(decision || currentDecision) === "rejected" ? "Rejected" : "Reject"}
+                        </button>
+                    </div>
+                )}
+                {event.event_type === "file.archived" && event.entity_id && !isRestored && (
+                    <button
+                        type="button"
+                        disabled={working}
+                        onClick={() => void restoreRevision()}
+                        className="mt-2 rounded-md border border-white/10 px-2.5 py-1 text-xs text-[#54e3b5] hover:bg-white/5 disabled:opacity-50"
+                    >
+                        {working ? "Restoring…" : "Restore revision"}
+                    </button>
+                )}
+                {actionError && <p role="alert" className="mt-2 text-xs text-red-300">{actionError}</p>}
             </div>
         </article>
     );
@@ -174,6 +262,34 @@ export default function ActivityPage() {
         });
         return [...unique.entries()].sort((left, right) => left[1].localeCompare(right[1]));
     }, [activities]);
+
+    const revisionDecisions = useMemo(() => {
+        const decisions = new Map<string, "approved" | "rejected">();
+        for (const event of activities) {
+            if (
+                event.entity_id &&
+                (event.event_type === "revision.approved" || event.event_type === "revision.rejected") &&
+                !decisions.has(event.entity_id)
+            ) {
+                decisions.set(
+                    event.entity_id,
+                    event.event_type === "revision.approved" ? "approved" : "rejected"
+                );
+            }
+        }
+        return decisions;
+    }, [activities]);
+
+    const restoredRevisionIds = useMemo(
+        () =>
+            new Set(
+                activities
+                    .filter((event) => event.event_type === "revision.restored" && event.entity_id)
+                    .map((event) => event.entity_id)
+                    .filter((entityId): entityId is string => Boolean(entityId))
+            ),
+        [activities]
+    );
 
     const visible = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -330,7 +446,15 @@ export default function ActivityPage() {
 
                 {!isLoading && !isError && visible.length > 0 && (
                     <section aria-label="Activity timeline" className="rounded-2xl border border-white/10 bg-[#0a0e17] px-4 sm:px-6">
-                        {visible.map((event) => <ActivityRow key={event.id} event={event} />)}
+                        {visible.map((event) => (
+                            <ActivityRow
+                                key={event.event_id || event.id}
+                                event={event}
+                                onChanged={() => void refetch()}
+                                currentDecision={event.entity_id ? revisionDecisions.get(event.entity_id) ?? null : null}
+                                isRestored={event.entity_id ? restoredRevisionIds.has(event.entity_id) : false}
+                            />
+                        ))}
                     </section>
                 )}
 

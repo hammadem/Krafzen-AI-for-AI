@@ -124,6 +124,30 @@ class ChatHistoryService:
             logger.error(f"Error checking message ownership: {e}")
             return False
 
+    async def get_assistant_message_context(
+        self, message_id: str, user_id: str
+    ) -> dict[str, str] | None:
+        """Return safe references for an assistant message owned by this user."""
+        try:
+            response = db.table("chat_messages").select(
+                "id, role, session_id"
+            ).eq("id", message_id).maybe_single().execute()
+            if not response.data or response.data.get("role") != "assistant":
+                return None
+
+            session_id = response.data["session_id"]
+            sessions = await self.get_user_sessions(user_id)
+            session = next((item for item in sessions if item["id"] == session_id), None)
+            if not session:
+                return None
+            context = {"message_id": message_id, "session_id": session_id}
+            if session.get("project_id"):
+                context["project_id"] = session["project_id"]
+            return context
+        except Exception as e:
+            logger.error(f"Error checking assistant message ownership: {e}", exc_info=True)
+            raise
+
     async def upsert_feedback(self, message_id: str, user_id: str, reaction: str, reason: str | None = None) -> bool:
         """Set or update feedback for a message. Returns True on success."""
         if reaction not in ("up", "down"):

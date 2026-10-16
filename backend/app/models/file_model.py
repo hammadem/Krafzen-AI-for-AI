@@ -14,10 +14,11 @@ class FileCreate(BaseModel):
     project_id: str | None = None
     file_type: str = "dxf"
     path: str
+    name: str | None = None
+    version: int = Field(default=1, gt=0)
     bucket: str | None = "dxf-files"
     mime_type: str | None = None
     size_bytes: int | None = None
-    name: str | None = None
 
 
 class FileUpdate(BaseModel):
@@ -44,6 +45,11 @@ class FileResponse(BaseModel):
     path: str
     file_type: str
     name: str | None = None
+    version: int = 1
+    archived_at: datetime | None = None
+    approval_state: str = "pending_review"
+    reviewed_by: str | None = None
+    reviewed_at: datetime | None = None
     mime_type: str | None = None
     size_bytes: int | None = None
     created_at: datetime | None = None

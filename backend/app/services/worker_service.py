@@ -17,7 +17,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.db.supabase_client import db
 from app.schemas.export_contracts import ExportStatus, PipelineStage
-from app.services.activity_service import record_event as _record_activity_event
+from app.services.activity_service import record_audit_event
 from app.services.export_pipeline_service import (
     run_export_generation,
     run_postflight_gate,
@@ -119,9 +119,10 @@ async def _run_export_pipeline(job: dict[str, Any]) -> None:
 
 async def emit_export_event(event_name: str, job_id: str, project_id: str, actor_user_id: str | None = None, message: str | None = None,) -> None:
     logger.info("[worker] Emitting event", event_name=event_name, job_id=job_id, project_id=project_id)
-    await _record_activity_event(
-        event_name=event_name,
-        job_id=job_id,
+    await record_audit_event(
+        action=event_name,
+        entity_type="export_job",
+        entity_id=job_id,
         project_id=project_id,
         actor_user_id=actor_user_id,
         message=message,

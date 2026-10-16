@@ -155,7 +155,7 @@ async def test_file_upload_audit_actor_comes_from_authenticated_user():
         "app.db.queries.file_queries.run_in_threadpool",
         new=AsyncMock(return_value=SimpleNamespace(data=[created_file])),
     ), patch(
-        "app.db.queries.file_queries.record_file_event",
+        "app.db.queries.file_queries.record_audit_event",
         new=AsyncMock(return_value={"id": "activity-1"}),
     ) as record_event:
         result = await create_file(
@@ -169,9 +169,13 @@ async def test_file_upload_audit_actor_comes_from_authenticated_user():
         )
 
     assert result == created_file
-    record_event.assert_awaited_once()
-    assert record_event.await_args.kwargs["actor_user_id"] == USER_A
-    assert record_event.await_args.kwargs["file_id"] == FILE_ID
+    upload_event = next(
+        call.kwargs for call in record_event.await_args_list
+        if call.kwargs["action"] == "file.uploaded"
+    )
+    assert upload_event["actor_user_id"] == USER_A
+    assert upload_event["entity_id"] == FILE_ID
+    assert upload_event["file_id"] == FILE_ID
 
 
 @pytest.mark.asyncio
@@ -209,15 +213,16 @@ async def test_file_rename_records_the_authenticated_actor():
         "app.db.queries.file_queries.run_in_threadpool",
         new=AsyncMock(return_value=SimpleNamespace(data=[updated_file])),
     ), patch(
-        "app.db.queries.file_queries.record_file_event",
+        "app.db.queries.file_queries.record_audit_event",
         new=AsyncMock(return_value={"id": "activity-2"}),
     ) as record_event:
         result = await update_file(FILE_ID, {"name": "FloorPlan_Final.dwg"}, USER)
 
     assert result == updated_file
-    assert record_event.await_args.kwargs["event_name"] == "file.renamed"
-    assert record_event.await_args.kwargs["actor_user_id"] == USER_A
-    assert record_event.await_args.kwargs["metadata"]["previous_name"] == "FloorPlan_V3.dwg"
+    rename_event = record_event.await_args.kwargs
+    assert rename_event["action"] == "file.renamed"
+    assert rename_event["actor_user_id"] == USER_A
+    assert rename_event["metadata"]["old_name"] == "FloorPlan_V3.dwg"
 
 
 @pytest.mark.asyncio
@@ -240,13 +245,13 @@ async def test_file_delete_records_the_authenticated_actor():
             SimpleNamespace(data=[{"id": FILE_ID}]),
         ]),
     ), patch(
-        "app.db.queries.file_queries.record_file_event",
+        "app.db.queries.file_queries.record_audit_event",
         new=AsyncMock(return_value={"id": "activity-3"}),
     ) as record_event:
         deleted = await delete_file(FILE_ID, USER)
 
     assert deleted is True
-    assert record_event.await_args.kwargs["event_name"] == "file.deleted"
+    assert record_event.await_args.kwargs["action"] == "file.deleted"
     assert record_event.await_args.kwargs["actor_user_id"] == USER_A
     assert record_event.await_args.kwargs["file_id"] == FILE_ID
 
