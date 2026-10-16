@@ -41,6 +41,9 @@ MOCK_JOBS = [
 async def test_activity_feed_returns_correct_shape():
     with patch("app.routes.dashboard_routes.get_projects", new=AsyncMock(return_value=MOCK_PROJECTS)), \
          patch("app.routes.dashboard_routes.get_jobs", new=AsyncMock(return_value=MOCK_JOBS)), \
+         patch("app.routes.dashboard_routes._get_user_workspace_ids", new=AsyncMock(return_value=[])), \
+         patch("app.routes.dashboard_routes._get_activity_rows", new=AsyncMock(return_value=[])), \
+         patch("app.routes.dashboard_routes._get_actor_names", new=AsyncMock(return_value={})), \
          patch("app.middlewares.auth.require_auth", return_value=MOCK_USER):
         async with AsyncClient(app=app, base_url="http://test") as ac:
             resp = await ac.get(BASE + "/activity")
@@ -54,6 +57,52 @@ async def test_activity_feed_returns_correct_shape():
         assert "status" in event
         assert "message" in event
         assert "occurred_at" in event
+
+
+@pytest.mark.asyncio
+async def test_activity_feed_merges_workspace_events_and_export_statuses():
+    audit_event = {
+        "id": "event-1",
+        "event_name": "file.uploaded",
+        "project_id": MOCK_PROJECTS[0]["id"],
+        "workspace_id": None,
+        "actor_user_id": MOCK_USER["user_id"],
+        "message": "Uploaded FloorPlan_V3.dwg",
+        "metadata": {"file_name": "FloorPlan_V3.dwg"},
+        "created_at": "2025-01-04T23:32:00+00:00",
+    }
+    with patch("app.routes.dashboard_routes.get_projects", new=AsyncMock(return_value=MOCK_PROJECTS)), \
+         patch("app.routes.dashboard_routes.get_jobs", new=AsyncMock(return_value=MOCK_JOBS)), \
+         patch("app.routes.dashboard_routes._get_user_workspace_ids", new=AsyncMock(return_value=["workspace-1"])), \
+         patch("app.routes.dashboard_routes._get_activity_rows", new=AsyncMock(return_value=[audit_event])), \
+         patch("app.routes.dashboard_routes._get_actor_names", new=AsyncMock(return_value={MOCK_USER["user_id"]: "Khadija Zain"})), \
+         patch("app.middlewares.auth.require_auth", return_value=MOCK_USER):
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            response = await ac.get(BASE + "/activity")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 3
+    uploaded = next(event for event in data["events"] if event["id"] == "event-1")
+    assert uploaded["category"] == "files"
+    assert uploaded["actor_name"] == "Khadija Zain"
+    assert uploaded["message"] == "Uploaded FloorPlan_V3.dwg"
+    assert all(event["category"] == "exports" for event in data["events"] if event["id"] != "event-1")
+
+
+@pytest.mark.asyncio
+async def test_activity_feed_does_not_query_an_unowned_project():
+    with patch("app.routes.dashboard_routes.get_projects", new=AsyncMock(return_value=MOCK_PROJECTS)), \
+         patch("app.routes.dashboard_routes._get_user_workspace_ids", new=AsyncMock()) as get_workspace_ids, \
+         patch("app.middlewares.auth.require_auth", return_value=MOCK_USER):
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            response = await ac.get(
+                BASE + "/activity?project_id=00000000-0000-0000-0000-000000000999"
+            )
+
+    assert response.status_code == 200
+    assert response.json() == {"events": [], "total": 0}
+    get_workspace_ids.assert_not_awaited()
 
 
 @pytest.mark.asyncio

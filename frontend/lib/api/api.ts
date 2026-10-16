@@ -258,9 +258,22 @@ export async function updateAProject(
 
 // Activity feed for the dashboard (auth-scoped by Bearer token)
 export async function getDashboardActivity(
-    user: User | null
+    user: User | null,
+    opts?: { limit?: number; projectId?: string }
 ) {
-    return apiClient("GET", DASHBOARD_URLS.GET_ACTIVITY(), user);
+    const params = new URLSearchParams();
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.projectId) params.set("project_id", opts.projectId);
+    const query = params.size ? `?${params.toString()}` : "";
+    return apiClient("GET", `${DASHBOARD_URLS.GET_ACTIVITY()}${query}`, user);
+}
+
+export async function getFileActivity(user: User | null, fileId: string) {
+    return apiClient(
+        "GET",
+        `/api/v1/activity/files/${encodeURIComponent(fileId)}?limit=50`,
+        user
+    );
 }
 
 // Notifications (auth-scoped). Supports unread_only + limit.

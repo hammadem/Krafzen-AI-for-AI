@@ -3,13 +3,16 @@ Dashboard endpoints — activity feed + workspace summary.
 Owner: Tazwar (queue_owner). Feeds Sunny's UI shells (Step 4/5).
 """
 
-from datetime import datetime
+import asyncio
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
 
 from app.db.queries.job_queries import get_jobs
 from app.db.queries.project_queries import get_projects
+from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.schemas.export_contracts import ExportStatus
 from app.utils.logger import logger
@@ -19,12 +22,19 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 class ActivityEvent(BaseModel):
-    job_id: str
-    project_id: str
-    status: ExportStatus
-    occurred_at: datetime | None
-    event_type: str        # "status_change" always for now; extendable
-    message: str           # human-readable label for the notification UI
+    id: str
+    job_id: str | None = None
+    project_id: str | None = None
+    project_name: str | None = None
+    status: str | None = None
+    occurred_at: datetime | None = None
+    event_type: str
+    event_name: str | None = None
+    category: str
+    actor_user_id: str | None = None
+    actor_name: str | None = None
+    message: str
+    metadata: dict = Field(default_factory=dict)
 
 
 class ActivityFeedResponse(BaseModel):
@@ -67,52 +77,279 @@ _ATTENTION_STATES = {
 @router.get("/activity", response_model=ActivityFeedResponse)
 async def get_activity_feed(
     project_id: str | None = Query(None, description="Filter to a specific project"),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=250),
     user=Depends(require_auth),
 ):
     """
-    Recent job lifecycle events for the authenticated user.
-    Ordered by most recent first. Used by Sunny's activity feed / notifications UI.
+    Recent project and workspace events visible to the authenticated user.
+    Ordered by most recent first.
     """
     try:
-        # get_jobs filters by project_id and scopes to user via RLS
-        if project_id:
-            raw_jobs = await get_jobs(project_id, user)
-        else:
-            # fetch all projects first, then gather jobs across them
-            projects = await get_projects(user)
-            raw_jobs = []
-            for p in projects:
-                jobs = await get_jobs(p["id"], user)
-                raw_jobs.extend(jobs)
-
-        # sort by updated_at descending, apply limit
-        raw_jobs.sort(
-            key=lambda j: j.get("updated_at") or j.get("created_at") or "",
-            reverse=True,
+        projects = await get_projects(user, limit=250)
+        project_by_id = {str(project["id"]): project for project in projects}
+        if project_id and project_id not in project_by_id:
+            return ActivityFeedResponse(events=[], total=0)
+        visible_projects = (
+            [project_by_id[project_id]] if project_id else projects
         )
-        raw_jobs = raw_jobs[:limit]
+        project_ids = [str(project["id"]) for project in visible_projects]
 
-        events = []
+        job_limit = asyncio.Semaphore(8)
+
+        async def jobs_for_project(owned_project_id: str) -> list[dict]:
+            async with job_limit:
+                return await get_jobs(owned_project_id, user)
+
+        job_groups = await asyncio.gather(
+            *(jobs_for_project(owned_project_id) for owned_project_id in project_ids)
+        )
+        raw_jobs = [job for group in job_groups for job in group]
+
+        workspace_ids = await _get_user_workspace_ids(user["user_id"])
+        activity_rows = await _get_activity_rows(project_ids, workspace_ids)
+        actor_names = await _get_actor_names(activity_rows, visible_projects)
+
+        events: list[ActivityEvent] = []
+        recorded_job_statuses = {
+            (str(row.get("job_id")), row.get("event_name"))
+            for row in activity_rows
+            if row.get("job_id") and row.get("event_name")
+        }
+
+        for row in activity_rows:
+            event_name = row.get("event_name") or "activity.updated"
+            row_project_id = row.get("project_id")
+            if project_id and str(row_project_id or "") != project_id:
+                continue
+            project = project_by_id.get(str(row_project_id)) if row_project_id else None
+            metadata = row.get("metadata") or {}
+            actor_user_id = row.get("actor_user_id")
+            events.append(ActivityEvent(
+                id=str(row.get("id") or row.get("event_id") or f"{event_name}-{row.get('created_at', '')}"),
+                job_id=str(row["job_id"]) if row.get("job_id") else None,
+                project_id=str(row_project_id) if row_project_id else None,
+                project_name=_project_display_name(project),
+                occurred_at=row.get("created_at") or row.get("timestamp"),
+                event_type=event_name,
+                event_name=event_name,
+                category=_activity_category(event_name),
+                actor_user_id=str(actor_user_id) if actor_user_id else None,
+                actor_name=actor_names.get(str(actor_user_id)) if actor_user_id else None,
+                message=_activity_message(
+                    event_name,
+                    metadata,
+                    actor_names.get(str(actor_user_id)) if actor_user_id else None,
+                    actor_names,
+                    row.get("message"),
+                ),
+                metadata=metadata,
+            ))
+
         for job in raw_jobs:
             try:
                 status = ExportStatus(job["status"])
             except ValueError:
                 continue  # skip any non-contract rows (pre-migration)
+            job_id = str(job["id"])
+            if (job_id, f"export.{status.value}") in recorded_job_statuses:
+                continue
+            project = project_by_id.get(str(job["project_id"]))
+            actor_user_id = project.get("user_id") if project else None
             events.append(ActivityEvent(
-                job_id=job["id"],
-                project_id=job["project_id"],
-                status=status,
+                id=job_id,
+                job_id=job_id,
+                project_id=str(job["project_id"]),
+                project_name=_project_display_name(project),
+                status=status.value,
                 occurred_at=job.get("updated_at") or job.get("created_at"),
                 event_type="status_change",
+                event_name=f"export.{status.value}",
+                category="exports",
+                actor_user_id=str(actor_user_id) if actor_user_id else None,
+                actor_name=actor_names.get(str(actor_user_id)) if actor_user_id else None,
                 message=_STATUS_LABELS.get(status, status.value),
+                metadata={},
             ))
 
+        events.sort(
+            key=_event_time_sort_key,
+            reverse=True,
+        )
+        events = events[:limit]
         return ActivityFeedResponse(events=events, total=len(events))
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error occurred while fetching activity feed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _get_user_workspace_ids(user_id: str) -> list[str]:
+    owned, memberships = await asyncio.gather(
+        run_in_threadpool(
+            lambda: db.table("workspaces").select("id").eq("owner_id", user_id).execute()
+        ),
+        run_in_threadpool(
+            lambda: db.table("workspace_members").select("workspace_id")
+                .eq("user_id", user_id).execute()
+        ),
+    )
+    return list({
+        str(row["id"]) for row in (owned.data or [])
+    } | {
+        str(row["workspace_id"]) for row in (memberships.data or [])
+    })
+
+
+async def _get_activity_rows(project_ids: list[str], workspace_ids: list[str]) -> list[dict]:
+    queries = []
+    if project_ids:
+        queries.append(
+            run_in_threadpool(
+                lambda: db.table("activity_events").select("*")
+                    .in_("project_id", project_ids)
+                    .order("created_at", desc=True).limit(250).execute()
+            )
+        )
+    if workspace_ids:
+        queries.append(
+            run_in_threadpool(
+                lambda: db.table("activity_events").select("*")
+                    .in_("workspace_id", workspace_ids)
+                    .order("created_at", desc=True).limit(250).execute()
+            )
+        )
+    responses = await asyncio.gather(*queries) if queries else []
+    deduplicated = {
+        str(row.get("id") or row.get("event_id")): row
+        for response in responses
+        for row in (response.data or [])
+    }
+    return list(deduplicated.values())
+
+
+async def _get_actor_names(
+    activity_rows: list[dict],
+    projects: list[dict],
+) -> dict[str, str]:
+    actor_ids = {
+        str(row["actor_user_id"])
+        for row in activity_rows
+        if row.get("actor_user_id")
+    }
+    for row in activity_rows:
+        target_user_id = (row.get("metadata") or {}).get("target_user_id")
+        if target_user_id:
+            actor_ids.add(str(target_user_id))
+    actor_ids.update(
+        str(project["user_id"])
+        for project in projects
+        if project.get("user_id")
+    )
+
+    semaphore = asyncio.Semaphore(10)
+
+    async def get_name(actor_id: str) -> tuple[str, str | None]:
+        async with semaphore:
+            try:
+                response = await run_in_threadpool(
+                    lambda: db.auth.admin.get_user_by_id(actor_id)
+                )
+                auth_user = response.user if response else None
+                metadata = auth_user.user_metadata if auth_user else {}
+                full_name = metadata.get("full_name") or metadata.get("name")
+                if not full_name:
+                    full_name = " ".join(
+                        part for part in (
+                            metadata.get("firstname") or metadata.get("first_name"),
+                            metadata.get("lastname") or metadata.get("last_name"),
+                        ) if part
+                    )
+                return actor_id, full_name or (auth_user.email if auth_user else None)
+            except Exception as e:
+                logger.warning(
+                    "Could not load activity actor name",
+                    actor_user_id=actor_id,
+                    error=str(e),
+                )
+                return actor_id, None
+
+    names = await asyncio.gather(*(get_name(actor_id) for actor_id in actor_ids))
+    return {actor_id: name for actor_id, name in names if name}
+
+
+def _project_display_name(project: dict | None) -> str | None:
+    if not project:
+        return None
+    name = project.get("name") or project.get("project_name") or project.get("input_text")
+    if isinstance(name, str) and len(name) > 72:
+        return f"{name[:69]}..."
+    return name
+
+
+def _event_time_sort_key(event: ActivityEvent) -> float:
+    timestamp = event.occurred_at
+    if timestamp is None:
+        return float("-inf")
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=UTC)
+    return timestamp.timestamp()
+
+
+def _activity_category(event_name: str) -> str:
+    if event_name.startswith(("file.", "upload.")):
+        return "files"
+    if event_name.startswith("ai."):
+        return "ai"
+    if event_name.startswith("revision."):
+        return "revisions"
+    if event_name.startswith("team."):
+        return "team"
+    if event_name.startswith("permissions."):
+        return "permissions"
+    if event_name.startswith("export."):
+        return "exports"
+    return "all"
+
+
+def _activity_message(
+    event_name: str,
+    metadata: dict,
+    actor_name: str | None = None,
+    actor_names: dict[str, str] | None = None,
+    fallback: str | None = None,
+) -> str:
+    target_user_id = metadata.get("target_user_id")
+    target = (
+        (actor_names or {}).get(str(target_user_id))
+        or metadata.get("target_user_name")
+        or metadata.get("target_email")
+    )
+    if event_name == "team.role_changed":
+        target = target or "member"
+        old_role = metadata.get("from_role", "previous role")
+        new_role = metadata.get("to_role", "new role")
+        actor = actor_name or "A team member"
+        return f"{actor} changed {target}'s role from {old_role.title()} to {new_role.title()}"
+    if event_name == "team.member_removed":
+        actor = actor_name or "A team member"
+        return f"{actor} removed {target or 'a member'} from the workspace"
+    if event_name == "team.member_invited":
+        actor = actor_name or "A team member"
+        return f"{actor} invited {target or 'a new member'} to the workspace"
+    if event_name == "team.member_joined":
+        return f"{actor_name or target or 'A team member'} joined the workspace"
+    if event_name == "permissions.permission_changed" and target:
+        old_role = metadata.get("from_role", "previous role")
+        new_role = metadata.get("to_role", "new role")
+        actor = actor_name or "A team member"
+        return f"{actor} changed {target}'s permissions from {old_role.title()} to {new_role.title()}"
+    if event_name == "permissions.access_granted":
+        return f"Workspace access granted to {target or 'a member'}"
+    if event_name == "permissions.access_revoked":
+        return f"Workspace access revoked for {target or 'a member'}"
+    return fallback or event_name.replace(".", " ").replace("_", " ").capitalize()
 
 
 @router.get("/workspace-summary", response_model=WorkspaceSummary)

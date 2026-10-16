@@ -35,7 +35,8 @@ for migration in \
   006_exports.sql \
   007_workspace_invites.sql \
   008_align_job_status_to_contract.sql \
-  010_workspace_audit_events.sql
+  010_workspace_audit_events.sql \
+  011_file_activity_and_audit_security.sql
 do
   echo "Applying $migration"
   psql "$DATABASE_URL" \

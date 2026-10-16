@@ -15,6 +15,7 @@ class ActivityEventResponse(BaseModel):
     event_name: str
     job_id: str | None = None
     project_id: str | None = None
+    file_id: str | None = None
     workspace_id: str | None = None
     actor_user_id: str | None = None
     message: str | None = None

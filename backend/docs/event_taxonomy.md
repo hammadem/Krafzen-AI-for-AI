@@ -46,6 +46,26 @@ Invite acceptance endpoint: `POST /api/v1/workspaces/invites/accept` with
 The server verifies the account email against the invitation before creating
 membership or recording the join event.
 
+The authenticated global activity feed at `GET /api/v1/dashboard/activity`
+combines activity events for the user's projects and workspaces with export
+status events. Each event includes an ID, category, actor, project (when
+applicable), message, timestamp, and metadata. Category values used by the
+Activity UI are `files`, `ai`, `revisions`, `team`, `permissions`, and `exports`.
+
+File activity is available at `GET /api/v1/activity/files/{file_id}`. The caller
+must own the file's project; the response combines events linked to that file
+with lifecycle events for its job. File creation, rename, and deletion events
+store the file ID, project ID, job ID, and authenticated actor ID. New AI,
+revision, approval, and export actions that belong to a particular file should
+also persist its `file_id` to `activity_events`.
+
+Authenticated users have read-only access to `activity_events`. Audit event
+inserts are performed by trusted backend services; clients cannot insert,
+update, or delete event rows. Project events are visible only to the project
+owner, and workspace events only to the workspace owner or current members.
+Deleting a project detaches its activity rows instead of cascading their
+deletion; detached events remain readable only to their original actor.
+
 ---
 
 ## `export.*`

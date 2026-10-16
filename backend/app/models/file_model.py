@@ -17,6 +17,7 @@ class FileCreate(BaseModel):
     bucket: str | None = "dxf-files"
     mime_type: str | None = None
     size_bytes: int | None = None
+    name: str | None = None
 
 
 class FileUpdate(BaseModel):

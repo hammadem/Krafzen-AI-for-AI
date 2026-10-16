@@ -9,6 +9,7 @@ Payload shape finalized with Sunny (Week 2):
   - actor: {display_name, avatar_url} joined inline
 """
 
+import asyncio
 from datetime import UTC, datetime
 from typing import Any
 
@@ -97,6 +98,98 @@ async def record_workspace_event(
             "[activity_service] Failed to record workspace event",
             event_name=event_name,
             workspace_id=workspace_id,
+            error=str(e),
+            exc_info=True,
+        )
+        raise
+
+
+async def record_file_event(
+    *,
+    event_name: str,
+    file_id: str,
+    project_id: str,
+    job_id: str,
+    actor_user_id: str,
+    metadata: dict[str, Any] | None = None,
+    message: str | None = None,
+) -> dict[str, Any]:
+    """Append an activity event tied to a file and its authenticated actor."""
+    if not event_name or not event_name.strip():
+        raise ValueError("An activity event name is required")
+    if not file_id or not project_id or not job_id or not actor_user_id:
+        raise ValueError("File, project, job, and authenticated actor IDs are required")
+
+    payload = {
+        "event_name": event_name,
+        "file_id": file_id,
+        "project_id": project_id,
+        "job_id": job_id,
+        "actor_user_id": actor_user_id,
+        "message": message or _default_message(event_name),
+        "metadata": metadata or {},
+        "created_at": datetime.now(UTC).isoformat(),
+    }
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("activity_events").insert(payload).execute()
+        )
+        if response and response.data:
+            return response.data[0]
+        raise RuntimeError("File activity event insert returned no data")
+    except Exception as e:
+        logger.error(
+            "[activity_service] Failed to record file event",
+            event_name=event_name,
+            file_id=file_id,
+            error=str(e),
+            exc_info=True,
+        )
+        raise
+
+
+async def get_file_activity(
+    file_id: str,
+    job_id: str,
+    project_id: str,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Return events attached to a file plus its job's lifecycle events."""
+    try:
+        responses = await asyncio.gather(
+            run_in_threadpool(
+                lambda: db.table("activity_events").select("*, profiles(display_name, avatar_url)")
+                    .eq("file_id", file_id)
+                    .eq("project_id", project_id)
+                    .order("created_at", desc=True)
+                    .limit(limit)
+                    .execute()
+            ),
+            run_in_threadpool(
+                lambda: db.table("activity_events").select("*, profiles(display_name, avatar_url)")
+                    .eq("job_id", job_id)
+                    .eq("project_id", project_id)
+                    .order("created_at", desc=True)
+                    .limit(limit)
+                    .execute()
+            ),
+        )
+        rows = {
+            str(row.get("id") or row.get("event_id")): row
+            for response in responses
+            for row in (response.data or [])
+            if not row.get("file_id") or str(row["file_id"]) == file_id
+        }
+        ordered = sorted(
+            rows.values(),
+            key=lambda row: row.get("created_at") or row.get("timestamp") or "",
+            reverse=True,
+        )
+        return [_shape_activity_row(row) for row in ordered[:limit]]
+    except Exception as e:
+        logger.error(
+            "[activity_service] Failed to fetch file activity",
+            file_id=file_id,
             error=str(e),
             exc_info=True,
         )

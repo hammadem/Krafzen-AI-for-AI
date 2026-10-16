@@ -2,10 +2,89 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboard } from "@/context/DashboardContext";
-import { getAProject } from "@/lib/api/api";
+import { useApiResource } from "@/hooks/useApiResource";
+import { getAProject, getAllJobs, getDashboardActivity } from "@/lib/api/api";
+import FilesPanel from "@/components/FilesPanel";
 import { AlertCircle, Check, Copy, Mic, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
+
+interface ProjectActivityEvent {
+    id: string;
+    message: string;
+    actor_name?: string | null;
+    occurred_at?: string | null;
+}
+
+function ProjectActivityPanel({ projectId }: { projectId: string }) {
+    const { data: events, isLoading, isError, error } = useApiResource<ProjectActivityEvent[]>({
+        fetcher: (authenticatedUser) =>
+            getDashboardActivity(authenticatedUser, { projectId, limit: 250 }),
+        select: (raw) =>
+            raw && typeof raw === "object" && "events" in raw
+                ? (raw as { events?: ProjectActivityEvent[] }).events ?? []
+                : [],
+        fallback: [],
+    });
+
+    return (
+        <section aria-label="Project activity" className="rounded-xl border border-white/10 bg-[#111722] p-5">
+            <h2 className="text-lg font-semibold text-white">Project Activity</h2>
+            {isLoading ? (
+                <p className="mt-3 text-sm text-[#94a3b8]">Loading activity...</p>
+            ) : isError ? (
+                <p role="alert" className="mt-3 text-sm text-red-300">
+                    {error?.message || "Could not load project activity."}
+                </p>
+            ) : events.length ? (
+                <ol className="mt-3 divide-y divide-white/10">
+                    {events.map((event) => (
+                        <li key={event.id} className="py-3 first:pt-0 last:pb-0">
+                            <p className="text-sm text-white">{event.message}</p>
+                            <p className="mt-1 text-xs text-[#94a3b8]">
+                                {event.actor_name || "System"}
+                                {event.occurred_at
+                                    ? ` - ${new Date(event.occurred_at).toLocaleString()}`
+                                    : ""}
+                            </p>
+                        </li>
+                    ))}
+                </ol>
+            ) : (
+                <p className="mt-3 text-sm text-[#94a3b8]">No activity recorded for this project yet.</p>
+            )}
+        </section>
+    );
+}
+
+function ProjectFilesPanel({ projectId }: { projectId: string }) {
+    const { data: jobs, isLoading, isError, error } = useApiResource<JobDetails[]>({
+        fetcher: (authenticatedUser) => getAllJobs(authenticatedUser, projectId),
+        select: (raw) => Array.isArray(raw) ? raw as unknown as JobDetails[] : [],
+        fallback: [],
+    });
+
+    return (
+        <section aria-label="Project files" className="rounded-xl border border-white/10 bg-[#111722] p-5">
+            <h2 className="text-lg font-semibold text-white">Files</h2>
+            {isLoading ? (
+                <p className="mt-3 text-sm text-[#94a3b8]">Loading project files...</p>
+            ) : isError ? (
+                <p role="alert" className="mt-3 text-sm text-red-300">
+                    {error?.message || "Could not load project files."}
+                </p>
+            ) : jobs.length ? (
+                <div className="mt-4 space-y-5">
+                    {jobs.map((job) => (
+                        <FilesPanel key={job.id} jobId={job.id} />
+                    ))}
+                </div>
+            ) : (
+                <p className="mt-3 text-sm text-[#94a3b8]">No files are linked to this project yet.</p>
+            )}
+        </section>
+    );
+}
 
 export default function ProjectUI({ slug }: { slug: string }) {
     const { currentProject, user, setCurrentProject } = useAuth();
@@ -160,6 +239,10 @@ export default function ProjectUI({ slug }: { slug: string }) {
 
                         </div>
 
+                        <div className="w-[90%] mr-4 sm:mr-0 space-y-5">
+                            <ProjectActivityPanel key={slug} projectId={slug} />
+                            <ProjectFilesPanel key={slug} projectId={slug} />
+                        </div>
                     </div>
                 </div>
             }

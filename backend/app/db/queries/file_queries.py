@@ -5,11 +5,12 @@ from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 
 from app.db.supabase_client import db
+from app.services.activity_service import record_file_event
 from app.utils.logger import logger
 
 
-# check if job belongs to user's project(helper)
-async def _user_owns_job(job_id: str, user_id: str) -> bool:
+# Resolve a job's project only when it belongs to the authenticated user.
+async def _get_owned_job_project_id(job_id: str, user_id: str) -> str | None:
     try:
         job_res = await run_in_threadpool(
             lambda: db.table("jobs")
@@ -21,7 +22,7 @@ async def _user_owns_job(job_id: str, user_id: str) -> bool:
 
         if not job_res or not job_res.data:
             logger.warning("[_user_owns_job] Job not found", job_id=job_id)
-            return False
+            return None
 
         project_id = job_res.data["project_id"]
 
@@ -35,16 +36,28 @@ async def _user_owns_job(job_id: str, user_id: str) -> bool:
 
         if not proj_res or not proj_res.data:
             logger.warning("[_user_owns_job] Project not found", project_id=project_id)  
-            return False
+            return None
 
         owns = proj_res.data["user_id"] == user_id
         if not owns:
             logger.warning("[_user_owns_job] Unauthorized access attempt", job_id=job_id, user_id=user_id[:8] + "...") 
-        return owns
+            return None
+        return str(project_id)
 
     except Exception as e:  
         logger.error("[_user_owns_job] Query error", job_id=job_id, error=str(e), exc_info=True)
-        return False
+        return None
+
+
+async def _user_owns_job(job_id: str, user_id: str) -> bool:
+    return await _get_owned_job_project_id(job_id, user_id) is not None
+
+
+def _file_name(file_data: dict[str, Any]) -> str:
+    name = file_data.get("name")
+    if name and str(name).strip():
+        return str(name)
+    return str(file_data.get("path") or "file").rstrip("/").split("/")[-1] or "file"
 
 # CREATE FILE (saves metadata to DB, path must come from whoever uploaded to Storage)
 async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any] | None:
@@ -66,21 +79,22 @@ async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[s
         except (ValueError, TypeError):
             return {"error": "Invalid job_id or project_id format"}
         
-        owns = await _user_owns_job(job_id, user["user_id"])
-        if not owns:
+        owned_project_id = await _get_owned_job_project_id(job_id, user["user_id"])
+        if not owned_project_id:
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
+        if project_id and project_id != owned_project_id:
+            raise HTTPException(status_code=400, detail={"error": "project_id does not match job"})
 
         payload = {
             "job_id": job_id,
+            "project_id": owned_project_id,
             "bucket": file_data.get("bucket", "krafzen-files"),
             "path": file_data.get("path"),
             "file_type": file_data.get("file_type", "dxf"),
             "mime_type": file_data.get("mime_type"),
             "size_bytes": file_data.get("size_bytes"),
+            "name": file_data.get("name"),
         }
-
-        if project_id:
-            payload["project_id"] = project_id
 
         response = await run_in_threadpool(
             lambda: db.table("files")
@@ -89,8 +103,24 @@ async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[s
             )
 
         if response and response.data:
-            logger.info("[create_file] File created successfully", file_id=response.data[0]["id"])
-            return response.data[0]
+            created_file = response.data[0]
+            logger.info("[create_file] File created successfully", file_id=created_file["id"])
+            try:
+                await record_file_event(
+                    event_name="file.uploaded",
+                    file_id=str(created_file["id"]),
+                    project_id=owned_project_id,
+                    job_id=job_id,
+                    actor_user_id=user["user_id"],
+                    metadata={"file_name": _file_name(created_file)},
+                    message=f"Uploaded {_file_name(created_file)}",
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail={"error": "File was created but its activity event could not be recorded"},
+                ) from e
+            return created_file
         
         logger.warning("[create_file] Insert failed")
         return None
@@ -162,11 +192,12 @@ async def get_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
             return None
 
         file_data = res.data  
-        owns = await _user_owns_job(file_data["job_id"], user["user_id"])
-        if not owns:
+        owned_project_id = await _get_owned_job_project_id(file_data["job_id"], user["user_id"])
+        if not owned_project_id:
             logger.warning("[get_file] Unauthorized access attempt", file_id=file_id) 
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
 
+        file_data["project_id"] = owned_project_id
         return file_data
     except HTTPException:
         raise
@@ -206,7 +237,32 @@ async def update_file(file_id: str, update_data: dict[str, Any], user: dict[str,
 
         if response and hasattr(response, "data") and response.data:
             logger.info("[update_file] File updated successfully", file_id=file_id) 
-            return response.data[0]
+            updated_file = response.data[0]
+            if "name" in payload or "path" in payload:
+                try:
+                    project_id = (
+                        updated_file.get("project_id")
+                        or file.get("project_id")
+                        or await _get_owned_job_project_id(file["job_id"], user["user_id"])
+                    )
+                    await record_file_event(
+                        event_name="file.renamed",
+                        file_id=file_id,
+                        project_id=str(project_id or ""),
+                        job_id=str(updated_file["job_id"]),
+                        actor_user_id=user["user_id"],
+                        metadata={
+                            "previous_name": _file_name(file),
+                            "file_name": _file_name(updated_file),
+                        },
+                        message=f"Renamed {_file_name(file)} to {_file_name(updated_file)}",
+                    )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail={"error": "File was updated but its activity event could not be recorded"},
+                    ) from e
+            return updated_file
 
         logger.warning("[update_file] Update failed", file_id=file_id) 
         return {"error": f"File with id {file_id} not found"}
@@ -254,6 +310,25 @@ async def delete_file(file_id: str, user: dict[str, Any]) -> bool:
         success = bool(response and hasattr(response, "data") and response.data)
         if success:
             logger.info("[delete_file] File deleted successfully", file_id=file_id) 
+            try:
+                project_id = (
+                    file.get("project_id")
+                    or await _get_owned_job_project_id(file["job_id"], user["user_id"])
+                )
+                await record_file_event(
+                    event_name="file.deleted",
+                    file_id=file_id,
+                    project_id=str(project_id or ""),
+                    job_id=str(file["job_id"]),
+                    actor_user_id=user["user_id"],
+                    metadata={"file_name": _file_name(file)},
+                    message=f"Deleted {_file_name(file)}",
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail={"error": "File was deleted but its activity event could not be recorded"},
+                ) from e
         else:
             logger.warning("[delete_file] Delete failed", file_id=file_id)
         return success
