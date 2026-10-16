@@ -60,21 +60,30 @@ class FakeReadQuery:
 
 class FakeWorkspaceDatabase:
     def __init__(self):
-        self.membership_query = FakeReadQuery({"user_id": "member"})
-        self.activity_query = FakeReadQuery([{
+        self.workspace_query = FakeReadQuery({"owner_id": "owner"})
+        self.membership_query = FakeReadQuery({
+            "user_id": "00000000-0000-0000-0000-000000000004"
+        })
+        self.activity_data = [{
             "event_id": "00000000-0000-0000-0000-000000000001",
             "action": "member.joined",
             "entity_type": "member",
             "entity_id": "00000000-0000-0000-0000-000000000002",
             "organization_id": "00000000-0000-0000-0000-000000000003",
             "timestamp": "2026-10-07T19:10:40+00:00",
-        }])
+        }]
+        self.activity_queries = []
 
     def table(self, table_name):
+        if table_name == "workspaces":
+            return self.workspace_query
         if table_name == "workspace_members":
             return self.membership_query
-        assert table_name == "activity_events"
-        return self.activity_query
+        if table_name == "activity_events":
+            query = FakeReadQuery(self.activity_data)
+            self.activity_queries.append(query)
+            return query
+        raise AssertionError(f"Unexpected table: {table_name}")
 
 
 @pytest.mark.asyncio
@@ -233,7 +242,9 @@ async def test_workspace_activity_is_filtered_by_organization_id(monkeypatch):
         user_id="00000000-0000-0000-0000-000000000004",
     )
 
-    assert fake_db.activity_query.filters == [
-        ("organization_id", "00000000-0000-0000-0000-000000000003")
-    ]
+    assert any(
+        query.filters
+        == [("organization_id", "00000000-0000-0000-0000-000000000003")]
+        for query in fake_db.activity_queries
+    )
     assert activity[0]["action"] == "member.joined"

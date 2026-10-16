@@ -68,7 +68,7 @@ class FakeQuery:
             data = matches[0] if self.single and matches else None if self.single else matches
         elif self.operation == "insert":
             inserted = dict(self.payload)
-            if self.table_name == "activity_events":
+            if self.table_name in {"activity_events", "workspace_invites"}:
                 inserted["id"] = f"event-{len(rows) + 1}"
             rows.append(inserted)
             data = [inserted]

@@ -420,7 +420,7 @@ async def _record_file_activity(
             actor_user_id=actor_user_id,
             project_id=project_id,
             file_id=file["id"],
-            legacy_job_id=str(file["job_id"]),
+            legacy_job_id=str(file["job_id"]) if file.get("job_id") else None,
             metadata=metadata,
         )
     except Exception as error:
@@ -445,7 +445,7 @@ async def _record_revision_activity(
             entity_id=file["id"],
             actor_user_id=actor_user_id,
             project_id=file.get("project_id"),
-            legacy_job_id=str(file["job_id"]),
+            legacy_job_id=str(file["job_id"]) if file.get("job_id") else None,
             file_id=file["id"],
             metadata={
                 "revision_id": file["id"],
