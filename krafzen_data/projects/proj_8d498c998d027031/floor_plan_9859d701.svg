@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2196.0 -2196.0 22692.0 10392.0" width="100%" height="100%" style="background:#090d10; border-radius: 8px;">
+<defs>
+  <pattern id="grid" width="1000" height="1000" patternUnits="userSpaceOnUse">
+    <path d="M 1000 0 L 0 0 0 1000" fill="none" stroke="#141d24" stroke-width="20"/>
+  </pattern>
+</defs>
+<rect x="-2196.0" y="-2196.0" width="22692.0" height="10392.0" fill="url(#grid)" />
+<rect x="0.0" y="0.0" width="5400.0" height="6000.0" fill="#101820" stroke="#54E3B5" stroke-width="200.0" rx="16" ry="16" />
+<text x="2700.0" y="2928.0" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-weight="600" font-size="240" text-anchor="middle">Living Room</text>
+<text x="2700.0" y="3216.0" fill="#54E3B5" font-family="system-ui, -apple-system, sans-serif" font-weight="500" font-size="180" text-anchor="middle">32.4 sq.m</text>
+<rect x="4100.0" y="0.0" width="3600.0" height="4000.0" fill="#101820" stroke="#54E3B5" stroke-width="200.0" rx="16" ry="16" />
+<text x="5900.0" y="1928.0" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-weight="600" font-size="240" text-anchor="middle">Kitchen</text>
+<text x="5900.0" y="2216.0" fill="#54E3B5" font-family="system-ui, -apple-system, sans-serif" font-weight="500" font-size="180" text-anchor="middle">14.4 sq.m</text>
+<rect x="9400.0" y="0.0" width="4200.0" height="4800.0" fill="#101820" stroke="#54E3B5" stroke-width="200.0" rx="16" ry="16" />
+<text x="11500.0" y="2328.0" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-weight="600" font-size="240" text-anchor="middle">Master Bedroom</text>
+<text x="11500.0" y="2616.0" fill="#54E3B5" font-family="system-ui, -apple-system, sans-serif" font-weight="500" font-size="180" text-anchor="middle">20.16 sq.m</text>
+<rect x="14100.0" y="0.0" width="4200.0" height="4800.0" fill="#101820" stroke="#54E3B5" stroke-width="200.0" rx="16" ry="16" />
+<text x="16200.0" y="2328.0" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-weight="600" font-size="240" text-anchor="middle">Bedroom 2</text>
+<text x="16200.0" y="2616.0" fill="#54E3B5" font-family="system-ui, -apple-system, sans-serif" font-weight="500" font-size="180" text-anchor="middle">20.16 sq.m</text>
+<rect x="11600.0" y="0.0" width="2400.0" height="3000.0" fill="#101820" stroke="#54E3B5" stroke-width="200.0" rx="16" ry="16" />
+<text x="12800.0" y="1428.0" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-weight="600" font-size="240" text-anchor="middle">Bathroom</text>
+<text x="12800.0" y="1716.0" fill="#54E3B5" font-family="system-ui, -apple-system, sans-serif" font-weight="500" font-size="180" text-anchor="middle">7.2 sq.m</text>
+</svg>
