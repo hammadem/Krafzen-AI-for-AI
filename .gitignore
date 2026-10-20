@@ -57,6 +57,14 @@ frontend/.env.production.local
 /backups/
 supabase/.branches/
 supabase/.temp/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+krafzen_local.db
+backend/krafzen_local.db
+krafzen_data/
+backend/krafzen_data/
 
 # OS/Editor
 .DS_Store

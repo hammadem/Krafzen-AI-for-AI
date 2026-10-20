@@ -14,7 +14,8 @@ export default function PricingDiv({
   onGetStarted?: (price: PricingDetails, index: number, monthly: boolean) => void;
 }) {
   const handleGetStarted = () => {
-    if (price.price === "Custom" || !price.stripeLink) {
+    const link = price.paymentLink || price.stripeLink;
+    if (price.price === "Custom" || !link) {
       window.open("/support", "_blank", "noopener,noreferrer");
       return;
     }
@@ -22,7 +23,7 @@ export default function PricingDiv({
       onGetStarted(price, index, monthly);
       return;
     }
-    window.open(price.stripeLink, "_blank", "noopener,noreferrer");
+    window.open(link, "_blank", "noopener,noreferrer");
   };
 
   const glowEffects = [
