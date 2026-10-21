@@ -4,7 +4,9 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi import HTTPException
 from app.db.supabase_client import db
 from app.utils.logger import logger
-import uuid  
+from app.services.supabase_service import supabase_service
+from app.utils.storage_service import storage_service
+import uuid
 
 # check if job belongs to user's project(helper)
 async def _user_owns_job(job_id: str, user_id: str) -> bool:
@@ -262,19 +264,76 @@ async def delete_file(file_id: str, user: Dict[str, Any]) -> bool:
         logger.error("[delete_file] Error", file_id=file_id, error=str(e), exc_info=True)
         return False
     
+# Enterprise: Get Organization ID for regional URLs
+async def _resolve_organization_id_for_file(file: Dict[str, Any]) -> Optional[uuid.UUID]:
+    """
+    Traverses files -> projects -> workspace_id (organization_id).
+    Falls back to files -> jobs -> projects -> workspace_id if project_id is null.
+    """
+    central_client = supabase_service.client or db
+    project_id = file.get("project_id")
+
+    # If project_id is missing on the file row, resolve it via the linked job
+    if not project_id and file.get("job_id"):
+        job_res = await run_in_threadpool(
+            lambda: central_client.table("jobs")
+            .select("project_id")
+            .eq("id", file["job_id"])
+            .maybe_single()
+            .execute()
+        )
+        if job_res and job_res.data:
+            project_id = job_res.data.get("project_id")
+
+    if not project_id:
+        return None
+
+    # Fetch workspace_id on the project record (workspace_id == organization_id)
+    proj_res = await run_in_threadpool(
+        lambda: central_client.table("projects")
+        .select("workspace_id")
+        .eq("id", project_id)
+        .maybe_single()
+        .execute()
+    )
+
+    if proj_res and proj_res.data and proj_res.data.get("workspace_id"):
+        try:
+            return uuid.UUID(str(proj_res.data["workspace_id"]))
+        except (ValueError, TypeError):
+            return None
+
+    return None
+
 # GET SIGNED URL
-async def get_signed_url(file_id: str, user: Dict[str, Any]) -> Optional[str]:
+async def get_signed_url(
+    file_id: str,
+    user: Dict[str, Any],
+    organization_id: Optional[uuid.UUID] = None,
+) -> Optional[str]:
     file = await get_file(file_id, user)
     if not file:
         return None
-    
+
     try:
-        res = await run_in_threadpool(
-            lambda: db.storage.from_(file["bucket"]).create_signed_url(file["path"], 3600)
+        record_bucket = file.get("bucket")
+        file_path = file.get("path")
+
+        if not organization_id:
+            organization_id = await _resolve_organization_id_for_file(file)
+
+        target_client, resolved_bucket, region_code = storage_service.resolve_target_bucket_and_client(
+            organization_id=organization_id
         )
-        return res.get("signedURL") or res.get("signed_url")
+
+        active_bucket = resolved_bucket if (organization_id and region_code != "global") else (record_bucket or resolved_bucket)
+
+        res = await run_in_threadpool(
+            lambda: target_client.storage.from_(active_bucket).create_signed_url(file_path, 3600)
+        )
+        return res.get("signedURL") or res.get("signed_url") or res.get("url")
     except Exception as e:
-        logger.error("[get_signed_url] Error", file_id=file_id, error=str(e), exc_info=True)
+        logger.error("[get_signed_url] Error: %s", e, exc_info=True)
         return None
     
     

@@ -17,13 +17,15 @@ import os
 import shutil
 from app.middlewares.auth import require_auth
 from app.utils.storage_service import storage_service
+from app.services.supabase_service import supabase_service
+from app.db.supabase_client import db
+from uuid import UUID
 from app.db.queries.project_queries import update_project
 from app.models.project_model import ProjectUpdate
 
 logger = logging.getLogger(__name__)
 
 # Import services with error handling
-
 
 try:
     from app.services.gemini_service import gemini_service
@@ -285,12 +287,39 @@ async def generate_and_store_dxf(
             if not user_id:
                 raise HTTPException(status_code=401, detail="User ID not found")
 
+            # Resolve enterprise workspace_id for the project
+            central_client = supabase_service.client or db
+            proj_data = (
+                central_client.table("projects")
+                .select("workspace_id")
+                .eq("id", project_id)
+                .maybe_single()
+                .execute()
+            )
+            org_id = None
+            if proj_data and proj_data.data and proj_data.data.get("workspace_id"):
+                try:
+                    org_id = UUID(str(proj_data.data["workspace_id"]))
+                except (ValueError, TypeError):
+                    org_id = None
+
+            # Pass organization_id to target regional bucket
             dxf_url = await storage_service.upload_cad_file(
                 file_bytes=dxf_bytes,
                 project_id=project_id,
                 user_id=user_id,
                 file_extension="dxf",
+                organization_id=org_id,
             )
+
+            if dwg_bytes:
+                dwg_url = await storage_service.upload_cad_file(
+                    file_bytes=dwg_bytes,
+                    project_id=project_id,
+                    user_id=user_id,
+                    file_extension="dwg",
+                    organization_id=org_id,
+                )
 
             if dwg_bytes:
                 dwg_url = await storage_service.upload_cad_file(
@@ -359,6 +388,30 @@ async def download_project_dxf(
             raise HTTPException(status_code=401, detail="User ID not found")
         
         ext = "dwg" if file_type == CADFileType.DWG else "dxf"
+        
+        central_client = supabase_service.client or db
+        proj_data = (
+            central_client.table("projects")
+            .select("workspace_id")
+            .eq("id", project_id)
+            .maybe_single()
+            .execute()
+        )
+        org_id = None
+        if proj_data and proj_data.data and proj_data.data.get("workspace_id"):
+            try:
+                org_id = UUID(str(proj_data.data["workspace_id"]))
+            except (ValueError, TypeError):
+                org_id = None
+
+        ext = "dwg" if file_type == CADFileType.DWG else "dxf"
+        file_bytes = await storage_service.download_cad_file(
+            project_id=project_id,
+            user_id=user_id,
+            file_extension=ext,
+            organization_id=org_id,
+        )
+        
         file_bytes = await storage_service.download_cad_file(project_id=project_id, user_id=user_id, file_extension=ext)
 
         if not file_bytes:
