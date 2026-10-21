@@ -124,7 +124,9 @@ export default function WorkspaceLayout() {
     deleteSession,
     chatJurisdiction,
     setChatJurisdiction,
-    onMessageFeedback
+    onMessageFeedback,
+    hasMoreMessages,
+    loadMoreMessages
   } = useChat();
   const { user, logout, session } = useAuth();
   
@@ -701,6 +703,18 @@ export default function WorkspaceLayout() {
           ) : canvasViewMode === 'chat' ? (
             <div className="workspace-chat-view-container custom-scrollbar">
               <div className="workspace-chat-view-inner">
+                {hasMoreMessages && (
+                  <div className="flex justify-center my-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-zinc-900 border-white/10 text-cyan-400 hover:bg-zinc-800 hover:text-cyan-300 rounded-full px-4 py-1.5 transition-all shadow-md"
+                      onClick={() => loadMoreMessages()}
+                    >
+                      Load older messages
+                    </Button>
+                  </div>
+                )}
                 {displayMessages.map((message, index) => (
                   <div
                     key={`${message.id}-${message.role}-${index}`}
@@ -1092,6 +1106,18 @@ export default function WorkspaceLayout() {
                 </div>
 
                 <div ref={threadMessagesRef} className="workspace-thread-messages custom-scrollbar">
+                  {hasMoreMessages && (
+                    <div className="flex justify-center my-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-[10px] bg-zinc-900 border-white/10 text-cyan-400 hover:bg-zinc-800 hover:text-cyan-300 rounded-full px-3 py-1 transition-all"
+                        onClick={() => loadMoreMessages()}
+                      >
+                        Load older messages
+                      </Button>
+                    </div>
+                  )}
                   {displayMessages.map((msg, index) => (
                     <div 
                       key={`${msg.id}-${msg.role}-${index}`}

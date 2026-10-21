@@ -150,6 +150,10 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Index for fast paginated chat query by session & created_at
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session_created ON chat_messages (session_id, created_at DESC);
+
+
 -- Message feedback (thumbs up/down per generated image)
 CREATE TABLE IF NOT EXISTS message_feedback (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
