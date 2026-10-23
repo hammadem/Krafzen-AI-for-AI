@@ -14,11 +14,13 @@ PLAN_CONFIG = {
             "requests": 50,
             "price": 149,
             "stripe_price_id": settings.STRIPE_PRICE_ID_STARTER_MONTHLY,
+            "dodo_product_id": settings.DODO_PRODUCT_ID_STARTER_MONTHLY or "pdt_0NptIUxBB6ax8M2pe8Jc2",
         },
         "annual": {
             "requests": 600,
             "price": 1490,
             "stripe_price_id": settings.STRIPE_PRICE_ID_STARTER_ANNUAL,
+            "dodo_product_id": settings.DODO_PRODUCT_ID_STARTER_ANNUAL or "pdt_0NptIUnfunV7bYoJ9dtUE",
         }
     },
     "professional": {
@@ -26,11 +28,13 @@ PLAN_CONFIG = {
             "requests": 300,
             "price": 499,
             "stripe_price_id": settings.STRIPE_PRICE_ID_PROFESSIONAL_MONTHLY,
+            "dodo_product_id": settings.DODO_PRODUCT_ID_PROFESSIONAL_MONTHLY or "pdt_0NptIUuKMySW5tuz5FgRk",
         },
         "annual": {
             "requests": 3600,
             "price": 4990,
             "stripe_price_id": settings.STRIPE_PRICE_ID_PROFESSIONAL_ANNUAL,
+            "dodo_product_id": settings.DODO_PRODUCT_ID_PROFESSIONAL_ANNUAL or "pdt_0NptIUjvCnzjEpS7tZdLo",
         }
     },
     "enterprise": {
@@ -38,11 +42,13 @@ PLAN_CONFIG = {
             "requests": 2000,
             "price": 1499,
             "stripe_price_id": settings.STRIPE_PRICE_ID_ENTERPRISE_MONTHLY,
+            "dodo_product_id": settings.DODO_PRODUCT_ID_ENTERPRISE_MONTHLY or "pdt_0NptIUsLytgIvdbPve7kh",
         },
         "annual": {
             "requests": 24000,
             "price": 14990,
             "stripe_price_id": settings.STRIPE_PRICE_ID_ENTERPRISE_ANNUAL,
+            "dodo_product_id": settings.DODO_PRODUCT_ID_ENTERPRISE_ANNUAL or "pdt_0NptIUqA05KZHkdnENr3r",
         }
     },
     "enterprise_plus": {
@@ -50,11 +56,13 @@ PLAN_CONFIG = {
             "requests": 10000,
             "price": None,
             "stripe_price_id": None,
+            "dodo_product_id": None,
         },
         "annual": {
             "requests": 120000,
             "price": None,
             "stripe_price_id": None,
+            "dodo_product_id": None,
         }
     }
 }

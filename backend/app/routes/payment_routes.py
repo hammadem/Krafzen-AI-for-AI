@@ -224,13 +224,30 @@ async def get_subscription_status(user_data: dict = Depends(require_auth)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/payments/webhook")
-async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+async def payment_webhook(request: Request, stripe_signature: str = Header(None)):
     """
-    Stripe Webhook handler. Verified using STRIPE_WEBHOOK_SECRET.
+    Webhook handler. Auto-routes between Dodo Payments and Stripe based on incoming signature headers.
     """
     try:
         payload = await request.body()
+        headers = dict(request.headers)
+        # Check for Dodo Payments (Standard Webhooks) headers
+        if "webhook-signature" in headers or "webhook-id" in headers:
+            return await payment_service.handle_dodo_webhook(payload, headers)
         return await payment_service.handle_webhook(payload, stripe_signature)
     except Exception as e:
         logger.error(f"Webhook error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/payments/dodo-webhook")
+async def dodo_webhook(request: Request):
+    """
+    Dedicated Dodo Payments Webhook handler. Verified using DODO_PAYMENTS_WEBHOOK_SECRET.
+    """
+    try:
+        payload = await request.body()
+        headers = dict(request.headers)
+        return await payment_service.handle_dodo_webhook(payload, headers)
+    except Exception as e:
+        logger.error(f"Dodo Webhook error: {e}")
         raise HTTPException(status_code=400, detail=str(e))

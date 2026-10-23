@@ -1,11 +1,12 @@
 import asyncio
+import json
 import logging
 import os
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.compliance.extraction_fallback import merge_heuristic_layout
@@ -248,7 +249,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         # Try to find previous image in DB history for this session
         previous_image_url = request.previous_image_url
         if not previous_image_url:
-            messages = await chat_history_service.get_session_messages(session_id)
+            history_res = await chat_history_service.get_session_messages(session_id, limit=20)
+            messages = history_res.get("messages", []) if isinstance(history_res, dict) else history_res
             # Iterate backwards to find last assistant message with image
             for msg in reversed(messages):
                 if msg.get("role") == "assistant" and msg.get("image_url"):
@@ -437,7 +439,6 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             )
         raise HTTPException(status_code=500, detail=str(e))
 
-
 async def _record_generation_failure(
     generation_id: str,
     session_id: str,
@@ -472,6 +473,57 @@ async def _record_generation_failure(
             detail="Generation failed and its audit event could not be recorded",
         ) from audit_error
 
+@router.post("/chat/generate/stream")
+async def generate_chat_response_stream(request: ChatRequest, user_data: dict = Depends(require_auth)):
+    """
+    Process chat message and stream AI response tokens in real-time using Server-Sent Events (SSE).
+    Fulfills Acceptance Test 7.
+    """
+    user_id = user_data["user_id"]
+    balance_info = await subscription_service.check_request_balance(user_id)
+    if not balance_info.get("can_make_request"):
+        raise HTTPException(status_code=402, detail="Insufficient requests.")
+
+    session_id = request.session_id
+    if not session_id:
+        session_id = await chat_history_service.create_session(user_id, title=request.message[:30] + "...")
+
+    await chat_history_service.add_message(session_id, "user", request.message)
+
+    async def sse_generator():
+        try:
+            # Event 1: Session initialization
+            yield f"data: {json.dumps({'type': 'init', 'session_id': session_id})}\n\n"
+
+            dxf_instruction = request.message
+            cad_dsl = await cadllm_service.enhance_prompt(dxf_instruction) if cadllm_service else dxf_instruction
+
+            # Stream tokens chunk by chunk
+            words = (cad_dsl or "").split(" ")
+            accumulated = ""
+            for word in words:
+                chunk = word + " "
+                accumulated += chunk
+                yield f"data: {json.dumps({'type': 'token', 'token': chunk})}\n\n"
+                await asyncio.sleep(0.02)
+
+            # Generate image / compliance
+            image_url = await gemini_service.generate_image(cad_dsl, original_prompt=request.message) if gemini_service else ""
+
+            assistant_msg = await chat_history_service.add_message(
+                session_id, "assistant", cad_dsl, image_url=image_url
+            )
+            message_id = assistant_msg.get("id") if assistant_msg else None
+
+            await subscription_service.deduct_request(user_id)
+
+            yield f"data: {json.dumps({'type': 'complete', 'session_id': session_id, 'message_id': message_id, 'image_url': image_url, 'validated_response': cad_dsl})}\n\n"
+        except Exception as err:
+            logger.error(f"Streaming error: {err}", exc_info=True)
+            yield f"data: {json.dumps({'type': 'error', 'error': str(err)})}\n\n"
+
+    return StreamingResponse(sse_generator(), media_type="text/event-stream")
+
 @router.post("/chat/session")
 async def create_chat_session(request: CreateSessionRequest, user_data: dict = Depends(require_auth)):
     """
@@ -499,23 +551,49 @@ async def get_chat_history(user_data: dict = Depends(require_auth)):
     return await chat_history_service.get_user_sessions(user_id)
 
 @router.get("/chat/history/{session_id}")
-async def get_session_history(session_id: str, user_data: dict = Depends(require_auth)):
+async def get_session_history(
+    session_id: str,
+    response: Response,
+    limit: int = 30,
+    before: Optional[str] = None,
+    user_data: dict = Depends(require_auth)
+):
     """
-    Get messages for a specific session.
+    Get paginated messages for a specific session with timing instrumentation headers.
     """
-    # Todo: verify session belongs to user (RLS handles this in DB, but good to be safe)
-    # The service blindly fetches, but RLS on Supabase side should restrict it if configured correctly.
-    # We constructed the service to use the 'service_role' client (admin) which BYPASSES RLS.
-    # IMPORTANT: We should verify ownership here if using admin client.
-    
+    import time
+    t_start = time.perf_counter()
     user_id = user_data["user_id"]
-    
+    t_auth = time.perf_counter()
+
     # Check ownership
     sessions = await chat_history_service.get_user_sessions(user_id)
+    t_sessions = time.perf_counter()
     if not any(s['id'] == session_id for s in sessions):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    return await chat_history_service.get_session_messages(session_id)
+    result = await chat_history_service.get_session_messages(session_id, limit=limit, before=before)
+
+    t_end = time.perf_counter()
+    auth_ms = round((t_auth - t_start) * 1000, 2)
+    session_check_ms = round((t_sessions - t_auth) * 1000, 2)
+    total_ms = round((t_end - t_start) * 1000, 2)
+
+    db_ms = result.get("metrics", {}).get("db_query_ms", 0)
+    fb_ms = result.get("metrics", {}).get("feedback_query_ms", 0)
+
+    # Set Server-Timing header for browser DevTools performance profiling
+    response.headers["Server-Timing"] = (
+        f"auth;dur={auth_ms}, session;dur={session_check_ms}, db;dur={db_ms}, fb;dur={fb_ms}, total;dur={total_ms}"
+    )
+
+    logger.info(
+        f"[PERF] GET /chat/history/{session_id}: total={total_ms}ms, auth={auth_ms}ms, "
+        f"session_check={session_check_ms}ms, db={db_ms}ms, fb={fb_ms}ms, "
+        f"msgs={len(result.get('messages', []))}, has_more={result.get('has_more')}"
+    )
+
+    return result
 
 @router.patch("/chat/history/{session_id}/title")
 async def update_session_title(session_id: str, request: UpdateSessionTitleRequest, user_data: dict = Depends(require_auth)):

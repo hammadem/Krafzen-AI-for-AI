@@ -1,9 +1,15 @@
-import logging
+import hmac
+import hashlib
+import base64
+import json
+from typing import Any
 
 import stripe
 
 from app.core.config import settings
 from app.services.subscription_service import PLAN_CONFIG, subscription_service
+from app.db.supabase_client import db
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -424,5 +430,126 @@ class PaymentService:
                     }).eq("user_id", user_id).execute()
             except Exception as e:
                 logger.error(f"Error handling payment failure: {e}")
+
+    def verify_dodo_signature(self, payload: bytes, headers: Dict[str, str]) -> bool:
+        """
+        Verify Dodo Payments webhook signature using standard webhooks (Svix-compatible HMAC SHA256).
+        """
+        secret = settings.DODO_PAYMENTS_WEBHOOK_SECRET
+        if not secret:
+            logger.warning("DODO_PAYMENTS_WEBHOOK_SECRET not configured. Rejecting Dodo webhook.")
+            return False
+
+        normalized_headers = {str(k).lower(): str(v) for k, v in headers.items()}
+        webhook_id = normalized_headers.get("webhook-id")
+        webhook_timestamp = normalized_headers.get("webhook-timestamp")
+        webhook_signature = normalized_headers.get("webhook-signature")
+
+        if not (webhook_id and webhook_timestamp and webhook_signature):
+            logger.warning("Missing required Dodo standard webhook signature headers.")
+            return False
+
+        try:
+            sec = secret
+            if sec.startswith("whsec_"):
+                sec = sec[len("whsec_"):]
+            key = base64.b64decode(sec)
+
+            to_sign = f"{webhook_id}.{webhook_timestamp}.".encode("utf-8") + payload
+            computed_sig = "v1," + base64.b64encode(
+                hmac.new(key, to_sign, hashlib.sha256).digest()
+            ).decode("utf-8")
+
+            passed_sigs = webhook_signature.split(" ")
+            return any(hmac.compare_digest(sig, computed_sig) for sig in passed_sigs)
+        except Exception as e:
+            logger.error(f"Error verifying Dodo webhook signature: {e}")
+            return False
+
+    async def handle_dodo_webhook(self, payload: bytes, headers: Dict[str, str]) -> Dict[str, Any]:
+        """
+        Handles incoming Dodo Payments webhooks for payment and subscription events.
+        """
+        if not self.verify_dodo_signature(payload, headers):
+            raise Exception("Invalid Dodo webhook signature")
+
+        try:
+            event = json.loads(payload.decode("utf-8"))
+        except Exception as e:
+            raise Exception(f"Invalid JSON payload: {e}")
+
+        event_type = event.get("type")
+        event_data = event.get("data", {})
+        logger.info(f"Received verified Dodo Payments webhook: {event_type}")
+
+        # Resolve plan and billing cycle from product_id or amount
+        product_id = event_data.get("product_id")
+        plan_name = None
+        billing_cycle = None
+
+        if product_id:
+            for p_name, cycles in PLAN_CONFIG.items():
+                for c_cycle, config in cycles.items():
+                    if config.get("dodo_product_id") == product_id:
+                        plan_name = p_name
+                        billing_cycle = c_cycle
+                        break
+                if plan_name:
+                    break
+
+        # Fallback to amount mapping
+        if not plan_name:
+            amount = event_data.get("amount") or event_data.get("total_amount") or event_data.get("recurring_pre_tax_amount")
+            if amount is not None:
+                amount_val = int(amount)
+                if amount_val > 100000:
+                    amount_val = amount_val // 100
+                elif amount_val in (14900, 49900, 149900):
+                    amount_val = amount_val // 100
+
+                plan_map = {
+                    149: ("starter", "monthly"),
+                    1490: ("starter", "annual"),
+                    499: ("professional", "monthly"),
+                    4990: ("professional", "annual"),
+                    1499: ("enterprise", "monthly"),
+                    14990: ("enterprise", "annual"),
+                }
+                plan_name, billing_cycle = plan_map.get(amount_val, (None, None))
+
+        metadata = event_data.get("metadata", {})
+        user_id = metadata.get("user_id") or metadata.get("internal_user_id")
+        customer = event_data.get("customer", {})
+        customer_email = customer.get("email") if isinstance(customer, dict) else None
+
+        # If user_id missing, attempt lookup by email in user_subscriptions
+        if not user_id and customer_email:
+            try:
+                sub_res = db.table("user_subscriptions").select("user_id").eq("user_id", customer_email).execute()
+                if sub_res.data:
+                    user_id = sub_res.data[0]["user_id"]
+            except Exception as e:
+                logger.debug(f"User lookup note for email {customer_email}: {e}")
+
+        customer_id = customer.get("customer_id") if isinstance(customer, dict) else None
+        subscription_id = event_data.get("subscription_id")
+        if not subscription_id and isinstance(event_data.get("subscription_ids"), list) and event_data["subscription_ids"]:
+            subscription_id = event_data["subscription_ids"][0]
+
+        if event_type in ("payment.succeeded", "subscription.active", "subscription.created"):
+            if user_id and plan_name and billing_cycle:
+                logger.info(f"Fulfilling Dodo subscription for {user_id}: {plan_name} ({billing_cycle})")
+                await subscription_service.start_subscription(
+                    user_id=user_id,
+                    plan_name=plan_name,
+                    billing_cycle=billing_cycle,
+                    stripe_customer_id=customer_id or f"dodo_{customer_id or user_id}",
+                    stripe_subscription_id=subscription_id or f"dodo_sub_{customer_id or user_id}",
+                    payment_completed=True,
+                )
+            else:
+                logger.warning(f"Dodo webhook missing user_id ({user_id}) or plan ({plan_name}/{billing_cycle})")
+
+        return {"status": "success", "event": event_type}
 
 payment_service = PaymentService()

@@ -148,7 +148,7 @@ export const PricingPlans: PricingPlans = {
     {
       type: "Starter",
       price: "$149",
-      stripeLink: "https://buy.stripe.com/00w5kD1iCfwy86Z4QWabK00",
+      stripeLink: "https://checkout.dodopayments.com/buy/pdt_0NptIUxBB6ax8M2pe8Jc2?quantity=1",
       features: [
         "Includes 50 drawings per month",
         "15 free workspace requests when you sign up (no card)",
@@ -163,7 +163,7 @@ export const PricingPlans: PricingPlans = {
     {
       type: "Professional",
       price: "$499",
-      stripeLink: "https://buy.stripe.com/00w9AT8L40BEdrj2IOabK02",
+      stripeLink: "https://checkout.dodopayments.com/buy/pdt_0NptIUuKMySW5tuz5FgRk?quantity=1",
       features: [
         "Includes 300 drawings per month",
         "15 free workspace requests when you sign up (no card)",
@@ -178,7 +178,7 @@ export const PricingPlans: PricingPlans = {
     {
       type: "Enterprise",
       price: "$1,499",
-      stripeLink: "https://buy.stripe.com/00waEXaTcgACcnfabgabK01",
+      stripeLink: "https://checkout.dodopayments.com/buy/pdt_0NptIUsLytgIvdbPve7kh?quantity=1",
       features: [
         "Includes 2,000 drawings per month",
         "15 free workspace requests when you sign up (no card)",
@@ -211,7 +211,7 @@ export const PricingPlans: PricingPlans = {
     {
       type: "Starter",
       price: "$1,490",
-      stripeLink: "https://buy.stripe.com/cNi7sL8LV7BP8jfemC4wM0c",
+      stripeLink: "https://checkout.dodopayments.com/buy/pdt_0NptIUnfunV7bYoJ9dtUE?quantity=1",
       features: [
         "Includes 50 drawings per month",
         "15 free workspace requests when you sign up (no card)",
@@ -226,7 +226,7 @@ export const PricingPlans: PricingPlans = {
     {
       type: "Professional",
       price: "$4,990",
-      stripeLink: "https://buy.stripe.com/00w3cvbY77BP42ZemC4wM0d",
+      stripeLink: "https://checkout.dodopayments.com/buy/pdt_0NptIUjvCnzjEpS7tZdLo?quantity=1",
       features: [
         "Includes 300 drawings per month",
         "15 free workspace requests when you sign up (no card)",
@@ -241,7 +241,7 @@ export const PricingPlans: PricingPlans = {
     {
       type: "Enterprise",
       price: "$14,990",
-      stripeLink: "https://buy.stripe.com/00w3cvd2b9JX6b7diy4wM0e",
+      stripeLink: "https://checkout.dodopayments.com/buy/pdt_0NptIUqA05KZHkdnENr3r?quantity=1",
       features: [
         "Includes 2,000 drawings per month",
         "15 free workspace requests when you sign up (no card)",

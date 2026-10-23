@@ -41,8 +41,8 @@ const pricingPlans: PricingPlan[] = [
         cta: "Get Started",
         featured: false,
         links: {
-            monthly: "https://buy.stripe.com/00w5kD1iCfwy86Z4QWabK00",
-            annual: "https://buy.stripe.com/cNi7sL8LV7BP8jfemC4wM0c"
+            monthly: "https://checkout.dodopayments.com/buy/pdt_0NptIUxBB6ax8M2pe8Jc2?quantity=1",
+            annual: "https://checkout.dodopayments.com/buy/pdt_0NptIUnfunV7bYoJ9dtUE?quantity=1"
         }
     },
     {
@@ -65,8 +65,8 @@ const pricingPlans: PricingPlan[] = [
         featured: true,
         popular: true,
         links: {
-            monthly: "https://buy.stripe.com/00w9AT8L40BEdrj2IOabK02",
-            annual: "https://buy.stripe.com/00w3cvbY77BP42ZemC4wM0d"
+            monthly: "https://checkout.dodopayments.com/buy/pdt_0NptIUuKMySW5tuz5FgRk?quantity=1",
+            annual: "https://checkout.dodopayments.com/buy/pdt_0NptIUjvCnzjEpS7tZdLo?quantity=1"
         }
     },
     {
@@ -89,8 +89,8 @@ const pricingPlans: PricingPlan[] = [
         cta: "Get Started",
         featured: false,
         links: {
-            monthly: "https://buy.stripe.com/00waEXaTcgACcnfabgabK01",
-            annual: "https://buy.stripe.com/00w3cvd2b9JX6b7diy4wM0e"
+            monthly: "https://checkout.dodopayments.com/buy/pdt_0NptIUsLytgIvdbPve7kh?quantity=1",
+            annual: "https://checkout.dodopayments.com/buy/pdt_0NptIUqA05KZHkdnENr3r?quantity=1"
         }
     },
     {
@@ -132,8 +132,22 @@ export default function PricingPage() {
             return;
         }
 
-        const paymentLink = plan.links?.[billingCycle];
-        if (paymentLink) window.open(paymentLink, '_blank', 'noopener,noreferrer');
+        let paymentLink = plan.links?.[billingCycle];
+        if (paymentLink) {
+            try {
+                const url = new URL(paymentLink);
+                if (user.email) {
+                    url.searchParams.set("customer_email", user.email);
+                }
+                if (user.userId) {
+                    url.searchParams.set("metadata_user_id", user.userId);
+                }
+                paymentLink = url.toString();
+            } catch {
+                // Keep base payment link if URL parsing fails
+            }
+            window.open(paymentLink, '_blank', 'noopener,noreferrer');
+        }
     };
 
     return (
