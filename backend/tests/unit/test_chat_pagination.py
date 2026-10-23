@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from app.services.chat_history_service import chat_history_service
 
 

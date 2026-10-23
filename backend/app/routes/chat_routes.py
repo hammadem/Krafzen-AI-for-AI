@@ -26,11 +26,11 @@ from app.models.chat_model import (
     MessageFeedbackRequest,
     UpdateSessionTitleRequest,
 )
+from app.services.activity_service import record_audit_event
 from app.services.cadllm_service import cadllm_service
 from app.services.chat_history_service import chat_history_service
 from app.services.gemini_service import gemini_service
 from app.services.subscription_service import subscription_service
-from app.services.activity_service import record_audit_event
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

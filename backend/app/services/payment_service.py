@@ -1,15 +1,15 @@
-import hmac
-import hashlib
 import base64
+import hashlib
+import hmac
 import json
+import logging
 from typing import Any
 
 import stripe
 
 from app.core.config import settings
-from app.services.subscription_service import PLAN_CONFIG, subscription_service
 from app.db.supabase_client import db
-import logging
+from app.services.subscription_service import PLAN_CONFIG, subscription_service
 
 logger = logging.getLogger(__name__)
 
@@ -451,11 +451,10 @@ class PaymentService:
 
         try:
             sec = secret
-            if sec.startswith("whsec_"):
-                sec = sec[len("whsec_"):]
+            sec = sec.removeprefix("whsec_")
             key = base64.b64decode(sec)
 
-            to_sign = f"{webhook_id}.{webhook_timestamp}.".encode("utf-8") + payload
+            to_sign = f"{webhook_id}.{webhook_timestamp}.".encode() + payload
             computed_sig = "v1," + base64.b64encode(
                 hmac.new(key, to_sign, hashlib.sha256).digest()
             ).decode("utf-8")
@@ -502,9 +501,7 @@ class PaymentService:
             amount = event_data.get("amount") or event_data.get("total_amount") or event_data.get("recurring_pre_tax_amount")
             if amount is not None:
                 amount_val = int(amount)
-                if amount_val > 100000:
-                    amount_val = amount_val // 100
-                elif amount_val in (14900, 49900, 149900):
+                if amount_val > 100000 or amount_val in (14900, 49900, 149900):
                     amount_val = amount_val // 100
 
                 plan_map = {

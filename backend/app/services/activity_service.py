@@ -10,7 +10,6 @@ Legacy payload shape finalized with Sunny (Week 2):
   - actor: {display_name, avatar_url} joined inline
 """
 
-import asyncio
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -78,8 +77,6 @@ async def record_audit_event(
     actor_user_id: str | None = None,
     organization_id: str | None = None,
     project_id: str | None = None,
-    workspace_id: str | None = None,
-    file_id: str | None = None,
     metadata: dict[str, Any] | None = None,
     message: str | None = None,
     legacy_job_id: str | None = None,
@@ -110,12 +107,10 @@ async def record_audit_event(
         "entity_type": entity_type,
         "entity_id": entity_id,
         "organization_id": organization_id,
-        "workspace_id": workspace_id,
         "timestamp": timestamp,
         "created_at": timestamp,
         "job_id": legacy_job_id,
         "project_id": project_id,
-        "file_id": file_id,
         "actor_user_id": actor_user_id,
         "message": message or _default_message(action),
         "metadata": event_metadata,
@@ -138,136 +133,6 @@ async def record_audit_event(
             "[activity_service] Failed to record event",
             action=action,
             entity_id=entity_id,
-            error=str(e),
-            exc_info=True,
-        )
-        raise
-
-
-async def record_workspace_event(
-    *,
-    event_name: str,
-    workspace_id: str,
-    actor_user_id: str,
-    metadata: dict[str, Any] | None = None,
-    message: str | None = None,
-) -> dict[str, Any]:
-    """Persist a workspace audit event, failing explicitly if it cannot be stored."""
-    if not event_name or not event_name.strip():
-        raise ValueError("An audit event name is required")
-    if not workspace_id:
-        raise ValueError("A workspace_id is required")
-    if not actor_user_id:
-        raise ValueError("An authenticated actor_user_id is required")
-
-    payload = {
-        "event_name": event_name,
-        "action": event_name,
-        "workspace_id": workspace_id,
-        "organization_id": workspace_id,
-        "event_id": str(uuid4()),
-        "entity_type": "workspace",
-        "entity_id": workspace_id,
-        "actor_user_id": actor_user_id,
-        "message": message or _default_message(event_name),
-        "metadata": metadata or {},
-        "created_at": datetime.now(UTC).isoformat(),
-    }
-
-    try:
-        response = await run_in_threadpool(
-            lambda: db.table("activity_events").insert(payload).execute()
-        )
-        if response and response.data:
-            logger.info(
-                "[activity_service] Workspace event recorded",
-                event_name=event_name,
-                workspace_id=workspace_id,
-            )
-            return response.data[0]
-        raise RuntimeError("Workspace audit event insert returned no data")
-    except Exception as e:
-        logger.error(
-            "[activity_service] Failed to record workspace event",
-            event_name=event_name,
-            workspace_id=workspace_id,
-            error=str(e),
-            exc_info=True,
-        )
-        raise
-
-
-async def record_file_event(
-    *,
-    event_name: str,
-    file_id: str,
-    project_id: str,
-    job_id: str,
-    actor_user_id: str,
-    metadata: dict[str, Any] | None = None,
-    message: str | None = None,
-) -> dict[str, Any]:
-    """Append an activity event tied to a file and its authenticated actor."""
-    if not event_name or not event_name.strip():
-        raise ValueError("An activity event name is required")
-    if not file_id or not project_id or not job_id or not actor_user_id:
-        raise ValueError("File, project, job, and authenticated actor IDs are required")
-
-    return await record_audit_event(
-        action=event_name,
-        entity_type="file",
-        entity_id=file_id,
-        actor_user_id=actor_user_id,
-        project_id=project_id,
-        legacy_job_id=job_id,
-        file_id=file_id,
-        metadata=metadata,
-        message=message,
-    )
-
-
-async def get_file_activity(
-    file_id: str,
-    job_id: str,
-    project_id: str,
-    limit: int = 50,
-) -> list[dict[str, Any]]:
-    """Return events attached to a file plus its job's lifecycle events."""
-    try:
-        responses = await asyncio.gather(
-            run_in_threadpool(
-                lambda: db.table("activity_events").select("*, profiles(display_name, avatar_url)")
-                    .eq("file_id", file_id)
-                    .eq("project_id", project_id)
-                    .order("created_at", desc=True)
-                    .limit(limit)
-                    .execute()
-            ),
-            run_in_threadpool(
-                lambda: db.table("activity_events").select("*, profiles(display_name, avatar_url)")
-                    .eq("job_id", job_id)
-                    .eq("project_id", project_id)
-                    .order("created_at", desc=True)
-                    .limit(limit)
-                    .execute()
-            ),
-        )
-        rows = {
-            str(row.get("id") or row.get("event_id")): row
-            for response in responses
-            for row in (response.data or [])
-            if not row.get("file_id") or str(row["file_id"]) == file_id
-        }
-        ordered = sorted(
-            rows.values(),
-            key=lambda row: row.get("created_at") or row.get("timestamp") or "",
-            reverse=True,
-        )
-        return [_shape_activity_row(row) for row in ordered[:limit]]
-    except Exception as e:
-        logger.error(
-            "[activity_service] Failed to fetch file activity",
-            file_id=file_id,
             error=str(e),
             exc_info=True,
         )
@@ -315,51 +180,24 @@ async def get_project_activity(
 
 
 async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
-    """Fetch only events assigned to this workspace for an owner or current member."""
+    """Fetch only events assigned to this workspace for a verified member."""
     try:
-        workspace_res = await run_in_threadpool(
-            lambda: db.table("workspaces").select("owner_id")
-                .eq("id", workspace_id).maybe_single().execute()
-        )
-        if not workspace_res or not workspace_res.data:
-            logger.warning("[activity_service] Workspace not found", workspace_id=workspace_id)
-            return []
-
         is_member = await run_in_threadpool(
             lambda: db.table("workspace_members").select("user_id")
                 .eq("workspace_id", workspace_id).eq("user_id", user_id)
                 .maybe_single().execute()
         )
-        is_owner = workspace_res.data["owner_id"] == user_id
-        if not is_owner and (not is_member or not is_member.data):
+        if not is_member or not is_member.data:
             logger.warning("[activity_service] Not a workspace member", workspace_id=workspace_id, user_id=user_id[:8])
             return []
 
-        responses = await asyncio.gather(
-            run_in_threadpool(
-                lambda: db.table("activity_events")
-                    .select("*, profiles(display_name, avatar_url)")
-                    .eq("workspace_id", workspace_id)
-                    .order("created_at", desc=True).limit(limit).execute()
-            ),
-            run_in_threadpool(
-                lambda: db.table("activity_events")
-                    .select("*, profiles(display_name, avatar_url)")
-                    .eq("organization_id", workspace_id)
-                    .order("timestamp", desc=True).limit(limit).execute()
-            ),
+        response = await run_in_threadpool(
+            lambda: db.table("activity_events").select("*, profiles(display_name, avatar_url)")
+                .eq("organization_id", workspace_id)
+                .order("timestamp", desc=True).limit(limit).execute()
         )
-        rows = {
-            str(row.get("event_id") or row.get("id")): row
-            for response in responses
-            for row in (response.data or [])
-        }
-        ordered = sorted(
-            rows.values(),
-            key=lambda row: row.get("timestamp") or row.get("created_at") or "",
-            reverse=True,
-        )
-        return [_shape_activity_row(row) for row in ordered[:limit]]
+        rows = response.data if response and response.data else []
+        return [_shape_activity_row(r) for r in rows]
     except Exception as e:
         logger.error("[activity_service] Failed to fetch workspace activity", workspace_id=workspace_id, error=str(e), exc_info=True)
         return []
@@ -456,26 +294,6 @@ def _metadata_entity_id(action: str, metadata: dict[str, Any]) -> str | None:
 def _default_message(event_name: str) -> str:
     """Fallback human-readable message when caller doesn't supply one."""
     return {
-        "ai.review_started": "AI review started",
-        "ai.review_completed": "AI review completed",
-        "ai.review_failed": "AI review failed",
-        "ai.generation_started": "AI generation started",
-        "ai.generation_completed": "AI generation completed",
-        "ai.generation_failed": "AI generation failed",
-        "ai.suggestion_accepted": "AI suggestion accepted",
-        "ai.suggestion_rejected": "AI suggestion rejected",
-        "revision.created": "Revision created",
-        "revision.approved": "Revision approved",
-        "revision.rejected": "Revision rejected",
-        "revision.restored": "Revision restored",
-        "file.uploaded": "File uploaded",
-        "file.updated": "File updated",
-        "file.renamed": "File renamed",
-        "file.version_created": "File version created",
-        "file.exported": "File exported",
-        "file.archived": "File archived",
-        "file.restored": "File restored",
-        "file.deleted": "File deleted",
         "export.queued": "Export queued",
         "export.processing": "Export started",
         "export.validating": "Validating export",

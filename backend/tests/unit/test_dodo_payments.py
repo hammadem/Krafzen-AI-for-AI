@@ -1,20 +1,20 @@
-import json
-import hmac
-import hashlib
 import base64
-import pytest
+import hashlib
+import hmac
+import json
 from unittest.mock import AsyncMock, patch
-from app.services.payment_service import payment_service
+
+import pytest
 from app.core.config import settings
+from app.services.payment_service import payment_service
 
 SECRET = "whsec_lXXZg5MJ4VZ03HMQ0SoXx4iUplSt88J/"
 
 def generate_dodo_signature(payload: bytes, msg_id: str, timestamp: str, secret: str = SECRET) -> str:
     sec = secret
-    if sec.startswith("whsec_"):
-        sec = sec[len("whsec_"):]
+    sec = sec.removeprefix("whsec_")
     key = base64.b64decode(sec)
-    to_sign = f"{msg_id}.{timestamp}.".encode("utf-8") + payload
+    to_sign = f"{msg_id}.{timestamp}.".encode() + payload
     sig = base64.b64encode(hmac.new(key, to_sign, hashlib.sha256).digest()).decode("utf-8")
     return f"v1,{sig}"
 
