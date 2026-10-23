@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -97,3 +98,108 @@ async def test_generation_failure_audit_records_stage_not_exception_message():
     assert event["metadata"]["error_type"] == "RuntimeError"
     assert "error" not in event["metadata"]
     assert "prompt" not in event["metadata"]
+
+
+@pytest.mark.asyncio
+async def test_generation_start_audit_failure_returns_original_error_without_unbound_state():
+    audit_error = RuntimeError("audit schema is not migrated")
+    with (
+        patch.object(
+            chat_routes.subscription_service,
+            "check_request_balance",
+            AsyncMock(return_value={"can_make_request": True}),
+        ),
+        patch.object(
+            chat_routes.chat_history_service,
+            "create_session",
+            AsyncMock(return_value=SESSION_ID),
+        ),
+        patch.object(chat_routes.chat_history_service, "add_message", AsyncMock()),
+        patch.object(
+            chat_routes.chat_history_service,
+            "ensure_project_for_session",
+            AsyncMock(return_value=PROJECT_ID),
+        ),
+        patch.object(
+            chat_routes, "record_audit_event", AsyncMock(side_effect=audit_error)
+        ),
+        patch.object(
+            chat_routes, "_record_generation_failure", AsyncMock()
+        ) as record_failure,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await chat_routes.generate_chat_response(
+                chat_routes.ChatRequest(message="Draw a floor plan"),
+                {"user_id": USER_ID},
+            )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == str(audit_error)
+    record_failure.assert_awaited_once()
+    assert record_failure.await_args.args[1:] == (
+        SESSION_ID,
+        USER_ID,
+        PROJECT_ID,
+        "generation_started_audit",
+        "RuntimeError",
+    )
+
+
+@pytest.mark.asyncio
+async def test_image_generation_placeholder_fails_without_deducting_request():
+    with (
+        patch.object(
+            chat_routes.subscription_service,
+            "check_request_balance",
+            AsyncMock(return_value={"can_make_request": True}),
+        ),
+        patch.object(
+            chat_routes.subscription_service, "deduct_request", AsyncMock()
+        ) as deduct_request,
+        patch.object(
+            chat_routes.chat_history_service,
+            "create_session",
+            AsyncMock(return_value=SESSION_ID),
+        ),
+        patch.object(
+            chat_routes.chat_history_service, "add_message", AsyncMock()
+        ) as add_message,
+        patch.object(
+            chat_routes.chat_history_service,
+            "ensure_project_for_session",
+            AsyncMock(return_value=PROJECT_ID),
+        ),
+        patch.object(
+            chat_routes.chat_history_service,
+            "get_session_messages",
+            AsyncMock(return_value={"messages": []}),
+        ),
+        patch.object(
+            chat_routes,
+            "cadllm_service",
+            SimpleNamespace(enhance_prompt=AsyncMock(return_value="CAD plan")),
+        ),
+        patch.object(
+            chat_routes,
+            "gemini_service",
+            SimpleNamespace(
+                generate_image=AsyncMock(
+                    return_value="https://placehold.co/600x400?text=Image+Generation+Failed"
+                )
+            ),
+        ),
+        patch.object(
+            chat_routes, "record_audit_event", AsyncMock(return_value={})
+        ) as record_event,
+    ):
+        with pytest.raises(HTTPException) as exc_info:
+            await chat_routes.generate_chat_response(
+                chat_routes.ChatRequest(message="Draw a kitchen"),
+                {"user_id": USER_ID},
+            )
+
+    assert exc_info.value.status_code == 502
+    assert "Image generation failed" in exc_info.value.detail
+    assert add_message.await_count == 1
+    deduct_request.assert_not_awaited()
+    assert record_event.await_args.kwargs["action"] == "ai.generation_failed"

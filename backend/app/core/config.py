@@ -3,6 +3,8 @@ Configuration settings for KRAFZEN AI backend
 """
 
 
+from typing import Optional
+
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 

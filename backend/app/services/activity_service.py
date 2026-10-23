@@ -76,6 +76,7 @@ async def record_audit_event(
     entity_id: str,
     actor_user_id: str | None = None,
     organization_id: str | None = None,
+    workspace_id: str | None = None,
     project_id: str | None = None,
     metadata: dict[str, Any] | None = None,
     message: str | None = None,
@@ -107,6 +108,7 @@ async def record_audit_event(
         "entity_type": entity_type,
         "entity_id": entity_id,
         "organization_id": organization_id,
+        "workspace_id": workspace_id,
         "timestamp": timestamp,
         "created_at": timestamp,
         "job_id": legacy_job_id,
@@ -137,6 +139,34 @@ async def record_audit_event(
             exc_info=True,
         )
         raise
+
+
+async def record_workspace_event(
+    *,
+    event_name: str,
+    workspace_id: str,
+    actor_user_id: str,
+    metadata: dict[str, Any] | None = None,
+    message: str | None = None,
+) -> dict[str, Any]:
+    """Record a workspace audit event attributed to its authenticated actor."""
+    if not actor_user_id:
+        raise ValueError("An authenticated actor_user_id is required")
+    if not workspace_id:
+        raise ValueError("A workspace_id is required")
+    if not event_name or not event_name.strip():
+        raise ValueError("An audit event action is required")
+
+    return await record_audit_event(
+        action=event_name,
+        entity_type="workspace",
+        entity_id=workspace_id,
+        actor_user_id=actor_user_id,
+        organization_id=workspace_id,
+        workspace_id=workspace_id,
+        metadata=metadata,
+        message=message,
+    )
 
 
 async def get_project_activity(
@@ -179,17 +209,85 @@ async def get_project_activity(
         return []
 
 
-async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
-    """Fetch only events assigned to this workspace for a verified member."""
+async def get_file_activity(
+    file_id: str,
+    job_id: str,
+    project_id: str,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Combine canonical file events and legacy job events for an authorized file."""
     try:
-        is_member = await run_in_threadpool(
-            lambda: db.table("workspace_members").select("user_id")
-                .eq("workspace_id", workspace_id).eq("user_id", user_id)
+        file_response = await run_in_threadpool(
+            lambda: db.table("activity_events")
+                .select("*, profiles(display_name, avatar_url)")
+                .eq("entity_id", file_id)
+                .eq("project_id", project_id)
+                .order("timestamp", desc=True)
+                .limit(limit)
+                .execute()
+        )
+        job_response = await run_in_threadpool(
+            lambda: db.table("activity_events")
+                .select("*, profiles(display_name, avatar_url)")
+                .eq("job_id", job_id)
+                .eq("project_id", project_id)
+                .order("timestamp", desc=True)
+                .limit(limit)
+                .execute()
+        )
+
+        rows = []
+        seen_ids = set()
+        for response in (file_response, job_response):
+            for row in response.data if response and response.data else []:
+                event_id = row.get("event_id") or row.get("id")
+                if event_id and event_id in seen_ids:
+                    continue
+                if event_id:
+                    seen_ids.add(event_id)
+                rows.append(row)
+
+        rows.sort(
+            key=lambda row: row.get("timestamp") or row.get("created_at") or "",
+            reverse=True,
+        )
+        return [_shape_activity_row(row) for row in rows[:limit]]
+    except Exception as e:
+        logger.error(
+            "[activity_service] Failed to fetch file activity",
+            file_id=file_id,
+            error=str(e),
+            exc_info=True,
+        )
+        return []
+
+
+async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 50) -> list[dict[str, Any]]:
+    """Fetch workspace events only for the owner or a verified member."""
+    try:
+        workspace = await run_in_threadpool(
+            lambda: db.table("workspaces").select("owner_id")
+                .eq("id", workspace_id)
                 .maybe_single().execute()
         )
-        if not is_member or not is_member.data:
-            logger.warning("[activity_service] Not a workspace member", workspace_id=workspace_id, user_id=user_id[:8])
+        if not workspace or not workspace.data:
+            logger.warning("[activity_service] Workspace not found", workspace_id=workspace_id)
             return []
+
+        is_owner = workspace.data.get("owner_id") == user_id
+        if not is_owner:
+            is_member = await run_in_threadpool(
+                lambda: db.table("workspace_members").select("user_id")
+                    .eq("workspace_id", workspace_id).eq("user_id", user_id)
+                    .maybe_single().execute()
+            )
+            if not is_member or not is_member.data:
+                logger.warning(
+                    "[activity_service] Not a workspace member",
+                    workspace_id=workspace_id,
+                    user_id=user_id[:8],
+                )
+                return []
 
         response = await run_in_threadpool(
             lambda: db.table("activity_events").select("*, profiles(display_name, avatar_url)")

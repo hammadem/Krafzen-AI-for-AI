@@ -1,4 +1,5 @@
 "use client";
+import "../workspace.css";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
@@ -40,4 +41,3 @@ export default function Layout({
 
   return <AppShell>{children}</AppShell>;
 }
-

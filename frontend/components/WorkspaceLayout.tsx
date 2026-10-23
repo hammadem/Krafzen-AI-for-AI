@@ -53,7 +53,6 @@ import {
 } from "@/components/ui/popover";
 import { ShareModal } from "./ShareModal";
 import { CommentSidebar } from "./CommentSidebar";
-import "../app/workspace.css";
 
 
 function ComplianceStrip({ data, projectName }: { data: CompliancePayload; projectName: string }) {

@@ -2,9 +2,10 @@ import base64
 import hashlib
 import hmac
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from app.services import payment_service as payment_service_module
 from app.core.config import settings
 from app.services.payment_service import payment_service
 
@@ -131,6 +132,43 @@ async def test_handle_dodo_webhook_subscription_active_yearly():
             payment_completed=True
         )
 
+@pytest.mark.asyncio
+async def test_handle_dodo_webhook_does_not_resolve_user_id_from_customer_email(monkeypatch):
+    payload = json.dumps({
+        "type": "payment.succeeded",
+        "data": {
+            "product_id": "pdt_0NptIUxBB6ax8M2pe8Jc2",
+            "customer": {
+                "customer_id": "cus_without_user_metadata",
+                "email": "user@example.com",
+            },
+            "metadata": {},
+        },
+    }).encode("utf-8")
+    msg_id = "msg_missing_user"
+    timestamp = "1729000006"
+    headers = {
+        "webhook-id": msg_id,
+        "webhook-timestamp": timestamp,
+        "webhook-signature": generate_dodo_signature(payload, msg_id, timestamp),
+    }
+
+    mock_db = Mock()
+    monkeypatch.setattr(payment_service_module, "db", mock_db)
+
+    with (
+        patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET),
+        patch(
+            "app.services.payment_service.subscription_service.start_subscription",
+            new_callable=AsyncMock,
+        ) as mock_start,
+    ):
+        result = await payment_service.handle_dodo_webhook(payload, headers)
+
+    assert result["status"] == "success"
+    mock_db.table.assert_not_called()
+    mock_start.assert_not_awaited()
+
 def test_dodo_webhook_endpoint_success(client):
     payload_dict = {
         "type": "payment.succeeded",
@@ -198,4 +236,3 @@ def test_payments_webhook_dual_routing_dodo(client):
         response = client.post("/api/v1/payments/webhook", content=payload, headers=headers)
         assert response.status_code == 200
         assert response.json()["status"] == "success"
-

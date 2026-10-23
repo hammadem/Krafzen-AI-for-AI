@@ -431,7 +431,7 @@ class PaymentService:
             except Exception as e:
                 logger.error(f"Error handling payment failure: {e}")
 
-    def verify_dodo_signature(self, payload: bytes, headers: Dict[str, str]) -> bool:
+    def verify_dodo_signature(self, payload: bytes, headers: dict[str, str]) -> bool:
         """
         Verify Dodo Payments webhook signature using standard webhooks (Svix-compatible HMAC SHA256).
         """
@@ -465,7 +465,9 @@ class PaymentService:
             logger.error(f"Error verifying Dodo webhook signature: {e}")
             return False
 
-    async def handle_dodo_webhook(self, payload: bytes, headers: Dict[str, str]) -> Dict[str, Any]:
+    async def handle_dodo_webhook(
+        self, payload: bytes, headers: dict[str, str]
+    ) -> dict[str, Any]:
         """
         Handles incoming Dodo Payments webhooks for payment and subscription events.
         """
@@ -517,16 +519,6 @@ class PaymentService:
         metadata = event_data.get("metadata", {})
         user_id = metadata.get("user_id") or metadata.get("internal_user_id")
         customer = event_data.get("customer", {})
-        customer_email = customer.get("email") if isinstance(customer, dict) else None
-
-        # If user_id missing, attempt lookup by email in user_subscriptions
-        if not user_id and customer_email:
-            try:
-                sub_res = db.table("user_subscriptions").select("user_id").eq("user_id", customer_email).execute()
-                if sub_res.data:
-                    user_id = sub_res.data[0]["user_id"]
-            except Exception as e:
-                logger.debug(f"User lookup note for email {customer_email}: {e}")
 
         customer_id = customer.get("customer_id") if isinstance(customer, dict) else None
         subscription_id = event_data.get("subscription_id")
@@ -545,7 +537,11 @@ class PaymentService:
                     payment_completed=True,
                 )
             else:
-                logger.warning(f"Dodo webhook missing user_id ({user_id}) or plan ({plan_name}/{billing_cycle})")
+                logger.warning(
+                    "Dodo webhook missing trusted user_id or plan (%s/%s)",
+                    plan_name,
+                    billing_cycle,
+                )
 
         return {"status": "success", "event": event_type}
 

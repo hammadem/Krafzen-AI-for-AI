@@ -10,6 +10,9 @@ ALTER TABLE public.activity_events
         REFERENCES public.workspaces(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS "timestamp" TIMESTAMPTZ;
 
+-- Existing rows need a one-time backfill before the append-only guard is restored.
+DROP TRIGGER IF EXISTS activity_events_reject_update_delete ON public.activity_events;
+
 UPDATE public.activity_events
 SET
     event_id = COALESCE(event_id, id),

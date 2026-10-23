@@ -178,9 +178,14 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             detail = "Insufficient requests. Upgrade your plan or wait for your billing cycle to renew."
         raise HTTPException(status_code=402, detail=detail)
 
+    session_id = request.session_id
+    session_project_id: str | None = None
+    generation_id: str | None = None
+    generation_started = False
+    generation_completed = False
+    generation_stage = "session_setup"
+
     try:
-        session_id = request.session_id
-        session_project_id: str | None = None
         if not session_id:
             # Create new session
             session_id = await chat_history_service.create_session(user_id, title=request.message[:30] + "...")
@@ -211,6 +216,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             logger.error(f"[generate] project bridge failed: {bridge_err}", exc_info=True)
 
         generation_id = str(uuid4())
+        generation_stage = "generation_started_audit"
         generation_started = True
         await record_audit_event(
             action="ai.generation_started",
@@ -356,6 +362,12 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
                 drawing_standard=drawing_standard,
             )
 
+        if image_url.startswith("https://placehold.co/"):
+            raise HTTPException(
+                status_code=502,
+                detail="Image generation failed. Check the backend logs and Gemini configuration.",
+            )
+
         logger.info(f"Generated Image URL: {image_url[:50]}...")
 
         # 5. Persist Assistant Response
@@ -423,7 +435,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
     except HTTPException:
         # Re-raise HTTP exceptions without charging the user
         logger.warning(f"HTTP exception occurred for user {user_id}, no charge applied")
-        if generation_started and not generation_completed:
+        if generation_started and generation_id and session_id and not generation_completed:
             await _record_generation_failure(
                 generation_id, session_id, user_id, session_project_id,
                 generation_stage, "HTTPException"
@@ -432,7 +444,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
     except Exception as e:
         # Log error and raise without charging the user
         logger.error(f"Chat generation error for user {user_id}: {e!s}, no charge applied", exc_info=True)
-        if generation_started and not generation_completed:
+        if generation_started and generation_id and session_id and not generation_completed:
             await _record_generation_failure(
                 generation_id, session_id, user_id, session_project_id,
                 generation_stage, type(e).__name__
@@ -555,7 +567,7 @@ async def get_session_history(
     session_id: str,
     response: Response,
     limit: int = 30,
-    before: Optional[str] = None,
+    before: str | None = None,
     user_data: dict = Depends(require_auth)
 ):
     """
