@@ -1,7 +1,10 @@
 """Supabase Storage service for CAD file uploads/downloads."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
+
+from httpx import HTTPError
+from storage3.utils import StorageException
 
 from app.db.supabase_client import db
 
@@ -34,7 +37,7 @@ class StorageService:
         try:
             ext = (file_extension or "dxf").strip(".").lower()
             if not filename:
-                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
                 filename = f"project_{project_id}_{timestamp}.{ext}"
             if not filename.lower().endswith(f".{ext}"):
                 filename = f"{filename}.{ext}"
@@ -48,7 +51,7 @@ class StorageService:
                 try:
                     try:
                         db.storage.from_(StorageService.BUCKET_NAME).list()
-                    except Exception:
+                    except StorageException:
                         logger.warning(
                             "Bucket %s might not exist. Please create it in Supabase dashboard.",
                             StorageService.BUCKET_NAME,
@@ -62,16 +65,16 @@ class StorageService:
                             "upsert": "true",
                         },
                     )
-                except Exception as e:
-                    logger.error(f"Storage upload error: {e}", exc_info=True)
+                except (StorageException, HTTPError):
+                    logger.exception("Storage upload error")
                     raise
 
             await run_in_threadpool(_upload)
             public_url = db.storage.from_(StorageService.BUCKET_NAME).get_public_url(storage_path)
             logger.info("✅ CAD file uploaded: %s", storage_path)
             return public_url
-        except Exception as e:
-            logger.error(f"Failed to upload CAD file to storage: {e}", exc_info=True)
+        except (StorageException, HTTPError, OSError, TypeError, ValueError):
+            logger.exception("Failed to upload CAD file to storage")
             return None
     
     @staticmethod
@@ -112,7 +115,7 @@ class StorageService:
                 try:
                     files = db.storage.from_(StorageService.BUCKET_NAME).list(storage_path)
                     return files
-                except Exception as e:
+                except (StorageException, HTTPError) as e:
                     logger.error(f"Error listing files: {e}")
                     return []
             
@@ -124,15 +127,15 @@ class StorageService:
                 return None
             
             # Get the most recent file
-            latest_file = sorted(dxf_files, key=lambda x: x.get('updated_at', ''), reverse=True)[0]
+            latest_file = max(dxf_files, key=lambda x: x.get('updated_at', ''))
             file_path = f"{storage_path}{latest_file['name']}"
             
             # Return public URL
             public_url = db.storage.from_(StorageService.BUCKET_NAME).get_public_url(file_path)
             return public_url
             
-        except Exception as e:
-            logger.error(f"Failed to get DXF file URL: {e}", exc_info=True)
+        except (StorageException, HTTPError, OSError, TypeError, ValueError):
+            logger.exception("Failed to get DXF file URL")
             return None
     
     @staticmethod
@@ -159,21 +162,21 @@ class StorageService:
                     if not dxf_files:
                         return None
                     
-                    latest_file = sorted(dxf_files, key=lambda x: x.get('updated_at', ''), reverse=True)[0]
+                    latest_file = max(dxf_files, key=lambda x: x.get('updated_at', ''))
                     file_path = f"{storage_path}{latest_file['name']}"
                     
                     # Download file
                     file_bytes = db.storage.from_(StorageService.BUCKET_NAME).download(file_path)
                     return file_bytes
-                except Exception as e:
+                except (StorageException, HTTPError, OSError, TypeError, ValueError) as e:
                     logger.error(f"Error downloading file: {e}")
                     return None
             
             file_bytes = await run_in_threadpool(_list_and_download)
             return file_bytes
             
-        except Exception as e:
-            logger.error(f"Failed to download DXF file: {e}", exc_info=True)
+        except (StorageException, HTTPError, OSError, TypeError, ValueError):
+            logger.exception("Failed to download DXF file")
             return None
 
     @staticmethod
@@ -190,25 +193,21 @@ class StorageService:
                     cad_files = [f for f in files if f.get("name", "").lower().endswith(f".{ext}")]
                     if not cad_files:
                         return None
-                    latest_file = sorted(cad_files, key=lambda x: x.get("updated_at", ""), reverse=True)[0]
+                    latest_file = max(cad_files, key=lambda x: x.get("updated_at", ""))
                     file_path = f"{storage_path}{latest_file['name']}"
                     return db.storage.from_(StorageService.BUCKET_NAME).download(file_path)
-                except Exception as e:
+                except (StorageException, HTTPError, OSError, TypeError, ValueError) as e:
                     logger.error(f"Error downloading CAD file: {e}")
                     return None
 
             return await run_in_threadpool(_list_and_download)
-        except Exception as e:
-            logger.error(f"Failed to download CAD file: {e}", exc_info=True)
+        except (StorageException, HTTPError, OSError, TypeError, ValueError):
+            logger.exception("Failed to download CAD file")
             return None
 
 
 # Global instance
 storage_service = StorageService()
-
-
-
-
 
 
 

@@ -1,8 +1,10 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.supabase_client import db
 from app.utils.logger import logger
@@ -54,7 +56,7 @@ async def create_job(job_data: dict[str, Any], user: dict[str, Any]) -> dict[str
         logger.warning("[create_job] Insert failed", project_id=project_id)
         return None
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[create_job] Unexpected error", error=str(e), exc_info=True)
         return {"error": "Unexpected server error"}
 
@@ -82,7 +84,7 @@ async def get_jobs(project_id: str, user: dict[str, Any]) -> list[dict[str, Any]
         logger.debug(f"[get_jobs] Retrieved {len(jobs)} jobs", project_id=project_id)
         return jobs
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_jobs] Error", project_id=project_id, error=str(e), exc_info=True)
         return []
 
@@ -115,7 +117,7 @@ async def get_job(job_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
 
         return job
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_job] Error", job_id=job_id, error=str(e), exc_info=True)
         return None
 
@@ -132,7 +134,7 @@ async def update_job(job_id: str, update_data: dict[str, Any], user: dict[str, A
             return {"error": "Unauthorized or job not found"}
 
         update_payload = {k: v for k, v in update_data.items() if v is not None}
-        update_payload["updated_at"] = datetime.utcnow().isoformat()
+        update_payload["updated_at"] = datetime.now(UTC).isoformat()
 
         if not update_payload:
             return {"error": "No valid update fields provided"}
@@ -151,7 +153,7 @@ async def update_job(job_id: str, update_data: dict[str, Any], user: dict[str, A
         logger.warning("[update_job] Update failed", job_id=job_id)
         return {"error": f"Job with id {job_id} not found"}
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[update_job] Error", job_id=job_id, error=str(e), exc_info=True)
         return {"error": str(e)}
 
@@ -180,6 +182,6 @@ async def delete_job(job_id: str, user: dict[str, Any]) -> bool:
             logger.warning("[delete_job] Delete failed", job_id=job_id)
         return success
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[delete_job] Error", job_id=job_id, error=str(e), exc_info=True)
         return False

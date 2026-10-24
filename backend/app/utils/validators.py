@@ -1,6 +1,8 @@
 import uuid
 
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.supabase_client import db
 from app.utils.logger import logger
@@ -35,6 +37,6 @@ async def _user_owns_project(project_id: str, user_id: str) -> bool:
             logger.warning("[_user_owns_project] Unauthorized access attempt", project_id=project_id, user_id=user_id[:8] + "...")
         return owns
         
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[_user_owns_project] Error", project_id=project_id, error=str(e), exc_info=True)
         return False

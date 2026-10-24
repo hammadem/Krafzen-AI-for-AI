@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.supabase_client import db
 from app.utils.logger import logger
@@ -56,7 +58,7 @@ async def create_notification(
             logger.info("[notification_service] Notification created", type=notification_type, user_id=user_id[:8])
             return response.data[0]
         return None
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[notification_service] Insert failed", error=str(e), exc_info=True)
         return None
 
@@ -68,7 +70,7 @@ async def get_notifications(user_id: str, unread_only: bool = False) -> list:
             query = query.eq("is_read", False)
         response = await run_in_threadpool(lambda: query.execute())
         return response.data if response and response.data else []
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[notification_service] Fetch failed", error=str(e), exc_info=True)
         return []
 
@@ -83,6 +85,6 @@ async def mark_as_read(notification_id: str, user_id: str) -> bool:
                 .execute()
         )
         return bool(response and response.data)
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[notification_service] Mark-read failed", error=str(e), exc_info=True)
         return False

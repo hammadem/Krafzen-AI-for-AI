@@ -2,6 +2,9 @@ import logging
 import time
 from typing import Any
 
+from httpx import HTTPError
+from postgrest.exceptions import APIError
+
 from app.db.supabase_client import db
 
 logger = logging.getLogger(__name__)
@@ -21,10 +24,10 @@ class ChatHistoryService:
             response = db.table("chat_sessions").insert(data).execute()
             if response.data:
                 return response.data[0]["id"]
-            raise Exception("Failed to create chat session")
-        except Exception as e:
-            logger.error(f"Error creating chat session: {e}", exc_info=True)
-            raise e
+            raise RuntimeError("Failed to create chat session")
+        except (APIError, HTTPError, KeyError, TypeError, ValueError):
+            logger.exception("Error creating chat session")
+            raise
 
     async def ensure_project_for_session(
         self,
@@ -71,8 +74,8 @@ class ChatHistoryService:
             db.table("chat_sessions").update({"project_id": project_id}).eq("id", session_id).execute()
             logger.info(f"[ensure_project_for_session] linked project {project_id} to session {session_id}")
             return project_id
-        except Exception as e:
-            logger.error(f"[ensure_project_for_session] failed: {e}", exc_info=True)
+        except (APIError, HTTPError, KeyError, TypeError, ValueError):
+            logger.exception("[ensure_project_for_session] failed")
             return None
 
     async def get_user_sessions(self, user_id: str) -> list[dict[str, Any]]:
@@ -81,7 +84,7 @@ class ChatHistoryService:
             # Order by updated_at descending
             response = db.table("chat_sessions").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
             return response.data
-        except Exception as e:
+        except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
             logger.error(f"Error fetching sessions: {e}")
             return []
 
@@ -153,7 +156,7 @@ class ChatHistoryService:
                 "metrics": metrics,
             }
         except Exception as e:
-            logger.error(f"Error fetching messages: {e}", exc_info=True)
+            logger.exception("Error fetching messages")
             return {
                 "messages": [],
                 "has_more": False,
@@ -169,8 +172,8 @@ class ChatHistoryService:
         try:
             response = db.table("message_feedback").select("message_id, reaction, reason").in_("message_id", message_ids).execute()
             return {row["message_id"]: {"reaction": row["reaction"], "reason": row.get("reason")} for row in (response.data or [])}
-        except Exception as e:
-            logger.error(f"Error fetching feedback: {e}")
+        except (APIError, HTTPError, KeyError, TypeError, ValueError):
+            logger.exception("Error fetching feedback")
             return {}
 
     async def message_belongs_to_user(self, message_id: str, user_id: str) -> bool:
@@ -182,8 +185,8 @@ class ChatHistoryService:
             session_id = msg.data[0]["session_id"]
             sessions = await self.get_user_sessions(user_id)
             return any(s["id"] == session_id for s in sessions)
-        except Exception as e:
-            logger.error(f"Error checking message ownership: {e}")
+        except (APIError, HTTPError, KeyError, TypeError, ValueError):
+            logger.exception("Error checking message ownership")
             return False
 
     async def get_assistant_message_context(
@@ -206,8 +209,8 @@ class ChatHistoryService:
             if session.get("project_id"):
                 context["project_id"] = session["project_id"]
             return context
-        except Exception as e:
-            logger.error(f"Error checking assistant message ownership: {e}", exc_info=True)
+        except Exception:
+            logger.exception("Error checking assistant message ownership")
             raise
 
     async def upsert_feedback(self, message_id: str, user_id: str, reaction: str, reason: str | None = None) -> bool:
@@ -222,8 +225,8 @@ class ChatHistoryService:
             row = {"message_id": message_id, "reaction": reaction, "reason": reason, "updated_at": now}
             db.table("message_feedback").upsert(row, on_conflict="message_id").execute()
             return True
-        except Exception as e:
-            logger.error(f"Error upserting feedback: {e}", exc_info=True)
+        except Exception:
+            logger.exception("Error upserting feedback")
             return False
 
     async def add_message(
@@ -253,9 +256,9 @@ class ChatHistoryService:
             if response.data:
                 return response.data[0]
             return {}
-        except Exception as e:
-            logger.error(f"Error adding message: {e}", exc_info=True)
-            raise e
+        except Exception:
+            logger.exception("Error adding message")
+            raise
 
     async def get_or_create_recent_session(self, user_id: str) -> str:
         """
@@ -284,21 +287,19 @@ class ChatHistoryService:
             }).eq("id", session_id).execute()
 
             return response.data is not None
-        except Exception as e:
-            logger.error(f"Error updating session title: {e}", exc_info=True)
-            raise e
+        except Exception:
+            logger.exception("Error updating session title")
+            raise
 
     async def delete_session(self, session_id: str, user_id: str) -> bool:
         """Deletes a chat session."""
         try:
             # RLS policies should ideally handle user_id check, but we add explicit check here
             response = db.table("chat_sessions").delete().eq("id", session_id).eq("user_id", user_id).execute()
-            if not response.data:
-                # If no data returned, it implies session didn't exist or wasn't owned by user
-                return False
-            return True
+            # If no data returned, the session did not exist or was not owned by the user.
+            return bool(response.data)
         except Exception as e:
             logger.error(f"Error deleting session: {e}")
-            raise e
+            raise
 
 chat_history_service = ChatHistoryService()

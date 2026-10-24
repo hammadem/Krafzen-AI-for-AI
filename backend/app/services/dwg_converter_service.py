@@ -103,7 +103,7 @@ class DwgConverterService:
         # ODA args (typical):
         # ODAFileConverter <inputFolder> <outputFolder> <outputVersion> <outputType> <recurse> <audit> [<inputFilter>]
         # We keep it conservative: 2018 DWG, DWG output, no recursion, no audit.
-        converter_cmd, ld_extra = self._resolve_converter_cmd_and_ld()
+        converter_cmd, _ld_extra = self._resolve_converter_cmd_and_ld()
         if not converter_cmd:
             raise RuntimeError(
                 "DWG converter executable not found. Install ODA File Converter and set DWG_CONVERTER_CMD "
@@ -140,16 +140,16 @@ class DwgConverterService:
             raise RuntimeError("DWG conversion finished but no .dwg output was produced.")
 
         # Pick largest DWG (safest when multiple candidates appear).
-        dwg_path = sorted(candidates, key=lambda p: os.path.getsize(p), reverse=True)[0]
+        dwg_path = max(candidates, key=lambda p: os.path.getsize(p))
 
         # Normalize output name if desired.
         final_dwg_path = os.path.join(work_dir, dwg_name)
         try:
             shutil.copyfile(dwg_path, final_dwg_path)
             dwg_path = final_dwg_path
-        except Exception:
+        except OSError as exc:
             # Keep original path if copy fails.
-            pass
+            logger.warning("Unable to normalize DWG output filename: %s", exc)
 
         return DwgConvertResult(dwg_path=dwg_path, input_dxf_path=input_dxf_path, work_dir=work_dir)
 
@@ -168,8 +168,8 @@ class DwgConverterService:
             try:
                 if "0" in doc.layers:
                     doc.layers.get("0").dxf.color = 7
-            except Exception:
-                pass
+            except ezdxf.DXFError as exc:
+                logger.debug("Unable to normalize the default DXF layer: %s", exc)
 
             def _normalize_layout(layout) -> None:
                 for entity in layout:
@@ -184,7 +184,8 @@ class DwgConverterService:
                         # Prefer ByLayer for portability.
                         if entity.dxf.hasattr("color"):
                             entity.dxf.color = 256  # BYLAYER
-                    except Exception:
+                    except ezdxf.DXFError as exc:
+                        logger.debug("Skipping unsupported DXF entity during normalization: %s", exc)
                         continue
 
             _normalize_layout(doc.modelspace())
@@ -193,10 +194,9 @@ class DwgConverterService:
                     _normalize_layout(layout)
 
             doc.saveas(dxf_path)
-        except Exception as e:
+        except (AttributeError, OSError, TypeError, ValueError, ezdxf.DXFError) as e:
             # Non-fatal: fall back to original DXF if normalization fails.
             logger.warning("DXF visibility normalization skipped: %s", e)
 
 
 dwg_converter_service = DwgConverterService()
-

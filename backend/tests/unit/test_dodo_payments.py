@@ -5,8 +5,9 @@ import json
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from app.services import payment_service as payment_service_module
+
 from app.core.config import settings
+from app.services import payment_service as payment_service_module
 from app.services.payment_service import payment_service
 
 SECRET = "whsec_lXXZg5MJ4VZ03HMQ0SoXx4iUplSt88J/"

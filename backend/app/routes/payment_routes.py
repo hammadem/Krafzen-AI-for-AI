@@ -1,6 +1,9 @@
 import logging
 
+import stripe
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 from pydantic import BaseModel
 
 from app.core.config import settings
@@ -55,7 +58,7 @@ async def create_checkout_session(
     except ValueError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError) as e:
         logger.error(f"Failed to create checkout session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -100,7 +103,7 @@ async def create_embedded_checkout_session(
     except ValueError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError) as e:
         logger.error(f"Failed to create embedded checkout session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -118,7 +121,7 @@ async def create_legacy_checkout_session(request: Request, user_data: dict = Dep
         
         url = await payment_service.create_legacy_checkout_session(user_id, success_url, cancel_url)
         return {"url": url}
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError) as e:
         logger.error(f"Failed to create checkout session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -170,7 +173,7 @@ async def mock_subscribe(
         return {"ok": True, "message": "Subscription started (mock)"}
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError) as e:
         logger.error(f"Mock subscribe error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -188,7 +191,7 @@ async def mock_activate_plan(user_data: dict = Depends(require_auth)):
         return {"ok": True, "message": "Plan requests activated (mock)"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError) as e:
         logger.error(f"Mock activate plan error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -219,7 +222,7 @@ async def get_subscription_status(user_data: dict = Depends(require_auth)):
             },
             "balance": balance
         }
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError) as e:
         logger.error(f"Failed to get subscription status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -235,7 +238,7 @@ async def payment_webhook(request: Request, stripe_signature: str = Header(None)
         if "webhook-signature" in headers or "webhook-id" in headers:
             return await payment_service.handle_dodo_webhook(payload, headers)
         return await payment_service.handle_webhook(payload, stripe_signature)
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError, ValueError) as e:
         logger.error(f"Webhook error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -248,6 +251,6 @@ async def dodo_webhook(request: Request):
         payload = await request.body()
         headers = dict(request.headers)
         return await payment_service.handle_dodo_webhook(payload, headers)
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError, ValueError) as e:
         logger.error(f"Dodo Webhook error: {e}")
         raise HTTPException(status_code=400, detail=str(e))

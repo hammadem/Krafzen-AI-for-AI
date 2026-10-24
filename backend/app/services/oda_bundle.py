@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import logging
+import lzma
 import os
 import re
 import shutil
@@ -19,6 +20,7 @@ from pathlib import Path
 _bundle_lock = threading.Lock()
 
 import httpx
+from botocore.exceptions import BotoCoreError
 
 from app.core.config import settings
 
@@ -122,7 +124,16 @@ def _ensure_opengl_runtime_extracted(bdir: Path) -> bool:
                 logger.info("DWG: downloading OpenGL runtime %s", deb_name)
                 _download_deb(url, deb_path)
             _extract_deb(deb_path, ogl_root)
-        except Exception as e:
+        except (
+            EOFError,
+            httpx.HTTPError,
+            lzma.LZMAError,
+            OSError,
+            RuntimeError,
+            subprocess.SubprocessError,
+            tarfile.TarError,
+            ValueError,
+        ) as e:
             logger.warning("DWG: OpenGL deb %s failed: %s", deb_name, e)
             deb_path.unlink(missing_ok=True)
 
@@ -193,9 +204,7 @@ def _linux_prefer_xvfb() -> bool:
 
     if not sys.platform.startswith("linux"):
         return False
-    if os.environ.get("DWG_USE_OFFSCREEN", "").strip().lower() in ("1", "true", "yes"):
-        return False
-    return True
+    return os.environ.get("DWG_USE_OFFSCREEN", "").strip().lower() not in ("1", "true", "yes")
 
 
 def _oda_platforms_dir(root: Path) -> Path | None:
@@ -348,7 +357,16 @@ def _ensure_headless_qt_plugins_from_deb(bdir: Path, platforms: Path) -> bool:
             if _has_headless_qt_plugin(platforms):
                 shutil.rmtree(extract_root, ignore_errors=True)
                 return True
-        except Exception as e:
+        except (
+            EOFError,
+            httpx.HTTPError,
+            lzma.LZMAError,
+            OSError,
+            RuntimeError,
+            subprocess.SubprocessError,
+            tarfile.TarError,
+            ValueError,
+        ) as e:
             logger.warning("DWG: Qt plugins deb %s failed: %s", deb_name, e)
             deb_path.unlink(missing_ok=True)
     return _has_headless_qt_plugin(platforms)
@@ -374,7 +392,16 @@ def _ensure_xvfb_bundle(bdir: Path) -> str | None:
                 logger.info("DWG: downloading %s for headless Xvfb", deb_name)
                 _download_deb(url, deb_path)
             _extract_deb(deb_path, xvfb_root)
-        except Exception as e:
+        except (
+            EOFError,
+            httpx.HTTPError,
+            lzma.LZMAError,
+            OSError,
+            RuntimeError,
+            subprocess.SubprocessError,
+            tarfile.TarError,
+            ValueError,
+        ) as e:
             logger.warning("DWG: xvfb deb %s failed: %s", deb_name, e)
             deb_path.unlink(missing_ok=True)
 
@@ -487,7 +514,7 @@ def _find_oda_binary(extract_root: Path) -> Path | None:
 
     if elf_candidates:
         # Prefer nested versioned binary over any stray matches
-        return sorted(elf_candidates, key=lambda p: len(p.parts), reverse=True)[0]
+        return max(elf_candidates, key=lambda p: len(p.parts))
     return None
 
 
@@ -535,9 +562,9 @@ def _extract_deb_ar_tar(deb_path: Path, dest: Path) -> bool:
             return False
         data_tar = data_tars[0]
         name = data_tar.name
-        if name.endswith(".xz") or name.endswith(".tar.xz"):
+        if name.endswith((".xz", ".tar.xz")):
             flag = "-xJf"
-        elif name.endswith(".gz") or name.endswith(".tar.gz"):
+        elif name.endswith((".gz", ".tar.gz")):
             flag = "-xzf"
         else:
             flag = "-xf"
@@ -689,7 +716,7 @@ def _download_oda_deb(dest: Path, url: str) -> None:
             )
             _download_deb_from_r2(dest, r2)
             return
-        except Exception as exc:
+        except (BotoCoreError, KeyError, OSError, RuntimeError, ValueError) as exc:
             logger.warning("R2 API download failed, trying presigned URL if set: %s", exc)
 
     if not url:
@@ -710,18 +737,20 @@ def _download_deb(url: str, dest: Path) -> None:
     """Download .deb with minimal headers (compatible with S3/R2 presigned GET)."""
     headers = {"Accept": "*/*"}
     timeout = httpx.Timeout(600.0, connect=60.0)
-    with httpx.Client(timeout=timeout, follow_redirects=True, http2=False) as client:
-        with client.stream("GET", url, headers=headers) as resp:
-            if resp.status_code >= 400:
-                body = resp.read().decode("utf-8", errors="replace")
-                raise httpx.HTTPStatusError(
-                    _hint_for_download_failure(resp.status_code, body, url),
-                    request=resp.request,
-                    response=resp,
-                )
-            with dest.open("wb") as out:
-                for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
-                    out.write(chunk)
+    with (
+        httpx.Client(timeout=timeout, follow_redirects=True, http2=False) as client,
+        client.stream("GET", url, headers=headers) as resp,
+    ):
+        if resp.status_code >= 400:
+            body = resp.read().decode("utf-8", errors="replace")
+            raise httpx.HTTPStatusError(
+                _hint_for_download_failure(resp.status_code, body, url),
+                request=resp.request,
+                response=resp,
+            )
+        with dest.open("wb") as out:
+            for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
+                out.write(chunk)
 
 
 def _ensure_oda_bundle_locked(force: bool = False) -> bool:
@@ -825,11 +854,11 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
             e.response.text if e.response else "",
             url,
         )
-        logger.error("Failed to ensure ODA bundle: %s", _last_oda_error, exc_info=True)
+        logger.exception("Failed to ensure ODA bundle: %s", _last_oda_error)
         return False if force else bool(_read_bundle(root)[0])
     except Exception as e:
         _last_oda_error = str(e)
-        logger.error("Failed to ensure ODA bundle: %s", e, exc_info=True)
+        logger.exception("Failed to ensure ODA bundle")
         return False if force else bool(_read_bundle(root)[0])
     finally:
         deb_local.unlink(missing_ok=True)

@@ -10,6 +10,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.supabase_client import db
 from app.schemas.export_contracts import ExportStatus
@@ -55,7 +57,7 @@ async def get_stuck_jobs(threshold_minutes: int = STUCK_JOB_THRESHOLD_MINUTES) -
                 threshold_minutes=threshold_minutes,
             )
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_stuck_jobs] Query failed", error=str(e), exc_info=True)
 
     return stuck
@@ -94,7 +96,7 @@ async def get_queue_health() -> dict[str, Any]:
             "assessed_at": datetime.now(UTC).isoformat(),
         }
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_queue_health] Failed", error=str(e), exc_info=True)
         return {"error": str(e)}
 
@@ -103,7 +105,7 @@ def _minutes_since(iso_timestamp: str | None) -> float | None:
     if not iso_timestamp:
         return None
     try:
-        dt = datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(iso_timestamp)
         return round((datetime.now(UTC) - dt).total_seconds() / 60, 1)
-    except Exception:
+    except (TypeError, ValueError, OverflowError):
         return None

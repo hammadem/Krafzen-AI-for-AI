@@ -21,8 +21,8 @@ def decode_supabase_token(token: str):
             options={"verify_aud": False, "verify_signature": False}
         )
         return payload
-    except Exception as e:
-        logger.error(f"JWT decode error: {e}", exc_info=True)
+    except (jwt.PyJWTError, TypeError, ValueError) as e:
+        logger.exception("JWT decode error")
         # Hint when signature verification fails: secret must match the Supabase project that issued the token
         if "Signature verification failed" in str(e) or "signature" in str(e).lower():
             try:
@@ -34,7 +34,7 @@ def decode_supabase_token(token: str):
                     "as the frontend's NEXT_PUBLIC_SUPABASE_URL). Token iss=%s",
                     iss,
                 )
-            except Exception:
+            except (jwt.PyJWTError, TypeError, ValueError):
                 logger.warning(
                     "JWT signature verification failed. Set SUPABASE_JWT_SECRET on this service "
                     "to the JWT Secret from Supabase Dashboard → Project Settings → API.",

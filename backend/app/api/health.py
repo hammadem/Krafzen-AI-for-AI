@@ -3,10 +3,12 @@ Health check endpoints
 """
 
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.core.config import settings
 from app.db.supabase_client import db
@@ -21,14 +23,14 @@ async def health_check():
         result = db.table("projects").select("id", count="exact").execute()
         return {
             "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "service": "KRAFZEN AI Backend",
             "db_project_count": result.count,
         }
-    except Exception:
+    except (APIError, HTTPError):
         return {
             "status": "degraded",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "service": "KRAFZEN AI Backend",
             "db": "unreachable",
         }
@@ -46,7 +48,7 @@ async def detailed_health_check():
     
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "service": "KRAFZEN AI Backend",
         "version": "0.1.0",
         "environment": settings.ENVIRONMENT,

@@ -289,8 +289,8 @@ class CADLLMService:
         try:
              # reuse the existing client mechanisms
              return await self._generate_text_response(prompt)
-        except Exception as e:
-             logger.error(f"CADLLM prompt enhancement failed: {e}")
+        except Exception:
+             logger.exception("CADLLM prompt enhancement failed")
              # Fallback to original text if enhancement fails
              return text
 
@@ -313,7 +313,6 @@ try:
     _ollama_configured = (os.getenv("OLLAMA_BASE_URL") or getattr(settings, "OLLAMA_BASE_URL", None))
     
     cadllm_service = CADLLMService() if (HF_AVAILABLE and (_hf_configured or _ollama_configured)) else None
-except Exception as e:
+except Exception as e:  # noqa: BLE001 - keep optional CADLLM initialization from breaking app startup.
     logger.warning(f"Failed to initialize CADLLM service: {e}")
     cadllm_service = None
-

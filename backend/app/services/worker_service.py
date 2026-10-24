@@ -14,6 +14,8 @@ import asyncio
 from typing import Any
 
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.supabase_client import db
 from app.schemas.export_contracts import ExportStatus, PipelineStage
@@ -99,7 +101,7 @@ async def process_export_job(job: dict[str, Any], system_user: dict[str, Any]) -
         await emit_export_event("export.completed", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export completed")
         await emit_notification(job_id, project_id, "export_completed", "Your export is ready.")
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - any job failure must be persisted as FAILED.
         logger.error("[worker] Unexpected error processing job", job_id=job_id, error=str(e), exc_info=True)
         await advance_export_status(
             job_id, ExportStatus.FAILED, system_user,
@@ -156,7 +158,7 @@ async def emit_notification(job_id: str, project_id: str, event_type: str, messa
             job_id=job_id,
             project_id=project_id,
         )
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
         logger.error("[worker] emit_notification failed", error=str(e), exc_info=True)
 
 
@@ -187,7 +189,7 @@ async def _poll_export_jobs() -> None:
                     continue
                 system_user = {"user_id": user_id}
                 asyncio.create_task(process_export_job(job, system_user))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - keep the background poller alive after unexpected failures.
             logger.error("[worker] Poller error", error=str(e), exc_info=True)
 
         await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
@@ -206,6 +208,6 @@ async def _resolve_project_owner(project_id: str | None) -> str | None:
                 .execute()
         )
         return (response.data or {}).get("user_id") if response else None
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
         logger.error("[worker] _resolve_project_owner failed", project_id=project_id, error=str(e), exc_info=True)
         return None

@@ -8,6 +8,8 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
 from app.db.queries.job_queries import get_jobs
@@ -190,7 +192,7 @@ async def get_activity_feed(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error(f"Error occurred while fetching activity feed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -277,7 +279,7 @@ async def _get_actor_names(
                         ) if part
                     )
                 return actor_id, full_name or (auth_user.email if auth_user else None)
-            except Exception as e:
+            except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
                 logger.warning(
                     "Could not load activity actor name",
                     actor_user_id=actor_id,
@@ -396,7 +398,7 @@ async def get_workspace_summary(user=Depends(require_auth)):
             requires_attention=attention,
         )
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error(f"Error occurred while fetching workspace summary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -498,7 +500,7 @@ async def get_notifications(
         notifications = notifications[:limit]
         return NotificationsResponse(notifications=notifications, total=len(notifications))
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -565,7 +567,7 @@ async def get_workspace_members(user=Depends(require_auth)):
         )
         return MembersResponse(members=[member], total=1)
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

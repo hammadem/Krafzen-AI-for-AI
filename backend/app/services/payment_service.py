@@ -1,4 +1,5 @@
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -6,9 +7,10 @@ import logging
 from typing import Any
 
 import stripe
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.core.config import settings
-from app.db.supabase_client import db
 from app.services.subscription_service import PLAN_CONFIG, subscription_service
 
 logger = logging.getLogger(__name__)
@@ -40,7 +42,7 @@ class PaymentService:
             cancel_url: URL to redirect on cancel
         """
         if not settings.STRIPE_SECRET_KEY:
-            raise Exception("Stripe configuration missing (Key)")
+            raise RuntimeError("Stripe configuration missing (Key)")
 
         try:
             plan_config = PLAN_CONFIG.get(plan_name.lower(), {}).get(billing_cycle.lower(), {})
@@ -100,9 +102,9 @@ class PaymentService:
                 }
             )
             return checkout_session.url
-        except Exception as e:
-            logger.error(f"Stripe Checkout Error: {e}", exc_info=True)
-            raise e
+        except Exception:
+            logger.exception("Stripe Checkout Error")
+            raise
 
     async def create_embedded_checkout_session(
         self,
@@ -116,7 +118,7 @@ class PaymentService:
         Returns client_secret for use with Stripe.js embedded checkout.
         """
         if not settings.STRIPE_SECRET_KEY:
-            raise Exception("Stripe configuration missing (Key)")
+            raise RuntimeError("Stripe configuration missing (Key)")
 
         try:
             plan_config = PLAN_CONFIG.get(plan_name.lower(), {}).get(billing_cycle.lower(), {})
@@ -174,16 +176,16 @@ class PaymentService:
                 },
             )
             return checkout_session.client_secret
-        except Exception as e:
-            logger.error(f"Stripe Embedded Checkout Error: {e}", exc_info=True)
-            raise e
+        except Exception:
+            logger.exception("Stripe Embedded Checkout Error")
+            raise
 
     async def create_legacy_checkout_session(self, user_id: str, success_url: str, cancel_url: str):
         """
         Creates a Stripe Checkout Session for purchasing minutes (legacy).
         """
         if not settings.STRIPE_SECRET_KEY or not settings.STRIPE_PRICE_ID_100_MINS:
-            raise Exception("Stripe configuration missing (Key or Price ID)")
+            raise RuntimeError("Stripe configuration missing (Key or Price ID)")
 
         try:
             checkout_session = stripe.checkout.Session.create(
@@ -203,16 +205,16 @@ class PaymentService:
                 }
             )
             return checkout_session.url
-        except Exception as e:
-            logger.error(f"Stripe Checkout Error: {e}", exc_info=True)
-            raise e
+        except Exception:
+            logger.exception("Stripe Checkout Error")
+            raise
 
     async def handle_webhook(self, payload: bytes, sig_header: str):
         """
         Handles Stripe Webhooks to fulfill orders.
         """
         if not settings.STRIPE_WEBHOOK_SECRET:
-            raise Exception("Stripe Webhook Secret not configured")
+            raise RuntimeError("Stripe Webhook Secret not configured")
 
         try:
             event = stripe.Webhook.construct_event(
@@ -220,10 +222,10 @@ class PaymentService:
             )
         except ValueError:
             # Invalid payload
-            raise Exception("Invalid payload")
+            raise ValueError("Invalid payload")
         except stripe.error.SignatureVerificationError:
             # Invalid signature
-            raise Exception("Invalid signature")
+            raise ValueError("Invalid signature")
 
         # Handle the event
         event_type = event['type']
@@ -312,7 +314,7 @@ class PaymentService:
                         metadata["billing_cycle"] = billing_cycle
                     else:
                         logger.error(f"Could not infer plan for amount {amount}")
-            except Exception as e:
+            except (AttributeError, KeyError, TypeError, ValueError) as e:
                 logger.error(f"Error inferring plan from session: {e}")
 
         if event_type == "subscription":
@@ -402,7 +404,7 @@ class PaymentService:
                     logger.info(f"Payment succeeded for user {user_id}, resetting plan requests")
                     # Reset plan requests for new billing cycle
                     await subscription_service.reset_plan_requests(user_id)
-            except Exception as e:
+            except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError, ValueError) as e:
                 logger.error(f"Error handling payment success: {e}")
 
     async def _handle_payment_failed(self, invoice):
@@ -428,7 +430,7 @@ class PaymentService:
                         "subscription_status": "past_due",
                         "updated_at": datetime.now().isoformat()
                     }).eq("user_id", user_id).execute()
-            except Exception as e:
+            except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError, ValueError) as e:
                 logger.error(f"Error handling payment failure: {e}")
 
     def verify_dodo_signature(self, payload: bytes, headers: dict[str, str]) -> bool:
@@ -461,7 +463,7 @@ class PaymentService:
 
             passed_sigs = webhook_signature.split(" ")
             return any(hmac.compare_digest(sig, computed_sig) for sig in passed_sigs)
-        except Exception as e:
+        except (binascii.Error, TypeError, ValueError) as e:
             logger.error(f"Error verifying Dodo webhook signature: {e}")
             return False
 
@@ -472,12 +474,12 @@ class PaymentService:
         Handles incoming Dodo Payments webhooks for payment and subscription events.
         """
         if not self.verify_dodo_signature(payload, headers):
-            raise Exception("Invalid Dodo webhook signature")
+            raise ValueError("Invalid Dodo webhook signature")
 
         try:
             event = json.loads(payload.decode("utf-8"))
-        except Exception as e:
-            raise Exception(f"Invalid JSON payload: {e}")
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            raise ValueError(f"Invalid JSON payload: {e}") from e
 
         event_type = event.get("type")
         event_data = event.get("data", {})

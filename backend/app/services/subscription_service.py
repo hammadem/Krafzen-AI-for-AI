@@ -123,7 +123,7 @@ class SubscriptionService:
 
         except Exception as e:
             logger.error(f"Error fetching subscription for {user_id}: {e}")
-            raise e
+            raise
 
     async def _check_trial_expiry(self, subscription: dict[str, Any]) -> None:
         """
@@ -132,7 +132,7 @@ class SubscriptionService:
         if subscription.get("subscription_status") == "trial":
             trial_end = subscription.get("trial_end_date")
             if trial_end:
-                trial_end_dt = datetime.fromisoformat(trial_end.replace('Z', '+00:00'))
+                trial_end_dt = datetime.fromisoformat(trial_end)
                 if datetime.now(trial_end_dt.tzinfo) > trial_end_dt:
                     new_status = "active" if subscription.get("stripe_subscription_id") else "inactive"
                     db.table(self.table).update({
@@ -146,8 +146,8 @@ class SubscriptionService:
         user_id: str,
         plan_name: str,
         billing_cycle: str,
-        stripe_customer_id: str = None,
-        stripe_subscription_id: str = None,
+        stripe_customer_id: str | None = None,
+        stripe_subscription_id: str | None = None,
         payment_completed: bool = False
     ) -> dict[str, Any]:
         """
@@ -197,7 +197,7 @@ class SubscriptionService:
 
         except Exception as e:
             logger.error(f"Error starting subscription for {user_id}: {e}")
-            raise e
+            raise
 
     async def activate_subscription(self, user_id: str) -> dict[str, Any]:
         """Set subscription to active (e.g. Stripe webhook)."""
@@ -214,7 +214,7 @@ class SubscriptionService:
 
         except Exception as e:
             logger.error(f"Error activating subscription for {user_id}: {e}")
-            raise e
+            raise
 
     async def check_request_balance(self, user_id: str) -> dict[str, Any]:
         """
@@ -297,7 +297,7 @@ class SubscriptionService:
             raise
         except Exception as e:
             logger.error(f"Error deducting request for {user_id}: {e}")
-            raise e
+            raise
 
     async def activate_plan_requests(self, user_id: str) -> dict[str, Any]:
         """Grant package requests (mock dev helper)."""
@@ -318,7 +318,7 @@ class SubscriptionService:
             return response.data[0] if response.data else update_data
         except Exception as e:
             logger.error(f"Error activating plan requests for {user_id}: {e}")
-            raise e
+            raise
 
     async def reset_plan_requests(self, user_id: str) -> dict[str, Any]:
         """Reset plan requests on successful recurring invoice payment."""
@@ -353,7 +353,7 @@ class SubscriptionService:
 
         except Exception as e:
             logger.error(f"Error resetting plan requests for {user_id}: {e}")
-            raise e
+            raise
 
     async def check_balance(self, user_id: str) -> float:
         """Returns the remaining minutes for a user (legacy)."""
@@ -376,7 +376,7 @@ class SubscriptionService:
             return new_balance
         except Exception as e:
             logger.error(f"Error deducting minutes for {user_id}: {e}")
-            raise e
+            raise
 
     async def add_minutes(self, user_id: str, amount: float) -> float:
         """Add minutes to user balance (legacy, e.g. after payment)."""
@@ -397,7 +397,7 @@ class SubscriptionService:
             return new_balance
         except Exception as e:
             logger.error(f"Error adding minutes for {user_id}: {e}")
-            raise e
+            raise
 
 
 subscription_service = SubscriptionService()

@@ -4,6 +4,9 @@ from typing import Any
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
+from storage3.utils import StorageException
 
 from app.db.supabase_client import db
 from app.services.activity_service import record_audit_event
@@ -45,7 +48,7 @@ async def _get_owned_job_project_id(job_id: str, user_id: str) -> str | None:
             return None
         return str(project_id)
 
-    except Exception as e:  
+    except (APIError, HTTPError, RuntimeError, KeyError, TypeError) as e:
         logger.error("[_user_owns_job] Query error", job_id=job_id, error=str(e), exc_info=True)
         return None
 
@@ -123,7 +126,7 @@ async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[s
     
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, RuntimeError, KeyError, TypeError) as e:
         logger.error("[create_file] Unexpected error", error=str(e), exc_info=True)
         return {"error": "Unexpected server error"}
 
@@ -159,7 +162,7 @@ async def get_files(job_id: str, user: dict[str, Any]) -> list[dict[str, Any]]:
         logger.debug(f"[get_files] Retrieved {len(files)} files", job_id=job_id)
         return files
 
-    except Exception as e:
+    except (APIError, HTTPError, RuntimeError) as e:
         logger.error("[get_files] Error", job_id=job_id, error=str(e), exc_info=True)
         return []
 
@@ -198,7 +201,7 @@ async def get_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
         return file_data
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, RuntimeError, KeyError, TypeError) as e:
         logger.error("[get_file] Error", file_id=file_id, error=str(e), exc_info=True)
         return None
 
@@ -265,7 +268,7 @@ async def update_file(file_id: str, update_data: dict[str, Any], user: dict[str,
     
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, RuntimeError, KeyError, TypeError) as e:
         logger.error("[update_file] Error", file_id=file_id, error=str(e), exc_info=True)
         return {"error": "Unexpected server error"}
 
@@ -291,7 +294,7 @@ async def delete_file(file_id: str, user: dict[str, Any]) -> bool:
         try:
             await run_in_threadpool(
                 lambda: db.storage.from_(file["bucket"]).remove([file["path"]]))
-        except Exception as e:
+        except (StorageException, HTTPError, RuntimeError) as e:
             logger.error("[delete_file] Storage delete failed", file_id=file_id, error=str(e))
             raise HTTPException(status_code=500, detail={"error": "Failed to delete file from storage"})
 
@@ -311,7 +314,7 @@ async def delete_file(file_id: str, user: dict[str, Any]) -> bool:
     
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, RuntimeError) as e:
         logger.error("[delete_file] Error", file_id=file_id, error=str(e), exc_info=True)
         return False
 
@@ -542,7 +545,7 @@ async def get_signed_url(file_id: str, user: dict[str, Any]) -> str | None:
             lambda: db.storage.from_(file["bucket"]).create_signed_url(file["path"], 3600)
         )
         return res.get("signedURL") or res.get("signed_url")
-    except Exception as e:
+    except (StorageException, HTTPError, RuntimeError) as e:
         logger.error("[get_signed_url] Error", file_id=file_id, error=str(e), exc_info=True)
         return None
     
@@ -586,6 +589,8 @@ async def create_artifact_file(file_data: dict[str, Any], user_id: str) -> dict[
             return artifact
 
         return None
-    except Exception as e:
+    except HTTPException:
+        raise
+    except (APIError, HTTPError, RuntimeError) as e:
         logger.error("[create_artifact_file] Error", error=str(e), exc_info=True)
         return None

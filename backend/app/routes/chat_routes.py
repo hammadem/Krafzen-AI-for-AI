@@ -2,11 +2,14 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 from typing import Any, Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
 from fastapi.responses import FileResponse, StreamingResponse
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 from pydantic import BaseModel
 
 from app.compliance.extraction_fallback import merge_heuristic_layout
@@ -51,11 +54,7 @@ async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_au
     """
     try:
         # Validate auth
-        user_id = user_data["user_id"] 
-        generation_id: str | None = None
-        generation_started = False
-        generation_completed = False
-        generation_stage = "session_setup"
+        user_data["user_id"]
         
         from app.services.local_dxf_service import local_dxf_service
         logger.info("Requesting Local DXF Conversion (Potrace)...")
@@ -72,7 +71,7 @@ async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_au
         )
 
     except Exception as e:
-        logger.error(f"DXF Generation Error: {e}", exc_info=True)
+        logger.exception("DXF Generation Error")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -80,17 +79,21 @@ def _safe_unlink(path: str) -> None:
     try:
         if path and os.path.exists(path):
             os.unlink(path)
-    except Exception:
-        pass
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        logger.warning("Unable to remove temporary file %s: %s", path, exc)
 
 
 def _safe_rmtree(path: str) -> None:
+    if not path or not os.path.exists(path):
+        return
     try:
-        if path and os.path.exists(path):
-            import shutil
-            shutil.rmtree(path, ignore_errors=True)
-    except Exception:
-        pass
+        shutil.rmtree(path)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        logger.warning("Unable to remove temporary directory %s: %s", path, exc)
 
 
 @router.post("/chat/design-file")
@@ -152,7 +155,7 @@ async def generate_design_file(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Design file generation error: {e}", exc_info=True)
+        logger.exception("Design file generation error")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -212,8 +215,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
                 user_id=user_id,
                 input_text=request.message,
             ) or session_project_id
-        except Exception as bridge_err:
-            logger.error(f"[generate] project bridge failed: {bridge_err}", exc_info=True)
+        except Exception:
+            logger.exception("[generate] project bridge failed")
 
         generation_id = str(uuid4())
         generation_stage = "generation_started_audit"
@@ -292,8 +295,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             async def extract_layout_safe() -> dict:
                 try:
                     return await gemini_service.extract_layout_metrics_json(request.message, cad_dsl)
-                except Exception as ex:
-                    logger.error(f"Layout extraction failed: {ex}", exc_info=True)
+                except Exception:
+                    logger.exception("Layout extraction failed")
                     return {}
 
             generation_stage = "compliance_review"
@@ -313,7 +316,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             try:
                 merged_raw = merge_heuristic_layout(layout_raw, request.message, cad_dsl)
                 layout = parse_layout_from_llm_dict(merged_raw)
-            except Exception as parse_err:
+            except (KeyError, TypeError, ValueError) as parse_err:
                 logger.warning(f"Layout JSON did not match schema, using empty extract: {parse_err}")
                 layout = LayoutExtract()
 
@@ -388,9 +391,9 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
                 input_text=request.message,
                 image_url=image_url,
             ) or session_project_id
-        except Exception as bridge_err:
+        except Exception:
             # Non-fatal: generation already succeeded, don't fail the request over the bridge.
-            logger.error(f"[generate] project bridge failed: {bridge_err}", exc_info=True)
+            logger.exception("[generate] project bridge failed")
 
         generation_stage = "audit_completion"
         generation_completed = True
@@ -441,9 +444,9 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
                 generation_stage, "HTTPException"
             )
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
         # Log error and raise without charging the user
-        logger.error(f"Chat generation error for user {user_id}: {e!s}, no charge applied", exc_info=True)
+        logger.exception("Chat generation error for user %s; no charge applied", user_id)
         if generation_started and generation_id and session_id and not generation_completed:
             await _record_generation_failure(
                 generation_id, session_id, user_id, session_project_id,
@@ -474,11 +477,10 @@ async def _record_generation_failure(
             },
         )
     except Exception as audit_error:
-        logger.error(
+        logger.exception(
             "Generation failed and its audit event could not be recorded",
             generation_id=generation_id,
             error_type=type(audit_error).__name__,
-            exc_info=True,
         )
         raise HTTPException(
             status_code=500,
@@ -531,7 +533,7 @@ async def generate_chat_response_stream(request: ChatRequest, user_data: dict = 
 
             yield f"data: {json.dumps({'type': 'complete', 'session_id': session_id, 'message_id': message_id, 'image_url': image_url, 'validated_response': cad_dsl})}\n\n"
         except Exception as err:
-            logger.error(f"Streaming error: {err}", exc_info=True)
+            logger.exception("Streaming error")
             yield f"data: {json.dumps({'type': 'error', 'error': str(err)})}\n\n"
 
     return StreamingResponse(sse_generator(), media_type="text/event-stream")
@@ -550,8 +552,8 @@ async def create_chat_session(request: CreateSessionRequest, user_data: dict = D
         if new_session:
             return new_session
         return {"id": session_id, "title": request.title or "New Chat", "created_at": None, "updated_at": None}
-    except Exception as e:
-        logger.error(f"Error creating session: {e}", exc_info=True)
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
+        logger.exception("Error creating session")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/chat/history")
@@ -620,8 +622,8 @@ async def update_session_title(session_id: str, request: UpdateSessionTitleReque
         return {"status": "success", "id": session_id, "title": request.title}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating session title: {e}")
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError):
+        logger.exception("Error updating session title")
         raise HTTPException(status_code=500, detail="Failed to update session title")
 
 @router.post("/chat/message/{message_id}/feedback")
@@ -683,6 +685,6 @@ async def delete_chat_session(session_id: str, user_data: dict = Depends(require
         return {"status": "success", "id": session_id}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Delete error: {e}")
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError):
+        logger.exception("Delete error")
         raise HTTPException(status_code=500, detail="Failed to delete session")

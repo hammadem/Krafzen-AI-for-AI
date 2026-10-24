@@ -5,6 +5,8 @@ from typing import Any
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.supabase_client import db
 from app.schemas.export_contracts import ExportStatus
@@ -118,7 +120,7 @@ async def create_export(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[create_export] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
@@ -146,7 +148,7 @@ async def get_export(export_id: str, user_id: str) -> dict[str, Any] | None:
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_export] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
@@ -172,7 +174,7 @@ async def get_project_exports(project_id: str, user_id: str) -> list[dict[str, A
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_project_exports] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
@@ -206,7 +208,7 @@ async def update_export_status(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[update_export_status] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
@@ -240,6 +242,6 @@ async def get_export_artifact(export_id: str, user_id: str) -> dict[str, Any] | 
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_export_artifact] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})

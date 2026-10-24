@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import logging
 import os
@@ -56,9 +57,9 @@ class LocalDxfService:
         # 1. Get Image Data
         try:
             image = await self._get_image_data(image_url)
-        except Exception as e:
+        except (httpx.HTTPError, OSError, TypeError, ValueError, OverflowError) as e:
             logger.error(f"Failed to load image data: {e}")
-            raise Exception(f"Failed to load image for local conversion: {e}")
+            raise RuntimeError(f"Failed to load image for local conversion: {e}") from e
         
         # 2. Convert to BMP (1-bit monochrome) for Potrace
         bmp_path = self._save_as_bmp(image)
@@ -193,7 +194,14 @@ class LocalDxfService:
             
             try:
                 # Pass the updated env with local bin path
-                result = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+                result = await asyncio.to_thread(
+                    subprocess.run,
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    env=env,
+                )
             except FileNotFoundError:
                 install_instructions = (
                     "Windows: Download from http://potrace.sourceforge.net/ or use Chocolatey: choco install potrace"
@@ -201,14 +209,14 @@ class LocalDxfService:
                     else "macOS: brew install potrace | Linux: apt-get install potrace or yum install potrace"
                 )
                 logger.error(f"Potrace executable not found. Please install potrace. {install_instructions}")
-                raise Exception(f"Potrace executable not found on the system. Local DXF generation requires 'potrace' to be installed. {install_instructions}")
+                raise FileNotFoundError(f"Potrace executable not found on the system. Local DXF generation requires 'potrace' to be installed. {install_instructions}")
 
             if result.returncode != 0:
                 logger.error(f"Potrace execution failed: {result.stderr}")
-                raise Exception(f"Potrace failed with exit code {result.returncode}: {result.stderr}")
+                raise subprocess.CalledProcessError(result.returncode, cmd, result.stderr)
                 
             if not os.path.exists(dxf_path):
-                 raise Exception("Potrace finished successfully but no DXF output file was created.")
+                 raise FileNotFoundError("Potrace finished successfully but no DXF output file was created.")
             
             file_size = os.path.getsize(dxf_path)
             logger.info(f"Potrace conversion successful. Created {dxf_path} ({file_size} bytes).")
@@ -220,18 +228,18 @@ class LocalDxfService:
             if os.path.exists(bmp_path):
                 try:
                     os.unlink(bmp_path)
-                except:
-                    pass
+                except OSError as exc:
+                    logger.warning("Failed to remove temporary BMP %s: %s", bmp_path, exc)
 
     async def _get_image_data(self, image_url: str) -> Image.Image:
         if image_url.startswith("data:"):
             # Format: "data:image/png;base64,..."
             try:
-                header, encoded = image_url.split(",", 1)
+                _header, encoded = image_url.split(",", 1)
                 file_bytes = base64.b64decode(encoded)
                 return Image.open(BytesIO(file_bytes))
             except Exception as e:
-                raise Exception(f"Invalid Base64 image data: {e}")
+                raise ValueError(f"Invalid Base64 image data: {e}") from e
         else:
             # Download from converted URL
             async with httpx.AsyncClient() as client:
@@ -271,8 +279,8 @@ class LocalDxfService:
             long_side = max(w, h)
             if long_side > 0 and long_side < _TRACE_LONG_SIDE_MIN_PX:
                 scale = _TRACE_LONG_SIDE_MIN_PX / float(long_side)
-                nw = min(_TRACE_LONG_SIDE_MAX_PX, max(1, int(round(w * scale))))
-                nh = min(_TRACE_LONG_SIDE_MAX_PX, max(1, int(round(h * scale))))
+                nw = min(_TRACE_LONG_SIDE_MAX_PX, max(1, round(w * scale)))
+                nh = min(_TRACE_LONG_SIDE_MAX_PX, max(1, round(h * scale)))
                 if nw != w or nh != h:
                     logger.info(
                         "Scaling raster for Potrace: %sx%s → %sx%s",
@@ -293,14 +301,14 @@ class LocalDxfService:
 
             bw.save(path, format="BMP")
             return path
-        except Exception as e:
+        except (OSError, TypeError, ValueError, OverflowError) as e:
             logger.error(f"Failed to convert image to BMP: {e}")
             # Try saving raw if conversion fails, though likely to fail in potrace if not BMP
             try: 
                 image.save(path, format="BMP")
                 return path
-            except:
-                raise Exception(f"Could not save intermediate BMP file: {e}")
+            except (OSError, ValueError) as save_error:
+                raise RuntimeError(f"Could not save intermediate BMP file: {e}") from save_error
 
 # Global instance
 local_dxf_service = LocalDxfService()

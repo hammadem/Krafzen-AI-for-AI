@@ -85,9 +85,8 @@ async def test_file_activity_route_checks_file_access_before_reading_events():
     ), patch(
         "app.routes.activity_routes.get_file_activity",
         new=AsyncMock(),
-    ) as read_activity:
-        with pytest.raises(HTTPException) as error:
-            await list_file_activity(FILE_ID, 50, USER)
+    ) as read_activity, pytest.raises(HTTPException) as error:
+        await list_file_activity(FILE_ID, 50, USER)
 
     assert error.value.status_code == 403
     read_activity.assert_not_awaited()

@@ -1,7 +1,9 @@
 import logging
 
-from app.core.config import settings
+from httpx import HTTPError
 from supabase import Client, create_client
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +20,7 @@ class SupabaseClient:
                         settings.SUPABASE_SERVICE_ROLE_KEY
                     )
                     logger.info("✅ Supabase service client initialized")
-                except Exception as e:
+                except (HTTPError, OSError, TypeError, ValueError) as e:
                     logger.warning(f"⚠️ Supabase init error: {e}")
                     self._client = None
             else:

@@ -68,8 +68,8 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
         # Process request
         try:
             response = await call_next(request)
-        except Exception as e:
-            logger.error(f"Middleware Exception: {e}")
+        except Exception:
+            logger.exception("Middleware exception")
             from starlette.responses import JSONResponse
             response = JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
@@ -143,7 +143,7 @@ except Exception as e:
     sys.stdout.write(error_msg + "\n")
     sys.stdout.flush()
     traceback.print_exc()
-    logger.error(f"Failed to import DXF generator module: {e}", exc_info=True)
+    logger.exception("Failed to import DXF generator module")
     dxf_generator_available = False
     dxf_generator = None
 
@@ -161,7 +161,7 @@ if dxf_generator_available and dxf_generator:
         sys.stdout.write(error_msg + "\n")
         sys.stdout.flush()
         traceback.print_exc()
-        logger.error(f"Failed to register DXF generator router: {e}", exc_info=True)
+        logger.exception("Failed to register DXF generator router")
 else:
     reason = "DXF generator module import failed" if not dxf_generator_available else "DXF generator is None"
     sys.stdout.write(f"⚠️ DXF generator router not available - {reason}\n")
@@ -219,8 +219,8 @@ async def rebuild_openapi_schema():
                     "DWG: converter not configured after bootstrap "
                     "(check R2 credentials or DWG_ODA_DEB_URL)"
                 )
-        except Exception as oda_err:
-            logger.error("DWG: ODA bundle bootstrap failed: %s", oda_err, exc_info=True)
+        except Exception:
+            logger.exception("DWG: ODA bundle bootstrap failed")
 
     threading.Thread(target=_bootstrap_oda_bundle, daemon=True, name="oda-bundle-bootstrap").start()
 

@@ -55,6 +55,6 @@ def init_sentry(dsn: str | None):
             )
             logger = logging.getLogger(__name__)
             logger.info("Sentry initialized successfully")
-        except Exception as e:
+        except (ImportError, OSError, RuntimeError, ValueError) as e:
             logger = logging.getLogger(__name__)
             logger.warning(f"Failed to initialize Sentry: {e}")

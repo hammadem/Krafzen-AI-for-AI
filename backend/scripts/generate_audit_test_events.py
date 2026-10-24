@@ -12,10 +12,11 @@ from uuid import UUID, uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from fastapi.concurrency import run_in_threadpool
+
 from app.core.config import settings
 from app.db.supabase_client import db
 from app.services.activity_service import record_audit_event
-from fastapi.concurrency import run_in_threadpool
 
 
 def parse_args() -> argparse.Namespace:
@@ -163,7 +164,7 @@ async def generate_events(args: argparse.Namespace) -> None:
                 )
         if row.get("metadata", {}).get("audit_test_run_id") != run_id:
             raise AssertionError(f"Event {event_id} has an unexpected test run marker")
-        event_timestamp = datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00"))
+        event_timestamp = datetime.fromisoformat(row["timestamp"])
         if event_timestamp.tzinfo is None or event_timestamp.utcoffset() != UTC.utcoffset(event_timestamp):
             raise AssertionError(f"Event {event_id} timestamp is not UTC")
         if event_timestamp < write_started_at:

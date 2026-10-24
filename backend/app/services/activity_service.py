@@ -15,6 +15,8 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.supabase_client import db
 from app.utils.logger import logger
@@ -138,7 +140,7 @@ async def record_audit_event(
             )
             return _shape_activity_row(response.data[0])
         raise RuntimeError("Activity event insert returned no data")
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error(
             "[activity_service] Failed to record event",
             action=action,
@@ -212,7 +214,7 @@ async def get_project_activity(
         )
         rows = response.data if response and response.data else []
         return [_shape_activity_row(r) for r in rows]
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[activity_service] Failed to fetch activity", project_id=project_id, error=str(e), exc_info=True)
         return []
 
@@ -260,7 +262,7 @@ async def get_file_activity(
             reverse=True,
         )
         return [_shape_activity_row(row) for row in rows[:limit]]
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error(
             "[activity_service] Failed to fetch file activity",
             file_id=file_id,
@@ -304,7 +306,7 @@ async def get_workspace_activity(workspace_id: str, user_id: str, limit: int = 5
         )
         rows = response.data if response and response.data else []
         return [_shape_activity_row(r) for r in rows]
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[activity_service] Failed to fetch workspace activity", workspace_id=workspace_id, error=str(e), exc_info=True)
         return []
 

@@ -3,9 +3,12 @@ Supabase service for database operations
 """
 
 
+from httpx import HTTPError
+from postgrest.exceptions import APIError
+from supabase import Client, create_client
+
 from app.core.config import settings
 from app.utils.logger import logger
-from supabase import Client, create_client
 
 
 class SupabaseService:
@@ -31,7 +34,7 @@ class SupabaseService:
             self.client = create_client(url, key)
             logger.info("Supabase client initialized successfully")
 
-        except Exception as e:
+        except (HTTPError, OSError, TypeError, ValueError) as e:
             logger.error("Error initializing Supabase client", error=str(e), exc_info=True)
             self.client = None
 
@@ -58,7 +61,7 @@ class SupabaseService:
                 "connected": connected
             }
 
-        except Exception as e:
+        except (APIError, HTTPError) as e:
             return {
                 "status": "error",
                 "message": f"Supabase connection failed: {e!s}",

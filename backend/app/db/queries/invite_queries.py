@@ -3,6 +3,8 @@ from typing import Any
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.queries.workspace_queries import get_workspace
 from app.db.supabase_client import db
@@ -34,9 +36,8 @@ async def create_invite(workspace_id: str, email: str, role: str, user_id: str) 
                 .execute()
         )
 
-        if existing and existing.data:
-            if existing.data["status"] == "pending":
-                raise HTTPException(status_code=409, detail={"error": "Invite already sent to this email"})
+        if existing and existing.data and existing.data["status"] == "pending":
+            raise HTTPException(status_code=409, detail={"error": "Invite already sent to this email"})
             
         res = await run_in_threadpool(
             lambda: db.table("workspace_invites")
@@ -68,7 +69,7 @@ async def create_invite(workspace_id: str, email: str, role: str, user_id: str) 
     
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[create_invite] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
     
@@ -123,7 +124,7 @@ async def revoke_invite(invite_id: str ,user_id: str) -> bool:
     
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[revoke_invite] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
@@ -148,7 +149,7 @@ async def accept_invite(token: str, user_id: str) -> dict[str, Any]:
         if invite["status"] != "pending":
             raise HTTPException(status_code=409, detail={"error": "Invite is not pending"})
 
-        expires_at = datetime.fromisoformat(invite["expires_at"].replace("Z", "+00:00"))
+        expires_at = datetime.fromisoformat(invite["expires_at"])
         if datetime.now(UTC) > expires_at:
             await run_in_threadpool(
                 lambda: db.table("workspace_invites")
@@ -200,7 +201,7 @@ async def accept_invite(token: str, user_id: str) -> dict[str, Any]:
             )
             if not member_res or not member_res.data:
                 raise RuntimeError("Workspace membership insert returned no data")
-        except Exception:
+        except (APIError, HTTPError, RuntimeError):
             await run_in_threadpool(
                 lambda: db.table("workspace_invites")
                     .update({"status": "pending"})
@@ -238,7 +239,7 @@ async def accept_invite(token: str, user_id: str) -> dict[str, Any]:
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[accept_invite] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
     
@@ -268,7 +269,7 @@ async def validate_invite(token: str) -> dict[str, Any]:
         if invite["status"] == "accepted":
             return {"valid": False, "message": "Invite already accepted"}
 
-        expires_at = datetime.fromisoformat(invite["expires_at"].replace("Z", "+00:00"))
+        expires_at = datetime.fromisoformat(invite["expires_at"])
         if datetime.now(UTC) > expires_at:
             await run_in_threadpool(
                 lambda: db.table("workspace_invites")
@@ -286,7 +287,7 @@ async def validate_invite(token: str) -> dict[str, Any]:
             "message": "Invite is valid"
         }
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[validate_invite] Error", error=str(e), exc_info=True)
         return {"valid": False, "message": "Server error"}
         
@@ -314,6 +315,6 @@ async def get_workspace_invites(workspace_id: str,user_id: str) -> list[dict[str
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_workspace_invites] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})

@@ -3,7 +3,7 @@ Transcriber API endpoints for voice-to-text conversion
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
@@ -52,14 +52,14 @@ async def transcribe_audio(
             language=detected_language or language or "unknown",
             filename=file.filename,
             duration=duration,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
         
     except ValueError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail="Invalid input provided.")
-    except Exception as e:
-        logger.error(f"Transcription error: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Transcription error")
         raise HTTPException(
             status_code=500,
             detail="Transcription failed due to an internal error."

@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from app.services.chat_history_service import chat_history_service
 
 
@@ -25,7 +26,7 @@ async def test_get_session_messages_pagination():
     mock_eq = MagicMock()
     mock_order = MagicMock()
     mock_limit = MagicMock()
-    mock_execute = MagicMock()
+    MagicMock()
 
     # Query chain: db.table().select().eq().order().limit().execute()
     mock_db.table.return_value = mock_table

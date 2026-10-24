@@ -35,7 +35,7 @@ def init_db():
         conn.close()
         print("✅ Database schema initialized successfully!")
         
-    except Exception as e:
+    except (psycopg2.Error, OSError) as e:
         print(f"❌ Database initialization failed: {e}")
 
 if __name__ == "__main__":

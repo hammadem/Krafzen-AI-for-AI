@@ -125,13 +125,12 @@ async def test_generation_start_audit_failure_returns_original_error_without_unb
         ),
         patch.object(
             chat_routes, "_record_generation_failure", AsyncMock()
-        ) as record_failure,
+        ) as record_failure,pytest.raises(HTTPException) as exc_info
     ):
-        with pytest.raises(HTTPException) as exc_info:
-            await chat_routes.generate_chat_response(
-                chat_routes.ChatRequest(message="Draw a floor plan"),
-                {"user_id": USER_ID},
-            )
+        await chat_routes.generate_chat_response(
+            chat_routes.ChatRequest(message="Draw a floor plan"),
+            {"user_id": USER_ID},
+        )
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail == str(audit_error)
@@ -191,8 +190,8 @@ async def test_image_generation_placeholder_fails_without_deducting_request():
         patch.object(
             chat_routes, "record_audit_event", AsyncMock(return_value={})
         ) as record_event,
+        pytest.raises(HTTPException) as exc_info,
     ):
-        with pytest.raises(HTTPException) as exc_info:
             await chat_routes.generate_chat_response(
                 chat_routes.ChatRequest(message="Draw a kitchen"),
                 {"user_id": USER_ID},

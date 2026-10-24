@@ -92,8 +92,8 @@ class InstructionValidator:
         text_lower = original_text.lower()
         
         # Extract room dimensions if mentioned
-        room_width = self._extract_dimension(text_lower, r"width[:\s]+(\d+)['\"]")
-        room_depth = self._extract_dimension(text_lower, r"depth[:\s]+(\d+)['\"]")
+        self._extract_dimension(text_lower, r"width[:\s]+(\d+)['\"]")
+        self._extract_dimension(text_lower, r"depth[:\s]+(\d+)['\"]")
         
         # Check for wall elements
         if 'wall' in text_lower or 'room' in text_lower:

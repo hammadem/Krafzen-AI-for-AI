@@ -39,7 +39,7 @@ class OllamaService:
                 return output_text
         except httpx.RequestError as e:
             logger.error(f"Ollama connection error: {e}")
-            raise Exception(f"Failed to connect to Ollama: {e}")
+            raise ConnectionError(f"Failed to connect to Ollama: {e}") from e
         except Exception as e:
             logger.error(f"Ollama generation error: {e}")
             raise

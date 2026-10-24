@@ -3,12 +3,13 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fastapi import HTTPException
+from httpx import AsyncClient
+
 from app.db.queries import invite_queries, workspace_queries
 from app.main import app
 from app.middlewares.auth import require_auth
 from app.services import activity_service
-from fastapi import HTTPException
-from httpx import AsyncClient
 
 ACTOR_ID = "00000000-0000-0000-0000-000000000001"
 TARGET_ID = "00000000-0000-0000-0000-000000000002"
@@ -304,11 +305,13 @@ async def test_accept_invite_rejects_authenticated_user_with_different_email():
     )
     record_event = AsyncMock()
 
-    with patch.object(invite_queries, "db", database), \
-         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
-         patch.object(invite_queries, "record_workspace_event", new=record_event):
-        with pytest.raises(HTTPException) as error:
-            await invite_queries.accept_invite(INVITE_TOKEN, TARGET_ID)
+    with (
+        patch.object(invite_queries, "db", database),
+        patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)),
+        patch.object(invite_queries, "record_workspace_event", new=record_event),
+        pytest.raises(HTTPException) as error,
+    ):
+        await invite_queries.accept_invite(INVITE_TOKEN, TARGET_ID)
 
     assert error.value.status_code == 403
     assert database.tables["workspace_invites"][0]["status"] == "pending"
@@ -322,11 +325,13 @@ async def test_expired_invite_is_not_accepted_or_audited():
     database = FakeDatabase({"workspace_invites": [make_invite(expires_at=expired_at)]})
     record_event = AsyncMock()
 
-    with patch.object(invite_queries, "db", database), \
-         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
-         patch.object(invite_queries, "record_workspace_event", new=record_event):
-        with pytest.raises(HTTPException) as error:
-            await invite_queries.accept_invite(INVITE_TOKEN, TARGET_ID)
+    with (
+        patch.object(invite_queries, "db", database),
+        patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)),
+        patch.object(invite_queries, "record_workspace_event", new=record_event),
+        pytest.raises(HTTPException) as error,
+    ):
+        await invite_queries.accept_invite(INVITE_TOKEN, TARGET_ID)
 
     assert error.value.status_code == 410
     assert database.tables["workspace_invites"][0]["status"] == "expired"

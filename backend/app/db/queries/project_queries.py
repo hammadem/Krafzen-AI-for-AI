@@ -4,6 +4,8 @@ from typing import Any
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.supabase_client import db
 from app.models.project_model import ProjectCreate, ProjectUpdate
@@ -37,7 +39,7 @@ async def create_project(project_data: ProjectCreate, user: dict[str, Any]) -> d
         logger.warning("[create_project] Insert failed")  
         return None
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[create_project] Unexpected error", error=str(e), exc_info=True)
         return None  
 
@@ -62,7 +64,7 @@ async def get_projects(user: dict[str, Any], page: int = 1, limit: int = 10, sta
         logger.debug(f"[get_projects] Retrieved {len(projects)} projects for user {user_id[:8]}...")
         return projects
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_projects] Error", user_id=user["user_id"], error=str(e), exc_info=True)
         return []
 
@@ -102,7 +104,7 @@ async def get_project(project_id: str, user: dict[str, Any]) -> dict[str, Any] |
     
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_project] Error", project_id=project_id, error=str(e), exc_info=True)
         return None
 
@@ -146,7 +148,7 @@ async def update_project(project_id: str, update_data: ProjectUpdate, user: dict
         logger.warning("[update_project] Update failed", project_id=project_id)  
         return None
 
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[update_project] Error", project_id=project_id, error=str(e), exc_info=True)
         return None
 
@@ -185,6 +187,6 @@ async def delete_project(project_id: str, user: dict[str, Any]) -> bool:
             logger.warning("[delete_project] Delete failed", project_id=project_id)
         return success
 
-    except Exception as e:
+    except (APIError, HTTPError, HTTPException, KeyError, TypeError, ValueError) as e:
         logger.error("[delete_project] Error", project_id=project_id, error=str(e), exc_info=True)
         return False

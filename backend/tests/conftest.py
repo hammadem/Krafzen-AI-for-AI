@@ -1,8 +1,9 @@
 """Pytest fixtures."""
 import pytest
+from fastapi.testclient import TestClient
+
 from app.main import app
 from app.middlewares.auth import require_auth
-from fastapi.testclient import TestClient
 
 TEST_USER = {"user_id": "00000000-0000-0000-0000-000000000001"}
 

@@ -2,9 +2,11 @@
 DXF Generator API endpoints for converting CAD instructions to DXF files
 """
 
+import asyncio
 import logging
 import os
 import shutil
+from pathlib import Path
 
 from fastapi import (
     APIRouter,
@@ -28,42 +30,61 @@ from app.utils.storage_service import storage_service
 
 logger = logging.getLogger(__name__)
 
+
+def _cleanup_file(path: str) -> None:
+    try:
+        os.unlink(path)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        logger.warning("Unable to remove temporary file %s: %s", path, exc)
+
+
+def _cleanup_directory(path: str) -> None:
+    try:
+        shutil.rmtree(path)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        logger.warning("Unable to remove temporary directory %s: %s", path, exc)
+
+
 # Import services with error handling
 
 
 try:
     from app.services.gemini_service import gemini_service
-except Exception as e:
+except ImportError as e:
     logger.warning(f"Failed to import gemini_service: {e}.")
     gemini_service = None
 
 try:
     from app.services.gemini_transcription_service import gemini_transcription_service
-except Exception as e:
+except ImportError as e:
     logger.warning(f"Failed to import gemini_transcription_service: {e}.")
     gemini_transcription_service = None
 
 try:
     from app.services.cadllm_service import cadllm_service
-except Exception as e:
+except ImportError as e:
     logger.warning(f"Failed to import cadllm_service: {e}.")
     cadllm_service = None
 
 try:
     from app.services.external_dxf_service import external_dxf_service
-except Exception as e:
+except ImportError as e:
     logger.warning(f"Failed to import external_dxf_service: {e}.")
     external_dxf_service = None
 
 try:
     from app.services.local_dxf_service import local_dxf_service
-except Exception as e:
+except ImportError as e:
     logger.warning(f"Failed to import local_dxf_service: {e}.")
     local_dxf_service = None
 
 try:
     from app.services.dwg_converter_service import dwg_converter_service
-except Exception as e:
+except ImportError as e:
     logger.warning(f"Failed to import dwg_converter_service: {e}.")
     dwg_converter_service = None
 
@@ -129,15 +150,10 @@ async def generate_dxf_from_audio(
 
         
         # 5. Return File
-        with open(dxf_path, 'rb') as f:
-            dxf_bytes = f.read()
+        dxf_bytes = await asyncio.to_thread(Path(dxf_path).read_bytes)
             
         # Cleanup temp file
-        try:
-            import os
-            os.unlink(dxf_path)
-        except:
-            pass
+        _cleanup_file(dxf_path)
             
         return Response(
             content=dxf_bytes,
@@ -147,8 +163,8 @@ async def generate_dxf_from_audio(
             }
         )
         
-    except Exception as e:
-        logger.error(f"Unified audio flow failed: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Unified audio flow failed")
         # Return generic error
         raise HTTPException(status_code=500, detail="An error occurred during DXF generation.")
 
@@ -195,15 +211,10 @@ async def generate_dxf_from_text(
 
         
         # 4. Return File
-        with open(dxf_path, 'rb') as f:
-            dxf_bytes = f.read()
+        dxf_bytes = await asyncio.to_thread(Path(dxf_path).read_bytes)
             
         # Cleanup temp file
-        try:
-            import os
-            os.unlink(dxf_path)
-        except:
-            pass
+        _cleanup_file(dxf_path)
             
         return Response(
             content=dxf_bytes,
@@ -213,8 +224,8 @@ async def generate_dxf_from_text(
             }
         )
         
-    except Exception as e:
-        logger.error(f"Unified text flow failed: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Unified text flow failed")
         raise HTTPException(status_code=500, detail="An error occurred during text-to-DXF generation.")
 
 
@@ -252,8 +263,7 @@ async def generate_and_store_dxf(
             logger.info("Converting Image to DXF (API)...")
             dxf_path = await external_dxf_service.convert_to_dxf(image_url)
 
-        with open(dxf_path, "rb") as f:
-            dxf_bytes = f.read()
+        dxf_bytes = await asyncio.to_thread(Path(dxf_path).read_bytes)
 
         requested_type = request.file_type or CADFileType.DXF
         dwg_bytes = None
@@ -267,19 +277,12 @@ async def generate_and_store_dxf(
                 raise HTTPException(status_code=503, detail=str(e))
 
             dwg_temp_dir = convert_result.work_dir
-            with open(convert_result.dwg_path, "rb") as f:
-                dwg_bytes = f.read()
+            dwg_bytes = await asyncio.to_thread(Path(convert_result.dwg_path).read_bytes)
 
-        try:
-            os.unlink(dxf_path)
-        except Exception:
-            pass
+        _cleanup_file(dxf_path)
 
         if dwg_temp_dir:
-            try:
-                shutil.rmtree(dwg_temp_dir, ignore_errors=True)
-            except Exception:
-                pass
+            _cleanup_directory(dwg_temp_dir)
 
         dxf_url = None
         dwg_url = None
@@ -333,8 +336,8 @@ async def generate_and_store_dxf(
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"DXF generation and storage error: {e}", exc_info=True)
+    except Exception:
+        logger.exception("DXF generation and storage error")
         raise HTTPException(
             status_code=500,
             detail="DXF generation and storage failed due to an internal error."
@@ -382,12 +385,9 @@ async def download_project_dxf(
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"DXF download error: {e}", exc_info=True)
+    except Exception:
+        logger.exception("DXF download error")
         raise HTTPException(
             status_code=500,
             detail="DXF download failed due to an internal error."
         )
-
-
-

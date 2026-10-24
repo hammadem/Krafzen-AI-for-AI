@@ -1,7 +1,10 @@
+import binascii
 import json
 import logging
 
 import google.generativeai as genai
+import httpx
+from PIL import Image
 
 from app.core.config import settings
 
@@ -88,8 +91,8 @@ class GeminiService:
     async def generate_image(
         self,
         prompt: str,
-        original_prompt: str = None,
-        previous_image_url: str = None,
+        original_prompt: str | None = None,
+        previous_image_url: str | None = None,
         drawing_standard: str | None = None,
     ) -> str:
         """
@@ -99,7 +102,7 @@ class GeminiService:
         Returns a base64 data URL.
         """
         if not settings.GEMINI_API_KEY:
-             raise Exception("Gemini API Key not configured")
+             raise RuntimeError("Gemini API key is not configured")
 
         try:
             # Use specific image generation model
@@ -177,9 +180,6 @@ class GeminiService:
                     import base64
                     import io
 
-                    import httpx
-                    from PIL import Image
-                    
                     image_data = None
                     if previous_image_url.startswith("data:"):
                         encoded = previous_image_url.split(",")[1]
@@ -194,7 +194,7 @@ class GeminiService:
                     if image_data:
                         logger.info("Including previous image in generation context.")
                         content_parts.append(image_data)
-                except Exception as e:
+                except (binascii.Error, IndexError, OSError, ValueError, httpx.HTTPError) as e:
                     logger.warning(f"Failed to process previous image for context: {e}")
 
             response = await model.generate_content_async(content_parts, safety_settings=safety_settings)
@@ -202,10 +202,7 @@ class GeminiService:
             # Check for refusal/empty candidates before accessing parts
             if not response.candidates:
                 logger.warning("Gemini returned NO CANDIDATES.")
-                try:
-                    logger.warning(f"Full Response Feedback: {response.prompt_feedback}")
-                except Exception as e:
-                    logger.warning(f"Could not read prompt_feedback: {e}")
+                logger.warning("Full Response Feedback: %s", getattr(response, "prompt_feedback", None))
                 
                 return "https://placehold.co/600x400?text=Gemini+Refused+Generation"
             
@@ -226,10 +223,10 @@ class GeminiService:
                 # Fallback: if it returns SVG code, we might want to handle it, but for now just log it.
                 return "https://placehold.co/600x400?text=Generation+returned+text+not+image"
             
-            raise Exception("No image data found in Gemini response")
+            raise ValueError("No image data found in Gemini response")
 
-        except Exception as e:
-            logger.error(f"Gemini image generation error: {e}")
+        except Exception:
+            logger.exception("Gemini image generation error")
             # Fallback to placeholder on error to keep UI functional
             return "https://placehold.co/600x400?text=Image+Generation+Failed"
 
@@ -291,14 +288,14 @@ Return ONLY valid JSON with this shape (no markdown):
         except json.JSONDecodeError as e:
             logger.warning(f"Layout extraction JSON parse error: {e}")
             return {}
-        except Exception as e:
-            logger.error(f"extract_layout_metrics_json error: {e}", exc_info=True)
+        except Exception:
+            logger.exception("extract_layout_metrics_json error")
             return {}
 
 
 # Global Instance
 try:
     gemini_service = GeminiService()
-except Exception as e:
+except Exception as e:  # noqa: BLE001 - keep optional Gemini initialization from breaking app startup.
     logger.warning(f"Failed to initialize gemini_service: {e}")
     gemini_service = None

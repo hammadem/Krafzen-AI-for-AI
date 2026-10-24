@@ -1,6 +1,8 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.core.permissions import get_role_payload
 from app.middlewares.auth import require_auth
@@ -35,6 +37,6 @@ async def get_user_profile(request: Request, user_data: dict = Depends(require_a
             "plan_requests_remaining": sub.get("plan_requests_remaining"),
             "trial_requests_remaining": sub.get("trial_requests_remaining")
         }
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error(f"Profile fetch error: {e}")
         raise HTTPException(status_code=500, detail={"error": "Failed to fetch profile"})

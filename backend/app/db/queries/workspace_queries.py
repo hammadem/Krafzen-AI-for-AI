@@ -2,6 +2,8 @@ from typing import Any
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
+from httpx import HTTPError
+from postgrest.exceptions import APIError
 
 from app.db.supabase_client import db
 from app.services.activity_service import record_workspace_event
@@ -43,7 +45,7 @@ async def get_workspace(workspace_id:str, user_id: str) -> dict[str, Any] | None
         return res.data
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_workspace] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
     
@@ -92,7 +94,7 @@ async def get_my_workspace(user_id: str) -> dict[str, Any] | None:
 
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_my_workspace] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
@@ -125,7 +127,7 @@ async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,pa
                 )
                 member["email"] = user_res.user.email if user_res and user_res.user else None
                 member["display_name"] = user_res.user.user_metadata.get("full_name") if user_res and user_res.user else None
-            except Exception:
+            except (APIError, HTTPError, KeyError, TypeError, ValueError):
                 member["email"] = None
                 member["display_name"] = None
             enriched.append(member)
@@ -139,7 +141,7 @@ async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,pa
     
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_workspace_members] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
     
@@ -205,7 +207,7 @@ async def update_role_member(workspace_id: str, target_user_id: str, new_role: s
         return res.data[0]
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[update_member_role] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
@@ -256,6 +258,6 @@ async def remove_member(workspace_id: str,target_user_id: str,user_id: str) -> b
         return True
     except HTTPException:
         raise
-    except Exception as e:
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[remove_member] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})

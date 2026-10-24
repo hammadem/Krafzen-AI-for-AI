@@ -117,10 +117,9 @@ def _door_widths_in(text: str) -> list[float]:
     for rx in width_patterns:
         for m in rx.finditer(text):
             w = float(m.group(1))
-            if 28.0 <= w <= 48.0:
-                if w not in seen:
-                    seen.add(w)
-                    out.append(w)
+            if 28.0 <= w <= 48.0 and w not in seen:
+                seen.add(w)
+                out.append(w)
     return out
 
 

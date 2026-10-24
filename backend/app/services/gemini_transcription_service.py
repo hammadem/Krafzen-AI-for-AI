@@ -45,7 +45,7 @@ class GeminiTranscriptionService:
             so these might be None or inferred.
         """
         if not settings.GEMINI_API_KEY:
-             raise Exception("Gemini API Key not configured")
+             raise RuntimeError("Gemini API key is not configured")
 
         # Validate file extension (Gemini supports common audio formats)
         file_ext = os.path.splitext(filename)[1].lower().lstrip('.')
@@ -100,7 +100,7 @@ class GeminiTranscriptionService:
             
         except Exception as e:
             logger.error(f"Gemini Transcription failed: {e}")
-            raise Exception(f"Transcription failed: {e!s}")
+            raise RuntimeError(f"Transcription failed: {e!s}") from e
             
         finally:
             # Clean up local temp file
@@ -112,7 +112,7 @@ class GeminiTranscriptionService:
                 try:
                     upload_ref.delete()
                 except Exception:
-                    pass
+                    logger.warning("Failed to delete uploaded Gemini audio file", exc_info=True)
 
     def is_configured(self) -> bool:
         """Check if service is properly configured"""
@@ -121,6 +121,6 @@ class GeminiTranscriptionService:
 # Global instance
 try:
     gemini_transcription_service = GeminiTranscriptionService() if settings.GEMINI_API_KEY else None
-except Exception as e:
+except Exception as e:  # noqa: BLE001 - keep optional transcription initialization from breaking app startup.
     logger.warning(f"Failed to initialize GeminiTranscriptionService: {e}")
     gemini_transcription_service = None

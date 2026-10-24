@@ -3,7 +3,6 @@ Configuration settings for KRAFZEN AI backend
 """
 
 
-from typing import Optional
 
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
@@ -111,19 +110,19 @@ class Settings(BaseSettings):
     STRIPE_PRICE_ID_ENTERPRISE_ANNUAL: str | None = None
 
     # Dodo Payments
-    DODO_PAYMENTS_API_KEY: Optional[str] = None
-    DODO_PAYMENTS_TEST_API_KEY: Optional[str] = None
-    DODO_PAYMENTS_WEBHOOK_SECRET: Optional[str] = None
-    DODO_PAYMENTS_WEBHOOK_ENDPOINT_ID: Optional[str] = None
+    DODO_PAYMENTS_API_KEY: str | None = None
+    DODO_PAYMENTS_TEST_API_KEY: str | None = None
+    DODO_PAYMENTS_WEBHOOK_SECRET: str | None = None
+    DODO_PAYMENTS_WEBHOOK_ENDPOINT_ID: str | None = None
     DODO_PAYMENTS_ENVIRONMENT: str = "live_mode"  # test_mode | live_mode
 
     # Dodo Product IDs
-    DODO_PRODUCT_ID_STARTER_MONTHLY: Optional[str] = "pdt_0NptIUxBB6ax8M2pe8Jc2"
-    DODO_PRODUCT_ID_STARTER_ANNUAL: Optional[str] = "pdt_0NptIUnfunV7bYoJ9dtUE"
-    DODO_PRODUCT_ID_PROFESSIONAL_MONTHLY: Optional[str] = "pdt_0NptIUuKMySW5tuz5FgRk"
-    DODO_PRODUCT_ID_PROFESSIONAL_ANNUAL: Optional[str] = "pdt_0NptIUjvCnzjEpS7tZdLo"
-    DODO_PRODUCT_ID_ENTERPRISE_MONTHLY: Optional[str] = "pdt_0NptIUsLytgIvdbPve7kh"
-    DODO_PRODUCT_ID_ENTERPRISE_ANNUAL: Optional[str] = "pdt_0NptIUqA05KZHkdnENr3r"
+    DODO_PRODUCT_ID_STARTER_MONTHLY: str | None = "pdt_0NptIUxBB6ax8M2pe8Jc2"
+    DODO_PRODUCT_ID_STARTER_ANNUAL: str | None = "pdt_0NptIUnfunV7bYoJ9dtUE"
+    DODO_PRODUCT_ID_PROFESSIONAL_MONTHLY: str | None = "pdt_0NptIUuKMySW5tuz5FgRk"
+    DODO_PRODUCT_ID_PROFESSIONAL_ANNUAL: str | None = "pdt_0NptIUjvCnzjEpS7tZdLo"
+    DODO_PRODUCT_ID_ENTERPRISE_MONTHLY: str | None = "pdt_0NptIUsLytgIvdbPve7kh"
+    DODO_PRODUCT_ID_ENTERPRISE_ANNUAL: str | None = "pdt_0NptIUqA05KZHkdnENr3r"
 
     # External Links
     CALENDLY_URL: str = "https://calendly.com/" # Default or empty
