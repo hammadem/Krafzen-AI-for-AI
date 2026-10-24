@@ -11,6 +11,7 @@ from app.db.queries.file_queries import (
     get_file,
     get_files,
     get_signed_url,
+    mark_revision_reviewed,
     restore_file,
     set_revision_approval,
     update_file,
@@ -108,6 +109,17 @@ async def set_revision_decision_route(
     user=Depends(require_auth),
 ):
     revision = await set_revision_approval(file_id, request.decision, user)
+    if not revision:
+        raise HTTPException(status_code=404, detail={"error": "Revision not found"})
+    return revision
+
+
+@router.post("/{file_id}/review", response_model=FileResponse)
+async def mark_revision_reviewed_route(
+    file_id: str,
+    user=Depends(require_auth),
+):
+    revision = await mark_revision_reviewed(file_id, user)
     if not revision:
         raise HTTPException(status_code=404, detail={"error": "Revision not found"})
     return revision

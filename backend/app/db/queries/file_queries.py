@@ -375,16 +375,24 @@ async def set_revision_approval(
         return None
     if file.get("approval_state") == approval_state:
         return file
+    if not file.get("reviewed_by"):
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "The revision must be reviewed before a decision"},
+        )
+    if file.get("approval_state", "pending_review") != "pending_review":
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "The revision already has a final decision"},
+        )
 
-    reviewed_at = datetime.now(UTC).isoformat()
     response = await run_in_threadpool(
         lambda: db.table("files")
             .update({
                 "approval_state": approval_state,
-                "reviewed_by": user["user_id"],
-                "reviewed_at": reviewed_at,
             })
             .eq("id", file_id)
+            .eq("approval_state", "pending_review")
             .execute()
     )
     if not response or not response.data:
@@ -394,6 +402,48 @@ async def set_revision_approval(
     action = "revision.approved" if approval_state == "approved" else "revision.rejected"
     await _record_revision_activity(action, updated_file, user["user_id"])
     return updated_file
+
+
+async def mark_revision_reviewed(
+    file_id: str,
+    user: dict[str, Any],
+) -> dict[str, Any] | None:
+    file = await get_file(file_id, user)
+    if not file:
+        return None
+    if file.get("approval_state", "pending_review") != "pending_review":
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "Only pending revisions can be reviewed"},
+        )
+    if file.get("reviewed_by"):
+        return file
+
+    reviewed_at = datetime.now(UTC).isoformat()
+    response = await run_in_threadpool(
+        lambda: db.table("files")
+            .update({
+                "reviewed_by": user["user_id"],
+                "reviewed_at": reviewed_at,
+            })
+            .eq("id", file_id)
+            .eq("approval_state", "pending_review")
+            .is_("reviewed_by", "null")
+            .execute()
+    )
+    if not response or not response.data:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "The revision was reviewed by another member"},
+        )
+
+    reviewed_file = response.data[0]
+    await _record_revision_activity(
+        "revision.reviewed",
+        reviewed_file,
+        user["user_id"],
+    )
+    return reviewed_file
 
 
 async def _record_file_activity(
@@ -438,6 +488,21 @@ async def _record_revision_activity(
     file: dict[str, Any],
     actor_user_id: str,
 ) -> None:
+    metadata = {
+        "revision_id": file["id"],
+        "file_id": file["id"],
+        "version": file.get("version", 1),
+        "approval_state": file.get("approval_state", "pending_review"),
+    }
+    if action == "revision.reviewed":
+        metadata["reviewed_by"] = actor_user_id
+    elif action == "revision.approved":
+        metadata["reviewed_by"] = file.get("reviewed_by")
+        metadata["approved_by"] = actor_user_id
+    elif action == "revision.rejected":
+        metadata["reviewed_by"] = file.get("reviewed_by")
+        metadata["decision_by"] = actor_user_id
+
     try:
         await record_audit_event(
             action=action,
@@ -447,12 +512,7 @@ async def _record_revision_activity(
             project_id=file.get("project_id"),
             legacy_job_id=str(file["job_id"]) if file.get("job_id") else None,
             file_id=file["id"],
-            metadata={
-                "revision_id": file["id"],
-                "file_id": file["id"],
-                "version": file.get("version", 1),
-                "approval_state": file.get("approval_state", "pending_review"),
-            },
+            metadata=metadata,
         )
     except Exception as error:
         raise HTTPException(

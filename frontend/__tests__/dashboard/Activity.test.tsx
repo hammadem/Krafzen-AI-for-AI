@@ -1,7 +1,22 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import ActivityPage from "@/app/(dashboard)/workspace/activity/page";
 
-const { activityEvents } = vi.hoisted(() => ({
+type TestActivityEvent = {
+    id: string;
+    event_id?: string;
+    entity_id?: string;
+    project_id?: string;
+    project_name?: string;
+    actor_user_id?: string;
+    actor_name?: string;
+    occurred_at?: string;
+    event_type: string;
+    event_name?: string;
+    category?: string;
+    message: string;
+};
+
+const { activityEvents, markRevisionReviewed, setRevisionDecision } = vi.hoisted(() => ({
     activityEvents: [
         {
             id: "event-ai",
@@ -27,7 +42,16 @@ const { activityEvents } = vi.hoisted(() => ({
             category: "team",
             message: "Changed John’s role from Member to Admin",
         },
-    ],
+    ] as TestActivityEvent[],
+    markRevisionReviewed: vi.fn().mockResolvedValue({ ok: true }),
+    setRevisionDecision: vi.fn().mockResolvedValue({ ok: true }),
+}));
+
+vi.mock("@/lib/api/api", () => ({
+    getDashboardActivity: vi.fn(),
+    markRevisionReviewed,
+    restoreFileRevision: vi.fn(),
+    setRevisionDecision,
 }));
 
 vi.mock("@/hooks/useApiResource", () => ({
@@ -76,5 +100,29 @@ describe("ActivityPage", () => {
         fireEvent.change(screen.getByLabelText("Activity from date"), { target: { value: "2025-01-03" } });
         expect(screen.getByText("Changed John’s role from Member to Admin")).toBeInTheDocument();
         expect(screen.queryByText("Started AI Review")).not.toBeInTheDocument();
+    });
+
+    it("requires a separate review action before allowing a revision decision", async () => {
+        activityEvents.splice(0, activityEvents.length, {
+            id: "revision-created",
+            event_id: "revision-created",
+            entity_id: "file-1",
+            event_type: "revision.created",
+            event_name: "revision.created",
+            category: "revisions",
+            message: "Revision created",
+        });
+        render(<ActivityPage />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
+        });
+        expect(markRevisionReviewed).toHaveBeenCalledWith(null, "file-1");
+        expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+        });
+        expect(setRevisionDecision).toHaveBeenCalledWith(null, "file-1", "approved");
     });
 });

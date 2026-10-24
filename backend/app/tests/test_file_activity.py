@@ -9,6 +9,7 @@ USER_ID = "00000000-0000-0000-0000-000000000001"
 JOB_ID = "00000000-0000-0000-0000-000000000002"
 PROJECT_ID = "00000000-0000-0000-0000-000000000003"
 FILE_ID = "00000000-0000-0000-0000-000000000004"
+REVIEWER_ID = "00000000-0000-0000-0000-000000000005"
 
 
 @pytest.mark.asyncio
@@ -218,11 +219,11 @@ async def test_revision_approval_persists_state_and_emits_reference_only_event()
         "project_id": PROJECT_ID,
         "version": 3,
         "approval_state": "pending_review",
+        "reviewed_by": REVIEWER_ID,
     }
     approved_file = {
         **file_row,
         "approval_state": "approved",
-        "reviewed_by": USER_ID,
     }
     with (
         patch.object(file_queries, "get_file", AsyncMock(return_value=file_row)),
@@ -244,8 +245,72 @@ async def test_revision_approval_persists_state_and_emits_reference_only_event()
     assert event["action"] == "revision.approved"
     assert event["entity_id"] == FILE_ID
     assert event["metadata"]["version"] == 3
+    assert event["metadata"]["reviewed_by"] == REVIEWER_ID
+    assert event["metadata"]["approved_by"] == USER_ID
     assert "path" not in event["metadata"]
     assert "name" not in event["metadata"]
+
+
+@pytest.mark.asyncio
+async def test_revision_review_is_a_separate_audit_event():
+    file_row = {
+        "id": FILE_ID,
+        "job_id": JOB_ID,
+        "project_id": PROJECT_ID,
+        "version": 3,
+        "approval_state": "pending_review",
+        "reviewed_by": None,
+    }
+    reviewed_file = {
+        **file_row,
+        "reviewed_by": REVIEWER_ID,
+        "reviewed_at": "2026-10-24T12:00:00+00:00",
+    }
+    with (
+        patch.object(file_queries, "get_file", AsyncMock(return_value=file_row)),
+        patch.object(
+            file_queries,
+            "run_in_threadpool",
+            AsyncMock(return_value=SimpleNamespace(data=[reviewed_file])),
+        ),
+        patch.object(
+            file_queries, "record_audit_event", AsyncMock(return_value={})
+        ) as record_event,
+    ):
+        result = await file_queries.mark_revision_reviewed(
+            FILE_ID, {"user_id": REVIEWER_ID}
+        )
+
+    assert result == reviewed_file
+    event = record_event.await_args.kwargs
+    assert event["action"] == "revision.reviewed"
+    assert event["actor_user_id"] == REVIEWER_ID
+    assert event["metadata"]["reviewed_by"] == REVIEWER_ID
+    assert event["metadata"]["approval_state"] == "pending_review"
+
+
+@pytest.mark.asyncio
+async def test_revision_cannot_be_approved_before_review():
+    from fastapi import HTTPException
+
+    file_row = {
+        "id": FILE_ID,
+        "job_id": JOB_ID,
+        "project_id": PROJECT_ID,
+        "approval_state": "pending_review",
+        "reviewed_by": None,
+    }
+    with (
+        patch.object(file_queries, "get_file", AsyncMock(return_value=file_row)),
+        patch.object(file_queries, "record_audit_event", AsyncMock()) as record_event,
+        pytest.raises(HTTPException) as error,
+    ):
+        await file_queries.set_revision_approval(
+            FILE_ID, "approved", {"user_id": USER_ID}
+        )
+
+    assert error.value.status_code == 409
+    record_event.assert_not_awaited()
 
 
 @pytest.mark.asyncio

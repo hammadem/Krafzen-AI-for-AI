@@ -138,6 +138,7 @@ async def test_record_audit_event_persists_requested_audit_fields(monkeypatch):
         action="file.renamed",
         entity_type="file",
         entity_id="00000000-0000-0000-0000-000000000007",
+        file_id="00000000-0000-0000-0000-000000000007",
         metadata={"old_name": "plan.dxf", "new_name": "floor-plan.dxf"},
     )
 
@@ -148,6 +149,7 @@ async def test_record_audit_event_persists_requested_audit_fields(monkeypatch):
     assert row["action"] == event["action"] == "file.renamed"
     assert row["entity_type"] == event["entity_type"] == "file"
     assert row["entity_id"] == event["entity_id"] == "00000000-0000-0000-0000-000000000007"
+    assert row["file_id"] == event["file_id"] == row["entity_id"]
     assert row["timestamp"] == event["timestamp"]
     assert row["metadata"] == event["metadata"]
 

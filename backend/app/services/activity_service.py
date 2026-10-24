@@ -31,6 +31,7 @@ async def record_event(
     action: str | None = None,
     entity_type: str | None = None,
     entity_id: str | None = None,
+    file_id: str | None = None,
     organization_id: str | None = None,
 ) -> dict[str, Any]:
     """
@@ -45,7 +46,11 @@ async def record_event(
     resolved_entity_type = entity_type or _entity_type_for(
         resolved_action, job_id=job_id, project_id=project_id
     )
-    resolved_entity_id = entity_id or _metadata_entity_id(resolved_action, event_metadata)
+    resolved_entity_id = (
+        entity_id
+        or file_id
+        or _metadata_entity_id(resolved_action, event_metadata)
+    )
     if resolved_entity_id is None:
         if resolved_entity_type == "export_job":
             resolved_entity_id = job_id
@@ -63,6 +68,7 @@ async def record_event(
         action=resolved_action,
         entity_type=resolved_entity_type,
         entity_id=resolved_entity_id,
+        file_id=file_id,
         metadata=event_metadata,
         message=message,
         legacy_job_id=job_id,
@@ -74,6 +80,7 @@ async def record_audit_event(
     action: str,
     entity_type: str,
     entity_id: str,
+    file_id: str | None = None,
     actor_user_id: str | None = None,
     organization_id: str | None = None,
     workspace_id: str | None = None,
@@ -107,6 +114,7 @@ async def record_audit_event(
         "event_name": action,
         "entity_type": entity_type,
         "entity_id": entity_id,
+        "file_id": file_id or (entity_id if entity_type == "file" else None),
         "organization_id": organization_id,
         "workspace_id": workspace_id,
         "timestamp": timestamp,

@@ -15,6 +15,7 @@ event = await record_audit_event(
     action="file.renamed",
     entity_type="file",
     entity_id=file_id,
+    file_id=file_id,
     metadata={"old_name": "plan.dxf", "new_name": "floor-plan.dxf"},
 )
 ```
@@ -28,7 +29,9 @@ available for existing call sites.
 ## Verify automatic file activity in staging
 
 Apply migrations `010_activity_events_audit_contract.sql`,
-`011_file_activity_lifecycle.sql`, and `012_file_revision_approval.sql` to staging. Upload a file through the
+`011_file_activity_and_audit_security.sql`,
+`012_file_revision_approval.sql`, and
+`013_activity_audit_read_scope.sql` to staging. Upload a file through the
 application, then copy its file ID from the response or file record and run:
 
 ```sql
@@ -36,6 +39,7 @@ SELECT
     event_id,
     actor_user_id,
     project_id,
+    file_id,
     action,
     entity_type,
     entity_id,
@@ -52,7 +56,11 @@ project. The event metadata should include `file_id`, `file_name`, `file_type`,
 `version`, `project_id`, and `user_id`; `timestamp_utc` should match the upload
 time. Renaming the file should append `file.renamed` with `old_name` and
 `new_name`, and archiving/restoring it should append `file.archived` and
-`file.restored`. No event is written for a failed file-row operation.
+`file.restored`. Marking a revision reviewed appends `revision.reviewed`;
+approving or rejecting it appends `revision.approved` or `revision.rejected`.
+The review event identifies `reviewed_by`; the approval event identifies both
+`reviewed_by` and `approved_by`. No event is written for a failed file-row
+operation.
 
 ## Manually generate three test events
 
@@ -61,7 +69,9 @@ append-only and will remain in the database; the test marker makes them easy to
 identify but they cannot be removed through the application.
 
 1. Apply migrations `010_activity_events_audit_contract.sql`,
-   `011_file_activity_lifecycle.sql`, and `012_file_revision_approval.sql` to staging first.
+   `011_file_activity_and_audit_security.sql`,
+   `012_file_revision_approval.sql`, and
+   `013_activity_audit_read_scope.sql` to staging first.
 2. In the backend environment, make sure `SUPABASE_URL` and
    `SUPABASE_SERVICE_ROLE_KEY` point to that staging project. Do not paste or
    commit the service-role key.

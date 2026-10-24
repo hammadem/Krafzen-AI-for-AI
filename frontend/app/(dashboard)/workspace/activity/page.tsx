@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import {
     getDashboardActivity,
+    markRevisionReviewed,
     restoreFileRevision,
     setRevisionDecision,
 } from "@/lib/api/api";
@@ -96,16 +97,19 @@ function ActivityRow({
     onChanged,
     currentDecision,
     isRestored,
+    isReviewed,
 }: {
     event: ActivityEvent;
     onChanged: () => void;
     currentDecision: "approved" | "rejected" | null;
     isRestored: boolean;
+    isReviewed: boolean;
 }) {
     const user = useOptionalAuth()?.user ?? null;
     const [working, setWorking] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
     const [decision, setDecision] = useState<"approved" | "rejected" | null>(null);
+    const [reviewed, setReviewed] = useState(false);
     const actorName = event.actor_name || "Workspace member";
     const category = categoryFor(event);
     const time = displayTime(event.occurred_at);
@@ -131,6 +135,24 @@ function ActivityRow({
             onChanged();
         } catch (error) {
             setActionError(error instanceof Error ? error.message : "Could not update revision.");
+        } finally {
+            setWorking(false);
+        }
+    };
+
+    const reviewRevision = async () => {
+        if (!event.entity_id) return;
+        setWorking(true);
+        setActionError(null);
+        try {
+            const result = await markRevisionReviewed(user, event.entity_id);
+            if (!result.ok) {
+                throw new Error(result.error?.message || "Could not mark revision as reviewed.");
+            }
+            setReviewed(true);
+            onChanged();
+        } catch (error) {
+            setActionError(error instanceof Error ? error.message : "Could not mark revision as reviewed.");
         } finally {
             setWorking(false);
         }
@@ -182,22 +204,36 @@ function ActivityRow({
                 )}
                 {event.event_type === "revision.created" && event.entity_id && (
                     <div className="flex items-center gap-2 pt-2">
-                        <button
-                            type="button"
-                            disabled={working || decision !== null || currentDecision !== null}
-                            onClick={() => void decideRevision("approved")}
-                            className="rounded-md border border-emerald-400/20 px-2.5 py-1 text-xs text-emerald-300 hover:bg-emerald-400/10 disabled:opacity-50"
-                        >
-                            {(decision || currentDecision) === "approved" ? "Approved" : "Approve"}
-                        </button>
-                        <button
-                            type="button"
-                            disabled={working || decision !== null || currentDecision !== null}
-                            onClick={() => void decideRevision("rejected")}
-                            className="rounded-md border border-amber-400/20 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-400/10 disabled:opacity-50"
-                        >
-                            {(decision || currentDecision) === "rejected" ? "Rejected" : "Reject"}
-                        </button>
+                        {!(reviewed || isReviewed) ? (
+                            <button
+                                type="button"
+                                disabled={working || decision !== null || currentDecision !== null}
+                                onClick={() => void reviewRevision()}
+                                className="rounded-md border border-sky-400/20 px-2.5 py-1 text-xs text-sky-300 hover:bg-sky-400/10 disabled:opacity-50"
+                            >
+                                {working ? "Reviewing…" : "Mark reviewed"}
+                            </button>
+                        ) : (
+                            <>
+                                <span className="text-xs text-sky-300">Reviewed</span>
+                                <button
+                                    type="button"
+                                    disabled={working || decision !== null || currentDecision !== null}
+                                    onClick={() => void decideRevision("approved")}
+                                    className="rounded-md border border-emerald-400/20 px-2.5 py-1 text-xs text-emerald-300 hover:bg-emerald-400/10 disabled:opacity-50"
+                                >
+                                    {(decision || currentDecision) === "approved" ? "Approved" : "Approve"}
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={working || decision !== null || currentDecision !== null}
+                                    onClick={() => void decideRevision("rejected")}
+                                    className="rounded-md border border-amber-400/20 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-400/10 disabled:opacity-50"
+                                >
+                                    {(decision || currentDecision) === "rejected" ? "Rejected" : "Reject"}
+                                </button>
+                            </>
+                        )}
                     </div>
                 )}
                 {event.event_type === "file.archived" && event.entity_id && !isRestored && (
@@ -285,6 +321,17 @@ export default function ActivityPage() {
             new Set(
                 activities
                     .filter((event) => event.event_type === "revision.restored" && event.entity_id)
+                    .map((event) => event.entity_id)
+                    .filter((entityId): entityId is string => Boolean(entityId))
+            ),
+        [activities]
+    );
+
+    const reviewedRevisionIds = useMemo(
+        () =>
+            new Set(
+                activities
+                    .filter((event) => event.event_type === "revision.reviewed" && event.entity_id)
                     .map((event) => event.entity_id)
                     .filter((entityId): entityId is string => Boolean(entityId))
             ),
@@ -453,6 +500,7 @@ export default function ActivityPage() {
                                 onChanged={() => void refetch()}
                                 currentDecision={event.entity_id ? revisionDecisions.get(event.entity_id) ?? null : null}
                                 isRestored={event.entity_id ? restoredRevisionIds.has(event.entity_id) : false}
+                                isReviewed={event.entity_id ? reviewedRevisionIds.has(event.entity_id) : false}
                             />
                         ))}
                     </section>

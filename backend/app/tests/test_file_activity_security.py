@@ -264,15 +264,26 @@ def test_normal_users_have_read_only_activity_routes_and_database_grants():
     assert activity_routes
     assert all(set(route.methods or []) <= {"GET", "HEAD"} for route in activity_routes)
 
-    migration = (
+    migration_dir = (
         Path(__file__).resolve().parent.parent
         / "db"
         / "migrations"
-        / "011_file_activity_and_audit_security.sql"
+    )
+    file_security_migration = (
+        migration_dir / "011_file_activity_and_audit_security.sql"
     ).read_text(encoding="utf-8").upper()
-    assert "ENABLE ROW LEVEL SECURITY" in migration
-    assert "REVOKE ALL PRIVILEGES" in migration
-    assert "FROM PUBLIC, ANON, AUTHENTICATED" in migration
-    assert "GRANT SELECT" in migration
-    assert "GRANT ALL PRIVILEGES ON TABLE PUBLIC.ACTIVITY_EVENTS TO SERVICE_ROLE" in migration
-    assert "ON DELETE SET NULL" in migration
+    audit_contract_migration = (
+        migration_dir / "010_activity_events_audit_contract.sql"
+    ).read_text(encoding="utf-8").upper()
+    read_scope_migration = (
+        migration_dir / "013_activity_audit_read_scope.sql"
+    ).read_text(encoding="utf-8").upper()
+
+    assert "ENABLE ROW LEVEL SECURITY" in file_security_migration
+    assert "REVOKE ALL PRIVILEGES" in read_scope_migration
+    assert "FROM PUBLIC, ANON, AUTHENTICATED, SERVICE_ROLE" in read_scope_migration
+    assert "GRANT SELECT, INSERT" in read_scope_migration
+    assert "WORKSPACES.OWNER_ID = AUTH.UID()" in read_scope_migration
+    assert "ON DELETE SET NULL" in file_security_migration
+    assert "BEFORE UPDATE OR DELETE" in audit_contract_migration
+    assert "BEFORE TRUNCATE" in audit_contract_migration

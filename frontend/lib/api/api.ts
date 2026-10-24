@@ -302,6 +302,14 @@ export async function setRevisionDecision(
     );
 }
 
+export async function markRevisionReviewed(user: User | null, revisionId: string) {
+    return apiClient(
+        "POST",
+        `/api/v1/files/${revisionId}/review`,
+        user
+    );
+}
+
 export async function restoreFileRevision(user: User | null, revisionId: string) {
     return apiClient("POST", `/api/v1/files/${revisionId}/restore`, user);
 }
