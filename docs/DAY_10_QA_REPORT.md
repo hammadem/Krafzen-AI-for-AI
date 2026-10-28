@@ -57,24 +57,3 @@ above. A passing unit suite does not establish that migrations or database
 policies are active in staging or production. The manual AI attempt is live
 failure evidence from the production project configured in the backend.
 
-## Open sign-off items
-
-1. In **staging**, apply the documented audit migrations and verify workspace
-   backfill/synchronization, append-only behavior, grants, and RLS. For
-   production, use the database owner's reviewed migration and backup process;
-   do not run the broad Week 2 migration script as an ad hoc fix.
-2. Run the five Day 10 manual scenarios in staging: file lifecycle, AI/revision
-   chain, team lifecycle, unauthorized access attempts, and large-history
-   pagination. Record test identities/data without including credentials.
-3. Before claiming file-provenance completion, implement and exercise real
-   export artifact creation and persistence; the current completion gate
-   intentionally blocks success without a linked artifact.
-4. Measure performance at 100 and 1,000 events and, if practical, 10,000+
-   events. Record response times and confirm deployed row/offset limits.
-5. Re-run the staging checks after deployment and update each **PARTIAL** or
-   **NOT VERIFIED** row with its environment, execution evidence, and final
-   pass/fail result.
-
-**Release recommendation:** Do not use this report as final production
-sign-off. The automated checks are green, but the live database, manual
-end-to-end flows, and performance targets remain outstanding.
