@@ -61,7 +61,11 @@ async def create_job(job_data: dict[str, Any], user: dict[str, Any]) -> dict[str
         return {"error": "Unexpected server error"}
 
 # LIST JOBS
-async def get_jobs(project_id: str, user: dict[str, Any]) -> list[dict[str, Any]]:
+async def get_jobs(
+    project_id: str,
+    user: dict[str, Any],
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
     #User guard
     if not user or "user_id" not in user:
         logger.warning("[get_jobs] Invalid user context")
@@ -73,12 +77,20 @@ async def get_jobs(project_id: str, user: dict[str, Any]) -> list[dict[str, Any]
             logger.warning("[get_jobs] Unauthorized access attempt", project_id=project_id)
             return []
 
-        response = await run_in_threadpool(
-            lambda: db.table("jobs")
-                .select("*")
-                .eq("project_id", project_id)
-                .execute()
+        query = (
+            db.table("jobs")
+            .select("*")
+            .eq("project_id", project_id)
         )
+        if limit is not None:
+            if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 10_101:
+                raise ValueError("Job limit must be between 1 and 10101")
+            query = (
+                query.order("updated_at", desc=True)
+                .order("id", desc=True)
+                .range(0, limit - 1)
+            )
+        response = await run_in_threadpool(lambda: query.execute())
 
         jobs = response.data if response and response.data else []
         logger.debug(f"[get_jobs] Retrieved {len(jobs)} jobs", project_id=project_id)

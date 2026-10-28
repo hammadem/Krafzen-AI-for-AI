@@ -3,6 +3,7 @@ Tests for dashboard endpoints: activity feed, workspace summary, notifications, 
 Owner: Tazwar
 """
 
+import time
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -101,7 +102,7 @@ async def test_activity_feed_does_not_query_an_unowned_project():
             )
 
     assert response.status_code == 200
-    assert response.json() == {"events": [], "total": 0}
+    assert response.json() == {"events": [], "total": 0, "has_more": False}
     get_workspace_ids.assert_not_awaited()
 
 
@@ -152,6 +153,78 @@ async def test_activity_feed_includes_audit_events():
     assert event["event_type"] == "ai.generation_completed"
     assert event["entity_type"] == "ai_generation"
     assert event["entity_id"] == audit_event["entity_id"]
+
+
+@pytest.mark.asyncio
+async def test_activity_feed_pages_synthetic_history_without_gaps_or_duplicates():
+    project_id = MOCK_PROJECTS[0]["id"]
+    synthetic_events = [
+        {
+            "id": f"event-{index:04d}",
+            "event_id": f"event-{index:04d}",
+            "action": "ai.generation_completed",
+            "entity_type": "ai_generation",
+            "entity_id": f"generation-{index:04d}",
+            "project_id": project_id,
+            "timestamp": f"2026-10-01T00:{index // 60:02d}:{index % 60:02d}+00:00",
+            "actor_user_id": MOCK_USER["user_id"],
+            "message": f"Generated item {index}",
+            "metadata": {},
+        }
+        for index in range(1, 1001)
+    ]
+    returned_ids: list[str] = []
+    started = time.perf_counter()
+    visible_projects = [
+        MOCK_PROJECTS[0],
+        {
+            "id": "00000000-0000-0000-0000-000000000003",
+            "user_id": MOCK_USER["user_id"],
+        },
+    ]
+    with (
+        patch(
+            "app.routes.dashboard_routes.get_projects",
+            new=AsyncMock(return_value=visible_projects),
+        ),
+        patch(
+            "app.routes.dashboard_routes.get_jobs",
+            new=AsyncMock(return_value=[]),
+        ),
+        patch(
+            "app.routes.dashboard_routes._get_user_workspace_ids",
+            new=AsyncMock(return_value=[]),
+        ),
+        patch(
+            "app.routes.dashboard_routes._get_activity_rows",
+            new=AsyncMock(return_value=synthetic_events),
+        ),
+        patch(
+            "app.routes.dashboard_routes._get_actor_names",
+            new=AsyncMock(return_value={}),
+        ),
+    ):
+        async with AsyncClient(app=app, base_url="http://test") as client:
+            for offset in range(0, len(synthetic_events), 50):
+                response = await client.get(
+                    f"{BASE}/activity?project_id={project_id}&limit=50&offset={offset}"
+                )
+                assert response.status_code == 200
+                data = response.json()
+                returned_ids.extend(event["event_id"] for event in data["events"])
+                assert data["has_more"] is (offset + 50 < len(synthetic_events))
+
+            other_project = visible_projects[1]["id"]
+            response = await client.get(
+                f"{BASE}/activity?project_id={other_project}&limit=50"
+            )
+            assert response.status_code == 200
+            assert response.json()["events"] == []
+
+    elapsed = time.perf_counter() - started
+    assert len(returned_ids) == 1000
+    assert len(set(returned_ids)) == 1000
+    assert elapsed < 10
 
 
 @pytest.mark.asyncio

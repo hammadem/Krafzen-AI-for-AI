@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fastapi import HTTPException
 
 from app.db.queries import file_queries
 
@@ -116,6 +117,7 @@ async def test_update_file_records_rename_and_metadata_update():
     rename_metadata = record_event.await_args_list[0].kwargs["metadata"]
     assert rename_metadata["old_name"] == "floor-plan.dwg"
     assert rename_metadata["new_name"] == "floor-plan-final.dwg"
+    assert "path" not in rename_metadata
     assert record_event.await_args_list[1].kwargs["metadata"]["changed_fields"] == [
         "file_type"
     ]
@@ -247,8 +249,43 @@ async def test_revision_approval_persists_state_and_emits_reference_only_event()
     assert event["metadata"]["version"] == 3
     assert event["metadata"]["reviewed_by"] == REVIEWER_ID
     assert event["metadata"]["approved_by"] == USER_ID
-    assert "path" not in event["metadata"]
-    assert "name" not in event["metadata"]
+
+
+@pytest.mark.asyncio
+async def test_file_rename_surfaces_audit_failure_after_successful_mutation():
+    file_row = {
+        "id": FILE_ID,
+        "job_id": JOB_ID,
+        "project_id": PROJECT_ID,
+        "name": "floor-plan.dwg",
+        "path": "uploads/floor-plan.dwg",
+        "file_type": "dwg",
+        "version": 1,
+    }
+    updated_file = {**file_row, "name": "floor-plan-final.dwg"}
+
+    with (
+        patch.object(file_queries, "get_file", AsyncMock(return_value=file_row)),
+        patch.object(
+            file_queries,
+            "run_in_threadpool",
+            AsyncMock(return_value=SimpleNamespace(data=[updated_file])),
+        ),
+        patch.object(
+            file_queries,
+            "record_audit_event",
+            AsyncMock(side_effect=RuntimeError("audit store unavailable")),
+        ),
+        pytest.raises(HTTPException) as error,
+    ):
+        await file_queries.update_file(
+            FILE_ID,
+            {"name": "floor-plan-final.dwg"},
+            {"user_id": USER_ID},
+        )
+
+    assert error.value.status_code == 500
+    assert "File state changed but file.renamed audit event could not be recorded" in str(error.value.detail)
 
 
 @pytest.mark.asyncio

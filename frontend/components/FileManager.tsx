@@ -50,6 +50,7 @@ function FileActivityPanel({ fileId }: { fileId: string }) {
         isLoading,
         isError,
         error,
+        refetch,
     } = useApiResource<FileActivityEvent[]>({
         fetcher: (u) => getFileActivity(u, fileId),
         select: (raw) => Array.isArray(raw) ? raw as unknown as FileActivityEvent[] : [],
@@ -62,7 +63,18 @@ function FileActivityPanel({ fileId }: { fileId: string }) {
             {isLoading ? (
                 <p className="text-xs text-[#94a3b8]">Loading activity...</p>
             ) : isError ? (
-                <p role="alert" className="text-xs text-red-300">{error?.message || "Could not load file activity."}</p>
+                <div>
+                    <p role="alert" className="text-xs text-red-300">
+                        {error?.message || "Could not load file activity."}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={refetch}
+                        className="mt-2 text-xs text-[#54e3b5] hover:text-white"
+                    >
+                        Try again
+                    </button>
+                </div>
             ) : events.length ? (
                 <ol className="space-y-3">
                     {events.map((event) => (

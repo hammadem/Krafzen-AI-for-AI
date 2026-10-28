@@ -60,10 +60,9 @@ async def create_invite(workspace_id: str, email: str, role: str, user_id: str) 
             actor_user_id=user_id,
             metadata={
                 "invite_id": invite["id"],
-                "target_email": email,
                 "role": role,
             },
-            message=f"Invitation sent to {email} with role {role.title()}.",
+            message=f"Workspace invitation sent with {role.title()} role.",
         )
         return invite
     
@@ -114,11 +113,10 @@ async def revoke_invite(invite_id: str ,user_id: str) -> bool:
             actor_user_id=user_id,
             metadata={
                 "invite_id": invite_id,
-                "target_email": invite.data["email"],
                 "role": invite.data["role"],
                 "access_scope": "pending_invitation",
             },
-            message=f"Workspace invitation for {invite.data['email']} was revoked.",
+            message="A pending workspace invitation was revoked.",
         )
         return True
     
@@ -214,7 +212,6 @@ async def accept_invite(token: str, user_id: str) -> dict[str, Any]:
         metadata = {
             "invite_id": invite["id"],
             "target_user_id": user_id,
-            "target_email": user_email,
             "role": invite["role"],
         }
         await record_workspace_event(
@@ -222,14 +219,14 @@ async def accept_invite(token: str, user_id: str) -> dict[str, Any]:
             workspace_id=invite["workspace_id"],
             actor_user_id=user_id,
             metadata=metadata,
-            message=f"{user_email} joined the workspace as {invite['role'].title()}.",
+            message=f"A new member joined the workspace as {invite['role'].title()}.",
         )
         await record_workspace_event(
             event_name="permissions.access_granted",
             workspace_id=invite["workspace_id"],
             actor_user_id=user_id,
             metadata=metadata,
-            message=f"Workspace access was granted to {user_email} as {invite['role'].title()}.",
+            message=f"Workspace access was granted with {invite['role'].title()} role.",
         )
         return {
             "workspace_id": invite["workspace_id"],

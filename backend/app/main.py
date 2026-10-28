@@ -2,7 +2,6 @@
 import asyncio
 import logging
 import re
-import sys
 
 from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -103,7 +102,7 @@ from app.routes import (
 )
 
 # ... (middle of file)
-print("✅ Registering User Routes...")
+logger.info("Registering API routes")
 # Include API routers
 app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"])
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
@@ -130,43 +129,25 @@ app.include_router(export_routes.router, prefix="/api/v1", tags=["Exports"])
 dxf_generator_available = False
 dxf_generator = None
 try:
-    sys.stdout.write("🔍 Attempting to import DXF generator module...\n")
-    sys.stdout.flush()
+    logger.info("Attempting to import DXF generator module")
     from app.api import dxf_generator
     dxf_generator_available = True
-    sys.stdout.write("✅ DXF generator module imported successfully\n")
-    sys.stdout.flush()
     logger.info("DXF generator module imported successfully")
-except Exception as e:
-    import traceback
-    error_msg = f"⚠️ Failed to import DXF generator module: {e}"
-    sys.stdout.write(error_msg + "\n")
-    sys.stdout.flush()
-    traceback.print_exc()
+except Exception:
     logger.exception("Failed to import DXF generator module")
     dxf_generator_available = False
     dxf_generator = None
 
 if dxf_generator_available and dxf_generator:
     try:
-        sys.stdout.write("🔍 Attempting to register DXF generator router...\n")
-        sys.stdout.flush()
+        logger.info("Attempting to register DXF generator router")
         app.include_router(dxf_generator.router, prefix="/api/v1/dxf", tags=["DXF Generator"])
-        sys.stdout.write("✅ DXF generator router registered successfully\n")
-        sys.stdout.flush()
         logger.info("DXF generator router registered successfully")
-    except Exception as e:
-        import traceback
-        error_msg = f"❌ Failed to register DXF generator router: {e}"
-        sys.stdout.write(error_msg + "\n")
-        sys.stdout.flush()
-        traceback.print_exc()
+    except Exception:
         logger.exception("Failed to register DXF generator router")
 else:
     reason = "DXF generator module import failed" if not dxf_generator_available else "DXF generator is None"
-    sys.stdout.write(f"⚠️ DXF generator router not available - {reason}\n")
-    sys.stdout.flush()
-    logger.warning(f"DXF generator router not available - {reason}")
+    logger.warning("DXF generator router not available - %s", reason)
 
 
 # Root endpoint
@@ -185,7 +166,7 @@ async def rebuild_openapi_schema():
     """Force rebuild of Swagger schema to fix cache issues"""
     app.openapi_schema = None
     app.openapi()
-    print("🔁 OpenAPI schema rebuilt successfully — all routes loaded.")
+    logger.info("OpenAPI schema rebuilt successfully; all routes loaded")
 
     if not (getattr(settings, "SUPABASE_JWT_SECRET", None) or "").strip():
         logger.warning(
@@ -198,11 +179,10 @@ async def rebuild_openapi_schema():
             "Set SUPABASE_PROJECT_ID on Render to match your Supabase project ref."
         )
     
-    print("\n🔍 Registered Routes:")
+    logger.info("Registered routes:")
     for route in app.routes:
         if hasattr(route, "path"):
-             print(f"   - {route.path} [{','.join(route.methods)}]")
-    print("---------------------\n")
+            logger.info("  %s [%s]", route.path, ",".join(route.methods))
 
     import threading
 

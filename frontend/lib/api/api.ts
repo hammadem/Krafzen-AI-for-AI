@@ -259,10 +259,11 @@ export async function updateAProject(
 // Activity feed for the dashboard (auth-scoped by Bearer token)
 export async function getDashboardActivity(
     user: User | null,
-    opts?: { limit?: number; projectId?: string }
+    opts?: { limit?: number; offset?: number; projectId?: string }
 ) {
     const params = new URLSearchParams();
     if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.offset) params.set("offset", String(opts.offset));
     if (opts?.projectId) params.set("project_id", opts.projectId);
     const query = params.size ? `?${params.toString()}` : "";
     return apiClient("GET", `${DASHBOARD_URLS.GET_ACTIVITY()}${query}`, user);

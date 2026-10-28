@@ -244,9 +244,58 @@ async def test_workspace_activity_is_filtered_by_organization_id(monkeypatch):
         user_id="00000000-0000-0000-0000-000000000004",
     )
 
-    assert any(
-        query.filters
-        == [("organization_id", "00000000-0000-0000-0000-000000000003")]
+    assert {
+        tuple(query.filters)
         for query in fake_db.activity_queries
-    )
+    } == {
+        (("workspace_id", "00000000-0000-0000-0000-000000000003"),),
+        (("organization_id", "00000000-0000-0000-0000-000000000003"),),
+    }
     assert activity[0]["action"] == "member.joined"
+
+
+@pytest.mark.asyncio
+async def test_workspace_event_maps_legacy_and_canonical_workspace_fields(monkeypatch):
+    fake_db = FakeDatabase()
+    monkeypatch.setattr(activity_service, "db", fake_db)
+
+    async def run_inline(function):
+        return function()
+
+    monkeypatch.setattr(activity_service, "run_in_threadpool", run_inline)
+
+    await activity_service.record_workspace_event(
+        event_name="team.member_invited",
+        workspace_id="00000000-0000-0000-0000-000000000003",
+        actor_user_id="00000000-0000-0000-0000-000000000004",
+        metadata={"invite_id": "00000000-0000-0000-0000-000000000005"},
+    )
+
+    payload = fake_db.activity_table.payload
+    assert payload["workspace_id"] == "00000000-0000-0000-0000-000000000003"
+    assert payload["organization_id"] == payload["workspace_id"]
+    assert payload["actor_user_id"] == "00000000-0000-0000-0000-000000000004"
+
+
+@pytest.mark.asyncio
+async def test_file_event_maps_file_and_job_context_to_canonical_fields(monkeypatch):
+    fake_db = FakeDatabase()
+    monkeypatch.setattr(activity_service, "db", fake_db)
+
+    async def run_inline(function):
+        return function()
+
+    monkeypatch.setattr(activity_service, "run_in_threadpool", run_inline)
+
+    await activity_service.record_file_event(
+        event_name="file.exported",
+        file_id="00000000-0000-0000-0000-000000000006",
+        actor_user_id="00000000-0000-0000-0000-000000000004",
+        project_id="00000000-0000-0000-0000-000000000003",
+        job_id="00000000-0000-0000-0000-000000000005",
+    )
+
+    payload = fake_db.activity_table.payload
+    assert payload["entity_type"] == "file"
+    assert payload["entity_id"] == payload["file_id"]
+    assert payload["job_id"] == "00000000-0000-0000-0000-000000000005"

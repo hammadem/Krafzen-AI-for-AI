@@ -15,7 +15,7 @@ router = APIRouter(prefix="/activity", tags=["Activity"])
 @router.get("/", response_model=list[ActivityEventResponse])
 async def list_activity(
     project_id: str = Query(...),
-    limit: int = Query(default=50, le=100),
+    limit: int = Query(default=50, ge=1, le=100),
     user=Depends(require_auth),
 ):
     return await get_project_activity(
@@ -28,7 +28,7 @@ async def list_activity(
 @router.get("/workspace/{workspace_id}", response_model=list[ActivityEventResponse])
 async def list_workspace_activity(
     workspace_id: str,
-    limit: int = Query(default=50, le=100),
+    limit: int = Query(default=50, ge=1, le=100),
     user=Depends(require_auth),
 ):
     return await get_workspace_activity(workspace_id=workspace_id, user_id=user["user_id"], limit=limit)
@@ -37,7 +37,7 @@ async def list_workspace_activity(
 @router.get("/files/{file_id}", response_model=list[ActivityEventResponse])
 async def list_file_activity(
     file_id: str,
-    limit: int = Query(default=50, le=100),
+    limit: int = Query(default=50, ge=1, le=100),
     user=Depends(require_auth),
 ):
     file = await get_file(file_id=file_id, user=user)

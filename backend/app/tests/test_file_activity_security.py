@@ -23,11 +23,13 @@ class StubQuery:
     def __init__(self, db, table):
         self.db = db
         self.table_name = table
+        self.filters = []
 
     def select(self, *_args, **_kwargs):
         return self
 
-    def eq(self, *_args, **_kwargs):
+    def eq(self, key, value, **_kwargs):
+        self.filters.append((key, value))
         return self
 
     def maybe_single(self):
@@ -41,7 +43,13 @@ class StubQuery:
 
     def execute(self):
         self.db.queried_tables.append(self.table_name)
-        return SimpleNamespace(data=self.db.responses.get(self.table_name))
+        data = self.db.responses.get(self.table_name)
+        if isinstance(data, list):
+            data = [
+                row for row in data
+                if all(row.get(key) == value for key, value in self.filters)
+            ]
+        return SimpleNamespace(data=data)
 
 
 class StubDB:
@@ -119,23 +127,62 @@ async def test_file_activity_route_uses_verified_file_job_and_project():
 async def test_file_activity_combines_file_and_job_events_without_duplicates():
     file_event = {
         "id": "file-event",
+        "file_id": FILE_ID,
+        "entity_id": FILE_ID,
+        "entity_type": "file",
+        "project_id": PROJECT_B,
+        "job_id": JOB_ID,
         "event_name": "file.uploaded",
         "created_at": "2025-01-02T10:48:00+00:00",
         "profiles": {"display_name": "Khadija"},
     }
     job_event = {
         "id": "job-event",
+        "entity_id": JOB_ID,
+        "entity_type": "export_job",
+        "project_id": PROJECT_B,
+        "job_id": JOB_ID,
         "event_name": "export.completed",
         "created_at": "2025-01-02T10:41:00+00:00",
     }
-    db_stub = StubDB({"activity_events": [file_event, job_event]})
+    unrelated_file_event = {
+        "id": "unrelated-file-event",
+        "file_id": "00000000-0000-0000-0000-000000000099",
+        "entity_id": "00000000-0000-0000-0000-000000000099",
+        "entity_type": "file",
+        "project_id": PROJECT_B,
+        "job_id": JOB_ID,
+        "event_name": "file.renamed",
+        "created_at": "2025-01-02T10:49:00+00:00",
+    }
+    unrelated_project_event = {
+        "id": "unrelated-project-event",
+        "entity_id": "other-job",
+        "entity_type": "export_job",
+        "project_id": WORKSPACE_B,
+        "job_id": "other-job",
+        "event_name": "export.completed",
+        "created_at": "2025-01-02T10:50:00+00:00",
+    }
+    db_stub = StubDB({
+        "activity_events": [
+            file_event,
+            job_event,
+            unrelated_file_event,
+            unrelated_project_event,
+        ]
+    })
 
     with patch.object(activity_service, "db", db_stub):
         events = await activity_service.get_file_activity(FILE_ID, JOB_ID, PROJECT_B)
 
     assert [event["id"] for event in events] == ["file-event", "job-event"]
     assert events[0]["actor"]["display_name"] == "Khadija"
-    assert db_stub.queried_tables == ["activity_events", "activity_events"]
+    assert db_stub.queried_tables == [
+        "activity_events",
+        "activity_events",
+        "activity_events",
+    ]
 
 
 @pytest.mark.asyncio
@@ -277,6 +324,9 @@ def test_normal_users_have_read_only_activity_routes_and_database_grants():
     read_scope_migration = (
         migration_dir / "013_activity_audit_read_scope.sql"
     ).read_text(encoding="utf-8").upper()
+    workspace_sync_migration = (
+        migration_dir / "014_sync_workspace_audit_identifiers.sql"
+    ).read_text(encoding="utf-8").upper()
 
     assert "ENABLE ROW LEVEL SECURITY" in file_security_migration
     assert "REVOKE ALL PRIVILEGES" in read_scope_migration
@@ -286,3 +336,5 @@ def test_normal_users_have_read_only_activity_routes_and_database_grants():
     assert "ON DELETE SET NULL" in file_security_migration
     assert "BEFORE UPDATE OR DELETE" in audit_contract_migration
     assert "BEFORE TRUNCATE" in audit_contract_migration
+    assert "WORKSPACE_ID = COALESCE(WORKSPACE_ID, ORGANIZATION_ID)" in workspace_sync_migration
+    assert "ORGANIZATION_ID = COALESCE(WORKSPACE_ID, ORGANIZATION_ID)" in workspace_sync_migration

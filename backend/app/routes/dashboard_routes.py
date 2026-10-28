@@ -46,6 +46,7 @@ class ActivityEvent(BaseModel):
 class ActivityFeedResponse(BaseModel):
     events: list[ActivityEvent]
     total: int
+    has_more: bool = False
 
 
 class WorkspaceSummary(BaseModel):
@@ -83,7 +84,8 @@ _ATTENTION_STATES = {
 @router.get("/activity", response_model=ActivityFeedResponse)
 async def get_activity_feed(
     project_id: str | None = Query(None, description="Filter to a specific project"),
-    limit: int = Query(100, ge=1, le=250),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0, le=10_000),
     user=Depends(require_auth),
 ):
     """
@@ -91,10 +93,11 @@ async def get_activity_feed(
     Ordered by most recent first.
     """
     try:
+        page_window = offset + limit + 1
         projects = await get_projects(user, limit=250)
         project_by_id = {str(project["id"]): project for project in projects}
         if project_id and project_id not in project_by_id:
-            return ActivityFeedResponse(events=[], total=0)
+            return ActivityFeedResponse(events=[], total=0, has_more=False)
         visible_projects = (
             [project_by_id[project_id]] if project_id else projects
         )
@@ -104,7 +107,7 @@ async def get_activity_feed(
 
         async def jobs_for_project(owned_project_id: str) -> list[dict]:
             async with job_limit:
-                return await get_jobs(owned_project_id, user)
+                return await get_jobs(owned_project_id, user, limit=page_window)
 
         job_groups = await asyncio.gather(
             *(jobs_for_project(owned_project_id) for owned_project_id in project_ids)
@@ -112,8 +115,7 @@ async def get_activity_feed(
         raw_jobs = [job for group in job_groups for job in group]
 
         workspace_ids = await _get_user_workspace_ids(user["user_id"])
-        activity_rows = await _get_activity_rows(project_ids, workspace_ids)
-        actor_names = await _get_actor_names(activity_rows, visible_projects)
+        activity_rows = await _get_activity_rows(project_ids, workspace_ids, page_window)
 
         events: list[ActivityEvent] = []
         recorded_job_statuses = {
@@ -140,7 +142,7 @@ async def get_activity_feed(
                 event_name=event_name,
                 category=_activity_category(event_name),
                 actor_user_id=str(actor_user_id) if actor_user_id else None,
-                actor_name=actor_names.get(str(actor_user_id)) if actor_user_id else None,
+                actor_name=None,
                 event_id=str(row.get("event_id") or row.get("id"))
                 if row.get("event_id") or row.get("id")
                 else None,
@@ -150,8 +152,8 @@ async def get_activity_feed(
                 message=_activity_message(
                     event_name,
                     metadata,
-                    actor_names.get(str(actor_user_id)) if actor_user_id else None,
-                    actor_names,
+                    None,
+                    {},
                     row.get("message"),
                 ),
                 metadata=metadata,
@@ -178,23 +180,48 @@ async def get_activity_feed(
                 event_name=f"export.{status.value}",
                 category="exports",
                 actor_user_id=str(actor_user_id) if actor_user_id else None,
-                actor_name=actor_names.get(str(actor_user_id)) if actor_user_id else None,
+                actor_name=None,
                 message=_STATUS_LABELS.get(status, status.value),
                 metadata={},
             ))
 
-        events.sort(
-            key=_event_time_sort_key,
-            reverse=True,
+        events.sort(key=_event_time_sort_key, reverse=True)
+        has_more = len(events) > offset + limit
+        page_events = events[offset:offset + limit]
+        actor_names = await _get_actor_names(
+            [
+                {"actor_user_id": event.actor_user_id, "metadata": event.metadata}
+                for event in page_events
+            ],
+            visible_projects,
         )
-        events = events[:limit]
-        return ActivityFeedResponse(events=events, total=len(events))
+        for event in page_events:
+            event.actor_name = (
+                actor_names.get(str(event.actor_user_id))
+                if event.actor_user_id
+                else None
+            )
+            event.message = _activity_message(
+                event.event_name or event.event_type,
+                event.metadata,
+                event.actor_name,
+                actor_names,
+                event.message,
+            )
+        return ActivityFeedResponse(
+            events=page_events,
+            total=len(page_events),
+            has_more=has_more,
+        )
 
     except HTTPException:
         raise
     except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error(f"Error occurred while fetching activity feed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve activity feed.",
+        ) from e
 
 
 async def _get_user_workspace_ids(user_id: str) -> list[str]:
@@ -214,14 +241,21 @@ async def _get_user_workspace_ids(user_id: str) -> list[str]:
     })
 
 
-async def _get_activity_rows(project_ids: list[str], workspace_ids: list[str]) -> list[dict]:
+async def _get_activity_rows(
+    project_ids: list[str],
+    workspace_ids: list[str],
+    fetch_limit: int,
+) -> list[dict]:
     queries = []
     if project_ids:
         queries.append(
             run_in_threadpool(
                 lambda: db.table("activity_events").select("*")
                     .in_("project_id", project_ids)
-                    .order("created_at", desc=True).limit(250).execute()
+                    .order("created_at", desc=True)
+                    .order("id", desc=True)
+                    .range(0, fetch_limit - 1)
+                    .execute()
             )
         )
     if workspace_ids:
@@ -229,7 +263,10 @@ async def _get_activity_rows(project_ids: list[str], workspace_ids: list[str]) -
             run_in_threadpool(
                 lambda: db.table("activity_events").select("*")
                     .in_("workspace_id", workspace_ids)
-                    .order("created_at", desc=True).limit(250).execute()
+                    .order("created_at", desc=True)
+                    .order("id", desc=True)
+                    .range(0, fetch_limit - 1)
+                    .execute()
             )
         )
     responses = await asyncio.gather(*queries) if queries else []
@@ -300,13 +337,13 @@ def _project_display_name(project: dict | None) -> str | None:
     return name
 
 
-def _event_time_sort_key(event: ActivityEvent) -> float:
+def _event_time_sort_key(event: ActivityEvent) -> tuple[float, str]:
     timestamp = event.occurred_at
     if timestamp is None:
-        return float("-inf")
+        return float("-inf"), event.id
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=UTC)
-    return timestamp.timestamp()
+    return timestamp.timestamp(), event.id
 
 
 def _activity_category(event_name: str) -> str:

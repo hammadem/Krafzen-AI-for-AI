@@ -132,3 +132,28 @@ async def test_unexpected_pipeline_error_marks_job_failed():
     assert advance.call_args.args[1] is ExportStatus.FAILED
     assert event.call_args.args[0] == "export.failed"
     notification.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_export_without_artifact_is_not_marked_completed():
+    advance = AsyncMock(return_value={"id": JOB["id"]})
+    event = AsyncMock()
+    notification = AsyncMock()
+
+    with (
+        patch.object(worker_service, "run_preflight_gate", AsyncMock(return_value=passing_preflight())),
+        patch.object(worker_service, "run_postflight_gate", wraps=worker_service.run_postflight_gate),
+        patch.object(worker_service, "_run_export_pipeline", AsyncMock()),
+        patch.object(worker_service, "advance_export_status", advance),
+        patch.object(worker_service, "emit_export_event", event),
+        patch.object(worker_service, "emit_notification", notification),
+    ):
+        await worker_service.process_export_job(JOB.copy(), USER)
+
+    assert advance.call_args.args[1] is ExportStatus.FAILED
+    assert [call.args[0] for call in event.call_args_list][-1] == "export.failed"
+    assert not any(
+        call.args[1] is ExportStatus.COMPLETED
+        for call in advance.call_args_list
+    )
+    notification.assert_awaited_once()

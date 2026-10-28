@@ -86,7 +86,8 @@ content.
 
 ## Workspace team and permissions
 
-Workspace events are stored in `activity_events` with `workspace_id` set.
+Workspace events are stored in `activity_events` with both `workspace_id` and
+the legacy `organization_id` set to the workspace UUID.
 Their `actor_user_id` is always taken from the authenticated JWT subject
 (`require_auth`); target user IDs and invite tokens are never used as the actor.
 
@@ -101,8 +102,10 @@ Their `actor_user_id` is always taken from the authenticated JWT subject
 | `permissions.permission_changed` | A member's workspace role is changed |
 
 Role-change events include `target_user_id`, `from_role`, and `to_role` in
-metadata. Membership and access events include the target user or invitation
-email and the role involved. A no-op role update does not produce a change event.
+metadata. Membership and access events include target user or invitation identifiers and
+the role involved. New invitation events do not persist invitation email
+addresses or tokens in audit metadata. A no-op role update does not produce a
+change event.
 
 Invite acceptance endpoint: `POST /api/v1/workspaces/invites/accept` with
 `{"token": "<invite token>"}` and a valid bearer token for the invited user.

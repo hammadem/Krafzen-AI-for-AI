@@ -16,8 +16,15 @@ type TestActivityEvent = {
     message: string;
 };
 
-const { activityEvents, markRevisionReviewed, setRevisionDecision } = vi.hoisted(() => ({
-    activityEvents: [
+const {
+    activityEvents,
+    activityFeed,
+    getDashboardActivity,
+    setFeedData,
+    markRevisionReviewed,
+    setRevisionDecision,
+} = vi.hoisted(() => {
+    const events: TestActivityEvent[] = [
         {
             id: "event-ai",
             project_id: "project-1",
@@ -42,29 +49,46 @@ const { activityEvents, markRevisionReviewed, setRevisionDecision } = vi.hoisted
             category: "team",
             message: "Changed John’s role from Member to Admin",
         },
-    ] as TestActivityEvent[],
-    markRevisionReviewed: vi.fn().mockResolvedValue({ ok: true }),
-    setRevisionDecision: vi.fn().mockResolvedValue({ ok: true }),
-}));
+    ];
+    return {
+        activityEvents: events,
+        activityFeed: { events, total: events.length, has_more: false },
+        getDashboardActivity: vi.fn(),
+        setFeedData: vi.fn(),
+        markRevisionReviewed: vi.fn().mockResolvedValue({ ok: true }),
+        setRevisionDecision: vi.fn().mockResolvedValue({ ok: true }),
+    };
+});
 
 vi.mock("@/lib/api/api", () => ({
-    getDashboardActivity: vi.fn(),
+    getDashboardActivity,
     markRevisionReviewed,
     restoreFileRevision: vi.fn(),
     setRevisionDecision,
 }));
 
+vi.mock("@/context/AuthContext", () => ({
+    useOptionalAuth: () => ({ user: { userId: "user-1" } }),
+}));
+
 vi.mock("@/hooks/useApiResource", () => ({
     useApiResource: () => ({
-        data: activityEvents,
+        data: activityFeed,
         isLoading: false,
         isError: false,
         error: null,
         refetch: vi.fn(),
+        setData: setFeedData,
     }),
 }));
 
 describe("ActivityPage", () => {
+    beforeEach(() => {
+        activityFeed.has_more = false;
+        getDashboardActivity.mockReset();
+        setFeedData.mockReset();
+    });
+
     it("renders the global timeline and available category filters", () => {
         render(<ActivityPage />);
 
@@ -77,6 +101,25 @@ describe("ActivityPage", () => {
         expect(screen.getByRole("button", { name: "Team" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Permissions" })).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Exports" })).toBeInTheDocument();
+    });
+
+    it("loads the next bounded page without replacing the current feed", async () => {
+        activityFeed.has_more = true;
+        getDashboardActivity.mockResolvedValue({
+            ok: true,
+            data: { events: [], total: 0, has_more: false },
+        });
+        render(<ActivityPage />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+        });
+
+        expect(getDashboardActivity).toHaveBeenCalledWith(
+            { userId: "user-1" },
+            { limit: 50, offset: 2 },
+        );
+        expect(setFeedData).toHaveBeenCalledOnce();
     });
 
     it("filters activity by category, user, project, and date range", () => {
@@ -117,12 +160,16 @@ describe("ActivityPage", () => {
         await act(async () => {
             fireEvent.click(screen.getByRole("button", { name: "Mark reviewed" }));
         });
-        expect(markRevisionReviewed).toHaveBeenCalledWith(null, "file-1");
+        expect(markRevisionReviewed).toHaveBeenCalledWith({ userId: "user-1" }, "file-1");
         expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
 
         await act(async () => {
             fireEvent.click(screen.getByRole("button", { name: "Approve" }));
         });
-        expect(setRevisionDecision).toHaveBeenCalledWith(null, "file-1", "approved");
+        expect(setRevisionDecision).toHaveBeenCalledWith(
+            { userId: "user-1" },
+            "file-1",
+            "approved",
+        );
     });
 });

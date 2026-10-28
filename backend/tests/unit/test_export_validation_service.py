@@ -21,8 +21,19 @@ async def test_preflight_passes_minimal_job():
 
 
 @pytest.mark.asyncio
-async def test_postflight_passes_without_artifact_stub():
+async def test_postflight_fails_without_required_artifact():
     report = await run_postflight({"id": "exp-1", "project_id": "p1", "format": "dxf"})
-    assert report.passed is True
+    assert report.passed is False
     assert report.requires_review is False
     assert any(i.code == "EXPORT_MISSING_ARTIFACT" for i in report.issues)
+
+
+@pytest.mark.asyncio
+async def test_postflight_passes_when_artifact_is_linked():
+    report = await run_postflight({
+        "id": "exp-1",
+        "project_id": "p1",
+        "format": "dxf",
+        "artifact_file_id": "file-1",
+    })
+    assert report.passed is True

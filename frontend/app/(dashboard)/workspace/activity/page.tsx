@@ -50,6 +50,41 @@ interface ActivityEvent {
     message: string;
 }
 
+interface ActivityFeedPage {
+    events: ActivityEvent[];
+    total: number;
+    has_more: boolean;
+}
+
+const ACTIVITY_PAGE_SIZE = 50;
+
+function parseActivityFeed(raw: unknown): ActivityFeedPage {
+    if (
+        typeof raw !== "object" ||
+        raw === null ||
+        !("events" in raw) ||
+        !Array.isArray(raw.events)
+    ) {
+        return { events: [], total: 0, has_more: false };
+    }
+
+    return {
+        events: raw.events.filter(
+            (event): event is ActivityEvent =>
+                typeof event === "object" &&
+                event !== null &&
+                "id" in event &&
+                typeof event.id === "string" &&
+                "event_type" in event &&
+                typeof event.event_type === "string" &&
+                "message" in event &&
+                typeof event.message === "string"
+        ),
+        total: "total" in raw && typeof raw.total === "number" ? raw.total : 0,
+        has_more: "has_more" in raw && raw.has_more === true,
+    };
+}
+
 const CATEGORIES: { label: string; value: ActivityCategory }[] = [
     { label: "All", value: "all" },
     { label: "Files", value: "files" },
@@ -258,6 +293,7 @@ const dateClass =
     "min-w-0 rounded-lg border border-white/10 bg-[#111722] px-3 py-2 text-sm text-white outline-none [color-scheme:dark] focus:border-[#54e3b5]/50";
 
 export default function ActivityPage() {
+    const user = useOptionalAuth()?.user ?? null;
     const [query, setQuery] = useState("");
     const [category, setCategory] = useState<ActivityCategory>("all");
     const [actorId, setActorId] = useState("all");
@@ -265,19 +301,66 @@ export default function ActivityPage() {
     const [dateFrom, setDateFrom] = useState("");
     const [dateTo, setDateTo] = useState("");
     const {
-        data: activities,
+        data: feed,
         isLoading,
         isError,
         error,
         refetch,
-    } = useApiResource<ActivityEvent[]>({
-        fetcher: (user) => getDashboardActivity(user, { limit: 250 }),
+        setData,
+    } = useApiResource<ActivityFeedPage>({
+        fetcher: (authenticatedUser) =>
+            getDashboardActivity(authenticatedUser, {
+                limit: ACTIVITY_PAGE_SIZE,
+                offset: 0,
+            }),
         select: (raw) =>
-            raw && typeof raw === "object" && "events" in raw
-                ? (raw as { events?: ActivityEvent[] }).events ?? []
-                : [],
-        fallback: [],
+            parseActivityFeed(raw),
+        fallback: { events: [], total: 0, has_more: false },
     });
+    const activities = feed.events;
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+
+    const loadMore = async () => {
+        if (!user || loadingMore || !feed.has_more) return;
+        setLoadingMore(true);
+        setLoadMoreError(null);
+        try {
+            const result = await getDashboardActivity(user, {
+                limit: ACTIVITY_PAGE_SIZE,
+                offset: activities.length,
+            });
+            if (!result.ok) {
+                throw new Error(result.error?.message || "Could not load more activity.");
+            }
+            const nextPage = parseActivityFeed(result.data);
+            if (!nextPage || !Array.isArray(nextPage.events)) {
+                throw new Error("The activity response was invalid.");
+            }
+            setData((current) => {
+                const seen = new Set(
+                    current.events.map((event) => event.event_id || event.id)
+                );
+                const newEvents = nextPage.events.filter(
+                    (event) => !seen.has(event.event_id || event.id)
+                );
+                return {
+                    ...current,
+                    events: [...current.events, ...newEvents],
+                    total: current.events.length + newEvents.length,
+                    has_more: nextPage.has_more,
+                };
+            });
+        } catch (loadError) {
+            setLoadMoreError(
+                loadError instanceof Error
+                    ? loadError.message
+                    : "Could not load more activity."
+            );
+        } finally {
+            setLoadingMore(false);
+        }
+    };
 
     const actors = useMemo(() => {
         const unique = new Map<string, string>();
@@ -524,6 +607,24 @@ export default function ActivityPage() {
                         <p className="text-sm text-[#94a3b8]">No activity matches these filters.</p>
                         <button type="button" onClick={clearFilters} className="text-sm text-[#54e3b5] hover:text-white">
                             Clear filters
+                        </button>
+                    </div>
+                )}
+
+                {!isLoading && !isError && feed.has_more && (
+                    <div className="flex flex-col items-center gap-3">
+                        {loadMoreError && (
+                            <p role="alert" className="text-sm text-red-300">
+                                {loadMoreError}
+                            </p>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => void loadMore()}
+                            disabled={loadingMore}
+                            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white hover:bg-white/10 disabled:opacity-50"
+                        >
+                            {loadingMore ? "Loading…" : loadMoreError ? "Try again" : "Load more"}
                         </button>
                     </div>
                 )}

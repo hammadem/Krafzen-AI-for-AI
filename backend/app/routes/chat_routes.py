@@ -244,7 +244,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
         dxf_instruction = request.message
         
         # Use CADLLM to generate DSL Spec
-        logger.info(f"Generating CADLLM response for: {dxf_instruction}")
+        logger.info("Generating CADLLM response")
         cad_dsl = await cadllm_service.enhance_prompt(dxf_instruction)
         
         if not cad_dsl:
@@ -371,7 +371,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
                 detail="Image generation failed. Check the backend logs and Gemini configuration.",
             )
 
-        logger.info(f"Generated Image URL: {image_url[:50]}...")
+        logger.info("Generated image for chat response")
 
         # 5. Persist Assistant Response
         assistant_msg = await chat_history_service.add_message(

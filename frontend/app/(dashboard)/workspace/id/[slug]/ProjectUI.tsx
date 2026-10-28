@@ -11,21 +11,108 @@ import { toast } from "react-toastify";
 
 interface ProjectActivityEvent {
     id: string;
+    event_id?: string | null;
     message: string;
     actor_name?: string | null;
     occurred_at?: string | null;
 }
 
+interface ProjectActivityPage {
+    events: ProjectActivityEvent[];
+    total: number;
+    has_more: boolean;
+}
+
+const PROJECT_ACTIVITY_PAGE_SIZE = 50;
+
+function parseProjectActivity(raw: unknown): ProjectActivityPage {
+    if (
+        typeof raw !== "object" ||
+        raw === null ||
+        !("events" in raw) ||
+        !Array.isArray(raw.events)
+    ) {
+        return { events: [], total: 0, has_more: false };
+    }
+
+    return {
+        events: raw.events.filter(
+            (event): event is ProjectActivityEvent =>
+                typeof event === "object" &&
+                event !== null &&
+                "id" in event &&
+                typeof event.id === "string" &&
+                "message" in event &&
+                typeof event.message === "string"
+        ),
+        total: "total" in raw && typeof raw.total === "number" ? raw.total : 0,
+        has_more: "has_more" in raw && raw.has_more === true,
+    };
+}
+
 function ProjectActivityPanel({ projectId }: { projectId: string }) {
-    const { data: events, isLoading, isError, error } = useApiResource<ProjectActivityEvent[]>({
+    const { user } = useAuth();
+    const {
+        data: activityPage,
+        isLoading,
+        isError,
+        error,
+        refetch,
+        setData,
+    } = useApiResource<ProjectActivityPage>({
         fetcher: (authenticatedUser) =>
-            getDashboardActivity(authenticatedUser, { projectId, limit: 250 }),
-        select: (raw) =>
-            raw && typeof raw === "object" && "events" in raw
-                ? (raw as { events?: ProjectActivityEvent[] }).events ?? []
-                : [],
-        fallback: [],
+            getDashboardActivity(authenticatedUser, {
+                projectId,
+                limit: PROJECT_ACTIVITY_PAGE_SIZE,
+                offset: 0,
+            }),
+        select: (raw) => parseProjectActivity(raw),
+        fallback: { events: [], total: 0, has_more: false },
     });
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    const loadMore = async () => {
+        if (!user || loadingMore || !activityPage.has_more) return;
+        setLoadingMore(true);
+        setLoadError(null);
+        try {
+            const result = await getDashboardActivity(user, {
+                projectId,
+                limit: PROJECT_ACTIVITY_PAGE_SIZE,
+                offset: activityPage.events.length,
+            });
+            if (!result.ok) {
+                throw new Error(result.error?.message || "Could not load more project activity.");
+            }
+            const nextPage = parseProjectActivity(result.data);
+            if (!nextPage || !Array.isArray(nextPage.events)) {
+                throw new Error("The project activity response was invalid.");
+            }
+            setData((current) => {
+                const seen = new Set(
+                    current.events.map((event) => event.event_id || event.id)
+                );
+                const newEvents = nextPage.events.filter(
+                    (event) => !seen.has(event.event_id || event.id)
+                );
+                return {
+                    ...current,
+                    events: [...current.events, ...newEvents],
+                    total: current.events.length + newEvents.length,
+                    has_more: nextPage.has_more,
+                };
+            });
+        } catch (error) {
+            setLoadError(
+                error instanceof Error
+                    ? error.message
+                    : "Could not load more project activity."
+            );
+        } finally {
+            setLoadingMore(false);
+        }
+    };
 
     return (
         <section aria-label="Project activity" className="rounded-xl border border-white/10 bg-[#111722] p-5">
@@ -33,13 +120,22 @@ function ProjectActivityPanel({ projectId }: { projectId: string }) {
             {isLoading ? (
                 <p className="mt-3 text-sm text-[#94a3b8]">Loading activity...</p>
             ) : isError ? (
-                <p role="alert" className="mt-3 text-sm text-red-300">
-                    {error?.message || "Could not load project activity."}
-                </p>
-            ) : events.length ? (
+                <div className="mt-3">
+                    <p role="alert" className="text-sm text-red-300">
+                        {error?.message || "Could not load project activity."}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={refetch}
+                        className="mt-2 text-sm text-[#54e3b5] hover:text-white"
+                    >
+                        Try again
+                    </button>
+                </div>
+            ) : activityPage.events.length ? (
                 <ol className="mt-3 divide-y divide-white/10">
-                    {events.map((event) => (
-                        <li key={event.id} className="py-3 first:pt-0 last:pb-0">
+                    {activityPage.events.map((event) => (
+                        <li key={event.event_id || event.id} className="py-3 first:pt-0 last:pb-0">
                             <p className="text-sm text-white">{event.message}</p>
                             <p className="mt-1 text-xs text-[#94a3b8]">
                                 {event.actor_name || "System"}
@@ -52,6 +148,19 @@ function ProjectActivityPanel({ projectId }: { projectId: string }) {
                 </ol>
             ) : (
                 <p className="mt-3 text-sm text-[#94a3b8]">No activity recorded for this project yet.</p>
+            )}
+            {!isLoading && !isError && activityPage.has_more && (
+                <div className="mt-4 flex flex-col items-center gap-2">
+                    {loadError && <p role="alert" className="text-sm text-red-300">{loadError}</p>}
+                    <button
+                        type="button"
+                        onClick={() => void loadMore()}
+                        disabled={loadingMore}
+                        className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/5 disabled:opacity-50"
+                    >
+                        {loadingMore ? "Loading…" : loadError ? "Try again" : "Load more"}
+                    </button>
+                </div>
             )}
         </section>
     );
@@ -240,7 +349,10 @@ export default function ProjectUI({ slug }: { slug: string }) {
                         </div>
 
                         <div className="w-[90%] mr-4 sm:mr-0 space-y-5">
-                            <ProjectActivityPanel key={slug} projectId={slug} />
+                            <ProjectActivityPanel
+                                key={currentProject.id}
+                                projectId={currentProject.id}
+                            />
                             <ProjectFilesPanel key={slug} projectId={slug} />
                         </div>
                     </div>

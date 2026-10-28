@@ -87,7 +87,7 @@ async def run_postflight(export_context: dict[str, Any]) -> PostflightReport:
                 "EXPORT_MISSING_ARTIFACT",
                 "No artifact_file_id linked after export generation.",
                 category=ValidationCategory.EXPORT_INTEGRITY,
-                severity=ValidationSeverity.WARNING,
+                severity=ValidationSeverity.ERROR,
             )
         )
 
