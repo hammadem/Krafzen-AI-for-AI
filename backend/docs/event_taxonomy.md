@@ -220,7 +220,7 @@ artifact-file persistence helper.
 Every event uses `entity_type="file"` and includes file ID, display name, file
 type, version, project ID, and actor user ID in metadata. The canonical event
 columns separately store actor, project, and UTC timestamp. Apply
-`011_file_activity_lifecycle.sql` and `012_file_revision_approval.sql` before
+`012_file_activity_lifecycle.sql` and `014_file_revision_approval.sql` before
 using version, archive, or revision approval behavior.
 
 | Event                  | Trigger                                      |

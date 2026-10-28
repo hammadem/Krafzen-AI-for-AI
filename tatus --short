@@ -1,0 +1,23 @@
+ backend/app/db/queries/invite_queries.py           |  11 [32m+[m[31m-[m
+ backend/app/db/queries/job_queries.py              |  24 [32m+++[m[31m-[m
+ backend/app/main.py                                |  38 [32m++[m[31m---[m
+ backend/app/routes/activity_routes.py              |   6 [32m+[m[31m-[m
+ backend/app/routes/chat_routes.py                  |   4 [32m+[m[31m-[m
+ backend/app/routes/dashboard_routes.py             |  79 [32m++++++++[m[31m---[m
+ backend/app/services/activity_service.py           | 153 [32m++++++++++++++++[m[31m-----[m
+ backend/app/services/export_validation_service.py  |   2 [32m+[m[31m-[m
+ backend/app/tests/test_activity_service.py         |  57 [32m+++++++[m[31m-[m
+ backend/app/tests/test_dashboard.py                |  75 [32m+++++++++[m[31m-[m
+ backend/app/tests/test_file_activity.py            |  41 [32m+++++[m[31m-[m
+ backend/app/tests/test_file_activity_security.py   |  60 [32m+++++++[m[31m-[m
+ backend/docs/event_taxonomy.md                     |   9 [32m+[m[31m-[m
+ backend/main.py                                    |   4 [32m+[m[31m-[m
+ .../tests/unit/test_export_validation_service.py   |  15 [32m+[m[31m-[m
+ backend/tests/unit/test_worker_service.py          |  25 [32m++++[m
+ frontend/__tests__/dashboard/Activity.test.tsx     |  67 [32m+++++++[m[31m--[m
+ .../app/(dashboard)/workspace/activity/page.tsx    | 115 [32m+++++++++++++++[m[31m-[m
+ .../(dashboard)/workspace/id/[slug]/ProjectUI.tsx  | 140 [32m+++++++++++++++++[m[31m--[m
+ frontend/components/FileManager.tsx                |  14 [32m+[m[31m-[m
+ frontend/lib/api/api.ts                            |   3 [32m+[m[31m-[m
+ scripts/apply-week2-migrations.sh                  |   6 [32m+[m[31m-[m
+ 22 files changed, 792 insertions(+), 156 deletions(-)

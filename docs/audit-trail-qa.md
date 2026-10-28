@@ -37,7 +37,7 @@ Commands were run from the repository root unless noted otherwise.
 
 ## Not verified / remaining
 
-- Migration 014 was not applied to a live database. Its backfill, insert
+- Migration 016 was not applied to a live database. Its backfill, insert
   synchronization trigger, append-only protection, database grants, and RLS
   must be verified in the target database environment using the documented
   migration procedure.

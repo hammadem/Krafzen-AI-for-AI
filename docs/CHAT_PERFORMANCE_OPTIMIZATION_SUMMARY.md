@@ -27,7 +27,7 @@ Eliminate conversation loading latency (previously up to 2+ minutes on long conv
 ## Architectural & Code Changes Summary
 
 ### 1. Database Indexing & Query Optimization
-- **Migration Script:** Created [010_chat_performance_indexes.sql](file:///f:/KRAFZEN-AI/KRAFZEN-AI-/backend/app/db/migrations/010_chat_performance_indexes.sql) adding composite index `idx_chat_messages_session_created` on `chat_messages(session_id, created_at DESC)`.
+- **Migration Script:** Created [017_chat_performance_indexes.sql](file:///f:/KRAFZEN-AI/KRAFZEN-AI-/backend/app/db/migrations/017_chat_performance_indexes.sql) adding composite index `idx_chat_messages_session_created` on `chat_messages(session_id, created_at DESC)`.
 - **Schema Alignment:** Updated main [schema.sql](file:///f:/KRAFZEN-AI/KRAFZEN-AI-/backend/app/db/schema.sql) to ensure new installations inherit indexed lookups.
 - **Impact:** Eliminates full table scans on large message histories, reducing query latency from several seconds down to ~15-40ms.
 
@@ -52,7 +52,7 @@ Eliminate conversation loading latency (previously up to 2+ minutes on long conv
 
 | File Path | Type | Summary of Changes |
 | :--- | :--- | :--- |
-| `backend/app/db/migrations/010_chat_performance_indexes.sql` | **NEW** | Composite index definition on `chat_messages(session_id, created_at DESC)`. |
+| `backend/app/db/migrations/017_chat_performance_indexes.sql` | **NEW** | Composite index definition on `chat_messages(session_id, created_at DESC)`. |
 | `backend/app/db/schema.sql` | **MODIFY** | Added composite index definition to primary database schema. |
 | `backend/app/services/chat_history_service.py` | **MODIFY** | Added cursor pagination logic (`limit`, `before`) and execution timing telemetry. |
 | `backend/app/routes/chat_routes.py` | **MODIFY** | Added pagination params to `/history/{session_id}`, `Server-Timing` headers, logging, and SSE stream route. |

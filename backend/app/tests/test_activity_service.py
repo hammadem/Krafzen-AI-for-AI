@@ -299,3 +299,25 @@ async def test_file_event_maps_file_and_job_context_to_canonical_fields(monkeypa
     assert payload["entity_type"] == "file"
     assert payload["entity_id"] == payload["file_id"]
     assert payload["job_id"] == "00000000-0000-0000-0000-000000000005"
+
+
+@pytest.mark.asyncio
+async def test_file_and_revision_activity_helpers_match_audit_signature(monkeypatch):
+    from app.db.queries import file_queries
+
+    db = FakeDatabase()
+    monkeypatch.setattr(activity_service, "db", db)
+    file = {
+        "id": "00000000-0000-0000-0000-000000000007",
+        "project_id": "00000000-0000-0000-0000-000000000008",
+        "job_id": "00000000-0000-0000-0000-000000000009",
+        "name": "plan.dxf",
+    }
+
+    await file_queries._record_file_activity("file.uploaded", file, "user-1")
+    assert db.activity_table.payload["file_id"] == file["id"]
+    assert db.activity_table.payload["entity_type"] == "file"
+
+    await file_queries._record_revision_activity("revision.reviewed", file, "user-1")
+    assert db.activity_table.payload["file_id"] == file["id"]
+    assert db.activity_table.payload["entity_type"] == "revision"

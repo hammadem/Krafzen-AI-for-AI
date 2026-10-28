@@ -14,7 +14,7 @@ the production database migration or export generation has been deployed.
    `record_file_event`. The writer records the actor, action, entity, optional
    project/file context, and non-sensitive metadata in `activity_events`.
 3. Workspace identity is written to both canonical `workspace_id` and legacy
-   `organization_id` fields. Migration 014 synchronizes existing rows and
+   `organization_id` fields. Migration 016 synchronizes existing rows and
    future inserts while retaining compatibility with older readers.
 4. Read services return bounded, stably ordered event windows. Workspace,
    project, and file reads apply their scope identifiers; file history also
@@ -30,10 +30,10 @@ the production database migration or export generation has been deployed.
 `entity_type`, `entity_id`, `timestamp`, `file_id`, and `workspace_id`, as well
 as legacy fields used by existing producers and readers. Event retrieval uses
 stable timestamp and identifier tie-breakers. The existing append-only trigger
-is preserved; migration 014 temporarily drops and recreates it around the
+is preserved; migration 016 temporarily drops and recreates it around the
 backfill and installs a before-insert synchronization trigger.
 
-The migration runner applies the existing 013 migration and new 014 migration
+The migration runner applies the existing 015 migration and new 016 migration
 after earlier explicitly ordered migrations. It requires the documented
 database URL, `psql`, backup confirmation, and interactive operator approval.
 The migration has not been applied to a live database as part of this work.

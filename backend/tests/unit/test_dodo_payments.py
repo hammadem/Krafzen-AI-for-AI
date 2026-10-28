@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from app.core.config import settings
-from app.services import payment_service as payment_service_module
 from app.services.payment_service import payment_service
 
 SECRET = "whsec_lXXZg5MJ4VZ03HMQ0SoXx4iUplSt88J/"
@@ -155,7 +154,7 @@ async def test_handle_dodo_webhook_does_not_resolve_user_id_from_customer_email(
     }
 
     mock_db = Mock()
-    monkeypatch.setattr(payment_service_module, "db", mock_db)
+    monkeypatch.setattr("app.db.supabase_client.db", mock_db)
 
     with (
         patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET),

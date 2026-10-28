@@ -316,16 +316,16 @@ def test_normal_users_have_read_only_activity_routes_and_database_grants():
         / "migrations"
     )
     file_security_migration = (
-        migration_dir / "011_file_activity_and_audit_security.sql"
+        migration_dir / "013_file_activity_and_audit_security.sql"
     ).read_text(encoding="utf-8").upper()
     audit_contract_migration = (
-        migration_dir / "010_activity_events_audit_contract.sql"
+        migration_dir / "011_activity_events_audit_contract.sql"
     ).read_text(encoding="utf-8").upper()
     read_scope_migration = (
-        migration_dir / "013_activity_audit_read_scope.sql"
+        migration_dir / "015_activity_audit_read_scope.sql"
     ).read_text(encoding="utf-8").upper()
     workspace_sync_migration = (
-        migration_dir / "014_sync_workspace_audit_identifiers.sql"
+        migration_dir / "016_sync_workspace_audit_identifiers.sql"
     ).read_text(encoding="utf-8").upper()
 
     assert "ENABLE ROW LEVEL SECURITY" in file_security_migration

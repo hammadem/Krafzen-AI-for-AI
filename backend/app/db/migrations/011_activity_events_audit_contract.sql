@@ -121,6 +121,13 @@ BEGIN
     NEW.created_at := NEW."timestamp";
     NEW.metadata := COALESCE(NEW.metadata, '{}'::jsonb);
 
+    IF NEW.organization_id IS NULL AND NEW.workspace_id IS NOT NULL THEN
+        NEW.organization_id := NEW.workspace_id;
+    END IF;
+    IF NEW.workspace_id IS NULL AND NEW.organization_id IS NOT NULL THEN
+        NEW.workspace_id := NEW.organization_id;
+    END IF;
+
     IF NEW.entity_type IS NULL THEN
         NEW.entity_type := CASE
             WHEN NEW.action LIKE 'file.%' THEN 'file'

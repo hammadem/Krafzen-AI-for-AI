@@ -112,12 +112,19 @@ async def record_audit_event(
     metadata: dict[str, Any] | None = None,
     message: str | None = None,
     legacy_job_id: str | None = None,
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Append a canonical audit event and return its stored representation.
 
     Use ``actor_user_id=None`` for automated/system actions. ``entity_id`` is
     polymorphic; ``entity_type`` identifies the referenced entity kind.
+    Unknown keyword arguments are logged and ignored rather than raising.
     """
+    if kwargs:
+        logger.warning(
+            "[activity_service] Ignoring unsupported audit arguments",
+            arguments=sorted(kwargs),
+        )
     if not action or not action.strip():
         raise ValueError("An audit event action is required")
     if not entity_type or not entity_type.strip():

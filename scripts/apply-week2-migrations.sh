@@ -19,7 +19,7 @@ if ! command -v psql >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "This applies Week 2 migrations 002 through 012, followed by the RLS migration."
+echo "This applies Week 2 migrations 002 through 016, followed by the RLS migration."
 echo "Confirm that a current database backup exists before continuing."
 read -r -p "Type APPLY WEEK2 to continue: " confirmation
 if [[ "$confirmation" != "APPLY WEEK2" ]]; then
@@ -37,10 +37,12 @@ for migration in \
   008_align_job_status_to_contract.sql \
   009_add_project_id_to_chat_sessions.sql \
   010_workspace_audit_events.sql \
-  010_activity_events_audit_contract.sql \
-  011_file_activity_lifecycle.sql \
-  011_file_activity_and_audit_security.sql \
-  012_file_revision_approval.sql
+  011_activity_events_audit_contract.sql \
+  012_file_activity_lifecycle.sql \
+  013_file_activity_and_audit_security.sql \
+  014_file_revision_approval.sql \
+  015_activity_audit_read_scope.sql \
+  016_sync_workspace_audit_identifiers.sql
 do
   echo "Applying $migration"
   psql "$DATABASE_URL" \

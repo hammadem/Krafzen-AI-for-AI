@@ -259,16 +259,19 @@ async def _get_activity_rows(
             )
         )
     if workspace_ids:
-        queries.append(
-            run_in_threadpool(
-                lambda: db.table("activity_events").select("*")
-                    .in_("workspace_id", workspace_ids)
-                    .order("created_at", desc=True)
-                    .order("id", desc=True)
-                    .range(0, fetch_limit - 1)
-                    .execute()
+        # organization_id is the legacy column; include it so rows written
+        # before migration 016 synchronized the identifiers are still returned.
+        for column in ("workspace_id", "organization_id"):
+            queries.append(
+                run_in_threadpool(
+                    lambda column=column: db.table("activity_events").select("*")
+                        .in_(column, workspace_ids)
+                        .order("created_at", desc=True)
+                        .order("id", desc=True)
+                        .range(0, fetch_limit - 1)
+                        .execute()
+                )
             )
-        )
     responses = await asyncio.gather(*queries) if queries else []
     deduplicated = {
         str(row.get("id") or row.get("event_id")): row

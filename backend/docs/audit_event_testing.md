@@ -28,10 +28,10 @@ available for existing call sites.
 
 ## Verify automatic file activity in staging
 
-Apply migrations `010_activity_events_audit_contract.sql`,
-`011_file_activity_and_audit_security.sql`,
-`012_file_revision_approval.sql`, and
-`013_activity_audit_read_scope.sql` to staging. Upload a file through the
+Apply migrations `011_activity_events_audit_contract.sql`,
+`013_file_activity_and_audit_security.sql`,
+`014_file_revision_approval.sql`, and
+`015_activity_audit_read_scope.sql` to staging. Upload a file through the
 application, then copy its file ID from the response or file record and run:
 
 ```sql
@@ -68,10 +68,10 @@ Use a **staging** Supabase project, never production. These events are
 append-only and will remain in the database; the test marker makes them easy to
 identify but they cannot be removed through the application.
 
-1. Apply migrations `010_activity_events_audit_contract.sql`,
-   `011_file_activity_and_audit_security.sql`,
-   `012_file_revision_approval.sql`, and
-   `013_activity_audit_read_scope.sql` to staging first.
+1. Apply migrations `011_activity_events_audit_contract.sql`,
+   `013_file_activity_and_audit_security.sql`,
+   `014_file_revision_approval.sql`, and
+   `015_activity_audit_read_scope.sql` to staging first.
 2. In the backend environment, make sure `SUPABASE_URL` and
    `SUPABASE_SERVICE_ROLE_KEY` point to that staging project. Do not paste or
    commit the service-role key.

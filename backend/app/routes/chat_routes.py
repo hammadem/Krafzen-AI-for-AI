@@ -478,9 +478,10 @@ async def _record_generation_failure(
         )
     except Exception as audit_error:
         logger.exception(
-            "Generation failed and its audit event could not be recorded",
-            generation_id=generation_id,
-            error_type=type(audit_error).__name__,
+            "Generation failed and its audit event could not be recorded "
+            "(generation_id=%s, error_type=%s)",
+            generation_id,
+            type(audit_error).__name__,
         )
         raise HTTPException(
             status_code=500,

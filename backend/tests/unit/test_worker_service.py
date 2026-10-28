@@ -157,3 +157,24 @@ async def test_export_without_artifact_is_not_marked_completed():
         for call in advance.call_args_list
     )
     notification.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_completed_export_records_artifact_provenance():
+    job = {**JOB, "artifact": {"bucket": "exports", "path": "p/out.step", "name": "out.step"}}
+    create = AsyncMock(return_value={"id": "file-1"})
+
+    with (
+        patch.object(worker_service, "run_preflight_gate", AsyncMock(return_value=passing_preflight())),
+        patch.object(worker_service, "run_postflight_gate", AsyncMock(return_value=passing_postflight())),
+        patch.object(worker_service, "_run_export_pipeline", AsyncMock()),
+        patch.object(worker_service, "advance_export_status", AsyncMock(return_value={"id": JOB["id"]})),
+        patch.object(worker_service, "emit_export_event", AsyncMock()),
+        patch.object(worker_service, "emit_notification", AsyncMock()),
+        patch.object(worker_service, "create_artifact_file", create),
+    ):
+        await worker_service.process_export_job(job, USER)
+
+    saved = create.await_args.args[0]
+    assert saved["job_id"] == JOB["id"] and saved["project_id"] == JOB["project_id"]
+    assert create.await_args.args[1] == USER["user_id"]

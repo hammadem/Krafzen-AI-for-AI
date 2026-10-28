@@ -101,6 +101,31 @@ async def test_generation_failure_audit_records_stage_not_exception_message():
 
 
 @pytest.mark.asyncio
+async def test_generation_failure_audit_error_returns_clear_http_error():
+    with (
+        patch.object(
+            chat_routes,
+            "record_audit_event",
+            AsyncMock(side_effect=RuntimeError("audit database unavailable")),
+        ),
+        pytest.raises(HTTPException) as exc_info,
+    ):
+        await chat_routes._record_generation_failure(
+            "00000000-0000-0000-0000-000000000005",
+            SESSION_ID,
+            USER_ID,
+            PROJECT_ID,
+            "image_generation",
+            "RuntimeError",
+        )
+
+    assert exc_info.value.status_code == 500
+    assert exc_info.value.detail == (
+        "Generation failed and its audit event could not be recorded"
+    )
+
+
+@pytest.mark.asyncio
 async def test_generation_start_audit_failure_returns_original_error_without_unbound_state():
     audit_error = RuntimeError("audit schema is not migrated")
     with (

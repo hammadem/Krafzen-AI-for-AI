@@ -17,6 +17,7 @@ from fastapi.concurrency import run_in_threadpool
 from httpx import HTTPError
 from postgrest.exceptions import APIError
 
+from app.db.queries.file_queries import create_artifact_file
 from app.db.supabase_client import db
 from app.schemas.export_contracts import ExportStatus, PipelineStage
 from app.services.activity_service import record_audit_event
@@ -94,8 +95,18 @@ async def process_export_job(job: dict[str, Any], system_user: dict[str, Any]) -
             await emit_notification(job_id, project_id, "export_requires_review", "Export needs manual review.")
             return
 
+        # Register the exported artifact (records file.exported) before completing.
+        artifact = job.get("artifact")
+        if artifact:
+            created = await create_artifact_file(
+                {**artifact, "project_id": project_id, "job_id": job_id},
+                system_user.get("user_id"),
+            )
+            if not created:
+                raise RuntimeError("Export artifact could not be recorded")
+
         # VALIDATING → COMPLETED
-        result = await advance_export_status(job_id, ExportStatus.COMPLETED, system_user)
+        result =  await advance_export_status(job_id, ExportStatus.COMPLETED, system_user)
         if not result or result.get("error"):
             raise RuntimeError((result or {}).get("error"))
         await emit_export_event("export.completed", job_id, project_id, actor_user_id=system_user.get("user_id"), message="Export completed")
@@ -115,6 +126,10 @@ async def _run_export_pipeline(job: dict[str, Any]) -> None:
     """Kiruthika export pipeline hook (Week 2)."""
     meta_patch = await run_export_generation(job)
     if meta_patch:
+        # An "artifact" entry describes the generated file (bucket, path, ...).
+        artifact = meta_patch.pop("artifact", None)
+        if artifact:
+            job["artifact"] = artifact
         job.setdefault("metadata", {}).update(meta_patch)
         job["metadata"]["stage"] = PipelineStage.EXPORT_GENERATION.value
 
