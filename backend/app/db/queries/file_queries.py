@@ -1,18 +1,6 @@
-<<<<<<< HEAD
 import uuid
 from datetime import UTC, datetime
 from typing import Any
-=======
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone  
-from fastapi.concurrency import run_in_threadpool
-from fastapi import HTTPException
-from app.db.supabase_client import db
-from app.utils.logger import logger
-from app.services.supabase_service import supabase_service
-from app.utils.storage_service import storage_service
-import uuid
->>>>>>> origin/feat/enterprise-regional-and-white-label-reporting
 
 from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
@@ -22,7 +10,9 @@ from storage3.utils import StorageException
 
 from app.db.supabase_client import db
 from app.services.activity_service import record_audit_event
+from app.services.supabase_service import supabase_service
 from app.utils.logger import logger
+from app.utils.storage_service import storage_service
 
 
 # Resolve a job's project only when it belongs to the authenticated user.
@@ -30,10 +20,10 @@ async def _get_owned_job_project_id(job_id: str, user_id: str) -> str | None:
     try:
         job_res = await run_in_threadpool(
             lambda: db.table("jobs")
-                .select("project_id")
-                .eq("id", job_id)
-                .maybe_single()
-                .execute()
+            .select("project_id")
+            .eq("id", job_id)
+            .maybe_single()
+            .execute()
         )
 
         if not job_res or not job_res.data:
@@ -44,24 +34,30 @@ async def _get_owned_job_project_id(job_id: str, user_id: str) -> str | None:
 
         proj_res = await run_in_threadpool(
             lambda: db.table("projects")
-                .select("user_id")
-                .eq("id", project_id)
-                .maybe_single()
-                .execute()
+            .select("user_id")
+            .eq("id", project_id)
+            .maybe_single()
+            .execute()
         )
 
         if not proj_res or not proj_res.data:
-            logger.warning("[_user_owns_job] Project not found", project_id=project_id)  
+            logger.warning("[_user_owns_job] Project not found", project_id=project_id)
             return None
 
         owns = proj_res.data["user_id"] == user_id
         if not owns:
-            logger.warning("[_user_owns_job] Unauthorized access attempt", job_id=job_id, user_id=user_id[:8] + "...") 
+            logger.warning(
+                "[_user_owns_job] Unauthorized access attempt",
+                job_id=job_id,
+                user_id=user_id[:8] + "...",
+            )
             return None
         return str(project_id)
 
     except (APIError, HTTPError, RuntimeError, KeyError, TypeError) as e:
-        logger.error("[_user_owns_job] Query error", job_id=job_id, error=str(e), exc_info=True)
+        logger.error(
+            "[_user_owns_job] Query error", job_id=job_id, error=str(e), exc_info=True
+        )
         return None
 
 
@@ -69,14 +65,18 @@ async def _user_owns_job(job_id: str, user_id: str) -> bool:
     return await _get_owned_job_project_id(job_id, user_id) is not None
 
 
-def _file_name(file_data: dict[str, Any]) -> str:
-    name = file_data.get("name")
+def _file_name(file: dict[str, Any]) -> str | None:
+    name = file.get("name")
     if name and str(name).strip():
         return str(name)
-    return str(file_data.get("path") or "file").rstrip("/").split("/")[-1] or "file"
+    path = file.get("path")
+    return path.rsplit("/", 1)[-1] if path else None
+
 
 # CREATE FILE (saves metadata to DB, path must come from whoever uploaded to Storage)
-async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any] | None:
+async def create_file(
+    file_data: dict[str, Any], user: dict[str, Any]
+) -> dict[str, Any] | None:
     if not user or "user_id" not in user:
         logger.warning("[create_file] Invalid user context")
         return {"error": "Invalid user context"}
@@ -85,21 +85,23 @@ async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[s
         job_id = file_data.get("job_id")
         project_id = file_data.get("project_id")
 
-        if not job_id :
+        if not job_id:
             return {"error": "job_id is required"}
-        
+
         try:
             uuid.UUID(job_id)
             if project_id:
                 uuid.UUID(project_id)
         except (ValueError, TypeError):
             return {"error": "Invalid job_id or project_id format"}
-        
+
         owned_project_id = await _get_owned_job_project_id(job_id, user["user_id"])
         if not owned_project_id:
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
         if project_id and project_id != owned_project_id:
-            raise HTTPException(status_code=400, detail={"error": "project_id does not match job"})
+            raise HTTPException(
+                status_code=400, detail={"error": "project_id does not match job"}
+            )
 
         path = file_data.get("path")
         payload = {
@@ -110,19 +112,20 @@ async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[s
             "file_type": file_data.get("file_type", "dxf"),
             "mime_type": file_data.get("mime_type"),
             "size_bytes": file_data.get("size_bytes"),
-            "name": file_data.get("name") or (path.rsplit("/", 1)[-1] if path else None),
+            "name": file_data.get("name")
+            or (path.rsplit("/", 1)[-1] if path else None),
             "version": file_data.get("version", 1),
         }
 
         response = await run_in_threadpool(
-            lambda: db.table("files")
-            .insert(payload)
-            .execute()
-            )
+            lambda: db.table("files").insert(payload).execute()
+        )
 
         if response and response.data:
             created_file = response.data[0]
-            await _record_file_activity("file.uploaded", created_file, user["user_id"])
+            await _record_file_activity(
+                "file.uploaded", created_file, user["user_id"]
+            )
             if created_file.get("version", 1) > 1:
                 await _record_file_activity(
                     "file.version_created", created_file, user["user_id"]
@@ -130,18 +133,19 @@ async def create_file(file_data: dict[str, Any], user: dict[str, Any]) -> dict[s
             await _record_revision_activity(
                 "revision.created", created_file, user["user_id"]
             )
-            logger.info("[create_file] File created successfully", file_id=created_file["id"])
+            logger.info(
+                "[create_file] File created successfully", file_id=created_file["id"]
+            )
             return created_file
-        
+
         logger.warning("[create_file] Insert failed")
         return None
-    
+
     except HTTPException:
         raise
     except (APIError, HTTPError, RuntimeError, KeyError, TypeError) as e:
         logger.error("[create_file] Unexpected error", error=str(e), exc_info=True)
         return {"error": "Unexpected server error"}
-
 
 
 # LIST FILES
@@ -164,10 +168,10 @@ async def get_files(job_id: str, user: dict[str, Any]) -> list[dict[str, Any]]:
 
         response = await run_in_threadpool(
             lambda: db.table("files")
-                .select("*")
-                .eq("job_id", job_id)
-                .is_("archived_at", "null")
-                .execute()
+            .select("*")
+            .eq("job_id", job_id)
+            .is_("archived_at", "null")
+            .execute()
         )
 
         files = response.data if response and response.data else []
@@ -178,8 +182,9 @@ async def get_files(job_id: str, user: dict[str, Any]) -> list[dict[str, Any]]:
         logger.error("[get_files] Error", job_id=job_id, error=str(e), exc_info=True)
         return []
 
+
 # GET SINGLE FILE
-async def get_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:  
+async def get_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
     if not user or "user_id" not in user:
         logger.warning("[get_file] Invalid user context")
         return None
@@ -193,20 +198,22 @@ async def get_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
 
         res = await run_in_threadpool(
             lambda: db.table("files")
-                .select("*")
-                .eq("id", file_id)
-                .maybe_single()
-                .execute()
+            .select("*")
+            .eq("id", file_id)
+            .maybe_single()
+            .execute()
         )
 
         if not res or not res.data:
             logger.warning("[get_file] File not found", file_id=file_id)
             return None
 
-        file_data = res.data  
-        owned_project_id = await _get_owned_job_project_id(file_data["job_id"], user["user_id"])
+        file_data = res.data
+        owned_project_id = await _get_owned_job_project_id(
+            file_data["job_id"], user["user_id"]
+        )
         if not owned_project_id:
-            logger.warning("[get_file] Unauthorized access attempt", file_id=file_id) 
+            logger.warning("[get_file] Unauthorized access attempt", file_id=file_id)
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
 
         file_data["project_id"] = owned_project_id
@@ -217,8 +224,11 @@ async def get_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
         logger.error("[get_file] Error", file_id=file_id, error=str(e), exc_info=True)
         return None
 
+
 # UPDATE FILE
-async def update_file(file_id: str, update_data: dict[str, Any], user: dict[str, Any]) -> dict[str, Any] | None:  
+async def update_file(
+    file_id: str, update_data: dict[str, Any], user: dict[str, Any]
+) -> dict[str, Any] | None:
     if not user or "user_id" not in user:
         logger.warning("[update_file] Invalid user context")
         return {"error": "Invalid user context"}
@@ -228,23 +238,21 @@ async def update_file(file_id: str, update_data: dict[str, Any], user: dict[str,
             uuid.UUID(file_id)
         except (ValueError, TypeError):
             logger.warning("[update_file] Invalid UUID format", file_id=file_id)
-            return {"error": f"Invalid file_id format: {file_id}. Must be a valid UUID."}
+            return {
+                "error": f"Invalid file_id format: {file_id}. Must be a valid UUID."
+            }
 
         file = await get_file(file_id, user)
         if not file:
             return {"error": "Unauthorized or file not found"}
 
         payload = {k: v for k, v in update_data.items() if v is not None}
-        #payload["updated_at"] = datetime.now(timezone.utc).isoformat()  no such column in the db table Files
 
-        if not payload:  
+        if not payload:
             return {"error": "No valid update fields provided"}
 
         response = await run_in_threadpool(
-            lambda: db.table("files")
-                .update(payload)
-                .eq("id", file_id)
-                .execute()
+            lambda: db.table("files").update(payload).eq("id", file_id).execute()
         )
 
         if response and hasattr(response, "data") and response.data:
@@ -275,17 +283,20 @@ async def update_file(file_id: str, update_data: dict[str, Any], user: dict[str,
             logger.info("[update_file] File updated successfully", file_id=file_id)
             return updated_file
 
-        logger.warning("[update_file] Update failed", file_id=file_id) 
+        logger.warning("[update_file] Update failed", file_id=file_id)
         return {"error": f"File with id {file_id} not found"}
-    
+
     except HTTPException:
         raise
     except (APIError, HTTPError, RuntimeError, KeyError, TypeError) as e:
-        logger.error("[update_file] Error", file_id=file_id, error=str(e), exc_info=True)
+        logger.error(
+            "[update_file] Error", file_id=file_id, error=str(e), exc_info=True
+        )
         return {"error": "Unexpected server error"}
 
+
 # DELETE FILE
-async def delete_file(file_id: str, user: dict[str, Any]) -> bool:  
+async def delete_file(file_id: str, user: dict[str, Any]) -> bool:
     if not user or "user_id" not in user:
         logger.warning("[delete_file] Invalid user context")
         return False
@@ -299,39 +310,48 @@ async def delete_file(file_id: str, user: dict[str, Any]) -> bool:
 
         file = await get_file(file_id, user)
         if not file:
-            logger.warning("[delete_file] File not authorized or not found", file_id=file_id) 
+            logger.warning(
+                "[delete_file] File not authorized or not found", file_id=file_id
+            )
             return False
-        
+
         # delete from Storage
         try:
             await run_in_threadpool(
-                lambda: db.storage.from_(file["bucket"]).remove([file["path"]]))
+                lambda: db.storage.from_(file["bucket"]).remove([file["path"]])
+            )
         except (StorageException, HTTPError, RuntimeError) as e:
-            logger.error("[delete_file] Storage delete failed", file_id=file_id, error=str(e))
-            raise HTTPException(status_code=500, detail={"error": "Failed to delete file from storage"})
+            logger.error(
+                "[delete_file] Storage delete failed", file_id=file_id, error=str(e)
+            )
+            raise HTTPException(
+                status_code=500,
+                detail={"error": "Failed to delete file from storage"},
+            )
 
         response = await run_in_threadpool(
-            lambda: db.table("files")
-                .delete()
-                .eq("id", file_id)
-                .execute()
+            lambda: db.table("files").delete().eq("id", file_id).execute()
         )
         success = bool(response and hasattr(response, "data") and response.data)
         if success:
-            logger.info("[delete_file] File deleted successfully", file_id=file_id) 
+            logger.info("[delete_file] File deleted successfully", file_id=file_id)
             await _record_file_activity("file.deleted", file, user["user_id"])
         else:
             logger.warning("[delete_file] Delete failed", file_id=file_id)
         return success
-    
+
     except HTTPException:
         raise
     except (APIError, HTTPError, RuntimeError) as e:
-        logger.error("[delete_file] Error", file_id=file_id, error=str(e), exc_info=True)
+        logger.error(
+            "[delete_file] Error", file_id=file_id, error=str(e), exc_info=True
+        )
         return False
 
 
-async def archive_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
+async def archive_file(
+    file_id: str, user: dict[str, Any]
+) -> dict[str, Any] | None:
     file = await get_file(file_id, user)
     if not file:
         return None
@@ -341,9 +361,9 @@ async def archive_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | N
     archived_at = datetime.now(UTC).isoformat()
     response = await run_in_threadpool(
         lambda: db.table("files")
-            .update({"archived_at": archived_at})
-            .eq("id", file_id)
-            .execute()
+        .update({"archived_at": archived_at})
+        .eq("id", file_id)
+        .execute()
     )
     if not response or not response.data:
         return None
@@ -353,7 +373,9 @@ async def archive_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | N
     return archived_file
 
 
-async def restore_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
+async def restore_file(
+    file_id: str, user: dict[str, Any]
+) -> dict[str, Any] | None:
     file = await get_file(file_id, user)
     if not file:
         return None
@@ -362,9 +384,9 @@ async def restore_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | N
 
     response = await run_in_threadpool(
         lambda: db.table("files")
-            .update({"archived_at": None})
-            .eq("id", file_id)
-            .execute()
+        .update({"archived_at": None})
+        .eq("id", file_id)
+        .execute()
     )
     if not response or not response.data:
         return None
@@ -403,18 +425,20 @@ async def set_revision_approval(
 
     response = await run_in_threadpool(
         lambda: db.table("files")
-            .update({
-                "approval_state": approval_state,
-            })
-            .eq("id", file_id)
-            .eq("approval_state", "pending_review")
-            .execute()
+        .update({
+            "approval_state": approval_state,
+        })
+        .eq("id", file_id)
+        .eq("approval_state", "pending_review")
+        .execute()
     )
     if not response or not response.data:
         return None
 
     updated_file = response.data[0]
-    action = "revision.approved" if approval_state == "approved" else "revision.rejected"
+    action = (
+        "revision.approved" if approval_state == "approved" else "revision.rejected"
+    )
     await _record_revision_activity(action, updated_file, user["user_id"])
     return updated_file
 
@@ -437,14 +461,14 @@ async def mark_revision_reviewed(
     reviewed_at = datetime.now(UTC).isoformat()
     response = await run_in_threadpool(
         lambda: db.table("files")
-            .update({
-                "reviewed_by": user["user_id"],
-                "reviewed_at": reviewed_at,
-            })
-            .eq("id", file_id)
-            .eq("approval_state", "pending_review")
-            .is_("reviewed_by", "null")
-            .execute()
+        .update({
+            "reviewed_by": user["user_id"],
+            "reviewed_at": reviewed_at,
+        })
+        .eq("id", file_id)
+        .eq("approval_state", "pending_review")
+        .is_("reviewed_by", "null")
+        .execute()
     )
     if not response or not response.data:
         raise HTTPException(
@@ -476,7 +500,9 @@ async def _record_file_activity(
         "project_id": project_id,
         "user_id": actor_user_id,
     }
-    metadata.update({key: value for key, value in details.items() if value is not None})
+    metadata.update(
+        {key: value for key, value in details.items() if value is not None}
+    )
     try:
         await record_audit_event(
             action=action,
@@ -539,15 +565,10 @@ async def _record_revision_activity(
         ) from error
 
 
-def _file_name(file: dict[str, Any]) -> str | None:
-    name = file.get("name")
-    if name:
-        return name
-    path = file.get("path")
-    return path.rsplit("/", 1)[-1] if path else None
-    
 # Enterprise: Get Organization ID for regional URLs
-async def _resolve_organization_id_for_file(file: Dict[str, Any]) -> Optional[uuid.UUID]:
+async def _resolve_organization_id_for_file(
+    file: dict[str, Any],
+) -> uuid.UUID | None:
     """
     Traverses files -> projects -> workspace_id (organization_id).
     Falls back to files -> jobs -> projects -> workspace_id if project_id is null.
@@ -587,16 +608,13 @@ async def _resolve_organization_id_for_file(file: Dict[str, Any]) -> Optional[uu
 
     return None
 
+
 # GET SIGNED URL
-<<<<<<< HEAD
-async def get_signed_url(file_id: str, user: dict[str, Any]) -> str | None:
-=======
 async def get_signed_url(
     file_id: str,
-    user: Dict[str, Any],
-    organization_id: Optional[uuid.UUID] = None,
-) -> Optional[str]:
->>>>>>> origin/feat/enterprise-regional-and-white-label-reporting
+    user: dict[str, Any],
+    organization_id: uuid.UUID | None = None,
+) -> str | None:
     file = await get_file(file_id, user)
     if not file:
         return None
@@ -608,32 +626,51 @@ async def get_signed_url(
         if not organization_id:
             organization_id = await _resolve_organization_id_for_file(file)
 
-        target_client, resolved_bucket, region_code = storage_service.resolve_target_bucket_and_client(
-            organization_id=organization_id
+        target_client, resolved_bucket, region_code = (
+            storage_service.resolve_target_bucket_and_client(
+                organization_id=organization_id
+            )
         )
-<<<<<<< HEAD
-        return res.get("signedURL") or res.get("signed_url")
-    except (StorageException, HTTPError, RuntimeError) as e:
-        logger.error("[get_signed_url] Error", file_id=file_id, error=str(e), exc_info=True)
-=======
 
-        active_bucket = resolved_bucket if (organization_id and region_code != "global") else (record_bucket or resolved_bucket)
+        active_bucket = (
+            resolved_bucket
+            if (organization_id and region_code != "global")
+            else (record_bucket or resolved_bucket)
+        )
 
         res = await run_in_threadpool(
-            lambda: target_client.storage.from_(active_bucket).create_signed_url(file_path, 3600)
+            lambda: target_client.storage.from_(active_bucket).create_signed_url(
+                file_path, 3600
+            )
         )
         return res.get("signedURL") or res.get("signed_url") or res.get("url")
-    except Exception as e:
-        logger.error("[get_signed_url] Error: %s", e, exc_info=True)
->>>>>>> origin/feat/enterprise-regional-and-white-label-reporting
+    except (StorageException, HTTPError, RuntimeError, Exception) as e:
+        logger.error(
+            "[get_signed_url] Error", file_id=file_id, error=str(e), exc_info=True
+        )
         return None
-    
-    
+
+
 # CREATE ARTIFACT FILE (called after Tazwar uploads export to storage)
-async def create_artifact_file(file_data: dict[str, Any], user_id: str) -> dict[str, Any] | None:
+async def create_artifact_file(
+    file_data: dict[str, Any],
+    user_id: str,
+    organization_id: uuid.UUID | None = None,
+) -> dict[str, Any] | None:
     try:
+        _, resolved_bucket, region_code = (
+            storage_service.resolve_target_bucket_and_client(
+                organization_id=organization_id
+            )
+        )
+        default_bucket = (
+            resolved_bucket
+            if (organization_id and region_code != "global")
+            else "dxf-files"
+        )
+
         payload = {
-            "bucket": file_data.get("bucket", "dxf-files"),
+            "bucket": file_data.get("bucket", default_bucket),
             "path": file_data.get("path"),
             "file_type": file_data.get("file_type", "dxf"),
             "mime_type": file_data.get("mime_type"),
@@ -644,9 +681,7 @@ async def create_artifact_file(file_data: dict[str, Any], user_id: str) -> dict[
         }
 
         res = await run_in_threadpool(
-            lambda: db.table("files")
-                .insert(payload)
-                .execute()
+            lambda: db.table("files").insert(payload).execute()
         )
 
         if res and res.data:
@@ -664,7 +699,10 @@ async def create_artifact_file(file_data: dict[str, Any], user_id: str) -> dict[
                 export_format=artifact.get("file_type"),
                 artifact_file_id=artifact["id"],
             )
-            logger.info("[create_artifact_file] Artifact file created", file_id=artifact["id"])
+            logger.info(
+                "[create_artifact_file] Artifact file created",
+                file_id=artifact["id"],
+            )
             return artifact
 
         return None

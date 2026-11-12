@@ -6,20 +6,17 @@ Yehor export_jobs + artifact handoff land; stage metadata is written for postfli
 """
 
 import asyncio
-<<<<<<< HEAD
+import inspect
+from datetime import UTC, datetime
 from typing import Any
-=======
-from typing import Any, Dict, Optional
-from datetime import datetime, timezone
 from uuid import UUID
-from app.utils.storage_service import storage_service
-from app.db.queries.file_queries import create_artifact_file
->>>>>>> origin/feat/enterprise-regional-and-white-label-reporting
 
 from app.core.export_stage_catalog import EXPORT_STAGE_CATALOG
+from app.db.queries.file_queries import create_artifact_file
 from app.schemas.export_contracts import PipelineStage
 from app.services.export_validation_service import run_postflight, run_preflight
 from app.utils.logger import logger
+from app.utils.storage_service import storage_service
 
 
 async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
@@ -27,13 +24,13 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
     PROCESSING stage: formats exported and persisted into regional storage.
     Returns metadata patch including artifact_file_id for postflight verification.
     """
-    export_format = job.get("format") or "dxf"
+    export_format = (job.get("format") or "dxf").lower()
     project_id = job.get("project_id")
     job_id = job.get("id")
     user_id = job.get("requested_by") or "system"
 
     org_id_raw = job.get("organization_id")
-    org_id: Optional[UUID] = None
+    org_id: UUID | None = None
     if org_id_raw:
         try:
             org_id = UUID(str(org_id_raw))
@@ -51,8 +48,8 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
     await asyncio.sleep(0.5)
 
     sample_bytes = b"SECTION\n2\nHEADER\n0\nENDSEC\n0\nEOF"
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-    filename = f"export_{project_id}_{timestamp}.{export_format.lower()}"
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+    filename = f"export_{project_id}_{timestamp}.{export_format}"
 
     # Regional sovereign storage
     artifact_url = await storage_service.upload_cad_file(
@@ -64,25 +61,39 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
         organization_id=org_id,
     )
 
+    _, bucket_name, _ = storage_service.resolve_target_bucket_and_client(org_id)
     storage_path = (
         f"tenants/{org_id}/cad/{project_id}/{filename}"
         if org_id
         else f"{user_id}/{project_id}/{filename}"
     )
 
-    # Persist artifact file record
-    artifact_row = await create_artifact_file(
-        file_data={
-            "project_id": project_id,
-            "job_id": job_id,
-            "path": storage_path,
-            "file_type": export_format.lower(),
-            "size_bytes": len(sample_bytes),
-            "name": filename,
-        },
-        user_id=user_id,
-        organization_id=org_id,
-    )
+    artifact_payload: dict[str, Any] = {
+        "bucket": bucket_name,
+        "project_id": project_id,
+        "job_id": job_id,
+        "path": storage_path,
+        "file_type": export_format,
+        "size_bytes": len(sample_bytes),
+        "name": filename,
+    }
+    if org_id:
+        artifact_payload["organization_id"] = str(org_id)
+
+    # Persist artifact file record (compatible with both 2-arg and 3-arg signatures)
+    sig = inspect.signature(create_artifact_file)
+    if "organization_id" in sig.parameters:
+        artifact_row = await create_artifact_file(
+            file_data=artifact_payload,
+            user_id=user_id,
+            organization_id=org_id,
+        )
+    else:
+        artifact_row = await create_artifact_file(
+            file_data=artifact_payload,
+            user_id=user_id,
+        )
+
     artifact_file_id = artifact_row.get("id") if artifact_row else None
 
     # Link artifact_file_id on job root context for Kiruthika's run_postflight

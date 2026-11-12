@@ -7,16 +7,13 @@ Rule execution expands in Week 3+; Week 2 freezes contract shape and gate behavi
 Extended for Enterprise Regional Background Processing & Worker Affinity.
 """
 
-<<<<<<< HEAD
-from typing import Any
-=======
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
-from fastapi.concurrency import run_in_threadpool
-from app.services.region_registry import CENTRAL_REGION_REGISTRY
->>>>>>> origin/feat/enterprise-regional-and-white-label-reporting
 
+from fastapi.concurrency import run_in_threadpool
+
+from app.db.supabase_client import db
 from app.schemas.export_contracts import (
     ExportFormat,
     PipelineStage,
@@ -26,8 +23,8 @@ from app.schemas.export_contracts import (
     ValidationIssue,
     ValidationSeverity,
 )
+from app.services.region_registry import CENTRAL_REGION_REGISTRY
 from app.services.supabase_service import supabase_service
-from app.db.supabase_client import db
 
 
 def _issue(
@@ -51,12 +48,9 @@ def _issue(
     )
 
 
-<<<<<<< HEAD
-async def run_preflight(export_context: dict[str, Any]) -> PreflightReport:
-=======
 async def _check_regional_worker_affinity(
-    export_context: Dict[str, Any]
-) -> Optional[ValidationIssue]:
+    export_context: dict[str, Any],
+) -> ValidationIssue | None:
     """
     Enforces that worker node region matches tenant's sovereign residency region.
     Supports 'auto'/'dynamic' for local dev and strict pinning for production.
@@ -134,8 +128,7 @@ async def _check_regional_worker_affinity(
     return None
 
 
-async def run_preflight(export_context: Dict[str, Any]) -> PreflightReport:
->>>>>>> origin/feat/enterprise-regional-and-white-label-reporting
+async def run_preflight(export_context: dict[str, Any]) -> PreflightReport:
     """
     Preflight checks before PROCESSING. Blocks worker when can_proceed=False.
     export_context: export_jobs row or jobs row with project_id, format, metadata.
@@ -207,7 +200,6 @@ async def run_postflight(export_context: dict[str, Any]) -> PostflightReport:
         )
 
     blocking = [i for i in issues if i.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)]
-    metadata = export_context.get("metadata") or {}
     requires_review = metadata.get("requires_review") is True
 
     return PostflightReport(

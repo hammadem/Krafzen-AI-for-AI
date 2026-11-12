@@ -21,28 +21,21 @@ branding_routes = import_module("app.routes.branding_routes")
 report_routes = import_module("app.routes.report_routes")
 
 __all__ = [
+    "activity_routes",
     "architecture_routes",
+    "branding_routes",
     "chat_routes",
     "dashboard_routes",
-<<<<<<< HEAD
     "export_routes",
+    "export_validation_routes",
     "file_routes",
     "invite_routes",
     "job_routes",
+    "notification_routes",
     "payment_routes",
     "project_routes",
-    "user_routes",
-    "workspace_routes"
-]
-=======
-    "workspace_routes",
-    "activity_routes",
-    "notification_routes",
-    "export_validation_routes",
-    "invite_routes",
-    "export_routes",
     "region_routes",
-    "branding_routes",
     "report_routes",
+    "user_routes",
+    "workspace_routes",
 ]
->>>>>>> origin/feat/enterprise-regional-and-white-label-reporting
