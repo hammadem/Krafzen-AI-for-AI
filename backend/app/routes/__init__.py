@@ -1,6 +1,4 @@
-"""
-Initialize route modules for FastAPI
-"""
+"""Initialize route modules for FastAPI."""
 
 from importlib import import_module
 
@@ -13,13 +11,20 @@ user_routes = import_module("app.routes.user_routes")
 architecture_routes = import_module("app.routes.architecture_routes")
 dashboard_routes = import_module("app.routes.dashboard_routes")
 workspace_routes = import_module("app.routes.workspace_routes")
+activity_routes = import_module("app.routes.activity_routes")
+notification_routes = import_module("app.routes.notification_routes")
+export_validation_routes = import_module("app.routes.export_validation_routes")
 invite_routes = import_module("app.routes.invite_routes")
 export_routes = import_module("app.routes.export_routes")
+region_routes = import_module("app.routes.region_routes")
+branding_routes = import_module("app.routes.branding_routes")
+report_routes = import_module("app.routes.report_routes")
 
 __all__ = [
     "architecture_routes",
     "chat_routes",
     "dashboard_routes",
+<<<<<<< HEAD
     "export_routes",
     "file_routes",
     "invite_routes",
@@ -29,3 +34,15 @@ __all__ = [
     "user_routes",
     "workspace_routes"
 ]
+=======
+    "workspace_routes",
+    "activity_routes",
+    "notification_routes",
+    "export_validation_routes",
+    "invite_routes",
+    "export_routes",
+    "region_routes",
+    "branding_routes",
+    "report_routes",
+]
+>>>>>>> origin/feat/enterprise-regional-and-white-label-reporting

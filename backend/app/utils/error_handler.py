@@ -27,8 +27,13 @@ def add_exception_handlers(app):
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
         import logging
+<<<<<<< HEAD
         logging.getLogger("app.error_handler").error(f"Global exception: {exc}")
+=======
+        logging.getLogger("app.error_handler").error(f"Middleware Exception: %s", exc, exc_info=True)
+        error_msg = exc.decode("utf-8", errors="replace") if isinstance(exc, bytes) else str(exc)
+>>>>>>> origin/feat/enterprise-regional-and-white-label-reporting
         return JSONResponse(
-            status_code=500,
-            content={"message": "Internal Server Error", "detail": "An unexpected error occurred. Please contact support."},
+        status_code=500,
+        content={"detail": {"error": {"code": "INTERNAL_SERVER_ERROR", "message": error_msg}}}
         )

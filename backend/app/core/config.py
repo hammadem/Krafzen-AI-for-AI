@@ -21,20 +21,29 @@ class Settings(BaseSettings):
     # CORS - Store as string to avoid JSON parsing issues with List[str]
     # Access via ALLOWED_ORIGINS_LIST property which converts to list
     # Includes wildcard for Vercel preview deployments (e.g., krafzen-ai-staging-*.vercel.app)
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,https://krafzen-ai-staging.vercel.app,https://*.vercel.app,https://staging.krafzen.com,https://www.staging.krafzen.com,https://krafzen.com,https://www.krafzen.com,https://app.krafzen.com"
-    
+    ALLOWED_ORIGINS: str = (
+        "http://localhost:3000,"
+        "http://localhost:3001,"
+        "http://localhost:5173,"
+        "http://127.0.0.1:5500,"
+        "http://localhost:5500,"
+        "http://127.0.0.1:8080,"
+        "http://localhost:8080,"
+        "https://project-7ifnz.vercel.app,"
+        "https://krafzen-ai-staging.vercel.app,"
+        "https://staging.krafzen.com,"
+        "https://www.staging.krafzen.com,"
+        "https://krafzen.com,"
+        "https://www.krafzen.com,"
+        "https://app.krafzen.com",
+        "https://enterprise-white-label.vercel.app/"
+    )
+
     @property
     def ALLOWED_ORIGINS_LIST(self) -> list[str]:
         """Get ALLOWED_ORIGINS as a list"""
         if not self.ALLOWED_ORIGINS:
-            return [
-                "http://localhost:3000",
-                "https://staging.krafzen.com",
-                "https://www.staging.krafzen.com",
-                "https://krafzen.com",
-                "https://www.krafzen.com",
-                "https://app.krafzen.com",
-            ]
+            return ["http://localhost:3000", "http://127.0.0.1:5500"]
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(',') if origin.strip()]
     
     # Supabase
@@ -44,6 +53,9 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str = ""  
     SUPABASE_SERVICE_ROLE_KEY: str = ""  
     SUPABASE_JWT_SECRET: str = ""
+    DEFAULT_STORAGE_REGION: str = "us-east-1"
+    DEFAULT_STORAGE_BUCKET: str = "dxf-files"
+
     # OpenAI API
     OPENAI_API_KEY: str = ""
     
@@ -151,6 +163,17 @@ class Settings(BaseSettings):
     # Render Configuration (optional)
     RENDER_SERVICE_ID_PRODUCTION: str = ""
     RENDER_SERVICE_ID_STAGING: str = ""
+
+    # Enterprise: US Sovereign Region Secret References
+    SUPABASE_DATABASE_URL_US: Optional[str] = None
+    SUPABASE_STORAGE_URL_US: Optional[str] = None
+    SUPABASE_STORAGE_KEY_US: Optional[str] = None
+    SUPABASE_STORAGE_BUCKET_US: str = "krafzen-us-files"
+    SUPABASE_STORAGE_REGION_US: str = "us-east-1"
+
+    # US Regional Background Queue & Processing
+    US_QUEUE_NAME: str = "krafzen-us-export-jobs"
+    US_WORKER_POOL: str = "render-us-nodes"
     
     class Config:
         env_file = ".env"

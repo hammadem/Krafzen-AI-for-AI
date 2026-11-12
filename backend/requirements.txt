@@ -41,9 +41,11 @@ boto3==1.35.99  # R2/S3 download for ODA .deb on Render
 requests==2.32.3  # For integration tests
 anyio<4,>=3.5.0
 
-# Image Processing
-Pillow>=10.0.0
+# Image Processing & PDF Report Generation
+Pillow>=10.0.0,<12.0.0
+reportlab>=4.2.0
 
 # Payments
 stripe>=8.0.0
 psycopg2-binary==2.9.10
+psycopg2-binary>=2.9.9
