@@ -213,29 +213,14 @@ try:
     logger.info("Attempting to import DXF generator module")
     from app.api import dxf_generator
 
-    dxf_generator_available = True
-    logger.info("DXF generator module imported successfully")
-except Exception:
-    logger.exception("Failed to import DXF generator module")
-    dxf_generator_available = False
-    dxf_generator = None
-
-if dxf_generator_available and dxf_generator:
-    try:
-        logger.info("Attempting to register DXF generator router")
-        app.include_router(
-            dxf_generator.router, prefix="/api/v1/dxf", tags=["DXF Generator"]
-        )
-        logger.info("DXF generator router registered successfully")
-    except Exception:
-        logger.exception("Failed to register DXF generator router")
-else:
-    reason = (
-        "DXF generator module import failed"
-        if not dxf_generator_available
-        else "DXF generator is None"
+    app.include_router(
+        dxf_generator.router, prefix="/api/v1/dxf", tags=["DXF Generator"]
     )
-    logger.warning("DXF generator router not available - %s", reason)
+    logger.info("DXF generator router registered successfully")
+except Exception as e:
+    logger.error(
+        "Failed to import/register DXF generator module: %s", e, exc_info=True
+    )
 
 
 @app.get("/")

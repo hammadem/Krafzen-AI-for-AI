@@ -167,7 +167,7 @@ async def generate_dxf_from_audio(
         if "placehold.co" in image_url:
             raise HTTPException(status_code=500, detail="Image generation failed.")
 
-        # 4. Convert to DXF (Api2Convert)
+        # 4. Convert to DXF
         if settings.DXF_GENERATION_METHOD == "LOCAL":
             logger.info("Converting Image to DXF (Local - Potrace)...")
             dxf_path = await local_dxf_service.convert_to_dxf(image_url)
@@ -233,7 +233,7 @@ async def generate_dxf_from_text(
         if "placehold.co" in image_url:
             raise HTTPException(status_code=500, detail="Image generation failed.")
 
-        # 3. Convert to DXF (Api2Convert)
+        # 3. Convert to DXF
         if settings.DXF_GENERATION_METHOD == "LOCAL":
             logger.info("Converting Image to DXF (Local - Potrace)...")
             dxf_path = await local_dxf_service.convert_to_dxf(image_url)
@@ -260,8 +260,7 @@ async def generate_dxf_from_text(
     except Exception:
         logger.exception("Unified text flow failed")
         raise HTTPException(
-            status_code=500,
-            detail="An error occurred during text-to-DXF generation.",
+            status_code=500, detail="An error occurred during text-to-DXF generation."
         )
 
 

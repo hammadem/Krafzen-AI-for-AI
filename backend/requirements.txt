@@ -43,9 +43,9 @@ anyio<4,>=3.5.0
 
 # Image Processing & PDF Report Generation
 Pillow>=10.0.0,<12.0.0
-reportlab>=4.2.0,<12.0.0
 reportlab>=4.2.0
 
 # Payments
 stripe>=8.0.0
 psycopg2-binary==2.9.10
+psycopg2-binary>=2.9.9

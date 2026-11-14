@@ -122,6 +122,57 @@ def _assert_sovereign_worker_boundary(job_id: str, target_region: str) -> None:
                 f"but active worker pool is '{CURRENT_WORKER_POOL}'."
             )
 
+        workspace_id_str = res.data[0]["workspace_id"]
+        workspace_id = uuid.UUID(str(workspace_id_str))
+
+        # 2. Resolve regional residency configuration
+        residency_res = await run_in_threadpool(
+            lambda: central_client.table("organization_residency")
+            .select("region_code, status")
+            .eq("organization_id", str(workspace_id))
+            .execute()
+        )
+        if residency_res.data and residency_res.data[0].get("status") == "active":
+            region_code = residency_res.data[0].get("region_code", "global")
+        else:
+            region_code = "global"
+
+        return workspace_id, region_code
+
+    except Exception as e:
+        logger.error(
+            "[worker] _resolve_organization_and_region failed",
+            project_id=project_id,
+            error=str(e),
+        )
+        return None, "global"
+
+
+def _assert_sovereign_worker_boundary(job_id: str, target_region: str) -> None:
+    """
+    Phase 2.8: Guard against cross-border processing violations.
+    Prevents workers in foreign pools from handling sovereign tasks.
+    """
+    region_entry = RegionRegistryService.get_region(target_region)
+    expected_pool = (
+        region_entry.processing_config.get("worker_pool")
+        if region_entry
+        else "render-default-nodes"
+    )
+
+    # If the job belongs to a sovereign region like 'us', strictly verify local worker identity
+    if target_region == "us":
+        if CURRENT_REGION_CODE != "us":
+            raise PermissionError(
+                f"Sovereignty Violation: Worker in region '{CURRENT_REGION_CODE}' attempted "
+                f"to process sovereign US job '{job_id}'."
+            )
+        if CURRENT_WORKER_POOL != expected_pool:
+            raise PermissionError(
+                f"Worker Pool Mismatch: Job '{job_id}' requires '{expected_pool}', "
+                f"but active worker pool is '{CURRENT_WORKER_POOL}'."
+            )
+
 
 async def process_export_job(
     job: dict[str, Any], system_user: dict[str, Any]
@@ -142,9 +193,7 @@ async def process_export_job(
 
         # Phase 2.8: Pre-execution sovereignty gate
         try:
-            _assert_sovereign_worker_boundary(
-                job_id=job_id, target_region=target_region
-            )
+            _assert_sovereign_worker_boundary(job_id=job_id, target_region=target_region)
         except PermissionError as perm_err:
             logger.error(
                 "[worker] Sovereignty boundary violation",
@@ -165,10 +214,7 @@ async def process_export_job(
                 message="Job rejected: processing region boundary violation.",
             )
             await emit_notification(
-                job_id,
-                project_id,
-                "export_failed",
-                "Processing region violation.",
+                job_id, project_id, "export_failed", "Processing region violation."
             )
             return
 
@@ -339,10 +385,7 @@ async def process_export_job(
             message="Export failed unexpectedly.",
         )
         await emit_notification(
-            job_id,
-            project_id,
-            "export_failed",
-            "Export failed unexpectedly.",
+            job_id, project_id, "export_failed", "Export failed unexpectedly."
         )
 
 
@@ -401,16 +444,10 @@ async def emit_notification(
         )
         if not response or not response.data:
             logger.warning(
-                "[worker] Could not resolve project owner",
-                project_id=project_id,
+                "[worker] Could not resolve project owner", project_id=project_id
             )
             return
-        row = (
-            response.data[0]
-            if isinstance(response.data, list)
-            else response.data
-        )
-        user_id = row.get("user_id") if isinstance(row, dict) else None
+        user_id = response.data[0].get("user_id")
         if not user_id:
             return
         await _create_notification(
@@ -476,11 +513,11 @@ async def _resolve_project_owner(project_id: str | None) -> str | None:
         if not response or not response.data:
             return None
         if isinstance(response.data, list):
-            return response.data[0].get("user_id")
+            return response.data[0].get("user_id") if response.data else None
         if isinstance(response.data, dict):
             return response.data.get("user_id")
         return None
-    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError, Exception) as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
         logger.error(
             "[worker] _resolve_project_owner failed",
             project_id=project_id,

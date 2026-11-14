@@ -162,7 +162,7 @@ class StorageService:
         signed_url_expiry: int = 3600,  # 1 hour
     ) -> str | None:
         """
-        Uploads a CAD file (DXF/DWG/IFC/RVT).
+        Uploads a CAD/BIM file (DXF/DWG/IFC/RVT).
         - For Enterprise (organization_id provided): saves under tenants/{org_id}/... and returns signed URL.
         - For Legacy/Individual: preserves {user_id}/{project_id}/... and returns public URL.
         """
@@ -220,8 +220,8 @@ class StorageService:
 
             return file_url
 
-        except (StorageException, HTTPError, OSError, TypeError, ValueError, Exception) as e:
-            logger.error("Failed to upload CAD file to storage: %s", e, exc_info=True)
+        except (StorageException, HTTPError, OSError, TypeError, ValueError):
+            logger.exception("Failed to upload CAD file to storage")
             return None
 
     @classmethod
@@ -252,6 +252,7 @@ class StorageService:
         organization_id: UUID | None = None,
         expires_in: int = 3600,
     ) -> str | None:
+        """Resolve the latest CAD file URL (signed for enterprise orgs, public for individual)."""
         try:
             client, bucket_name, _ = cls.resolve_target_bucket_and_client(organization_id)
             ext = (file_extension or "dxf").strip(".").lower()
@@ -284,8 +285,8 @@ class StorageService:
 
             return client.storage.from_(bucket_name).get_public_url(file_path)
 
-        except (StorageException, HTTPError, OSError, TypeError, ValueError, Exception) as e:
-            logger.error("Failed to resolve CAD file URL: %s", e, exc_info=True)
+        except (StorageException, HTTPError, OSError, TypeError, ValueError):
+            logger.exception("Failed to resolve CAD file URL")
             return None
 
     @classmethod
@@ -295,7 +296,7 @@ class StorageService:
         user_id: str,
         organization_id: UUID | None = None,
     ) -> str | None:
-        """Get the URL for a project's DXF file."""
+        """Backward-compatible DXF URL resolver."""
         return await cls.get_cad_file_url(
             project_id=project_id,
             user_id=user_id,
@@ -332,8 +333,8 @@ class StorageService:
 
             return await run_in_threadpool(_list_and_download)
 
-        except (StorageException, HTTPError, OSError, TypeError, ValueError, Exception) as e:
-            logger.error("Failed to download CAD file: %s", e, exc_info=True)
+        except (StorageException, HTTPError, OSError, TypeError, ValueError):
+            logger.exception("Failed to download CAD file")
             return None
 
     @classmethod
@@ -343,7 +344,7 @@ class StorageService:
         user_id: str,
         organization_id: UUID | None = None,
     ) -> bytes | None:
-        """Download DXF file from Supabase Storage."""
+        """Backward-compatible DXF downloader."""
         return await cls.download_cad_file(
             project_id=project_id,
             user_id=user_id,

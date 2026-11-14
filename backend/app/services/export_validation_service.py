@@ -203,11 +203,7 @@ async def run_postflight(export_context: dict[str, Any]) -> PostflightReport:
             )
         )
 
-    blocking = [
-        i
-        for i in issues
-        if i.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)
-    ]
+    blocking = [i for i in issues if i.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)]
     requires_review = metadata.get("requires_review") is True
 
     return PostflightReport(

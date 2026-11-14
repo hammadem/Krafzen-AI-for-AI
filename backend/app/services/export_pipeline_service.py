@@ -61,13 +61,15 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
         organization_id=org_id,
     )
 
+    _, bucket_name, _ = storage_service.resolve_target_bucket_and_client(org_id)
     storage_path = (
         f"tenants/{org_id}/cad/{project_id}/{filename}"
         if org_id
         else f"{user_id}/{project_id}/{filename}"
     )
 
-    file_data = {
+    artifact_payload: dict[str, Any] = {
+        "bucket": bucket_name,
         "project_id": project_id,
         "job_id": job_id,
         "path": storage_path,
@@ -75,18 +77,20 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
         "size_bytes": len(sample_bytes),
         "name": filename,
     }
+    if org_id:
+        artifact_payload["organization_id"] = str(org_id)
 
-    # Persist artifact file record
+    # Persist artifact file record (compatible with both 2-arg and 3-arg signatures)
     sig = inspect.signature(create_artifact_file)
     if "organization_id" in sig.parameters:
         artifact_row = await create_artifact_file(
-            file_data=file_data,
+            file_data=artifact_payload,
             user_id=user_id,
             organization_id=org_id,
         )
     else:
         artifact_row = await create_artifact_file(
-            file_data=file_data,
+            file_data=artifact_payload,
             user_id=user_id,
         )
 

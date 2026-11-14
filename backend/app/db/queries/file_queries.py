@@ -65,14 +65,12 @@ async def _user_owns_job(job_id: str, user_id: str) -> bool:
     return await _get_owned_job_project_id(job_id, user_id) is not None
 
 
-def _file_name(file_data: dict[str, Any]) -> str | None:
-    name = file_data.get("name")
+def _file_name(file: dict[str, Any]) -> str | None:
+    name = file.get("name")
     if name and str(name).strip():
         return str(name)
-    path = file_data.get("path")
-    if path and str(path).strip():
-        return str(path).rstrip("/").rsplit("/", 1)[-1] or None
-    return None
+    path = file.get("path")
+    return path.rsplit("/", 1)[-1] if path else None
 
 
 # CREATE FILE (saves metadata to DB, path must come from whoever uploaded to Storage)
@@ -125,7 +123,9 @@ async def create_file(
 
         if response and response.data:
             created_file = response.data[0]
-            await _record_file_activity("file.uploaded", created_file, user["user_id"])
+            await _record_file_activity(
+                "file.uploaded", created_file, user["user_id"]
+            )
             if created_file.get("version", 1) > 1:
                 await _record_file_activity(
                     "file.version_created", created_file, user["user_id"]
@@ -658,15 +658,16 @@ async def create_artifact_file(
     organization_id: uuid.UUID | None = None,
 ) -> dict[str, Any] | None:
     try:
-        default_bucket = "dxf-files"
-        if organization_id:
-            _, resolved_bucket, region_code = (
-                storage_service.resolve_target_bucket_and_client(
-                    organization_id=organization_id
-                )
+        _, resolved_bucket, region_code = (
+            storage_service.resolve_target_bucket_and_client(
+                organization_id=organization_id
             )
-            if region_code != "global":
-                default_bucket = resolved_bucket
+        )
+        default_bucket = (
+            resolved_bucket
+            if (organization_id and region_code != "global")
+            else "dxf-files"
+        )
 
         payload = {
             "bucket": file_data.get("bucket", default_bucket),
