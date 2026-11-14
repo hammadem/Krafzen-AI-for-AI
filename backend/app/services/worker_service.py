@@ -23,7 +23,10 @@ from postgrest.exceptions import APIError
 from app.db.queries.file_queries import create_artifact_file
 from app.db.supabase_client import db
 from app.schemas.export_contracts import ExportStatus, PipelineStage
-from app.services.activity_service import record_audit_event
+from app.services.activity_service import (
+    record_audit_event,
+    record_event as _record_activity_event,
+)
 from app.services.export_pipeline_service import (
     run_export_generation,
     run_postflight_gate,
@@ -119,8 +122,61 @@ def _assert_sovereign_worker_boundary(job_id: str, target_region: str) -> None:
                 f"but active worker pool is '{CURRENT_WORKER_POOL}'."
             )
 
+        workspace_id_str = res.data[0]["workspace_id"]
+        workspace_id = uuid.UUID(str(workspace_id_str))
 
-async def process_export_job(job: dict[str, Any], system_user: dict[str, Any]) -> None:
+        # 2. Resolve regional residency configuration
+        residency_res = await run_in_threadpool(
+            lambda: central_client.table("organization_residency")
+            .select("region_code, status")
+            .eq("organization_id", str(workspace_id))
+            .execute()
+        )
+        if residency_res.data and residency_res.data[0].get("status") == "active":
+            region_code = residency_res.data[0].get("region_code", "global")
+        else:
+            region_code = "global"
+
+        return workspace_id, region_code
+
+    except Exception as e:
+        logger.error(
+            "[worker] _resolve_organization_and_region failed",
+            project_id=project_id,
+            error=str(e),
+        )
+        return None, "global"
+
+
+def _assert_sovereign_worker_boundary(job_id: str, target_region: str) -> None:
+    """
+    Phase 2.8: Guard against cross-border processing violations.
+    Prevents workers in foreign pools from handling sovereign tasks.
+    """
+    region_entry = RegionRegistryService.get_region(target_region)
+    expected_pool = (
+        region_entry.processing_config.get("worker_pool")
+        if region_entry
+        else "render-default-nodes"
+    )
+
+    # If the job belongs to a sovereign region like 'us', strictly verify local worker identity
+    if target_region == "us":
+        if CURRENT_REGION_CODE != "us":
+            raise PermissionError(
+                f"Sovereignty Violation: Worker in region '{CURRENT_REGION_CODE}' attempted "
+                f"to process sovereign US job '{job_id}'."
+            )
+        if CURRENT_WORKER_POOL != expected_pool:
+            raise PermissionError(
+                f"Worker Pool Mismatch: Job '{job_id}' requires '{expected_pool}', "
+                f"but active worker pool is '{CURRENT_WORKER_POOL}'."
+            )
+
+
+async def process_export_job(
+    job: dict[str, Any], system_user: dict[str, Any]
+) -> None:
     """
     Drive a single job through: QUEUED → PROCESSING → VALIDATING → COMPLETED (or FAILED).
     Enforces geographic execution boundaries before launching CAD binaries.
@@ -402,7 +458,9 @@ async def emit_notification(
             project_id=project_id,
         )
     except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
-        logger.error("[worker] emit_notification failed", error=str(e), exc_info=True)
+        logger.error(
+            "[worker] emit_notification failed", error=str(e), exc_info=True
+        )
 
 
 async def _poll_export_jobs() -> None:

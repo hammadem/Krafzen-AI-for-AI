@@ -161,7 +161,11 @@ async def run_preflight(export_context: dict[str, Any]) -> PreflightReport:
             )
         )
 
-    blocking = [i for i in issues if i.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)]
+    blocking = [
+        i
+        for i in issues
+        if i.severity in (ValidationSeverity.ERROR, ValidationSeverity.CRITICAL)
+    ]
     return PreflightReport(
         export_id=export_id,
         can_proceed=len(blocking) == 0,
