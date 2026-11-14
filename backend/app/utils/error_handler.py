@@ -1,34 +1,62 @@
 """Global exception handling."""
-from fastapi import Request
+
+import logging
+from typing import Any
+
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+logger = logging.getLogger("app.error_handler")
 
-def add_exception_handlers(app):
+
+def add_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
-    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-        # Use `detail` like FastAPI's default so clients (e.g. design-file download) can show errors.
-        payload: dict = {"detail": exc.detail}
+    async def http_exception_handler(
+        request: Request, exc: StarletteHTTPException
+    ) -> JSONResponse:
+        payload: dict[str, Any] = {"detail": exc.detail}
         if isinstance(exc.detail, str):
             payload["message"] = exc.detail
+        elif isinstance(exc.detail, dict) and "error" in exc.detail:
+            err = exc.detail["error"]
+            payload["message"] = (
+                err.get("message") if isinstance(err, dict) else str(err)
+            )
         return JSONResponse(
             status_code=exc.status_code,
             content=payload,
         )
-    
+
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
         return JSONResponse(
             status_code=422,
             content={"message": "Validation Error", "detail": exc.errors()},
         )
-    
+
     @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception):
-        import logging
-        logging.getLogger("app.error_handler").error(f"Global exception: {exc}")
+    async def global_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        logger.error("Global exception: %s", exc, exc_info=True)
+        error_msg = (
+            exc.decode("utf-8", errors="replace")
+            if isinstance(exc, bytes)
+            else str(exc)
+        )
         return JSONResponse(
             status_code=500,
-            content={"message": "Internal Server Error", "detail": "An unexpected error occurred. Please contact support."},
+            content={
+                "message": "Internal Server Error",
+                "detail": {
+                    "error": {
+                        "code": "INTERNAL_SERVER_ERROR",
+                        "message": error_msg,
+                    }
+                },
+            },
         )
