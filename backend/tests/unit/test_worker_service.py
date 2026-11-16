@@ -15,6 +15,17 @@ JOB = {
 USER = {"user_id": "cccccccc-0000-0000-0000-000000000003"}
 
 
+@pytest.fixture(autouse=True)
+def mock_residency_for_worker_unit_tests():
+    # Lifecycle-only tests should not query a live database.
+    with patch.object(
+        worker_service,
+        "_resolve_organization_and_region",
+        AsyncMock(return_value=(None, "global")),
+    ):
+        yield
+
+
 def passing_preflight():
     return SimpleNamespace(can_proceed=True, issues=[])
 
@@ -178,3 +189,40 @@ async def test_completed_export_records_artifact_provenance():
     saved = create.await_args.args[0]
     assert saved["job_id"] == JOB["id"] and saved["project_id"] == JOB["project_id"]
     assert create.await_args.args[1] == USER["user_id"]
+
+
+
+@pytest.mark.asyncio
+async def test_residency_lookup_failure_blocks_export_before_processing():
+    advance = AsyncMock(return_value={"id": JOB["id"]})
+    preflight = AsyncMock()
+    with (
+        patch.object(worker_service, "_resolve_organization_and_region", AsyncMock(side_effect=RuntimeError("lookup failed"))),
+        patch.object(worker_service, "run_preflight_gate", preflight),
+        patch.object(worker_service, "advance_export_status", advance),
+        patch.object(worker_service, "emit_export_event", AsyncMock()),
+        patch.object(worker_service, "emit_notification", AsyncMock()),
+    ):
+        await worker_service.process_export_job(JOB.copy(), USER)
+
+    preflight.assert_not_awaited()
+    assert advance.await_args.args[1] is ExportStatus.FAILED
+
+
+@pytest.mark.asyncio
+async def test_us_residency_requires_explicit_worker_identity():
+    advance = AsyncMock(return_value={"id": JOB["id"]})
+    preflight = AsyncMock()
+    with (
+        patch.object(worker_service, "_resolve_organization_and_region", AsyncMock(return_value=("org-1", "us"))),
+        patch.object(worker_service, "CURRENT_REGION_CODE", ""),
+        patch.object(worker_service, "CURRENT_WORKER_POOL", ""),
+        patch.object(worker_service, "run_preflight_gate", preflight),
+        patch.object(worker_service, "advance_export_status", advance),
+        patch.object(worker_service, "emit_export_event", AsyncMock()),
+        patch.object(worker_service, "emit_notification", AsyncMock()),
+    ):
+        await worker_service.process_export_job(JOB.copy(), USER)
+
+    preflight.assert_not_awaited()
+    assert advance.await_args.args[1] is ExportStatus.FAILED
