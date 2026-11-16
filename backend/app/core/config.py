@@ -37,7 +37,7 @@ class Settings(BaseSettings):
         "https://www.staging.krafzen.com,"
         "https://krafzen.com,"
         "https://www.krafzen.com,"
-        "https://app.krafzen.com",
+        "https://app.krafzen.com,"
         "https://enterprise-white-label.vercel.app/"
     )
 
