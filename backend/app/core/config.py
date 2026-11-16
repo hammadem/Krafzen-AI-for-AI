@@ -165,6 +165,9 @@ class Settings(BaseSettings):
     RENDER_SERVICE_ID_STAGING: str = ""
 
     # Enterprise: US Sovereign Region Secret References
+    # Supabase REST API client uses the HTTPS URL and service role key.
+    SUPABASE_URL_US: Optional[str] = None
+    SUPABASE_SERVICE_ROLE_KEY_US: Optional[str] = None
     SUPABASE_DATABASE_URL_US: Optional[str] = None
     SUPABASE_STORAGE_URL_US: Optional[str] = None
     SUPABASE_STORAGE_KEY_US: Optional[str] = None
