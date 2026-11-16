@@ -38,6 +38,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
+    - name: Compile check (blocking)
+      run: |
+        cd backend
+        # Fails the build on any SyntaxError so a broken module can never reach deploy.
+        python -m compileall -q app main.py -x '\.oda_bundle|vendor'
+
     - name: Lint code
       run: |
         cd backend
