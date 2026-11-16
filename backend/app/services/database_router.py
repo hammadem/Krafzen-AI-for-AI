@@ -1,11 +1,8 @@
-"""
-Regional Database Router — KRAFZEN AI
-Phase 2.6: Centralized database routing service.
-Resolves authoritative regional Supabase clients per tenant organization with zero-downtime fallbacks.
-"""
+"""Region-aware Supabase client selection with fail-closed sovereign routing."""
 
-from typing import Dict, Optional
+from typing import Dict
 from uuid import UUID
+
 from fastapi import HTTPException, status
 from supabase import Client, create_client
 
@@ -16,84 +13,82 @@ from app.utils.logger import logger
 
 
 class RegionalDatabaseRouter:
-    """
-    Centralized database routing service.
-    Resolves authoritative regional Supabase clients per tenant organization.
-    """
+    """Route sovereign tenants only to their explicitly configured regional client."""
+
     _regional_clients: Dict[str, Client] = {}
 
     def __init__(self, central_client: Client):
         self.central_client = central_client
 
+    @staticmethod
+    def _unavailable(region: str, reason: str) -> HTTPException:
+        logger.error("Sovereign routing denied for region %s: %s", region, reason)
+        return HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": {
+                    "code": "REGIONAL_ROUTING_UNAVAILABLE",
+                    "message": (
+                        f"Regional infrastructure for '{region}' is unavailable. "
+                        "The request was blocked instead of using central infrastructure."
+                    ),
+                }
+            },
+        )
+
     def _get_client_for_region(self, region_code: str) -> Client:
-        """
-        Retrieves or initializes a cached client for a specific regional Supabase project.
-        Falls back to self.central_client if dedicated regional endpoints are unconfigured or match central.
-        """
         if not region_code or region_code == "global":
             return self.central_client
+
+        if region_code not in CENTRAL_REGION_REGISTRY or region_code != "us":
+            raise self._unavailable(region_code, "no supported regional client configured")
+
+        # Supabase Python create_client() needs the regional REST API URL, not a
+        # PostgreSQL connection string. Never infer residency from the central client.
+        url = (settings.SUPABASE_URL_US or "").strip()
+        key = (settings.SUPABASE_SERVICE_ROLE_KEY_US or "").strip()
+        central_url = (settings.SUPABASE_URL or "").strip()
+
+        if not url or not key or not url.startswith("https://"):
+            raise self._unavailable(region_code, "regional Supabase API URL or key missing")
+        if url.rstrip("/") == central_url.rstrip("/"):
+            raise self._unavailable(region_code, "regional API endpoint equals central endpoint")
 
         if region_code in self._regional_clients:
             return self._regional_clients[region_code]
 
-        region_entry = CENTRAL_REGION_REGISTRY.get(region_code)
-        if not region_entry:
-            logger.warning(f"Region '{region_code}' not found in registry; using central client fallback.")
-            return self.central_client
+        try:
+            client = create_client(url, key)
+        except Exception as exc:
+            raise self._unavailable(region_code, f"regional client initialization failed: {type(exc).__name__}") from exc
 
-        if region_code == "us":
-            # Check regional API URL & service key
-            url = (
-                getattr(settings, "SUPABASE_URL_US", None)
-                or getattr(settings, "SUPABASE_DATABASE_URL_US", None)
-            )
-            key = (
-                getattr(settings, "SUPABASE_SERVICE_ROLE_KEY_US", None)
-                or getattr(settings, "SUPABASE_SERVICE_KEY_US", None)
-            )
-
-            # In dev/single-project setups: fallback directly to central client
-            central_url = getattr(settings, "SUPABASE_URL", "")
-            if not url or not key or url == central_url or not url.startswith("http"):
-                self._regional_clients[region_code] = self.central_client
-                return self.central_client
-
-            try:
-                client = create_client(url, key)
-                self._regional_clients[region_code] = client
-                logger.info(f"Initialized regional Supabase client for region: {region_code}")
-                return client
-            except Exception as e:
-                logger.warning(f"Failed to initialize regional Supabase client for '{region_code}': {e}. Falling back to central client.")
-                return self.central_client
-
-        # Default fallback for any other region
-        return self.central_client
+        self._regional_clients[region_code] = client
+        return client
 
     def resolve_for_organization(self, organization_id: UUID) -> Client:
-        """
-        1. Query organization's authoritative region assignment from central registry.
-        2. If active, return the isolated regional client.
-        3. If not configured or not active, route to the default central client.
-        """
+        """Use central only when the organization has no residency assignment."""
         try:
-            # Using execute() rather than maybe_single() to prevent NoneType attribute crashes
-            res = (
+            response = (
                 self.central_client.table("organization_residency")
                 .select("region_code, status")
                 .eq("organization_id", str(organization_id))
                 .execute()
             )
-            record = res.data[0] if (res and res.data) else None
+            record = response.data[0] if response and response.data else None
+        except Exception as exc:
+            raise self._unavailable("unknown", f"residency lookup failed: {type(exc).__name__}") from exc
 
-            # Fall back to central DB if tenant has not activated sovereign residency
-            if not record or record.get("status") != ResidencyStatus.ACTIVE.value:
-                return self.central_client
-
-            region_code = record.get("region_code", "global")
-            return self._get_client_for_region(region_code)
-
-        except Exception as e:
-            logger.warning(f"Failed to resolve regional residency for org {organization_id}: {e}")
-            # Resilient fallback to central database
+        if record is None:
             return self.central_client
+
+        region = str(record.get("region_code") or "unknown").strip().lower()
+        state = str(record.get("status") or "").strip().lower()
+
+        # Existing assignments are not treated as unassigned during provisioning,
+        # suspension, failed migration, or malformed records.
+        if state != ResidencyStatus.ACTIVE.value:
+            raise self._unavailable(region, f"residency assignment status is {state or 'unknown'}")
+        if region in ("global", "unknown"):
+            raise self._unavailable(region, "active residency has no sovereign region")
+
+        return self._get_client_for_region(region)
