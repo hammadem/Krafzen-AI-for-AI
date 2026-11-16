@@ -32,9 +32,10 @@ CENTRAL_REGION_REGISTRY: Dict[str, RegionEntry] = {
         display_name="United States",
         status=RegionStatus.ACTIVE,
         database_config={
-            "secret_env_ref": "SUPABASE_DATABASE_URL_US",
-            "configured": bool(settings.SUPABASE_DATABASE_URL_US),
-            "provider": "supabase_postgres",
+            "secret_env_ref": "SUPABASE_URL_US",
+            "service_key_env_ref": "SUPABASE_SERVICE_ROLE_KEY_US",
+            "configured": bool(settings.SUPABASE_URL_US and settings.SUPABASE_SERVICE_ROLE_KEY_US),
+            "provider": "supabase_rest",
             "region": "us-east-1",
         },
         storage_config={
@@ -132,6 +133,21 @@ class RegionRegistryService:
                         "message": f"Region '{region_code}' failed infrastructure validation: Database credentials missing."
                     }
                 }
+            )
+
+        db_key_ref = region.database_config.get("service_key_env_ref")
+        if db_key_ref and not os.getenv(db_key_ref):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": {"code": "INFRASTRUCTURE_CHECK_FAILED",
+                                  "message": f"Region '{region_code}' is missing a dedicated Supabase service key."}},
+            )
+
+        if region_code == "us" and settings.SUPABASE_URL_US == settings.SUPABASE_URL:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": {"code": "INFRASTRUCTURE_CHECK_FAILED",
+                                  "message": "Regional database endpoint must differ from the central endpoint."}},
             )
 
         storage_secret_key = region.storage_config.get("secret_env_ref")
