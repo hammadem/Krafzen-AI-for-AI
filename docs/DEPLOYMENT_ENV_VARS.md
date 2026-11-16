@@ -68,3 +68,27 @@ If you clone this repo anew, run the setup script to link the env files:
 ln -s .env frontend/.env.local
 ln -s .env backend/.env
 ```
+
+
+### 3. Enterprise USA data-residency routing (required for sovereign tenants)
+
+Set these **backend-only secrets** on the dedicated US worker and API service:
+
+| Variable | Purpose |
+| :--- | :--- |
+| `SUPABASE_URL_US` | HTTPS REST API URL for a dedicated US Supabase project (different from `SUPABASE_URL`). |
+| `SUPABASE_SERVICE_ROLE_KEY_US` | Service role key for that US project. Never expose to browser/frontend. |
+| `SUPABASE_STORAGE_KEY_US` | Credentials used for US storage integration. |
+| `SUPABASE_STORAGE_BUCKET_US` | US-region object bucket. |
+| `CURRENT_REGION_CODE` | Set to `us` **only** for verified US workers. |
+| `WORKER_POOL_NAME` | Must match `US_WORKER_POOL` for the sovereign queue. |
+
+The optional `SUPABASE_DATABASE_URL_US` is a PostgreSQL connection string, **not** a valid
+`create_client()` REST URL. Missing regional configuration, invalid residency state,
+and routing failures now block the operation (HTTP 503) rather than falling back to
+central infrastructure.
+
+**Deployment gate:** before enabling residency for customers, independently verify the
+actual physical regions for Supabase databases/storage, processing, backups, logs, AI
+inference providers, analytics, and third-party data processors. Routing code alone
+is **not** evidence of a complete US-only data residency guarantee.
