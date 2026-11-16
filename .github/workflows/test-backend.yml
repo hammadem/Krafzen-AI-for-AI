@@ -38,6 +38,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
+    - name: Compile check (blocking)
+      run: |
+        cd backend
+        # Fails the build on any SyntaxError so a broken module can never reach deploy.
+        python -m compileall -q app main.py -x '\.oda_bundle|vendor'
+
     - name: Lint code
       run: |
         cd backend
@@ -69,32 +75,34 @@ jobs:
     - name: Verify Jobs and Files routes are registered
       run: |
         cd backend
-        timeout 10s uvicorn main:app --host 0.0.0.0 --port 8000 &
-        sleep 5
-        # Wait for server to be fully ready
-        for i in {1..10}; do
-          if curl -f http://localhost:8000/health > /dev/null 2>&1; then
-            break
-          fi
+        uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
+        SERVER_PID=$!
+        # /health needs Supabase credentials (absent in CI), so wait on the
+        # OpenAPI document, which only needs the app to import and start.
+        OPENAPI_JSON=""
+        for i in {1..30}; do
+          OPENAPI_JSON=$(curl -sf http://localhost:8000/openapi.json) && break
           sleep 1
         done
-        # Check OpenAPI JSON for actual endpoint paths (most reliable)
-        OPENAPI_JSON=$(curl -s http://localhost:8000/openapi.json)
-        # Check for Jobs endpoints
+        kill $SERVER_PID 2>/dev/null || true
+        if [ -z "$OPENAPI_JSON" ]; then
+          echo "❌ Server did not serve /openapi.json"
+          tail -50 /tmp/uvicorn.log
+          exit 1
+        fi
         if echo "$OPENAPI_JSON" | grep -q '"/api/v1/jobs'; then
           echo "✅ Jobs routes found"
         else
           echo "❌ Jobs routes not found - /api/v1/jobs endpoint missing"
           exit 1
         fi
-        # Check for Files endpoints
         if echo "$OPENAPI_JSON" | grep -q '"/api/v1/files'; then
           echo "✅ Files routes found"
         else
           echo "❌ Files routes not found - /api/v1/files endpoint missing"
           exit 1
         fi
-    
+
     - name: Run backend tests
       run: |
         cd backend
