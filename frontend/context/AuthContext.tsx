@@ -99,6 +99,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           lastname: data?.session?.user?.user_metadata?.lastname || data?.session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
           avatar_url: data?.session?.user?.user_metadata?.avatar_url || data?.session?.user?.user_metadata?.picture,
           subscription_plan: data?.session?.user?.user_metadata?.subscription_plan || "Free",
+          // No entitlement until the backend subscription check confirms payment.
+          can_access_workspace: false,
+          has_active_subscription: false,
           remaining_minutes: 0,
           total_minutes_purchased: 0
         });
@@ -136,6 +139,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           lastname: session?.user?.user_metadata?.lastname || session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
           avatar_url: session?.user?.user_metadata?.avatar_url || session?.user?.user_metadata?.picture,
           subscription_plan: session?.user?.user_metadata?.subscription_plan || "Free",
+          can_access_workspace: false,
+          has_active_subscription: false,
           remaining_minutes: 0,
           total_minutes_purchased: 0
         });
