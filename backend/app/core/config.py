@@ -38,7 +38,7 @@ class Settings(BaseSettings):
         "https://krafzen.com,"
         "https://www.krafzen.com,"
         "https://app.krafzen.com,"
-        "https://enterprise-white-label.vercel.app/"
+        "https://enterprise-white-label.vercel.app"
     )
 
     @property
