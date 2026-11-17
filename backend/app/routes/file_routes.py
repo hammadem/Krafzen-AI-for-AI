@@ -1,7 +1,7 @@
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 from app.db.queries.file_queries import (
@@ -18,6 +18,7 @@ from app.db.queries.file_queries import (
 )
 from app.middlewares.auth import require_auth
 from app.models.file_model import FileCreate, FileResponse, FileUpdate
+from app.services.import_service import import_dxf_for_job
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -31,10 +32,25 @@ async def create_file_route(
     file: FileCreate,
     user=Depends(require_auth)  # enforce authentication
 ):
-    result = await create_file(file.model_dump(), user)
-    if not result or result.get("error"):
-        raise HTTPException(status_code=400, detail={"error": result.get("error", "File creation failed") if result else "File creation failed"})
-    return result
+    # Never register arbitrary customer-supplied bucket/path metadata.
+    # A service-role storage client could otherwise sign another tenant's file.
+    raise HTTPException(
+        status_code=403,
+        detail="Direct file metadata registration is disabled. Use /files/import-dxf.",
+    )
+
+
+@router.post("/import-dxf", response_model=FileResponse, status_code=201)
+async def import_dxf_route(
+    job_id: str = Form(...),
+    upload: UploadFile = File(...),
+    user=Depends(require_auth),
+):
+    """Accept a DXF into a verified project/job after mandatory scanning."""
+    try:
+        return await import_dxf_for_job(job_id=job_id, upload=upload, user=user)
+    finally:
+        await upload.close()
 
 
 @router.get("/", response_model=list[FileResponse])
