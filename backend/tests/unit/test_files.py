@@ -82,7 +82,7 @@ async def test_update_file():
             "file_type": "pdf"
         }
         response = await ac.patch(f"{BASE_URL}/{file_id}", json=update_data)
-        assert response.status_code in [200, 400, 404]
+        assert response.status_code == 422
 
 
 @pytest.mark.asyncio
