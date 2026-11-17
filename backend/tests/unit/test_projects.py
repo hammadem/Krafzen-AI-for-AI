@@ -1,4 +1,6 @@
-"""Project API tests (provisional)."""
+"""Project HTTP tests with explicit database isolation."""
+
+from unittest.mock import AsyncMock, patch
 def test_create_project(client):
     response = client.post(
         "/api/v1/projects/",
@@ -10,6 +12,8 @@ def test_create_project(client):
         assert "id" in response.json()
 
 def test_list_projects(client):
-    response = client.get("/api/v1/projects/?user_id=test-uuid")
+    with patch("app.routes.project_routes.get_projects", AsyncMock(return_value=[])) as query:
+        response = client.get("/api/v1/projects/?user_id=test-uuid")
     assert response.status_code == 200
-    assert isinstance(response.json(), list)
+    assert response.json() == []
+    query.assert_awaited_once()
