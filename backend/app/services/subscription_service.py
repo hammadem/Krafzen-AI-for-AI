@@ -130,7 +130,8 @@ class SubscriptionService:
             if trial_end:
                 trial_end_dt = datetime.fromisoformat(trial_end)
                 if datetime.now(trial_end_dt.tzinfo) > trial_end_dt:
-                    new_status = "active" if subscription.get("stripe_subscription_id") else "inactive"
+                    # Trial expiry is never payment confirmation.
+                    new_status = "inactive"
                     db.table(self.table).update({
                         "subscription_status": new_status,
                         "updated_at": datetime.now().isoformat()

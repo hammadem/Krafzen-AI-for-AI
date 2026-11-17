@@ -89,3 +89,55 @@ def test_payment_status_route_not_paywalled():
 def test_default_signup_grant_is_zero():
     from app.services.subscription_service import SIGNUP_FREE_REQUESTS
     assert SIGNUP_FREE_REQUESTS == 0
+
+
+@pytest.mark.asyncio
+async def test_unpaid_account_cannot_create_project_over_http(client):
+    """Exercise the real paid gate, not just the route dependency graph."""
+    from app.middlewares.auth import require_auth
+
+    original = app.dependency_overrides.pop(require_paid_subscription, None)
+    try:
+        with patch.object(
+            subscription_service, "get_subscription",
+            AsyncMock(return_value=FREE_WITH_OLD_CREDITS),
+        ), patch(
+            "app.routes.project_routes.create_project_query", AsyncMock()
+        ) as create:
+            response = client.post("/api/v1/projects/", json={"input_text": "Unpaid design"})
+        assert response.status_code == 402
+        create.assert_not_awaited()
+    finally:
+        if original is not None:
+            app.dependency_overrides[require_paid_subscription] = original
+
+
+@pytest.mark.asyncio
+async def test_paid_active_account_may_create_project_over_http(client):
+    """The HTTP gate allows active paid users; project creation remains mocked."""
+    project = {
+        "id": "00000000-0000-0000-0000-000000000002",
+        "user_id": USER["user_id"],
+        "input_text": "Paid design",
+        "parsed_json": None,
+        "image_url": None,
+        "dxf_url": None,
+        "dwg_url": None,
+        "created_at": "2026-07-05T00:00:00Z",
+        "updated_at": None,
+    }
+    original = app.dependency_overrides.pop(require_paid_subscription, None)
+    try:
+        with patch.object(
+            subscription_service, "get_subscription",
+            AsyncMock(return_value=ACTIVE),
+        ), patch(
+            "app.routes.project_routes.create_project_query",
+            AsyncMock(return_value=project),
+        ) as create:
+            response = client.post("/api/v1/projects/", json={"input_text": "Paid design"})
+        assert response.status_code == 201
+        create.assert_awaited_once()
+    finally:
+        if original is not None:
+            app.dependency_overrides[require_paid_subscription] = original
