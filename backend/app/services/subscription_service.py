@@ -7,7 +7,7 @@ from app.db.supabase_client import db
 
 logger = logging.getLogger(__name__)
 
-# Paid plan configuration (package requests per billing period). Signup free tier is separate (see SIGNUP_FREE_REQUESTS).
+# Paid plan configuration (package requests per billing period). No free signup credits.
 PLAN_CONFIG = {
     "starter": {
         "monthly": {
@@ -67,31 +67,27 @@ PLAN_CONFIG = {
     }
 }
 
-# Granted on account creation (no card). Stored in trial_requests_* columns for DB compatibility.
-SIGNUP_FREE_REQUESTS = 15
+# Legacy trial columns are retained for database compatibility; free grants are disabled.
+SIGNUP_FREE_REQUESTS = 0
 
 
 class SubscriptionService:
     def __init__(self):
         self.table = "user_subscriptions"
 
-    def _is_free_signup_tier(self, sub: dict[str, Any]) -> bool:
-        """Account has never subscribed; uses signup free request pool."""
-        plan = (sub.get("plan_name") or "free").lower()
-        st = (sub.get("subscription_status") or "inactive").lower()
-        if plan != "free" or st != "inactive":
-            return False
-        return not sub.get("stripe_subscription_id")
-
     def _is_paid_subscriber(self, sub: dict[str, Any]) -> bool:
-        """Active paid Stripe subscription (package requests only)."""
-        plan = (sub.get("plan_name") or "free").lower()
-        if plan == "free":
+        """Only a verified, active, non-free subscription grants workspace access."""
+        plan = str(sub.get("plan_name") or sub.get("plan_tier") or "").lower()
+        state = str(sub.get("subscription_status") or "").lower()
+        provider_id = str(sub.get("stripe_subscription_id") or "").strip()
+
+        if plan not in PLAN_CONFIG or state != "active" or not provider_id:
             return False
-        if not sub.get("stripe_subscription_id"):
+
+        # Dev mock subscriptions must never authorize production users.
+        if provider_id.startswith("mock_") and settings.ENVIRONMENT.lower() != "development":
             return False
-        st = (sub.get("subscription_status") or "inactive").lower()
-        return st in ("active", "trial", "past_due")
+        return True
 
     async def get_subscription(self, user_id: str) -> dict[str, Any]:
         """
@@ -173,7 +169,7 @@ class SubscriptionService:
                 "plan_name": plan_name.lower(),
                 "plan_tier": plan_name.lower(),
                 "billing_cycle": billing_cycle.lower(),
-                "subscription_status": "active",
+                "subscription_status": "active" if payment_completed else "inactive",
                 "trial_start_date": None,
                 "trial_end_date": None,
                 "trial_requests_total": 0,
@@ -217,87 +213,45 @@ class SubscriptionService:
             raise
 
     async def check_request_balance(self, user_id: str) -> dict[str, Any]:
-        """
-        Free signup tier: only signup free requests (trial_requests_*).
-        Paid subscriber: only package requests (plan_requests_*).
-        """
+        """Only active paid subscriptions may spend package requests."""
         sub = await self.get_subscription(user_id)
-
-        trial_requests = int(sub.get("trial_requests_remaining", 0))
-        plan_requests = int(sub.get("plan_requests_remaining", 0))
-        free_signup = self._is_free_signup_tier(sub)
         paid = self._is_paid_subscriber(sub)
-
-        if free_signup:
-            can_make_request = trial_requests > 0
-            usable_requests = trial_requests
-        elif paid:
-            can_make_request = plan_requests > 0
-            usable_requests = plan_requests
-        else:
-            can_make_request = False
-            usable_requests = 0
-
+        remaining = max(0, int(sub.get("plan_requests_remaining") or 0)) if paid else 0
         return {
-            "trial_requests": trial_requests,
-            "plan_requests": plan_requests,
-            "total_requests": trial_requests + plan_requests,
-            "usable_requests": usable_requests,
-            "can_make_request": can_make_request,
+            "trial_requests": 0,
+            "plan_requests": remaining,
+            "total_requests": remaining,
+            "usable_requests": remaining,
+            "can_make_request": paid and remaining > 0,
             "in_trial_period": False,
-            "in_free_signup_tier": free_signup,
+            "in_free_signup_tier": False,
             "subscription_status": sub.get("subscription_status", "inactive"),
             "plan_name": sub.get("plan_name", "free"),
-            "trial_end_date": sub.get("trial_end_date"),
+            "trial_end_date": None,
         }
 
     async def deduct_request(self, user_id: str) -> dict[str, Any]:
-        """Deduct one request from the appropriate pool (signup free vs package)."""
-        try:
-            current_sub = await self.get_subscription(user_id)
+        """Deduct from an active paid plan only; legacy free credits are never usable."""
+        current = await self.get_subscription(user_id)
+        if not self._is_paid_subscriber(current):
+            raise ValueError("An active paid subscription is required to use the workspace.")
 
-            trial_requests = int(current_sub.get("trial_requests_remaining", 0))
-            plan_requests = int(current_sub.get("plan_requests_remaining", 0))
+        remaining = int(current.get("plan_requests_remaining") or 0)
+        if remaining <= 0:
+            raise ValueError("Insufficient package requests. Upgrade or wait for renewal.")
 
-            if self._is_free_signup_tier(current_sub):
-                if trial_requests <= 0:
-                    raise ValueError(
-                        "You have used all free requests. Subscribe to a plan to continue using the workspace."
-                    )
-                new_trial = trial_requests - 1
-                db.table(self.table).update({
-                    "trial_requests_remaining": new_trial,
-                    "updated_at": datetime.now().isoformat()
-                }).eq("user_id", user_id).execute()
-                logger.info(f"Deducted 1 signup free request for user {user_id}. Remaining: {new_trial}")
-                return {
-                    "trial_requests": new_trial,
-                    "plan_requests": plan_requests,
-                    "total_requests": new_trial + plan_requests
-                }
-
-            if self._is_paid_subscriber(current_sub):
-                if plan_requests <= 0:
-                    raise ValueError("Insufficient package requests. Your plan will renew on the next billing cycle, or upgrade for more.")
-                new_plan = plan_requests - 1
-                db.table(self.table).update({
-                    "plan_requests_remaining": new_plan,
-                    "updated_at": datetime.now().isoformat()
-                }).eq("user_id", user_id).execute()
-                logger.info(f"Deducted 1 plan request for user {user_id}. Remaining: {new_plan}")
-                return {
-                    "trial_requests": trial_requests,
-                    "plan_requests": new_plan,
-                    "total_requests": trial_requests + new_plan
-                }
-
-            raise ValueError("Subscribe to a plan to continue using the workspace.")
-
-        except ValueError:
-            raise
-        except Exception as e:
-            logger.error(f"Error deducting request for {user_id}: {e}")
-            raise
+        # TODO: Replace the read-modify-write with an atomic conditional DB RPC
+        # before allowing concurrent billable generation requests in production.
+        next_remaining = remaining - 1
+        db.table(self.table).update({
+            "plan_requests_remaining": next_remaining,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }).eq("user_id", user_id).execute()
+        return {
+            "trial_requests": 0,
+            "plan_requests": next_remaining,
+            "total_requests": next_remaining,
+        }
 
     async def activate_plan_requests(self, user_id: str) -> dict[str, Any]:
         """Grant package requests (mock dev helper)."""
@@ -305,8 +259,8 @@ class SubscriptionService:
             current_sub = await self.get_subscription(user_id)
             plan_name = current_sub.get("plan_name")
             billing_cycle = current_sub.get("billing_cycle")
-            if not plan_name or plan_name == "free" or not billing_cycle:
-                raise ValueError("No active plan to activate")
+            if not self._is_paid_subscriber(current_sub) or not billing_cycle:
+                raise ValueError("No active paid plan to activate")
             plan_config = PLAN_CONFIG.get(plan_name, {}).get(billing_cycle, {})
             plan_requests = plan_config.get("requests", 0)
             update_data = {
