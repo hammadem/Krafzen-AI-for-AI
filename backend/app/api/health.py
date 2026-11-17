@@ -6,6 +6,7 @@ import time
 from datetime import UTC, datetime
 
 from fastapi import APIRouter
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from httpx import HTTPError
 from postgrest.exceptions import APIError
@@ -35,6 +36,59 @@ async def health_check():
             "db": "unreachable",
         }
 
+@router.get("/ready")
+async def readiness_check():
+    """503 unless essential connected dependencies are usable.
+
+    Unlike /health, which is a liveness probe, /health/ready indicates
+    deployment readiness. Never include credentials or connection errors.
+    """
+    auth_ready = all((
+        settings.SUPABASE_PROJECT_ID,
+        settings.SUPABASE_JWT_SECRET,
+    ))
+    database_configured = bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY)
+    database_ready = False
+    if database_configured:
+        try:
+            result = await run_in_threadpool(supabase_service.test_connection)
+            database_ready = bool(result.get("connected"))
+        except Exception:
+            database_ready = False
+
+    ai_ready = bool(settings.GEMINI_API_KEY)
+    stripe_ready = bool(settings.STRIPE_SECRET_KEY and settings.STRIPE_WEBHOOK_SECRET)
+    dodo_key = (
+        settings.DODO_PAYMENTS_TEST_API_KEY
+        if settings.DODO_PAYMENTS_ENVIRONMENT == "test_mode"
+        else settings.DODO_PAYMENTS_API_KEY
+    )
+    dodo_ready = bool(dodo_key and settings.DODO_PAYMENTS_WEBHOOK_SECRET)
+    billing_ready = stripe_ready or dodo_ready
+
+    from app.services.dwg_converter_service import dwg_converter_service
+    dwg_ready = bool(dwg_converter_service.is_configured())
+
+    checks = {
+        "database": database_ready,
+        "authentication": auth_ready,
+        "ai_generation": ai_ready,
+        "billing": billing_ready,
+        "dwg_converter": dwg_ready,
+    }
+    ready = all(checks.values())
+    payload = {
+        "status": "ready" if ready else "not_ready",
+        "dependencies": {
+            name: "ready" if is_ready else "unavailable"
+            for name, is_ready in checks.items()
+        },
+    }
+    if ready:
+        return payload
+    return JSONResponse(status_code=503, content=payload)
+
+
 @router.get("/detailed")
 async def detailed_health_check():
     """Detailed health check with system info"""
@@ -47,7 +101,7 @@ async def detailed_health_check():
     response_time = round((time.time() - start_time) * 1000, 2)  # in milliseconds
     
     return {
-        "status": "healthy",
+        "status": "healthy" if supabase_status["connected"] else "degraded",
         "timestamp": datetime.now(UTC).isoformat(),
         "service": "KRAFZEN AI Backend",
         "version": "0.1.0",
