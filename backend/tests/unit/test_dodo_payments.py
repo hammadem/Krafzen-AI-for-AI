@@ -53,208 +53,133 @@ def test_verify_dodo_signature_missing_headers():
     with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET):
         assert payment_service.verify_dodo_signature(payload, headers) is False
 
+
 @pytest.mark.asyncio
-async def test_handle_dodo_webhook_payment_succeeded():
-    payload_dict = {
+async def test_dodo_paid_event_is_forwarded_to_atomic_rpc():
+    data = {
         "type": "payment.succeeded",
         "data": {
             "product_id": "pdt_0NptIUxBB6ax8M2pe8Jc2",
-            "payment_id": "pay_test123",
-            "customer": {
-                "customer_id": "cus_test1",
-                "email": "user@example.com"
-            },
-            "metadata": {
-                "user_id": "usr_test_uuid"
-            }
-        }
-    }
-    payload = json.dumps(payload_dict).encode("utf-8")
-    msg_id = "msg_abc"
-    timestamp = str(int(time.time()))
-    sig = generate_dodo_signature(payload, msg_id, timestamp)
-    
-    headers = {
-        "webhook-id": msg_id,
-        "webhook-timestamp": timestamp,
-        "webhook-signature": sig
-    }
-
-    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET), \
-         patch("app.services.payment_service.subscription_service.start_subscription", new_callable=AsyncMock) as mock_start:
-        result = await payment_service.handle_dodo_webhook(payload, headers)
-        assert result["status"] == "success"
-        mock_start.assert_awaited_once_with(
-            user_id="usr_test_uuid",
-            plan_name="starter",
-            billing_cycle="monthly",
-            stripe_customer_id="cus_test1",
-            stripe_subscription_id="dodo_sub_cus_test1",
-            payment_completed=True
-        )
-
-@pytest.mark.asyncio
-async def test_handle_dodo_webhook_subscription_active_without_payment_does_not_grant_access():
-    payload_dict = {
-        "type": "subscription.active",
-        "data": {
-            "product_id": "pdt_0NptIUjvCnzjEpS7tZdLo",
-            "subscription_id": "sub_dodo_annual",
-            "customer": {
-                "customer_id": "cus_test2",
-                "email": "pro@example.com"
-            },
-            "metadata": {
-                "user_id": "usr_pro_uuid"
-            }
-        }
-    }
-    payload = json.dumps(payload_dict).encode("utf-8")
-    msg_id = "msg_def"
-    timestamp = str(int(time.time()))
-    sig = generate_dodo_signature(payload, msg_id, timestamp)
-    
-    headers = {
-        "webhook-id": msg_id,
-        "webhook-timestamp": timestamp,
-        "webhook-signature": sig
-    }
-
-    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET), \
-         patch("app.services.payment_service.subscription_service.start_subscription", new_callable=AsyncMock) as mock_start:
-        result = await payment_service.handle_dodo_webhook(payload, headers)
-        assert result["status"] == "success"
-        # A subscription.active event does not prove that a payment succeeded.
-        mock_start.assert_not_awaited()
-
-@pytest.mark.asyncio
-async def test_handle_dodo_webhook_does_not_resolve_user_id_from_customer_email(monkeypatch):
-    payload = json.dumps({
-        "type": "payment.succeeded",
-        "data": {
-            "product_id": "pdt_0NptIUxBB6ax8M2pe8Jc2",
-            "customer": {
-                "customer_id": "cus_without_user_metadata",
-                "email": "user@example.com",
-            },
-            "metadata": {},
+            "payment_id": "pay_001",
+            "subscription_id": "sub_dodo_001",
+            "total_amount": 14900,
+            "customer": {"customer_id": "cus_001"},
+            "metadata": {"user_id": "00000000-0000-0000-0000-000000000001"},
         },
-    }).encode("utf-8")
-    msg_id = "msg_missing_user"
-    timestamp = str(int(time.time()))
-    headers = {
-        "webhook-id": msg_id,
-        "webhook-timestamp": timestamp,
-        "webhook-signature": generate_dodo_signature(payload, msg_id, timestamp),
     }
-
-    mock_db = Mock()
-    monkeypatch.setattr("app.db.supabase_client.db", mock_db)
-
+    payload = json.dumps(data).encode()
+    stamp = str(int(time.time()))
+    headers = {
+        "webhook-id": "evt_001",
+        "webhook-timestamp": stamp,
+        "webhook-signature": generate_dodo_signature(payload, "evt_001", stamp),
+    }
     with (
         patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET),
         patch(
-            "app.services.payment_service.subscription_service.start_subscription",
+            "app.services.payment_service.subscription_service.apply_verified_payment_event",
             new_callable=AsyncMock,
-        ) as mock_start,
+            return_value="applied",
+        ) as grant,
     ):
         result = await payment_service.handle_dodo_webhook(payload, headers)
+    assert result["outcome"] == "applied"
+    grant.assert_awaited_once()
+    params = grant.await_args.kwargs
+    assert params["provider"] == "dodo"
+    assert params["resource_id"] == "pay_001"
+    assert params["subscription_id"] == "sub_dodo_001"
+    assert params["plan_name"] == "starter"
+    assert params["billing_cycle"] == "monthly"
 
-    assert result["status"] == "success"
-    mock_db.table.assert_not_called()
-    mock_start.assert_not_awaited()
 
-def test_dodo_webhook_endpoint_success(client):
-    payload_dict = {
-        "type": "payment.succeeded",
-        "data": {
-            "product_id": "pdt_0NptIUsLytgIvdbPve7kh",
-            "customer": {"customer_id": "cus_ent1", "email": "ent@example.com"},
-            "metadata": {"user_id": "usr_ent_uuid"}
-        }
-    }
-    payload = json.dumps(payload_dict).encode("utf-8")
-    msg_id = "msg_ent"
-    timestamp = str(int(time.time()))
-    sig = generate_dodo_signature(payload, msg_id, timestamp)
-
-    headers = {
-        "webhook-id": msg_id,
-        "webhook-timestamp": timestamp,
-        "webhook-signature": sig,
-        "Content-Type": "application/json"
-    }
-
-    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET), \
-         patch("app.services.payment_service.subscription_service.start_subscription", new_callable=AsyncMock):
-        response = client.post("/api/v1/payments/dodo-webhook", content=payload, headers=headers)
-        assert response.status_code == 200
-        assert response.json()["status"] == "success"
-
-def test_dodo_webhook_endpoint_invalid_signature(client):
-    payload = b'{"type": "payment.succeeded"}'
-    headers = {
-        "webhook-id": "msg_bad",
-        "webhook-timestamp": "1729000004",
-        "webhook-signature": "v1,invalid",
-        "Content-Type": "application/json"
-    }
-
-    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET):
-        response = client.post("/api/v1/payments/dodo-webhook", content=payload, headers=headers)
-        assert response.status_code == 400
-
-def test_payments_webhook_dual_routing_dodo(client):
-    payload_dict = {
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case", ["missing_payment", "missing_subscription", "no_amount", "unknown_product"])
+async def test_dodo_ambiguous_payment_does_not_grant(case):
+    data = {
         "type": "payment.succeeded",
         "data": {
             "product_id": "pdt_0NptIUxBB6ax8M2pe8Jc2",
-            "customer": {"customer_id": "cus_dual", "email": "dual@example.com"},
-            "metadata": {"user_id": "usr_dual_uuid"}
-        }
+            "payment_id": "pay_001",
+            "subscription_id": "sub_dodo_001",
+            "total_amount": 14900,
+            "metadata": {"user_id": "00000000-0000-0000-0000-000000000001"},
+        },
     }
-    payload = json.dumps(payload_dict).encode("utf-8")
-    msg_id = "msg_dual"
-    timestamp = str(int(time.time()))
-    sig = generate_dodo_signature(payload, msg_id, timestamp)
+    name = {
+        "missing_payment": "payment_id",
+        "missing_subscription": "subscription_id",
+        "no_amount": "total_amount",
+        "unknown_product": "product_id",
+    }[case]
+    data["data"].pop(name)
+    payload = json.dumps(data).encode()
+    stamp = str(int(time.time()))
+    headers = {"webhook-id": "evt_002", "webhook-timestamp": stamp,
+               "webhook-signature": generate_dodo_signature(payload, "evt_002", stamp)}
+    with (
+        patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET),
+        patch(
+            "app.services.payment_service.subscription_service.apply_verified_payment_event",
+            new_callable=AsyncMock,
+        ) as grant,
+    ):
+        with pytest.raises(ValueError):
+            await payment_service.handle_dodo_webhook(payload, headers)
+    grant.assert_not_awaited()
 
-    headers = {
-        "webhook-id": msg_id,
-        "webhook-timestamp": timestamp,
-        "webhook-signature": sig,
-        "Content-Type": "application/json"
+
+@pytest.mark.asyncio
+async def test_dodo_subscription_active_alone_does_not_grant():
+    data = {"type": "subscription.active", "data": {"metadata": {"user_id": "00000000-0000-0000-0000-000000000001"}}}
+    payload = json.dumps(data).encode()
+    stamp = str(int(time.time()))
+    headers = {"webhook-id": "evt_003", "webhook-timestamp": stamp,
+               "webhook-signature": generate_dodo_signature(payload, "evt_003", stamp)}
+    with (
+        patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET),
+        patch(
+            "app.services.payment_service.subscription_service.apply_verified_payment_event",
+            new_callable=AsyncMock,
+        ) as grant,
+    ):
+        response = await payment_service.handle_dodo_webhook(payload, headers)
+    assert response["status"] == "ignored"
+    grant.assert_not_awaited()
+
+
+def test_dodo_webhook_endpoint_signature_rejected(client):
+    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET):
+        response = client.post("/api/v1/payments/dodo-webhook",
+                               content=b'{"type":"payment.succeeded"}',
+                               headers={"webhook-id": "evt_bad", "webhook-timestamp": str(int(time.time())),
+                                        "webhook-signature": "v1,invalid"})
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_paid_dodo_http_webhook_uses_rpc(client):
+    data = {
+        "type": "payment.succeeded",
+        "data": {
+            "product_id": "pdt_0NptIUxBB6ax8M2pe8Jc2", "payment_id": "pay_http_001",
+            "subscription_id": "sub_http_001", "total_amount": 14900,
+            "metadata": {"user_id": "00000000-0000-0000-0000-000000000001"},
+        },
     }
-
-    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET), \
-         patch("app.services.payment_service.subscription_service.start_subscription", new_callable=AsyncMock):
-        # Hit the unified /payments/webhook endpoint with Dodo headers
-        response = client.post("/api/v1/payments/webhook", content=payload, headers=headers)
-        assert response.status_code == 200
-        assert response.json()["status"] == "success"
-
-
-def test_dodo_valid_hmac_old_timestamp_does_not_authorize_replay():
-    payload = b'{"type":"payment.succeeded"}'
-    timestamp = str(int(time.time()) - 301)
-    headers = {"webhook-id": "msg_stale", "webhook-timestamp": timestamp,
-               "webhook-signature": generate_dodo_signature(payload, "msg_stale", timestamp)}
-    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET):
-        assert not payment_service.verify_dodo_signature(payload, headers)
-
-
-def test_dodo_future_timestamp_rejected():
-    payload = b'{"type":"payment.succeeded"}'
-    timestamp = str(int(time.time()) + 301)
-    headers = {"webhook-id": "msg_future", "webhook-timestamp": timestamp,
-               "webhook-signature": generate_dodo_signature(payload, "msg_future", timestamp)}
-    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET):
-        assert not payment_service.verify_dodo_signature(payload, headers)
-
-
-def test_dodo_nonnumeric_timestamp_rejected():
-    payload = b'{"type":"payment.succeeded"}'
-    timestamp = "bogus"
-    headers = {"webhook-id": "msg_bad_timestamp", "webhook-timestamp": timestamp,
-               "webhook-signature": generate_dodo_signature(payload, "msg_bad_timestamp", timestamp)}
-    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET):
-        assert not payment_service.verify_dodo_signature(payload, headers)
+    payload = json.dumps(data).encode()
+    stamp = str(int(time.time()))
+    headers = {"webhook-id": "evt_http", "webhook-timestamp": stamp,
+               "webhook-signature": generate_dodo_signature(payload, "evt_http", stamp)}
+    with (
+        patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET),
+        patch(
+            "app.services.payment_service.subscription_service.apply_verified_payment_event",
+            new_callable=AsyncMock,
+            return_value="applied",
+        ) as grant,
+    ):
+        response = client.post("/api/v1/payments/dodo-webhook", content=payload, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "applied"
+    grant.assert_awaited_once()

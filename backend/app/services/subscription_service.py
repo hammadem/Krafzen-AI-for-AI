@@ -1,6 +1,9 @@
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID
+
+from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.db.supabase_client import db
@@ -195,6 +198,63 @@ class SubscriptionService:
         except Exception as e:
             logger.error(f"Error starting subscription for {user_id}: {e}")
             raise
+
+    async def apply_verified_payment_event(
+        self,
+        *,
+        provider: str,
+        event_id: str,
+        kind: str,
+        resource_id: str,
+        user_id: str,
+        subscription_id: str,
+        customer_id: str | None,
+        plan_name: str | None,
+        billing_cycle: str | None,
+        occurred_at: datetime,
+    ) -> str:
+        """Apply one verified provider event in a single Postgres transaction.
+
+        RPC uniqueness and entitlement mutation happen atomically. The RPC is
+        service-role-only; missing migrations or DB errors fail the webhook
+        (so the payment provider can retry), never grant credits in Python.
+        """
+        if provider not in {"stripe", "dodo"} or kind not in {"paid", "past_due", "canceled"}:
+            raise ValueError("Invalid payment event provider/kind")
+        if not event_id or not resource_id or not subscription_id:
+            raise ValueError("Payment event requires provider IDs")
+        try:
+            UUID(str(user_id))
+        except (ValueError, TypeError) as exc:
+            raise ValueError("Payment event has no valid internal user ID") from exc
+        if occurred_at.tzinfo is None:
+            raise ValueError("Payment event requires an offset-aware event timestamp")
+        if kind == "paid" and (
+            plan_name not in PLAN_CONFIG
+            or billing_cycle not in PLAN_CONFIG[plan_name]
+            or PLAN_CONFIG[plan_name][billing_cycle]["price"] is None
+        ):
+            raise ValueError("Payment event has no recognized billable plan")
+
+        payload = {
+            "p_provider": provider,
+            "p_event_id": event_id,
+            "p_event_kind": kind,
+            "p_resource_id": resource_id,
+            "p_user_id": str(user_id),
+            "p_subscription_id": subscription_id,
+            "p_customer_id": customer_id,
+            "p_plan_name": plan_name,
+            "p_billing_cycle": billing_cycle,
+            "p_occurred_at": occurred_at.isoformat(),
+        }
+        result = await run_in_threadpool(
+            lambda: db.rpc("apply_paid_webhook_event", payload).execute()
+        )
+        outcome = result.data if result else None
+        if outcome not in {"applied", "duplicate", "ignored"}:
+            raise RuntimeError("Verified payment event was not persisted")
+        return outcome
 
     async def activate_subscription(self, user_id: str) -> dict[str, Any]:
         """Set subscription to active (e.g. Stripe webhook)."""
