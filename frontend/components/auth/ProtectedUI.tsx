@@ -1,9 +1,7 @@
 "use client";
 
-// SU4 — minimal permission gating for Week 1.
-// Basic hide/disable based on a role *stub*. Real workspace roles land in Week 2
-// (workspace members API); until the user object carries a role, we default to
-// "owner" so current behavior is unchanged.
+// Frontend permission display only; authorization must also be enforced by
+// backend endpoints. Unknown roles are denied, never treated as owners.
 //
 // Usage:
 //   <ProtectedUI allow={["owner", "admin"]}>           // hide if not allowed
@@ -18,15 +16,19 @@ import { useAuth } from "@/context/AuthContext";
 
 export type Role = "owner" | "admin" | "member" | "viewer";
 
-/** Current user's role, defaulting to "owner" until real roles are wired (Week 2). */
-export function useRole(): Role {
+/** Unknown/missing roles must never acquire owner permissions. */
+export function useRole(): Role | null {
     const { user } = useAuth();
-    return (user?.role as Role) || "owner";
+    const role = user?.role;
+    return role === "owner" || role === "admin" || role === "member" || role === "viewer"
+        ? role
+        : null;
 }
 
-/** Whether the current role is in the allowed set. */
+/** Client-side UI gate; all protected operations also require backend checks. */
 export function useCan(allow: Role[]): boolean {
-    return allow.includes(useRole());
+    const role = useRole();
+    return role !== null && allow.includes(role);
 }
 
 export default function ProtectedUI({
