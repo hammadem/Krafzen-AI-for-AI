@@ -56,7 +56,11 @@ async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_au
         # Validate auth
         user_data["user_id"]
         
-        from app.services.local_dxf_service import local_dxf_service
+        from app.services.local_dxf_service import local_dxf_service, validate_image_source
+        try:
+            validate_image_source(request.image_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         logger.info("Requesting Local DXF Conversion (Potrace)...")
         file_path = await local_dxf_service.convert_to_dxf(request.image_url)
 
@@ -70,9 +74,11 @@ async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_au
             media_type='application/dxf'
         )
 
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("DXF Generation Error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="DXF generation failed")
 
 
 def _safe_unlink(path: str) -> None:
@@ -115,7 +121,11 @@ async def generate_design_file(
         if file_type not in ("dxf", "dwg"):
             raise HTTPException(status_code=400, detail="file_type must be 'dxf' or 'dwg'")
 
-        from app.services.local_dxf_service import local_dxf_service
+        from app.services.local_dxf_service import local_dxf_service, validate_image_source
+        try:
+            validate_image_source(request.image_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         logger.info("Generating DXF from image (local Potrace)...")
         dxf_path = await local_dxf_service.convert_to_dxf(request.image_url)

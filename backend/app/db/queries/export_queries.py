@@ -183,6 +183,8 @@ async def update_export_status(
     export_id: str,
     update_data: dict[str, Any],
     user_id: str,
+    *,
+    expected_status: str | None = None,
 ) -> dict[str, Any] | None:
     if not _valid_uuid(export_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid export_id"})
@@ -197,11 +199,19 @@ async def update_export_status(
         payload = {k: v for k, v in update_data.items() if v is not None}
         payload["updated_at"] = datetime.now(UTC).isoformat()
 
-        res = await run_in_threadpool(
-            lambda: db.table("export_jobs").update(payload).eq("id", export_id).execute()
-        )
+        def _update():
+            query = db.table("export_jobs").update(payload).eq("id", export_id)
+            if expected_status is not None:
+                # Compare-and-swap is a single PostgREST UPDATE statement. Two
+                # workers cannot both transition queued -> processing.
+                query = query.eq("status", expected_status)
+            return query.execute()
+
+        res = await run_in_threadpool(_update)
 
         if not res or not res.data:
+            if expected_status is not None:
+                return None  # Another worker claimed or transitioned the row.
             raise HTTPException(status_code=404, detail={"error": "Export not found"})
 
         return res.data[0]

@@ -367,9 +367,10 @@ class PaymentService:
             status = subscription.get("status")
             logger.info(f"Subscription updated for user {user_id}, status: {status}")
             
-            # Update subscription status in database
+            # A subscription.updated(active) event is not evidence of a paid
+            # invoice. Activation must follow a verified paid checkout.
             if status == "active":
-                await subscription_service.activate_subscription(user_id)
+                logger.info("Awaiting verified checkout/payment before granting access")
 
     async def _handle_subscription_deleted(self, subscription):
         """

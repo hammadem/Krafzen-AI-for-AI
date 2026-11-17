@@ -14,7 +14,6 @@ from app.db.queries.export_queries import (
     get_export,
     get_export_artifact,
     get_project_exports,
-    update_export_status,
 )
 from app.db.queries.file_queries import get_signed_url
 from app.db.supabase_client import db
@@ -150,17 +149,31 @@ async def get_export_artifact_route(
         else None
     )
 
-    # Check if regional signed URL applies
-    if org_id and residency_ctx and residency_ctx.get("region_code") != "global":
-        signed_url = await storage_service.get_cad_file_url(
-            project_id=str(project_id),
-            user_id=user["user_id"],
-            file_extension=artifact.get("file_type", "dxf"),
-            organization_id=org_id,
-            expires_in=3600,
+    # Sign the exact artifact referenced by this export, never the latest file
+    # with the same extension (which could belong to a different export).
+    if org_id:
+        if not residency_ctx or residency_ctx.get("region_code") == "global":
+            raise HTTPException(status_code=503, detail="Regional export storage is not configured")
+        client, bucket, region = storage_service.resolve_target_bucket_and_client(org_id)
+        expected_prefix = f"tenants/{org_id}/cad/{project_id}/"
+        artifact_path = artifact.get("path") or ""
+        if (region != residency_ctx["region_code"]
+                or artifact.get("bucket") != bucket
+                or artifact.get("project_id") != project_id
+                or not artifact_path.startswith(expected_prefix)
+                or ".." in artifact_path.split("/")):
+            raise HTTPException(status_code=409, detail="Export artifact storage metadata mismatch")
+        result = await run_in_threadpool(
+            lambda: client.storage.from_(bucket).create_signed_url(
+                path=artifact_path, expires_in=3600
+            )
         )
+        signed_url = result.get("signedURL") or result.get("signed_url") or result.get("url")
     else:
         signed_url = await get_signed_url(artifact["id"], user)
+
+    if not signed_url:
+        raise HTTPException(status_code=503, detail="Export artifact URL is unavailable")
 
     return {
         "file_id": artifact["id"],
@@ -189,6 +202,9 @@ async def update_export_status_route(
     body: ExportStatusUpdate,
     user=Depends(require_auth),
 ):
-    return await update_export_status(
-        export_id, body.model_dump(exclude_unset=True), user["user_id"]
+    # Clients may inspect exports but cannot impersonate the internal worker
+    # by setting status=completed or providing arbitrary artifact_file_id.
+    raise HTTPException(
+        status_code=403,
+        detail="Export lifecycle updates are restricted to the internal worker",
     )
