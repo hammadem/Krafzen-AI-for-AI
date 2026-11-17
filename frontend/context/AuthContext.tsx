@@ -42,8 +42,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const planNameRaw = sub.plan_name || balance.plan_name || "free";
     const planName = typeof planNameRaw === "string" ? planNameRaw.toLowerCase() : "free";
     const status = sub.status || balance.subscription_status || "inactive";
-    const trialReq = balance.trial_requests ?? 0;
-    const planReq = balance.plan_requests ?? 0;
     const planTotal = sub.plan_requests_total ?? 0;
     // Frontend is advisory only. The backend enforces paid entitlements for
     // every protected API route, even if the user modifies this state.

@@ -531,7 +531,7 @@ class PaymentService:
             subscription_id = event_data["subscription_ids"][0]
 
         # Subscription creation alone is not proof of payment.
-        if event_type in ("payment.succeeded", "subscription.active"):
+        if event_type == "payment.succeeded":
             if user_id and plan_name and billing_cycle:
                 logger.info(f"Fulfilling Dodo subscription for {user_id}: {plan_name} ({billing_cycle})")
                 await subscription_service.start_subscription(
