@@ -149,7 +149,23 @@ def test_invalid_design_file_source_returns_422(client):
 
 @pytest.mark.asyncio
 async def test_stripe_active_update_alone_cannot_grant_payment():
+    from datetime import UTC, datetime
     from app.services.payment_service import payment_service
-    with patch("app.services.payment_service.subscription_service.activate_subscription", AsyncMock()) as activate:
-        await payment_service._handle_subscription_updated({"metadata": {"user_id": USER["user_id"]}, "status": "active"})
-    activate.assert_not_awaited()
+    event = {
+        "id": "evt_subscription_updated_unpaid",
+        "type": "customer.subscription.updated",
+        "created": int(datetime.now(UTC).timestamp()),
+        "data": {"object": {"id": "sub_001", "status": "active",
+                            "metadata": {"user_id": USER["user_id"]}}},
+    }
+    with (
+        patch("app.services.payment_service.settings.STRIPE_WEBHOOK_SECRET", "whsec_test"),
+        patch("app.services.payment_service.stripe.Webhook.construct_event", return_value=event),
+        patch(
+            "app.services.payment_service.subscription_service.apply_verified_payment_event",
+            AsyncMock(),
+        ) as record,
+    ):
+        result = await payment_service.handle_webhook(b"signed", "signature")
+    assert result["status"] == "ignored"
+    record.assert_not_awaited()
