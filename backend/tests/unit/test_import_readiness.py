@@ -1,6 +1,6 @@
 """Health gates require the import scanner and a migrated database."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from app.main import app
 
@@ -35,7 +35,11 @@ def test_readiness_reports_ifc_migration_missing(client, monkeypatch):
 
     with (
         patch("app.api.health.supabase_service.test_connection", return_value={"connected": True}),
-        patch("app.api.health.run_in_threadpool", side_effect=RuntimeError("column missing")),
+        patch(
+            "app.api.health.run_in_threadpool",
+            new_callable=AsyncMock,
+            side_effect=[{"connected": True}, RuntimeError("column missing")],
+        ),
     ):
         response = client.get("/health/ready")
 
