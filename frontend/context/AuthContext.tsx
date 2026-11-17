@@ -45,10 +45,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const trialReq = balance.trial_requests ?? 0;
     const planReq = balance.plan_requests ?? 0;
     const planTotal = sub.plan_requests_total ?? 0;
-    const paidStatuses = ["active", "trial", "past_due"];
-    const hasPaidSubscription = planName !== "free" && paidStatuses.includes(status);
-    const canAccessWorkspace =
-      hasPaidSubscription || trialReq > 0 || planReq > 0;
+    // Frontend is advisory only. The backend enforces paid entitlements for
+    // every protected API route, even if the user modifies this state.
+    const hasPaidSubscription = planName !== "free" && status === "active";
+    const canAccessWorkspace = hasPaidSubscription;
     const displayPlan =
       planName === "free" ? "Free" : planName.charAt(0).toUpperCase() + planName.slice(1);
     setUser((prev) =>
@@ -59,11 +59,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             has_active_subscription: hasPaidSubscription,
             can_access_workspace: canAccessWorkspace,
             subscription_status: status,
-            trial_requests_remaining: trialReq,
+            trial_requests_remaining: 0,
             plan_requests_remaining: planReq,
             plan_requests_total: planTotal,
             trial_end_date: sub.trial_end_date ?? undefined,
-            in_free_signup_tier: balance.in_free_signup_tier ?? planName === "free",
+            in_free_signup_tier: false,
           }
         : null
     );
