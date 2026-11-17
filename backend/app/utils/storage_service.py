@@ -104,8 +104,13 @@ class StorageService:
             )
             record = res.data[0] if (res and res.data) else None
 
-            if not record or record.get("status") != ResidencyStatus.ACTIVE.value:
+            if not record:
                 return regional_client, cls.DEFAULT_BUCKET_NAME, "global"
+            if record.get("status") != ResidencyStatus.ACTIVE.value:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Regional storage unavailable: residency assignment is not active.",
+                )
 
             region_code = record.get("region_code", "us")
             region_entry = CENTRAL_REGION_REGISTRY.get(region_code)
@@ -119,9 +124,14 @@ class StorageService:
 
             return regional_client, bucket_name, region_code
 
+        except HTTPException:
+            raise
         except Exception as e:
-            logger.error("Failed resolving regional bucket for org %s: %s", organization_id, e)
-            return regional_client, cls.DEFAULT_BUCKET_NAME, "global"
+            logger.exception("Failed resolving regional bucket for org %s", organization_id)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Regional storage resolution failed; central storage fallback is prohibited.",
+            ) from e
 
     @classmethod
     def validate_file_metadata(cls, content_type: str, file_size_bytes: int, category: str) -> None:

@@ -27,7 +27,7 @@ async def health_check():
             "service": "KRAFZEN AI Backend",
             "db_project_count": result.count,
         }
-    except (APIError, HTTPError):
+    except (APIError, HTTPError, RuntimeError):
         return {
             "status": "degraded",
             "timestamp": datetime.now(UTC).isoformat(),

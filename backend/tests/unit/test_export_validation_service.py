@@ -1,5 +1,7 @@
 """Tests for export validation preflight/postflight framework."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from app.services.export_validation_service import run_postflight, run_preflight
@@ -14,10 +16,17 @@ async def test_preflight_blocks_missing_project():
 
 @pytest.mark.asyncio
 async def test_preflight_passes_minimal_job():
-    report = await run_preflight(
-        {"id": "job-1", "project_id": "proj-1", "format": "dxf", "metadata": {"idempotency_key": "abc12345"}}
-    )
+    # This unit case tests the export contract; sovereign worker affinity
+    # is exercised separately in test_residency_routing and worker tests.
+    with patch(
+        "app.services.export_validation_service._check_regional_worker_affinity",
+        AsyncMock(return_value=None),
+    ) as affinity:
+        report = await run_preflight(
+            {"id": "job-1", "project_id": "proj-1", "format": "dxf", "metadata": {"idempotency_key": "abc12345"}}
+        )
     assert report.can_proceed is True
+    affinity.assert_awaited_once()
 
 
 @pytest.mark.asyncio

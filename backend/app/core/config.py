@@ -4,6 +4,8 @@ Configuration settings for KRAFZEN AI backend
 
 
 
+from typing import Optional
+
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
@@ -35,8 +37,8 @@ class Settings(BaseSettings):
         "https://www.staging.krafzen.com,"
         "https://krafzen.com,"
         "https://www.krafzen.com,"
-        "https://app.krafzen.com",
-        "https://enterprise-white-label.vercel.app/"
+        "https://app.krafzen.com,"
+        "https://enterprise-white-label.vercel.app"
     )
 
     @property
@@ -165,6 +167,9 @@ class Settings(BaseSettings):
     RENDER_SERVICE_ID_STAGING: str = ""
 
     # Enterprise: US Sovereign Region Secret References
+    # Supabase REST API client uses the HTTPS URL and service role key.
+    SUPABASE_URL_US: Optional[str] = None
+    SUPABASE_SERVICE_ROLE_KEY_US: Optional[str] = None
     SUPABASE_DATABASE_URL_US: Optional[str] = None
     SUPABASE_STORAGE_URL_US: Optional[str] = None
     SUPABASE_STORAGE_KEY_US: Optional[str] = None

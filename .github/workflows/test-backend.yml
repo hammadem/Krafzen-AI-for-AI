@@ -69,32 +69,17 @@ jobs:
     - name: Verify Jobs and Files routes are registered
       run: |
         cd backend
-        timeout 10s uvicorn main:app --host 0.0.0.0 --port 8000 &
-        sleep 5
-        # Wait for server to be fully ready
-        for i in {1..10}; do
-          if curl -f http://localhost:8000/health > /dev/null 2>&1; then
-            break
-          fi
-          sleep 1
-        done
-        # Check OpenAPI JSON for actual endpoint paths (most reliable)
-        OPENAPI_JSON=$(curl -s http://localhost:8000/openapi.json)
-        # Check for Jobs endpoints
-        if echo "$OPENAPI_JSON" | grep -q '"/api/v1/jobs'; then
-          echo "✅ Jobs routes found"
-        else
-          echo "❌ Jobs routes not found - /api/v1/jobs endpoint missing"
-          exit 1
-        fi
-        # Check for Files endpoints
-        if echo "$OPENAPI_JSON" | grep -q '"/api/v1/files'; then
-          echo "✅ Files routes found"
-        else
-          echo "❌ Files routes not found - /api/v1/files endpoint missing"
-          exit 1
-        fi
-    
+        # Inspect the FastAPI app directly. /health requires Supabase secrets
+        # and should not be used as a readiness gate in credential-free CI.
+        python - <<'PY'
+        from app.main import app
+
+        paths = {route.path for route in app.routes}
+        for required in ("/api/v1/jobs/", "/api/v1/files/", "/api/v1/projects/"):
+            assert required in paths, f"Missing registered API route: {required}"
+        print("Jobs, files, and projects routes registered successfully")
+        PY
+
     - name: Run backend tests
       run: |
         cd backend

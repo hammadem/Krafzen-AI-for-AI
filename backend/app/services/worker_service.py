@@ -45,133 +45,74 @@ JOB_TIMEOUT_SECONDS = 120
 MAX_RETRY_COUNT = 3
 
 # Local worker process configuration
-CURRENT_WORKER_POOL = os.getenv("WORKER_POOL_NAME", "render-us-nodes")
-CURRENT_REGION_CODE = os.getenv("CURRENT_REGION_CODE", "us")
+# Do not assume a worker is in the US without explicit deployment configuration.
+CURRENT_WORKER_POOL = os.getenv("WORKER_POOL_NAME", "").strip()
+CURRENT_REGION_CODE = os.getenv("CURRENT_REGION_CODE", "").strip().lower()
 
 
 async def _resolve_organization_and_region(
     project_id: str | None,
 ) -> tuple[uuid.UUID | None, str]:
-    """
-    Phase 2.6: Resolves project's workspace_id (tenant organization_id)
-    and sovereign data residency region mapping.
-    """
+    """Resolve project residency; never silently return global on query failures."""
     if not project_id:
-        return None, "global"
+        raise ValueError("Export job is missing project_id")
+
     try:
         central_client = supabase_service.client or db
-
-        # 1. Resolve workspace_id from projects
-        res = await run_in_threadpool(
+        project_res = await run_in_threadpool(
             lambda: central_client.table("projects")
             .select("workspace_id")
             .eq("id", str(project_id))
             .execute()
         )
-        if not res.data or not res.data[0].get("workspace_id"):
-            return None, "global"
+        if not project_res.data:
+            raise LookupError(f"Export project '{project_id}' was not found")
 
-        workspace_id_str = res.data[0]["workspace_id"]
-        workspace_id = uuid.UUID(str(workspace_id_str))
+        workspace_id_raw = project_res.data[0].get("workspace_id")
+        if not workspace_id_raw:
+            return None, "global"  # Verified individual project without organization.
 
-        # 2. Resolve regional residency configuration
+        workspace_id = uuid.UUID(str(workspace_id_raw))
         residency_res = await run_in_threadpool(
             lambda: central_client.table("organization_residency")
             .select("region_code, status")
             .eq("organization_id", str(workspace_id))
             .execute()
         )
-        if residency_res.data and residency_res.data[0].get("status") == "active":
-            region_code = residency_res.data[0].get("region_code", "global")
-        else:
-            region_code = "global"
+        if not residency_res.data:
+            return workspace_id, "global"  # Organization has no residency assignment.
 
-        return workspace_id, region_code
+        assignment = residency_res.data[0]
+        state = str(assignment.get("status") or "").lower()
+        region = str(assignment.get("region_code") or "").lower()
+        if state != "active" or not region or region == "global":
+            raise PermissionError(
+                "Export blocked: organization residency assignment is not active or valid"
+            )
 
-    except Exception as e:
-        logger.error(
-            "[worker] _resolve_organization_and_region failed",
-            project_id=project_id,
-            error=str(e),
-        )
-        return None, "global"
+        return workspace_id, region
+    except Exception:
+        logger.exception("[worker] Residency resolution failed for project %s", project_id)
+        raise
 
 
 def _assert_sovereign_worker_boundary(job_id: str, target_region: str) -> None:
-    """
-    Phase 2.8: Guard against cross-border processing violations.
-    Prevents workers in foreign pools from handling sovereign tasks.
-    """
+    """Require explicit regional worker identity for sovereign export jobs."""
+    if target_region == "global":
+        return
+
     region_entry = RegionRegistryService.get_region(target_region)
-    expected_pool = (
-        region_entry.processing_config.get("worker_pool")
-        if region_entry
-        else "render-default-nodes"
-    )
-
-    # If the job belongs to a sovereign region like 'us', strictly verify local worker identity
-    if target_region == "us":
-        if CURRENT_REGION_CODE != "us":
-            raise PermissionError(
-                f"Sovereignty Violation: Worker in region '{CURRENT_REGION_CODE}' attempted "
-                f"to process sovereign US job '{job_id}'."
-            )
-        if CURRENT_WORKER_POOL != expected_pool:
-            raise PermissionError(
-                f"Worker Pool Mismatch: Job '{job_id}' requires '{expected_pool}', "
-                f"but active worker pool is '{CURRENT_WORKER_POOL}'."
-            )
-
-        workspace_id_str = res.data[0]["workspace_id"]
-        workspace_id = uuid.UUID(str(workspace_id_str))
-
-        # 2. Resolve regional residency configuration
-        residency_res = await run_in_threadpool(
-            lambda: central_client.table("organization_residency")
-            .select("region_code, status")
-            .eq("organization_id", str(workspace_id))
-            .execute()
+    if not region_entry:
+        raise PermissionError(
+            f"Sovereignty violation: unknown processing region '{target_region}' for job '{job_id}'"
         )
-        if residency_res.data and residency_res.data[0].get("status") == "active":
-            region_code = residency_res.data[0].get("region_code", "global")
-        else:
-            region_code = "global"
 
-        return workspace_id, region_code
-
-    except Exception as e:
-        logger.error(
-            "[worker] _resolve_organization_and_region failed",
-            project_id=project_id,
-            error=str(e),
+    expected_pool = region_entry.processing_config.get("worker_pool")
+    if not expected_pool or CURRENT_REGION_CODE != target_region or CURRENT_WORKER_POOL != expected_pool:
+        raise PermissionError(
+            f"Sovereignty violation: job '{job_id}' requires region '{target_region}' "
+            f"and worker pool '{expected_pool}', got '{CURRENT_REGION_CODE}' / '{CURRENT_WORKER_POOL}'"
         )
-        return None, "global"
-
-
-def _assert_sovereign_worker_boundary(job_id: str, target_region: str) -> None:
-    """
-    Phase 2.8: Guard against cross-border processing violations.
-    Prevents workers in foreign pools from handling sovereign tasks.
-    """
-    region_entry = RegionRegistryService.get_region(target_region)
-    expected_pool = (
-        region_entry.processing_config.get("worker_pool")
-        if region_entry
-        else "render-default-nodes"
-    )
-
-    # If the job belongs to a sovereign region like 'us', strictly verify local worker identity
-    if target_region == "us":
-        if CURRENT_REGION_CODE != "us":
-            raise PermissionError(
-                f"Sovereignty Violation: Worker in region '{CURRENT_REGION_CODE}' attempted "
-                f"to process sovereign US job '{job_id}'."
-            )
-        if CURRENT_WORKER_POOL != expected_pool:
-            raise PermissionError(
-                f"Worker Pool Mismatch: Job '{job_id}' requires '{expected_pool}', "
-                f"but active worker pool is '{CURRENT_WORKER_POOL}'."
-            )
 
 
 async def process_export_job(
