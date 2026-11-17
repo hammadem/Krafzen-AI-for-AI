@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import logging
+import time
 from typing import Any
 
 import stripe
@@ -453,6 +454,16 @@ class PaymentService:
 
         if not (webhook_id and webhook_timestamp and webhook_signature):
             logger.warning("Missing required Dodo standard webhook signature headers.")
+            return False
+
+        # HMAC authenticates the timestamp, but an old signed payload remains
+        # replayable without a separate freshness check.
+        try:
+            signed_at = int(webhook_timestamp)
+            if signed_at <= 0 or abs(time.time() - signed_at) > 300:
+                logger.warning("Dodo webhook timestamp outside permitted window")
+                return False
+        except (ValueError, TypeError):
             return False
 
         try:

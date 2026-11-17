@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import time
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -22,7 +23,7 @@ def generate_dodo_signature(payload: bytes, msg_id: str, timestamp: str, secret:
 def test_verify_dodo_signature_valid():
     payload = b'{"type": "payment.succeeded"}'
     msg_id = "msg_123"
-    timestamp = "1729000000"
+    timestamp = str(int(time.time()))
     sig = generate_dodo_signature(payload, msg_id, timestamp)
     
     headers = {
@@ -70,7 +71,7 @@ async def test_handle_dodo_webhook_payment_succeeded():
     }
     payload = json.dumps(payload_dict).encode("utf-8")
     msg_id = "msg_abc"
-    timestamp = "1729000001"
+    timestamp = str(int(time.time()))
     sig = generate_dodo_signature(payload, msg_id, timestamp)
     
     headers = {
@@ -110,7 +111,7 @@ async def test_handle_dodo_webhook_subscription_active_without_payment_does_not_
     }
     payload = json.dumps(payload_dict).encode("utf-8")
     msg_id = "msg_def"
-    timestamp = "1729000002"
+    timestamp = str(int(time.time()))
     sig = generate_dodo_signature(payload, msg_id, timestamp)
     
     headers = {
@@ -140,7 +141,7 @@ async def test_handle_dodo_webhook_does_not_resolve_user_id_from_customer_email(
         },
     }).encode("utf-8")
     msg_id = "msg_missing_user"
-    timestamp = "1729000006"
+    timestamp = str(int(time.time()))
     headers = {
         "webhook-id": msg_id,
         "webhook-timestamp": timestamp,
@@ -174,7 +175,7 @@ def test_dodo_webhook_endpoint_success(client):
     }
     payload = json.dumps(payload_dict).encode("utf-8")
     msg_id = "msg_ent"
-    timestamp = "1729000003"
+    timestamp = str(int(time.time()))
     sig = generate_dodo_signature(payload, msg_id, timestamp)
 
     headers = {
@@ -214,7 +215,7 @@ def test_payments_webhook_dual_routing_dodo(client):
     }
     payload = json.dumps(payload_dict).encode("utf-8")
     msg_id = "msg_dual"
-    timestamp = "1729000005"
+    timestamp = str(int(time.time()))
     sig = generate_dodo_signature(payload, msg_id, timestamp)
 
     headers = {
@@ -230,3 +231,30 @@ def test_payments_webhook_dual_routing_dodo(client):
         response = client.post("/api/v1/payments/webhook", content=payload, headers=headers)
         assert response.status_code == 200
         assert response.json()["status"] == "success"
+
+
+def test_dodo_valid_hmac_old_timestamp_does_not_authorize_replay():
+    payload = b'{"type":"payment.succeeded"}'
+    timestamp = str(int(time.time()) - 301)
+    headers = {"webhook-id": "msg_stale", "webhook-timestamp": timestamp,
+               "webhook-signature": generate_dodo_signature(payload, "msg_stale", timestamp)}
+    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET):
+        assert not payment_service.verify_dodo_signature(payload, headers)
+
+
+def test_dodo_future_timestamp_rejected():
+    payload = b'{"type":"payment.succeeded"}'
+    timestamp = str(int(time.time()) + 301)
+    headers = {"webhook-id": "msg_future", "webhook-timestamp": timestamp,
+               "webhook-signature": generate_dodo_signature(payload, "msg_future", timestamp)}
+    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET):
+        assert not payment_service.verify_dodo_signature(payload, headers)
+
+
+def test_dodo_nonnumeric_timestamp_rejected():
+    payload = b'{"type":"payment.succeeded"}'
+    timestamp = "bogus"
+    headers = {"webhook-id": "msg_bad_timestamp", "webhook-timestamp": timestamp,
+               "webhook-signature": generate_dodo_signature(payload, "msg_bad_timestamp", timestamp)}
+    with patch.object(settings, "DODO_PAYMENTS_WEBHOOK_SECRET", SECRET):
+        assert not payment_service.verify_dodo_signature(payload, headers)
