@@ -18,7 +18,7 @@ from app.db.queries.file_queries import (
 )
 from app.middlewares.auth import require_auth
 from app.models.file_model import FileCreate, FileResponse, FileUpdate
-from app.services.import_service import import_dxf_for_job
+from app.services.import_service import import_dxf_for_job, import_ifc_for_job
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -49,6 +49,19 @@ async def import_dxf_route(
     """Accept a DXF into a verified project/job after mandatory scanning."""
     try:
         return await import_dxf_for_job(job_id=job_id, upload=upload, user=user)
+    finally:
+        await upload.close()
+
+
+@router.post("/import-ifc", response_model=FileResponse, status_code=201)
+async def import_ifc_route(
+    job_id: str = Form(...),
+    upload: UploadFile = File(...),
+    user=Depends(require_auth),
+):
+    """Import scanned and parsed IFC models with stored BIM metadata."""
+    try:
+        return await import_ifc_for_job(job_id=job_id, upload=upload, user=user)
     finally:
         await upload.close()
 

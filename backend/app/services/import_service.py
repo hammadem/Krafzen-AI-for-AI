@@ -6,7 +6,10 @@ and ezdxf parsing are NOT substitutes for malware scanning.
 """
 
 import asyncio
+import json
 import os
+import sys
+import importlib.util
 import shutil
 import subprocess
 import tempfile
@@ -23,55 +26,82 @@ from app.db.queries.project_queries import get_project
 from app.utils.storage_service import storage_service
 
 MAX_DXF_BYTES = 25 * 1024 * 1024
+MAX_IFC_BYTES = 40 * 1024 * 1024
 SCAN_TIMEOUT_SECONDS = 60
+IFC_PARSE_TIMEOUT_SECONDS = 90
+
+
+def _scan_file(path: Path) -> None:
+    """Scan uploaded bytes. No parser is allowed to run before a clean scan."""
+    scanner = shutil.which(os.getenv("CLAMSCAN_CMD", "clamscan"))
+    if not scanner:
+        raise HTTPException(
+            status_code=503, detail="Import scanner is not configured; upload rejected."
+        )
+    try:
+        scan = subprocess.run(
+            [scanner, "--no-summary", str(path)],
+            capture_output=True,
+            text=True,
+            timeout=SCAN_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise HTTPException(
+            status_code=503, detail="Import scanner unavailable or timed out."
+        ) from exc
+    if scan.returncode == 1:
+        raise HTTPException(status_code=422, detail="Upload rejected by malware scanner.")
+    if scan.returncode != 0:
+        raise HTTPException(status_code=503, detail="Import scanner could not validate the file.")
 
 
 def _scan_and_validate(data: bytes) -> None:
-    """Validate nonempty vector entities and require a successful ClamAV scan."""
+    """Scan and validate a source DXF, refusing empty modelspace."""
     with tempfile.TemporaryDirectory(prefix="krafzen-import-") as tmpdir:
         path = Path(tmpdir) / "upload.dxf"
         path.write_bytes(data)
-
-        scanner = shutil.which(os.getenv("CLAMSCAN_CMD", "clamscan"))
-        if not scanner:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Import scanner is not configured; upload rejected.",
-            )
-        try:
-            scan = subprocess.run(
-                [scanner, "--no-summary", str(path)],
-                capture_output=True,
-                text=True,
-                timeout=SCAN_TIMEOUT_SECONDS,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Import scanner unavailable or timed out.",
-            ) from exc
-        if scan.returncode == 1:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Upload rejected by malware scanner.",
-            )
-        if scan.returncode != 0:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Import scanner could not validate the file.",
-            )
-
+        _scan_file(path)
         try:
             document = ezdxf.readfile(path)
-            # Reject DXF containers that lack editable vector geometry.
             if not any(True for _ in document.modelspace()):
                 raise ValueError("No modelspace geometry")
         except (ezdxf.DXFError, OSError, UnicodeDecodeError, ValueError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Invalid or empty DXF drawing.",
-            ) from exc
+            raise HTTPException(status_code=422, detail="Invalid or empty DXF drawing.") from exc
+
+
+def _scan_ifc_and_extract_metadata(data: bytes) -> dict:
+    """Scan an IFC and parse its real entities in a time-bounded child process."""
+    if not data.lstrip().startswith(b"ISO-10303-21;") or b"END-ISO-10303-21;" not in data[-256:]:
+        raise HTTPException(status_code=422, detail="Malformed IFC STEP envelope")
+    if importlib.util.find_spec("ifcopenshell") is None:
+        raise HTTPException(status_code=503, detail="IFC parser is not installed")
+    with tempfile.TemporaryDirectory(prefix="krafzen-ifc-") as tmpdir:
+        path = Path(tmpdir) / "upload.ifc"
+        path.write_bytes(data)
+        _scan_file(path)
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "app.services.ifc_inspection", str(path)],
+                capture_output=True,
+                text=True,
+                timeout=IFC_PARSE_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise HTTPException(status_code=503, detail="IFC processing unavailable or timed out") from exc
+
+        if result.returncode < 0:
+            raise HTTPException(status_code=503, detail="IFC model processing failed")
+        if result.returncode != 0:
+            raise HTTPException(status_code=422, detail="Invalid or unsupported IFC model")
+        try:
+            summary = json.loads(result.stdout)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise HTTPException(status_code=503, detail="IFC parser returned invalid metadata") from exc
+        if not isinstance(summary, dict) or summary.get("type") != "ifc":
+            raise HTTPException(status_code=503, detail="IFC model metadata is unavailable")
+        return summary
 
 
 async def import_dxf_for_job(
@@ -162,3 +192,85 @@ async def import_dxf_for_job(
             # Cleanup requires operator follow-up; preserve the real failure.
             pass
         raise HTTPException(status_code=503, detail="Import could not be finalized") from exc
+
+
+async def import_ifc_for_job(
+    *, job_id: str, upload: UploadFile, user: dict
+) -> dict:
+    """Import a genuine IFC model and persist parsed model metadata."""
+    if not user or not user.get("user_id"):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        uuid.UUID(str(job_id))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="Invalid job ID") from exc
+
+    job = await get_job(job_id, user)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    project_id = str(job.get("project_id") or "")
+    project = await get_project(project_id, user)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    # Sovereign org projects require region-isolated scanner and persistence.
+    if project.get("workspace_id"):
+        raise HTTPException(
+            status_code=503, detail="Organization imports require verified regional processing."
+        )
+
+    original = upload.filename or ""
+    if (not original or "/" in original or "\\" in original
+            or not original.lower().endswith(".ifc")):
+        raise HTTPException(status_code=415, detail="Only .ifc BIM models are supported")
+
+    data = await upload.read(MAX_IFC_BYTES + 1)
+    if not data:
+        raise HTTPException(status_code=422, detail="IFC file is empty")
+    if len(data) > MAX_IFC_BYTES:
+        raise HTTPException(status_code=413, detail="IFC file exceeds 40 MB")
+
+    summary = await run_in_threadpool(_scan_ifc_and_extract_metadata, data)
+    user_id = str(user["user_id"])
+    filename = f"import_{uuid.uuid4().hex}.ifc"
+    storage_path = f"{user_id}/{project_id}/imports/{job_id}/{filename}"
+    client, bucket, region = storage_service.resolve_target_bucket_and_client(None)
+    if region != "global":
+        raise HTTPException(status_code=503, detail="Unexpected storage region")
+
+    try:
+        await run_in_threadpool(
+            lambda: client.storage.from_(bucket).upload(
+                path=storage_path,
+                file=data,
+                file_options={"content-type": "application/x-step", "upsert": "false"},
+            )
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="IFC storage upload failed") from exc
+
+    try:
+        record = await create_file(
+            {
+                "job_id": job_id,
+                "project_id": project_id,
+                "bucket": bucket,
+                "path": storage_path,
+                "file_type": "ifc",
+                "mime_type": "application/x-step",
+                "size_bytes": len(data),
+                "name": original,
+                "import_metadata": summary,
+            },
+            user,
+        )
+        if not record or record.get("error"):
+            raise RuntimeError("IFC metadata registration failed")
+        return record
+    except Exception as exc:
+        try:
+            await run_in_threadpool(
+                lambda: client.storage.from_(bucket).remove([storage_path])
+            )
+        except Exception:
+            pass
+        raise HTTPException(status_code=503, detail="IFC import could not be finalized") from exc

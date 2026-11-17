@@ -284,6 +284,24 @@ export default function FileManager({ jobId }: { jobId: string }) {
                                     {` · ${formatBytes(file.size_bytes)}`}
                                     {file.created_at ? ` · ${formatDate(file.created_at)}` : ""}
                                 </span>
+                                {file.file_type?.toLowerCase() === "ifc" && (() => {
+                                    const summary = (file as FileDetails & {
+                                        import_metadata?: {
+                                            schema?: string;
+                                            project_name?: string;
+                                            product_count?: number;
+                                            element_count?: number;
+                                        }
+                                    }).import_metadata;
+                                    return summary && summary.schema ? (
+                                        <span className="text-[#94a3b8] text-xs truncate" title="IFC entity metadata only; geometry and clash detection not verified">
+                                            {summary.schema}
+                                            {summary.project_name ? ` · ${summary.project_name}` : ""}
+                                            {` · ${summary.product_count ?? 0} products`}
+                                            {` · ${summary.element_count ?? 0} elements`}
+                                        </span>
+                                    ) : null;
+                                })()}
                             </div>
 
                             <div className="flex items-center gap-1 shrink-0">

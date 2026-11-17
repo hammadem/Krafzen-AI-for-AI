@@ -174,6 +174,17 @@ export async function parseAnInput(
 
 // Upload a real DXF to the authenticated server; never submit caller-controlled
 // storage buckets or paths. The backend scans, validates, stores and registers it.
+export async function importIfcFile(
+    user: User | null,
+    jobId: string,
+    file: File
+) {
+    const body = new FormData();
+    body.append("job_id", jobId);
+    body.append("upload", file, file.name);
+    return apiClient("POST", "/api/v1/files/import-ifc", user, body);
+}
+
 export async function importDxfFile(
     user: User | null,
     jobId: string,

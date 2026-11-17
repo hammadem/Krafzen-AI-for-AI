@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import FileManager from "@/components/FileManager";
 import { useAuth } from "@/context/AuthContext";
-import { importDxfFile } from "@/lib/api/api";
+import { importDxfFile, importIfcFile } from "@/lib/api/api";
 
 /** Secure DXF upload entry point. The backend validates, scans and persists. */
 export default function FilesPanel({ jobId }: { jobId: string }) {
@@ -18,25 +18,35 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
         if (!file) return;
         setError(null);
         setMessage(null);
-        if (!file.name.toLowerCase().endsWith(".dxf")) {
-            setError("Only DXF drawings are supported by this import pathway.");
+        const format = file.name.toLowerCase().endsWith(".ifc")
+            ? "ifc"
+            : file.name.toLowerCase().endsWith(".dxf")
+                ? "dxf"
+                : null;
+        if (!format) {
+            setError("Only DXF drawings and IFC BIM models are supported.");
             return;
         }
-        if (file.size === 0 || file.size > 25 * 1024 * 1024) {
-            setError("Select a nonempty DXF file smaller than 25 MB.");
+        const limit = format === "ifc" ? 40 : 25;
+        if (file.size === 0 || file.size > limit * 1024 * 1024) {
+            setError(`Select a nonempty ${format.toUpperCase()} file smaller than ${limit} MB.`);
             return;
         }
         setUploading(true);
         try {
-            const result = await importDxfFile(user, jobId, file);
+            const result = format === "ifc"
+                ? await importIfcFile(user, jobId, file)
+                : await importDxfFile(user, jobId, file);
             if (!result.ok) {
-                setError(result.error?.message || "DXF upload failed.");
+                setError(result.error?.message || "Import failed.");
                 return;
             }
             setRevision((count) => count + 1);
-            setMessage("Drawing imported. Its metadata is now linked to this job.");
+            setMessage(format === "ifc"
+                ? "IFC model imported. Parsed project and element metadata is available below."
+                : "DXF drawing imported and linked to this job.");
         } catch {
-            setError("DXF upload failed. Please retry.");
+            setError("Import failed. Please retry.");
         } finally {
             setUploading(false);
             if (fileInput.current) fileInput.current.value = "";
@@ -50,8 +60,8 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
                 <input
                     ref={fileInput}
                     type="file"
-                    accept=".dxf,application/dxf"
-                    aria-label="Choose DXF drawing"
+                    accept=".dxf,.ifc,application/dxf,application/x-step"
+                    aria-label="Choose DXF drawing or IFC model"
                     className="sr-only"
                     onChange={(event) => void submitFile(event.currentTarget.files?.[0])}
                 />
@@ -61,7 +71,7 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
                     onClick={() => fileInput.current?.click()}
                     className="rounded-md bg-[#54e3b5] px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50"
                 >
-                    {uploading ? "Validating…" : "Import DXF"}
+                    {uploading ? "Validating…" : "Import DXF / IFC"}
                 </button>
             </div>
             {error && <p role="alert" className="text-xs text-red-400">{error}</p>}

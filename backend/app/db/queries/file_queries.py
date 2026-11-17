@@ -116,6 +116,8 @@ async def create_file(
             or (path.rsplit("/", 1)[-1] if path else None),
             "version": file_data.get("version", 1),
         }
+        if file_data.get("import_metadata") is not None:
+            payload["import_metadata"] = file_data["import_metadata"]
 
         response = await run_in_threadpool(
             lambda: db.table("files").insert(payload).execute()

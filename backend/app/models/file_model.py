@@ -50,6 +50,7 @@ class FileResponse(BaseModel):
     reviewed_at: datetime | None = None
     mime_type: str | None = None
     size_bytes: int | None = None
+    import_metadata: dict | None = None
     created_at: datetime | None = None
 
     class Config: 
