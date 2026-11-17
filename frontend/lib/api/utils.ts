@@ -1,5 +1,6 @@
-// modifying code creating requests
-import { apiCache, getCache } from "./cache";
+// Authenticated API data must never be shared through a URL-only cache.
+// User-switches, role changes, paid entitlements and file permissions require
+// fresh server authorization on every request.
 
 /** Prefer NEXT_PUBLIC_API_URL; otherwise infer from hostname so production never calls staging API. */
 export function getApiBaseUrl(): string {
@@ -27,11 +28,9 @@ export async function apiClient(
         }
     };
 
-    const cacheKey = `${method}:${url}`;
-    const cached = getCache(cacheKey);
-    if (cached !== undefined) return cached; // TypeScript now knows cached is ApiRes
-
-    // const timeout = setTimeout(() => controller.abort(), 20000);
+    // Intentionally no global authenticated-response cache: its previous key
+    // (method + URL) leaked data between users in the same browser session.
+    // Reintroduce caching only with audited principal-scoped invalidation.
 
     const headers: Record<string, string> = {
         ...(!(body instanceof FormData) && { "Content-Type": contentType }),
@@ -59,7 +58,7 @@ export async function apiClient(
         let result: ApiRes;
         if (response.ok) {
             result = { ok: response.ok, data, error: data?.message }
-            if (method === "GET") apiCache.set(cacheKey, result);
+            // No global API response caching for private data.
         } else {
             // FastAPI returns 401/4xx with { detail: string | { error: string } }
             const detail = data?.detail;

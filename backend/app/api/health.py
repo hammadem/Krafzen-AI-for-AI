@@ -2,6 +2,9 @@
 Health check endpoints
 """
 
+import importlib.util
+import os
+import shutil
 import time
 from datetime import UTC, datetime
 
@@ -68,6 +71,22 @@ async def readiness_check():
 
     from app.services.dwg_converter_service import dwg_converter_service
     dwg_ready = bool(dwg_converter_service.is_configured())
+    # A working web server does not imply imports can scan customer files.
+    scanner_detected = bool(shutil.which(os.getenv("CLAMSCAN_CMD", "clamscan")))
+    ifc_parser_installed = importlib.util.find_spec("ifcopenshell") is not None
+    potrace_detected = bool(shutil.which("potrace"))
+
+    ifc_schema_ready = False
+    if database_ready:
+        try:
+            # Real schema probe: a missing import_metadata migration must keep
+            # readiness red even when the database is reachable.
+            await run_in_threadpool(
+                lambda: db.table("files").select("import_metadata").limit(1).execute()
+            )
+            ifc_schema_ready = True
+        except Exception:
+            ifc_schema_ready = False
 
     checks = {
         "database": database_ready,
@@ -75,6 +94,10 @@ async def readiness_check():
         "ai_generation": ai_ready,
         "billing": billing_ready,
         "dwg_converter": dwg_ready,
+        "import_scanner_detected": scanner_detected,
+        "ifc_parser_installed": ifc_parser_installed,
+        "dxf_tracer_detected": potrace_detected,
+        "ifc_import_schema": ifc_schema_ready,
     }
     ready = all(checks.values())
     payload = {
@@ -87,6 +110,26 @@ async def readiness_check():
     if ready:
         return payload
     return JSONResponse(status_code=503, content=payload)
+
+
+@router.get("/imports")
+async def import_capabilities():
+    """Non-secret diagnostics of CAD/BIM import prerequisites.
+
+    Detection of a binary does not verify antivirus signatures or ability to
+    successfully process a model. Import endpoints still fail closed.
+    """
+    checks = {
+        "scanner_binary_detected": bool(shutil.which(os.getenv("CLAMSCAN_CMD", "clamscan"))),
+        "ifc_parser_installed": importlib.util.find_spec("ifcopenshell") is not None,
+        "dxf_tracer_detected": bool(shutil.which("potrace")),
+    }
+    return {
+        "status": "prerequisites_detected" if all(checks.values()) else "incomplete",
+        "dependencies": checks,
+        "scanner_signatures_verified": False,
+        "storage_upload_verified": False,
+    }
 
 
 @router.get("/detailed")
