@@ -85,11 +85,12 @@ async def advance_job_status_route(
     Only contract-aligned transitions are accepted.
     Source of truth: /api/v1/contracts/export-lifecycle
     """
-    result = await advance_job_status(job_id, body.status, user, body.error_message)
-    if not result or result.get("error"):
-        logger.warning("[advance_route] Transition failed", job_id=job_id, error=(result or {}).get("error"))
-        raise HTTPException(status_code=400, detail={"error": (result or {}).get("error", "Status transition failed")})
-    return result
+    # Legacy clients could forge lifecycle completion through this endpoint.
+    # The internal worker calls queue_service.advance_job_status directly.
+    raise HTTPException(
+        status_code=403,
+        detail="Job lifecycle transitions are restricted to internal workers",
+    )
 
 
 @router.post("/{job_id}/retry", response_model=JobResponse)

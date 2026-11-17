@@ -216,8 +216,12 @@ async def get_file(file_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
             logger.warning("[get_file] Unauthorized access attempt", file_id=file_id)
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
 
-        file_data["project_id"] = owned_project_id
-        return file_data
+        # Legacy metadata can be inconsistent. Never silently overwrite a
+        # mismatched project ID and then sign the original object's storage path.
+        if file_data.get("project_id") and str(file_data["project_id"]) != owned_project_id:
+            raise HTTPException(status_code=403, detail={"error": "File/project mismatch"})
+
+        return {**file_data, "project_id": owned_project_id}
     except HTTPException:
         raise
     except (APIError, HTTPError, RuntimeError, KeyError, TypeError) as e:
@@ -246,10 +250,11 @@ async def update_file(
         if not file:
             return {"error": "Unauthorized or file not found"}
 
-        payload = {k: v for k, v in update_data.items() if v is not None}
-
-        if not payload:
-            return {"error": "No valid update fields provided"}
+        if any(k != "name" for k in update_data):
+            return {"error": "Storage metadata and file type are immutable"}
+        payload = {k: v for k, v in update_data.items() if k == "name" and v is not None}
+        if not payload or not isinstance(payload["name"], str) or not 1 <= len(payload["name"].strip()) <= 255:
+            return {"error": "A valid file display name is required"}
 
         response = await run_in_threadpool(
             lambda: db.table("files").update(payload).eq("id", file_id).execute()
@@ -632,14 +637,27 @@ async def get_signed_url(
             )
         )
 
-        active_bucket = (
-            resolved_bucket
-            if (organization_id and region_code != "global")
-            else (record_bucket or resolved_bucket)
-        )
+        # Sign only server-generated paths in the bucket chosen for the
+        # authenticated file's project. Database records may be legacy/corrupt.
+        project_id = str(file.get("project_id") or "")
+        if organization_id:
+            expected_prefix = f"tenants/{organization_id}/cad/{project_id}/"
+            if region_code == "global":
+                return None
+        else:
+            expected_prefix = f"{user['user_id']}/{project_id}/"
+
+        if (not project_id
+                or not isinstance(file_path, str)
+                or not file_path.startswith(expected_prefix)
+                or any(segment in {"", ".", ".."} for segment in file_path.split("/"))
+                or "\\" in file_path
+                or record_bucket != resolved_bucket):
+            logger.warning("[get_signed_url] Unsafe storage reference rejected", file_id=file_id)
+            return None
 
         res = await run_in_threadpool(
-            lambda: target_client.storage.from_(active_bucket).create_signed_url(
+            lambda: target_client.storage.from_(resolved_bucket).create_signed_url(
                 file_path, 3600
             )
         )
