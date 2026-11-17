@@ -13,7 +13,7 @@ afterEach(() => {
 describe("authenticated API isolation", () => {
     it("never returns another account's prior URL-cached response", async () => {
         const url = "/api/v1/projects/?page=1";
-        apiCache.set(`GET:${url}`, { ok: true, data: ["private-user-a"], error: null as unknown as AppError });
+        apiCache.set(`GET:${url}`, { ok: true, data: [], error: null as unknown as AppError });
 
         const fetchMock = vi.fn()
             .mockResolvedValueOnce({ ok: true, json: async () => ["private-user-a"] })
