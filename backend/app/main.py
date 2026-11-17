@@ -7,7 +7,7 @@ import threading
 import traceback
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse, Response
 
@@ -33,6 +33,7 @@ from app.routes import (
     user_routes,
     workspace_routes,
 )
+from app.middlewares.paid_access import require_paid_subscription
 from app.services.worker_service import _poll_export_jobs
 from app.utils.error_handler import add_exception_handlers
 
@@ -181,32 +182,29 @@ app.add_middleware(WildcardCORSMiddleware)
 
 logger.info("Registering API routes")
 
-# Register Core API Routers
-app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"])
-app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"])
-app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"])
-app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"])
+# Paid-only engineering and workspace APIs. Auth and checkout remain available.
+paid_access = [Depends(require_paid_subscription)]
+
+app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"], dependencies=paid_access)
+app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"], dependencies=paid_access)
+app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"], dependencies=paid_access)
+app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"], dependencies=paid_access)
 app.include_router(payment_routes.router, prefix="/api/v1", tags=["Payments"])
 app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
-app.include_router(
-    architecture_routes.router, prefix="/api/v1", tags=["Architecture Contracts"]
-)
+app.include_router(architecture_routes.router, prefix="/api/v1", tags=["Architecture Contracts"])
 app.include_router(health.router, prefix="/health", tags=["Health"])
-app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"])
-app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"])
-app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"])
-app.include_router(activity_routes.router, prefix="/api/v1", tags=["Activity"])
-app.include_router(notification_routes.router, prefix="/api/v1", tags=["Notifications"])
-app.include_router(
-    export_validation_routes.router, prefix="/api/v1", tags=["Export Validation"]
-)
-app.include_router(invite_routes.router, prefix="/api/v1", tags=["Invites"])
-app.include_router(export_routes.router, prefix="/api/v1", tags=["Exports"])
+app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"], dependencies=paid_access)
+app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"], dependencies=paid_access)
+app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"], dependencies=paid_access)
+app.include_router(activity_routes.router, prefix="/api/v1", tags=["Activity"], dependencies=paid_access)
+app.include_router(notification_routes.router, prefix="/api/v1", tags=["Notifications"], dependencies=paid_access)
+app.include_router(export_validation_routes.router, prefix="/api/v1", tags=["Export Validation"], dependencies=paid_access)
+app.include_router(invite_routes.router, prefix="/api/v1", tags=["Invites"], dependencies=paid_access)
+app.include_router(export_routes.router, prefix="/api/v1", tags=["Exports"], dependencies=paid_access)
 
-# Enterprise & White-Label Routers
-app.include_router(region_routes.router, prefix="/api/v1")
-app.include_router(branding_routes.router, prefix="/api/v1")
-app.include_router(report_routes.router, prefix="/api/v1")
+app.include_router(region_routes.router, prefix="/api/v1", dependencies=paid_access)
+app.include_router(branding_routes.router, prefix="/api/v1", dependencies=paid_access)
+app.include_router(report_routes.router, prefix="/api/v1", dependencies=paid_access)
 
 # DXF Generator Router
 try:
@@ -214,7 +212,7 @@ try:
     from app.api import dxf_generator
 
     app.include_router(
-        dxf_generator.router, prefix="/api/v1/dxf", tags=["DXF Generator"]
+        dxf_generator.router, prefix="/api/v1/dxf", tags=["DXF Generator"], dependencies=paid_access
     )
     logger.info("DXF generator router registered successfully")
 except Exception as e:

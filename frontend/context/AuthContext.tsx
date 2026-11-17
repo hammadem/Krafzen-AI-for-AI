@@ -42,13 +42,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const planNameRaw = sub.plan_name || balance.plan_name || "free";
     const planName = typeof planNameRaw === "string" ? planNameRaw.toLowerCase() : "free";
     const status = sub.status || balance.subscription_status || "inactive";
-    const trialReq = balance.trial_requests ?? 0;
     const planReq = balance.plan_requests ?? 0;
     const planTotal = sub.plan_requests_total ?? 0;
-    const paidStatuses = ["active", "trial", "past_due"];
-    const hasPaidSubscription = planName !== "free" && paidStatuses.includes(status);
-    const canAccessWorkspace =
-      hasPaidSubscription || trialReq > 0 || planReq > 0;
+    // Frontend is advisory only. The backend enforces paid entitlements for
+    // every protected API route, even if the user modifies this state.
+    const hasPaidSubscription = planName !== "free" && status === "active";
+    const canAccessWorkspace = hasPaidSubscription;
     const displayPlan =
       planName === "free" ? "Free" : planName.charAt(0).toUpperCase() + planName.slice(1);
     setUser((prev) =>
@@ -59,11 +58,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             has_active_subscription: hasPaidSubscription,
             can_access_workspace: canAccessWorkspace,
             subscription_status: status,
-            trial_requests_remaining: trialReq,
+            trial_requests_remaining: 0,
             plan_requests_remaining: planReq,
             plan_requests_total: planTotal,
             trial_end_date: sub.trial_end_date ?? undefined,
-            in_free_signup_tier: balance.in_free_signup_tier ?? planName === "free",
+            in_free_signup_tier: false,
           }
         : null
     );
@@ -101,6 +100,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           lastname: data?.session?.user?.user_metadata?.lastname || data?.session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
           avatar_url: data?.session?.user?.user_metadata?.avatar_url || data?.session?.user?.user_metadata?.picture,
           subscription_plan: data?.session?.user?.user_metadata?.subscription_plan || "Free",
+          // No entitlement until the backend subscription check confirms payment.
+          can_access_workspace: false,
+          has_active_subscription: false,
           remaining_minutes: 0,
           total_minutes_purchased: 0
         });
@@ -138,6 +140,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           lastname: session?.user?.user_metadata?.lastname || session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
           avatar_url: session?.user?.user_metadata?.avatar_url || session?.user?.user_metadata?.picture,
           subscription_plan: session?.user?.user_metadata?.subscription_plan || "Free",
+          can_access_workspace: false,
+          has_active_subscription: false,
           remaining_minutes: 0,
           total_minutes_purchased: 0
         });

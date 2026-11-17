@@ -319,15 +319,17 @@ export default function WorkspaceLayout() {
   const currentSession = sessions.find(s => s.id === currentSessionId);
   
   // Shared Subscription Logic
-  const isTrial = user?.in_free_signup_tier || !user?.has_active_subscription;
-  const plan = (user?.subscription_plan || 'trial').toLowerCase();
-  let totalRequests = 15;
+  const isTrial = !user?.has_active_subscription;
+  const plan = (user?.subscription_plan || 'free').toLowerCase();
+  let totalRequests = 0;
   if (plan.includes('starter')) totalRequests = 50;
   else if (plan.includes('professional')) totalRequests = 300;
   else if (plan.includes('enterprise')) totalRequests = 2000;
-  const currentRequests = isTrial ? (user?.trial_requests_remaining ?? 0) : (user?.plan_requests_remaining ?? 0);
+  const currentRequests = !isTrial ? (user?.plan_requests_remaining ?? 0) : 0;
   const displayTotalRequests = totalRequests;
-  const requestsPercentage = Math.min(100, (currentRequests / displayTotalRequests) * 100);
+  const requestsPercentage = displayTotalRequests > 0
+    ? Math.min(100, (currentRequests / displayTotalRequests) * 100)
+    : 0;
 
   const assistantImageMessages = messages.filter(m => m.role === 'assistant' && m.imageUrl);
   const selectedMsg = selectedMessageId 
@@ -516,13 +518,13 @@ export default function WorkspaceLayout() {
                   </div>
                   <div className="wam-stat-row">
                     <Clock size={14} className="wam-icon-blue" />
-                    <span>Free requests:</span>
-                    <strong>{user?.trial_requests_remaining ?? 0} {isTrial ? `/ 15` : ''}</strong>
+                    <span>Access:</span>
+                    <strong>{isTrial ? 'Subscription required' : 'Active paid plan'}</strong>
                   </div>
                   <div className="wam-stat-row">
                     <Clock size={14} className="wam-icon-blue" />
                     <span>Package requests:</span>
-                    <strong>{user?.plan_requests_remaining ?? 0} {!isTrial ? `/ ${displayTotalRequests}` : ''}</strong>
+                    <strong>{currentRequests} {!isTrial ? `/ ${displayTotalRequests}` : ''}</strong>
                   </div>
                 </div>
 
@@ -610,7 +612,7 @@ export default function WorkspaceLayout() {
         <div className="workspace-rail-foot">
           <div className="workspace-quota-wrap">
             <div className="workspace-quota-info">
-              <span>{isTrial ? 'Trial requests' : `${plan.charAt(0).toUpperCase() + plan.slice(1)} requests`}</span>
+              <span>{isTrial ? 'Paid subscription required' : `${plan.charAt(0).toUpperCase() + plan.slice(1)} requests`}</span>
               <strong>{currentRequests} / {totalRequests.toLocaleString()}</strong>
             </div>
             <div className="workspace-quota-bar">

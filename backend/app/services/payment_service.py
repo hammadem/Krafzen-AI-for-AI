@@ -318,7 +318,10 @@ class PaymentService:
                 logger.error(f"Error inferring plan from session: {e}")
 
         if event_type == "subscription":
-            # Start subscription
+            # Signed checkout completion is not sufficient unless payment settled.
+            if session.get("payment_status") != "paid" or not session.get("subscription"):
+                logger.warning("Subscription checkout is not paid; withholding access")
+                return
             plan_name = metadata.get("plan_name")
             billing_cycle = metadata.get("billing_cycle")
             
@@ -527,7 +530,8 @@ class PaymentService:
         if not subscription_id and isinstance(event_data.get("subscription_ids"), list) and event_data["subscription_ids"]:
             subscription_id = event_data["subscription_ids"][0]
 
-        if event_type in ("payment.succeeded", "subscription.active", "subscription.created"):
+        # Subscription creation alone is not proof of payment.
+        if event_type == "payment.succeeded":
             if user_id and plan_name and billing_cycle:
                 logger.info(f"Fulfilling Dodo subscription for {user_id}: {plan_name} ({billing_cycle})")
                 await subscription_service.start_subscription(
