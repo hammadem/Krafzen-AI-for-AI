@@ -11,7 +11,7 @@ SQL = ROOT / "supabase/migrations/20261118010000_paid_webhook_atomic_ledger.sql"
 USER = "00000000-0000-0000-0000-000000000111"
 
 
-def apply(cursor, event_id, resource_id, kind="paid", sub="sub_001", occurred="2026-11-18 12:00:00+00", user=USER):
+def apply(cursor, event_id, resource_id, kind="paid", sub="sub_001", occurred="2026-01-18 12:00:00+00", user=USER):
     cursor.execute(
         """SELECT public.apply_paid_webhook_event(
           %s,%s,%s,%s,%s::uuid,%s,%s,%s,%s,%s::timestamptz)""",
@@ -65,22 +65,22 @@ def main():
             cur.execute("SELECT plan_requests_remaining FROM public.user_subscriptions WHERE user_id=%s", (USER,))
             assert cur.fetchone() == (49,)
 
-            assert apply(cur, "evt_004", "invoice_renewal", occurred="2026-11-18 13:00:00+00") == "applied"
+            assert apply(cur, "evt_004", "invoice_renewal", occurred="2026-01-18 13:00:00+00") == "applied"
             cur.execute("SELECT plan_requests_remaining FROM public.user_subscriptions WHERE user_id=%s", (USER,))
             assert cur.fetchone() == (50,)
 
             # Out-of-order older paid event cannot reset a newer balance.
             cur.execute("UPDATE public.user_subscriptions SET plan_requests_remaining=48 WHERE user_id=%s", (USER,))
-            assert apply(cur, "evt_005", "checkout_old", occurred="2026-11-18 12:30:00+00") == "ignored"
+            assert apply(cur, "evt_005", "checkout_old", occurred="2026-01-18 12:30:00+00") == "ignored"
             cur.execute("SELECT plan_requests_remaining FROM public.user_subscriptions WHERE user_id=%s", (USER,))
             assert cur.fetchone() == (48,)
 
             # Old-subscription cancellation cannot revoke a different subscription.
-            assert apply(cur, "evt_006", "sub_old", kind="canceled", sub="sub_other", occurred="2026-11-18 13:30:00+00") == "ignored"
+            assert apply(cur, "evt_006", "sub_old", kind="canceled", sub="sub_other", occurred="2026-01-18 13:30:00+00") == "ignored"
             cur.execute("SELECT subscription_status FROM public.user_subscriptions WHERE user_id=%s", (USER,))
             assert cur.fetchone() == ("active",)
 
-            assert apply(cur, "evt_007", "invoice_failed", kind="past_due", occurred="2026-11-18 14:00:00+00") == "applied"
+            assert apply(cur, "evt_007", "invoice_failed", kind="past_due", occurred="2026-01-18 14:00:00+00") == "applied"
             cur.execute("SELECT subscription_status FROM public.user_subscriptions WHERE user_id=%s", (USER,))
             assert cur.fetchone() == ("past_due",)
 
