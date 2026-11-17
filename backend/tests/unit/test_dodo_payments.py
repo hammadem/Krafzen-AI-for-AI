@@ -93,7 +93,7 @@ async def test_handle_dodo_webhook_payment_succeeded():
         )
 
 @pytest.mark.asyncio
-async def test_handle_dodo_webhook_subscription_active_yearly():
+async def test_handle_dodo_webhook_subscription_active_without_payment_does_not_grant_access():
     payload_dict = {
         "type": "subscription.active",
         "data": {
@@ -123,14 +123,8 @@ async def test_handle_dodo_webhook_subscription_active_yearly():
          patch("app.services.payment_service.subscription_service.start_subscription", new_callable=AsyncMock) as mock_start:
         result = await payment_service.handle_dodo_webhook(payload, headers)
         assert result["status"] == "success"
-        mock_start.assert_awaited_once_with(
-            user_id="usr_pro_uuid",
-            plan_name="professional",
-            billing_cycle="annual",
-            stripe_customer_id="cus_test2",
-            stripe_subscription_id="sub_dodo_annual",
-            payment_completed=True
-        )
+        # A subscription.active event does not prove that a payment succeeded.
+        mock_start.assert_not_awaited()
 
 @pytest.mark.asyncio
 async def test_handle_dodo_webhook_does_not_resolve_user_id_from_customer_email(monkeypatch):
