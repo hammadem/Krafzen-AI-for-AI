@@ -287,6 +287,10 @@ async def process_export_job(
             )
             if not created:
                 raise RuntimeError("Export artifact could not be recorded")
+            job["artifact_file_id"] = created["id"]
+
+        if not job.get("artifact_file_id"):
+            raise RuntimeError("Cannot complete an export without a persisted artifact reference")
 
         # VALIDATING → COMPLETED
         result = await advance_export_status(
@@ -339,7 +343,7 @@ async def _run_export_pipeline(job: dict[str, Any]) -> None:
         if artifact:
             job["artifact"] = artifact
         job.setdefault("metadata", {}).update(meta_patch)
-        job["metadata"]["stage"] = PipelineStage.EXPORT_GENERATION.value
+        job["metadata"]["stage"] = meta_patch.get("stage", PipelineStage.EXPORT_GENERATION.value)
         if "artifact_file_id" in meta_patch:
             job["artifact_file_id"] = meta_patch["artifact_file_id"]
 

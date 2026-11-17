@@ -48,7 +48,7 @@ async def test_happy_path_queued_to_completed():
         patch.object(worker_service, "emit_export_event", event),
         patch.object(worker_service, "emit_notification", notification),
     ):
-        await worker_service.process_export_job(JOB.copy(), USER)
+        await worker_service.process_export_job({**JOB, "artifact_file_id": "verified-file"}, USER)
 
     assert [call.args[1] for call in advance.call_args_list] == [
         ExportStatus.PROCESSING,
