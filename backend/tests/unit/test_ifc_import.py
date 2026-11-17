@@ -155,3 +155,64 @@ async def test_ifc_route_rejects_invalid_file_extension_before_storage(client):
             files={"upload": ("drawing.rvt", b"invalid", "application/octet-stream")},
         )
     assert response.status_code == 415
+
+
+
+def test_real_ifc_spatial_storey_and_length_units(tmp_path):
+    model = ifcopenshell.file(schema="IFC4")
+    project = model.create_entity(
+        "IfcProject", GlobalId=ifcopenshell.guid.new(), Name="Library"
+    )
+    storey = model.create_entity(
+        "IfcBuildingStorey", GlobalId=ifcopenshell.guid.new(),
+        Name="Level 01", Elevation=3.2,
+    )
+    metre = model.create_entity(
+        "IfcSIUnit", UnitType="LENGTHUNIT", Name="METRE"
+    )
+    project.UnitsInContext = model.create_entity("IfcUnitAssignment", Units=[metre])
+    path = tmp_path / "library.ifc"
+    model.write(str(path))
+    summary = ifc_inspection.inspect_ifc_file(str(path))
+    assert summary["storey_count"] == 1
+    assert summary["storeys"][0]["name"] == "Level 01"
+    assert summary["storeys"][0]["elevation"] == 3.2
+    assert summary["length_unit"]["name"] == "METRE"
+    assert summary["geometry_validated"] is False
+
+
+def test_ifc_summary_endpoint_requires_owned_file(client):
+    from app.routes import file_routes
+    with patch.object(file_routes, "get_file", AsyncMock(return_value=None)):
+        response = client.get(f"/api/v1/files/{JOB}/bim-summary")
+    assert response.status_code == 404
+
+
+def test_ifc_summary_endpoint_returns_only_verified_ifc_model(client):
+    from app.routes import file_routes
+    metadata = {
+        "type": "ifc", "schema": "IFC4",
+        "storey_count": 1, "geometry_validated": False,
+    }
+    record = {
+        "id": JOB, "project_id": PROJECT, "file_type": "ifc",
+        "bucket": "private-bucket", "path": "private/path",
+        "import_metadata": metadata,
+    }
+    with patch.object(file_routes, "get_file", AsyncMock(return_value=record)):
+        response = client.get(f"/api/v1/files/{JOB}/bim-summary")
+    assert response.status_code == 200
+    assert response.json() == {
+        "file_id": JOB, "project_id": PROJECT, "model": metadata,
+    }
+    assert "private/path" not in response.text
+
+
+def test_ifc_summary_endpoint_rejects_unparsed_legacy_file(client):
+    from app.routes import file_routes
+    with patch.object(file_routes, "get_file", AsyncMock(return_value={
+        "id": JOB, "project_id": PROJECT, "file_type": "ifc",
+        "import_metadata": None,
+    })):
+        response = client.get(f"/api/v1/files/{JOB}/bim-summary")
+    assert response.status_code == 409

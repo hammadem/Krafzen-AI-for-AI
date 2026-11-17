@@ -36,6 +36,33 @@ def inspect_ifc_file(path: str) -> dict:
     # IFC model entities are not necessarily valid 3-D bodies. Distinguish
     # declared representations from geometrically verified shape results.
     represented = sum(1 for entity in products if getattr(entity, "Representation", None))
+
+    # Model structure comes from actual IFC spatial containment assignments.
+    # No manufactured floor geometry or assumptions about IFC units.
+    storeys = model.by_type("IfcBuildingStorey")
+    levels = []
+    for storey in storeys[:100]:
+        assignments = getattr(storey, "ContainsElements", ()) or ()
+        assigned = sum(len(rel.RelatedElements) for rel in assignments)
+        levels.append({
+            "global_id": str(storey.GlobalId),
+            "name": str(storey.Name or "")[:160],
+            "elevation": getattr(storey, "Elevation", None),
+            "contained_element_count": assigned,
+        })
+
+    # Extract only project-level declared model length units. Report raw IFC
+    # values without translating or inventing dimensional accuracy.
+    length_unit = None
+    units = getattr(project, "UnitsInContext", None)
+    for unit in (getattr(units, "Units", ()) or ()):
+        if unit.is_a("IfcSIUnit") and str(unit.UnitType) == "LENGTHUNIT":
+            length_unit = {
+                "name": str(unit.Name),
+                "prefix": str(unit.Prefix) if unit.Prefix else None,
+            }
+            break
+
     return {
         "type": "ifc",
         "schema": schema,
@@ -48,6 +75,9 @@ def inspect_ifc_file(path: str) -> dict:
             if schema in {"IFC2X3", "IFC4"}
             else len(model.by_type("IfcSpatialElement"))
         ),
+        "storeys": levels,
+        "storey_count": len(storeys),
+        "length_unit": length_unit,
         "represented_product_count": represented,
         "entity_counts": dict(sorted(counts.items())[:80]),
         "geometry_validated": False,

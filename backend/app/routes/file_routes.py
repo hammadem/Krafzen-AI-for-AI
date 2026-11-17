@@ -154,6 +154,27 @@ async def mark_revision_reviewed_route(
     return revision
 
 
+@router.get("/{file_id}/bim-summary")
+async def get_ifc_model_summary(
+    file_id: str,
+    user=Depends(require_auth),
+):
+    """Read only verified IFC summary saved at import, after ownership checks."""
+    record = await get_file(file_id, user)
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
+    if str(record.get("file_type") or "").lower() != "ifc":
+        raise HTTPException(status_code=415, detail="This file is not an IFC model")
+    summary = record.get("import_metadata")
+    if not isinstance(summary, dict) or summary.get("type") != "ifc":
+        raise HTTPException(
+            status_code=409,
+            detail="This IFC file has no verified parsed metadata",
+        )
+    # Do not return storage URL, bucket, raw object bytes or user-controlled paths.
+    return {"file_id": record["id"], "project_id": record["project_id"], "model": summary}
+
+
 @router.get("/{file_id}/signed-url")
 async def get_signed_url_route(
     file_id: str,
