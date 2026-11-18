@@ -23,12 +23,15 @@ RECORD = {
 @pytest.mark.asyncio
 async def test_active_projects_exclude_archived_and_archived_list_includes_only_archived():
     chain = MagicMock()
+    for method in ("select", "eq", "is_", "filter", "order", "range", "update"):
+        getattr(chain, method).return_value = chain
     chain.execute.return_value = SimpleNamespace(data=[RECORD])
+    fake_db = MagicMock()
+    fake_db.table.return_value = chain
     with (
-        patch.object(project_queries, "db") as db,
+        patch.dict(project_queries.__dict__, {"db": fake_db}),
         patch.object(project_queries, "run_in_threadpool", AsyncMock(side_effect=lambda fn: fn())),
     ):
-        db.table.return_value = chain
         active = await project_queries.get_projects(USER)
         assert len(active) == 1
         chain.is_.assert_called_with("archived_at", "null")
@@ -70,15 +73,18 @@ def test_restore_route_denies_missing_or_foreign_project(client):
 @pytest.mark.asyncio
 async def test_archive_db_mutation_is_scoped_to_owner():
     chain = MagicMock()
+    for method in ("select", "eq", "is_", "filter", "order", "range", "update"):
+        getattr(chain, method).return_value = chain
     chain.execute.return_value = SimpleNamespace(data=[{
         **RECORD, "archived_at": CREATED, "archived_by": USER["user_id"],
     }])
+    fake_db = MagicMock()
+    fake_db.table.return_value = chain
     with (
         patch.object(project_queries, "get_project", AsyncMock(return_value=RECORD)),
-        patch.object(project_queries, "db") as db,
+        patch.dict(project_queries.__dict__, {"db": fake_db}),
         patch.object(project_queries, "run_in_threadpool", AsyncMock(side_effect=lambda fn: fn())),
     ):
-        db.table.return_value = chain
         out = await project_queries.archive_project(PROJECT_ID, USER)
         assert out["archived_by"] == USER["user_id"]
         chain.eq.assert_any_call("user_id", USER["user_id"])
@@ -88,18 +94,21 @@ async def test_archive_db_mutation_is_scoped_to_owner():
 @pytest.mark.asyncio
 async def test_restore_db_mutation_is_scoped_to_owner():
     chain = MagicMock()
+    for method in ("select", "eq", "is_", "filter", "order", "range", "update"):
+        getattr(chain, method).return_value = chain
     chain.execute.return_value = SimpleNamespace(data=[{
         **RECORD, "archived_at": None, "archived_by": None,
         "restored_at": CREATED, "restored_by": USER["user_id"],
     }])
+    fake_db = MagicMock()
+    fake_db.table.return_value = chain
     with (
         patch.object(project_queries, "get_project", AsyncMock(return_value={
             **RECORD, "archived_at": CREATED, "archived_by": USER["user_id"],
         })),
-        patch.object(project_queries, "db") as db,
+        patch.dict(project_queries.__dict__, {"db": fake_db}),
         patch.object(project_queries, "run_in_threadpool", AsyncMock(side_effect=lambda fn: fn())),
     ):
-        db.table.return_value = chain
         out = await project_queries.restore_project(PROJECT_ID, USER)
         assert out["archived_at"] is None
         chain.eq.assert_any_call("user_id", USER["user_id"])
