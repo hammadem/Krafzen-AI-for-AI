@@ -24,6 +24,10 @@ class ProjectOut(BaseModel):
     dwg_url: str | None = None
     created_at: datetime
     updated_at: datetime | None = None
+    archived_at: datetime | None = None
+    archived_by: str | None = None
+    restored_at: datetime | None = None
+    restored_by: str | None = None
 
     class Config:
         from_attributes = True  # Allows ORM-ish mapping

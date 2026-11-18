@@ -128,3 +128,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://krafzen_ci:local_ci_only@127.0.0.1:5432/krafzen_ci
         run: python backend/scripts/verify_payment_webhook_migration.py
+
+      - name: Verify project archive migration on isolated PostgreSQL
+        env:
+          DATABASE_URL: postgresql://krafzen_ci:local_ci_only@127.0.0.1:5432/krafzen_ci
+        run: python backend/scripts/verify_project_archive_migration.py
