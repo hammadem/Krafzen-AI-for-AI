@@ -286,7 +286,9 @@ export async function updateAProject(
     projectId: string,
     data: string
 ) {
-    return apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, data);
+    // Browser edits are restricted to the description; only backend CAD
+    // workers can persist generated file URLs or parsed engineering metadata.
+    return apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, { input_text: data });
 }
 
 

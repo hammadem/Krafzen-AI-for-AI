@@ -136,16 +136,18 @@ async def update_project(project_id: str, update_data: ProjectUpdate, user: dict
             logger.warning("[update_project] Unauthorized or not found", project_id=project_id)
             return None
 
+        if existing.get("archived_at"):
+            raise HTTPException(status_code=409, detail="Restore project before editing")
         payload = update_data.model_dump(exclude_unset=True)
-        payload["updated_at"] = datetime.now(UTC).isoformat()  #Timezone
-
-        if not payload:  #Guard for empty updates
-            logger.warning("[update_project] No fields to update", project_id=project_id)
-            return existing  
+        if set(payload) != {"input_text"} or not isinstance(payload["input_text"], str) or not payload["input_text"].strip():
+            raise HTTPException(status_code=422, detail="Only nonempty project text can be edited")
+        payload["updated_at"] = datetime.now(UTC).isoformat()  
         response = await run_in_threadpool(
             lambda: db.table("projects")
                 .update(payload)
                 .eq("id", project_id)
+                .eq("user_id", user["user_id"])
+                .is_("archived_at", "null")
                 .execute()
         )
 
@@ -156,9 +158,11 @@ async def update_project(project_id: str, update_data: ProjectUpdate, user: dict
         logger.warning("[update_project] Update failed", project_id=project_id)  
         return None
 
+    except HTTPException:
+        raise
     except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[update_project] Error", project_id=project_id, error=str(e), exc_info=True)
-        return None
+        raise HTTPException(status_code=503, detail="Project update unavailable") from e
 
 # DELETE PROJECT
 async def delete_project(project_id: str, user: dict[str, Any]) -> bool:  
@@ -251,3 +255,52 @@ async def restore_project(project_id: str, user: dict[str, Any]) -> dict[str, An
     except (APIError, HTTPError, KeyError, TypeError, ValueError) as exc:
         logger.error("[restore_project] Failed", project_id=project_id, error=str(exc))
         raise HTTPException(status_code=503, detail="Could not restore project") from exc
+
+
+async def update_generated_project_assets(
+    project_id: str,
+    *,
+    user: dict[str, Any],
+    image_url: str | None,
+    dxf_url: str | None,
+    dwg_url: str | None,
+) -> dict[str, Any]:
+    """Internal CAD generator only: persist actual uploaded artifact references.
+
+    Never expose this function as a user-supplied PATCH model. The generating
+    service has to verify ownership before spending work or uploading bytes.
+    """
+    if not user or not user.get("user_id"):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    project = await get_project(project_id, user)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.get("archived_at"):
+        raise HTTPException(status_code=409, detail="Cannot modify archived project")
+    assets = {
+        key: value for key, value in (
+            ("image_url", image_url),
+            ("dxf_url", dxf_url),
+            ("dwg_url", dwg_url),
+        ) if value is not None
+    }
+    if not assets:
+        raise HTTPException(status_code=422, detail="No generated asset to persist")
+    assets["updated_at"] = datetime.now(UTC).isoformat()
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("projects")
+                .update(assets)
+                .eq("id", project_id)
+                .eq("user_id", user["user_id"])
+                .is_("archived_at", "null")
+                .execute()
+        )
+        if response and response.data:
+            return response.data[0]
+        raise HTTPException(status_code=409, detail="Project changed while saving assets")
+    except HTTPException:
+        raise
+    except (APIError, HTTPError, KeyError, TypeError, ValueError) as exc:
+        logger.error("[update_generated_project_assets] Failed", project_id=project_id, error=str(exc))
+        raise HTTPException(status_code=503, detail="Could not persist generated CAD artifacts") from exc
