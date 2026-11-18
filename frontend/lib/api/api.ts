@@ -29,7 +29,9 @@ const PROJECT_URLS = {
     GET_A_PROJECT: (projectId: string) => `/api/v1/projects/${projectId}`,
     GET_ALL_PROJECTS: (userId: string, page = 1, limit = 20) => `/api/v1/projects?user_id=${userId}&page=${page}&limit=${limit}`,
     // Archived projects (Yehor — `archived` flag/endpoint pending; page degrades to empty)
-    GET_ARCHIVED: (userId: string) => `/api/v1/projects?user_id=${userId}&archived=true`,
+    GET_ARCHIVED: () => `/api/v1/projects?archived=true&page=1&limit=100`,
+    ARCHIVE: (projectId: string) => `/api/v1/projects/${projectId}/archive`,
+    RESTORE: (projectId: string) => `/api/v1/projects/${projectId}/restore`,
     UPDATE: (projectId: string) => `/api/v1/projects/${projectId}`,
     DELETE: (projectId: string) => `/api/v1/projects/${projectId}`,
 } as const;
@@ -267,10 +269,18 @@ export async function deleteAProject(
 };
 export async function getArchivedProjects(
     user: User | null,
-    userId: string
+    _userId: string
 ) {
-    return apiClient("GET", PROJECT_URLS.GET_ARCHIVED(userId), user);
+    return apiClient("GET", PROJECT_URLS.GET_ARCHIVED(), user);
 };
+
+export async function archiveProject(user: User | null, projectId: string) {
+    return apiClient("POST", PROJECT_URLS.ARCHIVE(projectId), user);
+}
+
+export async function restoreArchivedProject(user: User | null, projectId: string) {
+    return apiClient("POST", PROJECT_URLS.RESTORE(projectId), user);
+}
 export async function updateAProject(
     user: User | null,
     projectId: string,

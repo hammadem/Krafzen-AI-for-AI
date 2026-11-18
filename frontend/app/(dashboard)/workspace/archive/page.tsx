@@ -2,7 +2,8 @@
 import { Archive, Folder, Clock, RefreshCw, AlertCircle, Search, Lock } from "lucide-react";
 import { useState, useMemo } from "react";
 import Link from "next/link";
-import { getArchivedProjects } from "@/lib/api/api";
+import { getArchivedProjects, restoreArchivedProject } from "@/lib/api/api";
+import { useAuth } from "@/context/AuthContext";
 import { useApiResource } from "@/hooks/useApiResource";
 import { formatDate } from "@/lib/utils";
 
@@ -24,6 +25,9 @@ const TABS: { key: TabKey; label: string; soon?: boolean }[] = [
 export default function ArchivePage() {
     const [tab, setTab] = useState<TabKey>("projects");
     const [search, setSearch] = useState("");
+    const { user } = useAuth();
+    const [restoring, setRestoring] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
 
     const {
         data: projects,
@@ -44,6 +48,24 @@ export default function ArchivePage() {
         },
         fallback: [],
     });
+
+    const restore = async (projectId: string) => {
+        if (restoring) return;
+        setRestoring(projectId);
+        setActionError(null);
+        try {
+            const result = await restoreArchivedProject(user, projectId);
+            if (!result.ok) {
+                setActionError(result.error?.message || "Unable to restore project.");
+                return;
+            }
+            refetch();
+        } catch {
+            setActionError("Unable to restore project. Please retry.");
+        } finally {
+            setRestoring(null);
+        }
+    };
 
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
@@ -133,6 +155,8 @@ export default function ArchivePage() {
                 </div>
             )}
 
+            {actionError && <p role="alert" className="text-sm text-red-400">{actionError}</p>}
+
             {/* Table of archived projects */}
             {!isLoading && !isError && visible.length > 0 && (
                 <div className="border border-white/10 rounded-2xl overflow-hidden animate-in fade-in-0 duration-300">
@@ -142,27 +166,32 @@ export default function ArchivePage() {
                         <span />
                     </div>
                     {visible.map((p) => (
-                        <Link
+                        <div
                             key={p.id}
-                            href={`/workspace/id/${p.id}`}
                             className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_auto] gap-2 sm:gap-4 px-4 py-3 border-b border-white/5 last:border-0 items-center hover:bg-white/[0.02] transition-colors group"
                         >
-                            <span className="flex items-center gap-3 min-w-0">
+                            <Link href={`/workspace/id/${p.id}`} className="flex items-center gap-3 min-w-0">
                                 <span className="w-8 h-8 rounded-lg bg-white/5 grid place-items-center shrink-0 group-hover:bg-[#54e3b5]/10 transition-colors">
                                     <Folder className="w-4 h-4 text-[#94a3b8] group-hover:text-[#54e3b5]" />
                                 </span>
                                 <span className="text-sm text-white truncate group-hover:text-[#54e3b5] transition-colors">
                                     {p.input_text || "Untitled Project"}
                                 </span>
-                            </span>
+                            </Link>
                             <span className="text-[11px] font-mono text-[#94a3b8] flex items-center gap-1.5 uppercase">
                                 <Clock className="w-3 h-3" />
-                                {formatDate(p.created_at)}
+                                {formatDate((p as ProjectDetails & { archived_at?: string }).archived_at || p.created_at)}
                             </span>
-                            <span className="text-[11px] font-semibold text-[#54e3b5] uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity justify-self-end">
-                                Open
-                            </span>
-                        </Link>
+                            <button
+                                type="button"
+                                disabled={restoring === p.id}
+                                onClick={() => void restore(p.id)}
+                                className="text-[11px] font-semibold text-[#54e3b5] uppercase tracking-wider justify-self-end hover:underline disabled:opacity-50"
+                                aria-label={`Restore ${p.input_text || "Untitled Project"}`}
+                            >
+                                {restoring === p.id ? "Restoring…" : "Restore"}
+                            </button>
+                        </div>
                     ))}
                 </div>
             )}

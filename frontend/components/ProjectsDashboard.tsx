@@ -2,12 +2,13 @@
 import React, { useMemo, useState } from 'react';
 import { useFetchProjects } from '@/hooks/useFetchProjects';
 import { useAuth } from '@/context/AuthContext';
+import { archiveProject } from '@/lib/api/api';
 import {
+  Archive,
   Folder,
   Plus,
   Search,
-  MoreVertical,
-  Clock,
+   Clock,
   AlertCircle,
   RefreshCw,
   FileCheck,
@@ -37,6 +38,28 @@ export default function ProjectsDashboard() {
   const { projects, status, apiError, forceRefetch } = useFetchProjects();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
+  const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+
+  const confirmArchive = async () => {
+    if (!archiveTarget || archiving) return;
+    setArchiving(true);
+    setArchiveError(null);
+    try {
+      const response = await archiveProject(user, archiveTarget);
+      if (!response.ok) {
+        setArchiveError(response.error?.message || "Could not archive the project.");
+        return;
+      }
+      setArchiveTarget(null);
+      forceRefetch();
+    } catch {
+      setArchiveError("Archive failed. Please retry.");
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   // Client-side filter over the already-loaded list (frontend-only, API-safe).
   const visible = useMemo(() => {
@@ -197,11 +220,13 @@ export default function ProjectsDashboard() {
                   className="group relative bg-[#0a0e17] border border-white/10 rounded-2xl p-[18px] flex flex-col gap-3.5 transition-all hover:-translate-y-0.5 hover:border-[#54e3b5]/40 hover:bg-white/[0.03]"
                 >
                   <button
-                    className="absolute top-3 right-3 w-6 h-6 grid place-items-center rounded-md text-[#94a3b8] opacity-0 group-hover:opacity-100 hover:text-white hover:bg-white/5 transition-all"
-                    aria-label="Project actions"
-                    onClick={(e) => e.preventDefault()}
+                    type="button"
+                    className="absolute top-3 right-3 flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[#94a3b8] hover:text-[#54e3b5] hover:bg-white/5 transition-all"
+                    aria-label={`Archive ${project.input_text || 'Untitled Project'}`}
+                    onClick={() => { setArchiveError(null); setArchiveTarget(project.id); }}
                   >
-                    <MoreVertical className="w-3.5 h-3.5" />
+                    <Archive className="w-3.5 h-3.5" />
+                    Archive
                   </button>
                   <Link href={`/workspace/id/${project.id}`} className="flex flex-col gap-3.5">
                     <div className="flex items-start justify-between gap-3 pr-5">
@@ -229,6 +254,19 @@ export default function ProjectsDashboard() {
           </div>
         )}
       </div>
+      {archiveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="archive-dialog-title" className="w-full max-w-md rounded-2xl border border-white/15 bg-[#101722] p-6 shadow-2xl">
+            <h2 id="archive-dialog-title" className="text-lg font-semibold text-white">Archive this project?</h2>
+            <p className="mt-2 text-sm text-[#94a3b8]">The project and its files will be preserved. You can restore it from Archive.</p>
+            {archiveError && <p role="alert" className="mt-3 text-sm text-red-400">{archiveError}</p>}
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" disabled={archiving} onClick={() => { setArchiveTarget(null); setArchiveError(null); }} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white">Cancel</button>
+              <button type="button" disabled={archiving} onClick={() => void confirmArchive()} className="rounded-lg bg-[#54e3b5] px-4 py-2 text-sm font-semibold text-[#06080d] disabled:opacity-50">{archiving ? 'Archiving…' : 'Confirm archive'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
