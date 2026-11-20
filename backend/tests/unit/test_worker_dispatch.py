@@ -140,3 +140,48 @@ async def test_us_poller_skips_global_job_before_processing():
     assert process.call_count == 1
     assert process.call_args.args[0]["id"] == US_JOB["id"]
     assert len(created) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("region", ["global", "us"])
+async def test_queue_filter_is_applied_before_limit(region):
+    """Avoid starving a region behind >50 older jobs from another pool."""
+    query = MagicMock()
+    query.select.return_value = query
+    query.eq.return_value = query
+    query.or_.return_value = query
+    query.order.return_value = query
+    query.limit.return_value = query
+    query.execute.return_value = SimpleNamespace(data=[])
+    client = MagicMock()
+    client.table.return_value = query
+
+    async def inline(fn):
+        return fn()
+
+    with (
+        patch.object(worker_service, "CURRENT_REGION_CODE", region),
+        patch.object(worker_service, "CURRENT_WORKER_POOL", (
+            "render-default-nodes" if region == "global" else US_POOL
+        )),
+        patch.object(worker_service, "db", client),
+        patch.object(worker_service, "run_in_threadpool", inline),
+        patch.object(
+            worker_service.asyncio, "sleep",
+            AsyncMock(side_effect=asyncio.CancelledError),
+        ),
+    ):
+        with pytest.raises(asyncio.CancelledError):
+            await worker_service._poll_export_jobs()
+
+    if region == "us":
+        assert any(
+            c.args == ("metadata->>region_code", "us")
+            for c in query.eq.call_args_list
+        )
+        query.or_.assert_not_called()
+    else:
+        query.or_.assert_called_once_with(
+            "metadata->>region_code.eq.global,metadata->>region_code.is.null"
+        )
+    query.limit.assert_called_once_with(50)
