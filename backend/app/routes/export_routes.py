@@ -26,6 +26,34 @@ from app.utils.storage_service import storage_service
 router = APIRouter(prefix="/exports", tags=["Exports"])
 
 
+def _resolve_active_assignment(record: dict[str, Any]) -> tuple[str, str]:
+    """Fail closed when an organization has an invalid residency assignment.
+
+    An existing but suspended/malformed assignment must not be interpreted as
+    an unassigned global tenant during export queuing.
+    """
+    region = str(record.get("region_code") or "").strip().lower()
+    assignment_status = str(record.get("status") or "").strip().lower()
+    if assignment_status != "active" or not region or region == "global":
+        raise HTTPException(
+            status_code=503,
+            detail="Organization residency assignment is not active or valid",
+        )
+
+    region_entry = RegionRegistryService.get_region(region)
+    worker_pool = (
+        region_entry.processing_config.get("worker_pool")
+        if region_entry
+        else None
+    )
+    if not worker_pool:
+        raise HTTPException(
+            status_code=503,
+            detail="No supported regional export worker pool is configured",
+        )
+    return region, worker_pool
+
+
 async def _resolve_project_residency_context(project_id: str) -> dict[str, Any]:
     """
     Resolves workspace_id and regional residency metadata for sovereign dispatch.
@@ -60,13 +88,9 @@ async def _resolve_project_residency_context(project_id: str) -> dict[str, Any]:
     region_code = "global"
     worker_pool = "render-default-nodes"
 
-    if res_info.data and res_info.data[0].get("status") == "active":
-        region_code = res_info.data[0].get("region_code", "global")
-        region_entry = RegionRegistryService.get_region(region_code)
-        if region_entry:
-            worker_pool = region_entry.processing_config.get(
-                "worker_pool", "render-default-nodes"
-            )
+    if res_info.data:
+        # An explicit assignment can never silently degrade to global routing.
+        region_code, worker_pool = _resolve_active_assignment(res_info.data[0])
 
     _, bucket_name, _ = storage_service.resolve_target_bucket_and_client(
         UUID(str(workspace_id)) if workspace_id else None
