@@ -79,6 +79,23 @@ async def create_export(
         if not owns:
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
 
+        # A caller may attach only a job belonging to the same owned project.
+        # A UUID format check alone allows cross-project/cross-tenant job refs.
+        if source_job_id:
+            source_res = await run_in_threadpool(
+                lambda: db.table("jobs")
+                .select("project_id")
+                .eq("id", source_job_id)
+                .maybe_single()
+                .execute()
+            )
+            source = source_res.data if source_res else None
+            if not source or str(source.get("project_id") or "") != str(project_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail={"error": "Source job is not part of the requested project"},
+                )
+
         existing = await run_in_threadpool(
             lambda: db.table("export_jobs")
             .select("id, status")
