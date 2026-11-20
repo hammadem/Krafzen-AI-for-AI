@@ -469,14 +469,24 @@ async def _poll_export_jobs() -> None:
     while True:
         try:
             running = {job_id: task for job_id, task in running.items() if not task.done()}
-            response = await run_in_threadpool(
-                lambda: db.table("export_jobs")
-                .select("*")
-                .eq("status", ExportStatus.QUEUED.value)
-                .order("created_at", desc=False)
-                .limit(50)
-                .execute()
-            )
+            def _fetch_affinity_candidates():
+                query = (
+                    db.table("export_jobs")
+                    .select("*")
+                    .eq("status", ExportStatus.QUEUED.value)
+                )
+                # Apply the same region partition in PostgREST before LIMIT.
+                # Otherwise 50 US jobs can starve global jobs (or vice versa).
+                if CURRENT_REGION_CODE and CURRENT_REGION_CODE != "global":
+                    query = query.eq("metadata->>region_code", CURRENT_REGION_CODE)
+                else:
+                    query = query.or_(
+                        "metadata->>region_code.eq.global,"
+                        "metadata->>region_code.is.null"
+                    )
+                return query.order("created_at", desc=False).limit(50).execute()
+
+            response = await run_in_threadpool(_fetch_affinity_candidates)
             jobs = response.data if response and response.data else []
             for job in jobs:
                 job_id = str(job.get("id") or "")
