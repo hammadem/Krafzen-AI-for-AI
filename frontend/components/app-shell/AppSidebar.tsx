@@ -2,8 +2,8 @@
 
 // Shared left rail for the workspace app shell (CEO redesign, PR #1).
 // Visual reference: krafzen-product/style-guide.html + projects.html.
-// Real routes are active nav; CAD/BIM items are disabled "Soon" per Kiru's scope
-// (Imports / Reviews / Models / As-Built belong to the upcoming CAD/BIM track).
+// Real routes are active nav. Reviews / Models / As-Built remain disabled until
+// their actual backend workflows are implemented and verified.
 // No fake counts — data-driven badges come later when the backend exposes them.
 
 import Link from "next/link";
@@ -27,9 +27,9 @@ const MAIN: NavItem[] = [
     { label: "Billing", href: "/workspace/billings", icon: CreditCard },
 ];
 
-// Upcoming CAD/BIM track — visible but disabled until backend contracts exist.
+// The Imports workflow uses existing scoped DXF/IFC processing; other tools remain pending.
 const CAD_BIM: NavItem[] = [
-    { label: "Imports", href: "#", icon: Upload, soon: true },
+    { label: "Imports", href: "/workspace/imports", icon: Upload },
     { label: "Reviews", href: "#", icon: ClipboardCheck, soon: true },
     { label: "Models", href: "#", icon: Box, soon: true },
     { label: "As-Built", href: "#", icon: Ruler, soon: true },
