@@ -54,6 +54,8 @@ const TEMPLATE_URLS = {
 // Exports (Kiruthikha — Step 4 enriches this; endpoint pending, page degrades to empty)
 const EXPORT_URLS = {
     GET_PROJECT: (projectId: string) => `/api/v1/exports/project/${projectId}`,
+    GET_MINE: (page: number, limit: number) => `/api/v1/exports/?page=${page}&limit=${limit}`,
+    GET_ARTIFACT: (exportId: string) => `/api/v1/exports/${exportId}/artifact`,
     // Retry a failed/cancelled export (lifecycle: failed|cancelled → queued).
     // Path pending Kiruthikha's confirmation — she owns the export service.
     RETRY: (exportId: string) => `/api/v1/exports/${exportId}/retry`,
@@ -407,21 +409,26 @@ function normalizeList<T>(raw: unknown, keys: string[] = []): T[] {
 }
 
 export async function getUserExports(user: User | null): Promise<ApiRes> {
-    const projectsRes = await getAllProjects(user, user?.userId ?? "", 1, 100);
-    if (!projectsRes.ok) return projectsRes;
+    const pageSize = 100;
+    const results: ExportDetails[] = [];
+    // The backend scopes every page to the authenticated requester.
+    for (let page = 1; page <= 100; page++) {
+        const response = await apiClient("GET", EXPORT_URLS.GET_MINE(page, pageSize), user);
+        if (!response.ok) return response;
+        const batch = normalizeList<ExportDetails>(response.data, ["exports", "data", "items"]);
+        results.push(...batch);
+        if (batch.length < pageSize) {
+            return { ok: true, data: results, error: null as unknown as AppError };
+        }
+    }
+    return {
+        ok: false, data: null,
+        error: { type: "APIERROR", message: "Export history exceeds the supported page range." },
+    };
+}
 
-    const projects = normalizeList<{ id?: string }>(projectsRes.data, ["projects", "data", "items"]);
-    const projectIds = projects.map((project) => project.id).filter((id): id is string => Boolean(id));
-
-    const exportResults = await Promise.all(projectIds.map((projectId) => getExportsForProject(user, projectId)));
-    const failed = exportResults.find((result) => !result.ok);
-    if (failed) return failed;
-
-    const exports = exportResults
-        .flatMap((result) => normalizeList<ExportDetails>(result.data, ["exports", "data", "items"]))
-        .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
-
-    return { ok: true, data: exports, error: null as unknown as AppError };
+export async function getExportArtifactSignedUrl(user: User | null, exportId: string) {
+    return apiClient("GET", EXPORT_URLS.GET_ARTIFACT(exportId), user);
 }
 
 // Retry a failed/cancelled export (Kiruthikha — retry path pending confirmation).

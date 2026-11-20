@@ -223,6 +223,79 @@ async def update_export_status(
         raise HTTPException(status_code=500, detail={"error": "Server error"})
 
 
+MAX_EXPORT_RETRIES = 3
+
+
+async def list_user_exports(
+    user_id: str, *, page: int = 1, limit: int = 100
+) -> list[dict[str, Any]]:
+    """Page through export history belonging to the authenticated requester."""
+    offset = (page - 1) * limit
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("export_jobs")
+            .select("*")
+            .eq("requested_by", user_id)
+            .order("created_at", desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+        return response.data if response and response.data else []
+    except (APIError, HTTPError, RuntimeError, ValueError, TypeError) as exc:
+        logger.error("[list_user_exports] Query failed", error=str(exc))
+        raise HTTPException(status_code=503, detail="Export history is unavailable") from exc
+
+
+async def retry_export(export_id: str, user_id: str) -> dict[str, Any]:
+    """Atomically retry an owned failed/cancelled export; clear stale artifacts."""
+    export = await get_export(export_id, user_id)
+    current = str(export.get("status") or "").lower()
+    if current == ExportStatus.QUEUED.value:
+        return export  # Duplicate retry request; nothing to change.
+    if current not in (ExportStatus.FAILED.value, ExportStatus.CANCELLED.value):
+        raise HTTPException(status_code=409, detail="Export is not retryable")
+
+    retries = int(export.get("retry_count") or 0)
+    if retries >= MAX_EXPORT_RETRIES:
+        raise HTTPException(status_code=409, detail="Export retry limit reached")
+
+    metadata = dict(export.get("metadata") or {})
+    for key in ("stage", "artifact_url", "artifact_file_id", "file_path",
+                "generation_method", "engineering_accuracy_verified", "requires_review"):
+        metadata.pop(key, None)
+
+    payload = {
+        "status": ExportStatus.QUEUED.value,
+        "retry_count": retries + 1,
+        "progress_percent": 0,
+        "artifact_file_id": None,
+        "file_path": None,
+        "bucket": None,
+        "error_code": None,
+        "error_message": None,
+        "errors": None,
+        "metadata": metadata,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    try:
+        # The requester and prior terminal state are checked in the UPDATE,
+        # not just a preceding SELECT. Concurrent retries cannot both win.
+        result = await run_in_threadpool(
+            lambda: db.table("export_jobs")
+            .update(payload)
+            .eq("id", export_id)
+            .eq("requested_by", user_id)
+            .eq("status", current)
+            .execute()
+        )
+    except (APIError, HTTPError, RuntimeError, ValueError, TypeError) as exc:
+        logger.error("[retry_export] Update failed", export_id=export_id, error=str(exc))
+        raise HTTPException(status_code=503, detail="Export retry is unavailable") from exc
+    if not result or not result.data:
+        raise HTTPException(status_code=409, detail="Export changed before retry was applied")
+    return result.data[0]
+
+
 async def get_export_artifact(export_id: str, user_id: str) -> dict[str, Any] | None:
     if not _valid_uuid(export_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid export_id"})

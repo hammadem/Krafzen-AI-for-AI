@@ -6,7 +6,7 @@ Enhanced for Regional Routing & Tenant Boundary Compliance
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.concurrency import run_in_threadpool
 
 from app.db.queries.export_queries import (
@@ -14,8 +14,9 @@ from app.db.queries.export_queries import (
     get_export,
     get_export_artifact,
     get_project_exports,
+    list_user_exports,
+    retry_export,
 )
-from app.db.queries.file_queries import get_signed_url
 from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.models.export_model import ExportCreate, ExportResponse, ExportStatusUpdate
@@ -134,6 +135,25 @@ async def create_export_route(
     )
 
 
+# LIST CURRENT USER'S EXPORTS (no 100-project truncation)
+@router.get("/", response_model=list[ExportResponse])
+async def list_my_exports_route(
+    page: int = Query(default=1, ge=1, le=10000),
+    limit: int = Query(default=100, ge=1, le=100),
+    user=Depends(require_auth),
+):
+    return await list_user_exports(user["user_id"], page=page, limit=limit)
+
+
+# RETRY AN OWNED FAILED / CANCELLED EXPORT
+@router.post("/{export_id}/retry", response_model=ExportResponse)
+async def retry_export_route(
+    export_id: str,
+    user=Depends(require_auth),
+):
+    return await retry_export(export_id, user["user_id"])
+
+
 # GET EXPORT BY ID
 @router.get("/{export_id}", response_model=ExportResponse)
 async def get_export_route(
@@ -173,29 +193,39 @@ async def get_export_artifact_route(
         else None
     )
 
-    # Sign the exact artifact referenced by this export, never the latest file
-    # with the same extension (which could belong to a different export).
-    if org_id:
-        if not residency_ctx or residency_ctx.get("region_code") == "global":
-            raise HTTPException(status_code=503, detail="Regional export storage is not configured")
-        client, bucket, region = storage_service.resolve_target_bucket_and_client(org_id)
-        expected_prefix = f"tenants/{org_id}/cad/{project_id}/"
-        artifact_path = artifact.get("path") or ""
-        if (region != residency_ctx["region_code"]
-                or artifact.get("bucket") != bucket
-                or artifact.get("project_id") != project_id
-                or not artifact_path.startswith(expected_prefix)
-                or ".." in artifact_path.split("/")):
-            raise HTTPException(status_code=409, detail="Export artifact storage metadata mismatch")
-        result = await run_in_threadpool(
-            lambda: client.storage.from_(bucket).create_signed_url(
-                path=artifact_path, expires_in=3600
-            )
-        )
-        signed_url = result.get("signedURL") or result.get("signed_url") or result.get("url")
-    else:
-        signed_url = await get_signed_url(artifact["id"], user)
+    # Export artifacts reference export_jobs, not ordinary jobs. Verify
+    # ownership through get_export() and use the export-bound artifact record
+    # rather than the regular /files/{id}/signed-url job authorization.
+    if export_record.get("status") != "completed":
+        raise HTTPException(status_code=409, detail="Export is not completed")
+    if (str(artifact.get("project_id") or "") != str(project_id)
+            or str(artifact.get("job_id") or "") != str(export_id)
+            or str(artifact.get("id") or "") != str(export_record.get("artifact_file_id") or "")):
+        raise HTTPException(status_code=409, detail="Export artifact does not match its job")
 
+    if org_id and (not residency_ctx or residency_ctx.get("region_code") == "global"):
+        raise HTTPException(status_code=503, detail="Regional export storage is not configured")
+
+    client, bucket, region = storage_service.resolve_target_bucket_and_client(org_id)
+    expected_prefix = (
+        f"tenants/{org_id}/cad/{project_id}/" if org_id
+        else f"{user['user_id']}/{project_id}/"
+    )
+    artifact_path = artifact.get("path")
+    if (not isinstance(artifact_path, str)
+            or not artifact_path.startswith(expected_prefix)
+            or any(segment in ("", ".", "..") for segment in artifact_path.split("/"))
+            or chr(92) in artifact_path
+            or artifact.get("bucket") != bucket
+            or (org_id and region != residency_ctx["region_code"])):
+        raise HTTPException(status_code=409, detail="Export artifact storage metadata mismatch")
+
+    result = await run_in_threadpool(
+        lambda: client.storage.from_(bucket).create_signed_url(
+            path=artifact_path, expires_in=3600
+        )
+    )
+    signed_url = result.get("signedURL") or result.get("signed_url") or result.get("url")
     if not signed_url:
         raise HTTPException(status_code=503, detail="Export artifact URL is unavailable")
 

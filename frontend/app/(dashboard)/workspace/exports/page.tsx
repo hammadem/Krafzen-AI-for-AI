@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileDown, SearchIcon, RefreshCw, AlertCircle, Download, RotateCcw, Loader2 } from "lucide-react";
 import { useState, useMemo } from "react";
-import { getUserExports, retryExport, getFileSignedUrl } from "@/lib/api/api";
+import { getUserExports, retryExport, getExportArtifactSignedUrl } from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useAuth } from "@/context/AuthContext";
 import { formatDate } from "@/lib/utils";
@@ -127,7 +127,7 @@ export default function Exports() {
         if (!item.artifact_file_id || downloading.has(item.id)) return;
         setDownloading((prev) => new Set(prev).add(item.id));
 
-        const { ok, data } = await getFileSignedUrl(user, item.artifact_file_id);
+        const { ok, data } = await getExportArtifactSignedUrl(user, item.id);
         const url = (data as unknown as SignedUrlResponse | null)?.signed_url;
         if (ok && url) {
             window.open(url, "_blank", "noopener,noreferrer");
