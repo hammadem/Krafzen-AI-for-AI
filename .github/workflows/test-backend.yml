@@ -62,21 +62,53 @@ jobs:
         python -c "from app.api.health import router; print('✅ Health module imports successfully')"
         python -c "from app.services.supabase_service import supabase_service; print('✅ Supabase service imports successfully')"
     
-    - name: Test FastAPI startup
+    - name: Require successful HTTP startup and API documentation
+      shell: bash
       run: |
+        set -Eeuo pipefail
         cd backend
-        timeout 10s uvicorn main:app --host 0.0.0.0 --port 8000 &
-        sleep 5
-        curl -f http://localhost:8000/health/ || echo "Health check failed"
-        curl -f http://localhost:8000/health/detailed || echo "Detailed health check failed"
-    
-    - name: Test API documentation
-      run: |
-        cd backend
-        timeout 10s uvicorn main:app --host 0.0.0.0 --port 8000 &
-        sleep 5
-        curl -f http://localhost:8000/docs || echo "API docs check failed"
-    
+        python -m uvicorn main:app --host 127.0.0.1 --port 8000 > /tmp/krafzen_ci_uvicorn.log 2>&1 &
+        SERVER_PID=$!
+        trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+        # This probe verifies the HTTP server without requiring live Supabase
+        # secrets. Deployment readiness and /health/ready are separate gates.
+        HTTP_READY=0
+        for attempt in {1..15}; do
+          if curl --fail --silent --show-error --max-time 2 \
+            http://127.0.0.1:8000/openapi.json \
+            -o /tmp/krafzen_ci_openapi.json 2>/dev/null; then
+            HTTP_READY=1
+            break
+          fi
+          if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+            echo "Uvicorn exited before HTTP startup:"
+            cat /tmp/krafzen_ci_uvicorn.log
+            exit 1
+          fi
+          sleep 1
+        done
+        if [ "$HTTP_READY" -ne 1 ]; then
+          echo "HTTP startup timed out:"
+          cat /tmp/krafzen_ci_uvicorn.log
+          exit 1
+        fi
+        curl --fail --silent --show-error --max-time 5 \
+          http://127.0.0.1:8000/docs -o /dev/null
+        python - <<'PY'
+        import json
+
+        with open("/tmp/krafzen_ci_openapi.json", encoding="utf-8") as fh:
+            api = json.load(fh)
+        assert api.get("openapi"), "OpenAPI version missing"
+        paths = api.get("paths", {})
+        for required in (
+            "/api/v1/jobs/", "/api/v1/files/", "/api/v1/projects/"
+        ):
+            assert required in paths, f"Missing live OpenAPI route: {required}"
+        print("HTTP startup, /docs and OpenAPI routes verified")
+        PY
+
     - name: Verify Jobs and Files routes are registered
       run: |
         cd backend
