@@ -37,7 +37,7 @@ const pricingPlans: PricingPlan[] = [
             "Project workspace",
             "Email support"
         ],
-        trial: "15 free requests · no card required",
+        trial: "Verified paid subscription required",
         cta: "Get Started",
         featured: false,
         links: {
@@ -60,7 +60,7 @@ const pricingPlans: PricingPlan[] = [
             "Up to 10 team members",
             "Priority email support"
         ],
-        trial: "15 free requests · no card required",
+        trial: "Verified paid subscription required",
         cta: "Get Started",
         featured: true,
         popular: true,
@@ -85,7 +85,7 @@ const pricingPlans: PricingPlan[] = [
             "Up to 25 team members",
             "Dedicated support"
         ],
-        trial: "15 free requests · no card required",
+        trial: "Verified paid subscription required",
         cta: "Get Started",
         featured: false,
         links: {
@@ -160,7 +160,7 @@ export default function PricingPage() {
                     Plans That Scale With You
                 </h1>
                 <p className="text-xl text-[#cbd5e1]/70 max-w-2xl mx-auto mb-12">
-                    Get 15 free workspace requests on any plan. No credit card required. Choose the cycle that fits your budget.
+                    Workspace access begins with a verified paid subscription. Choose the cycle that fits your budget.
                 </p>
 
                 {/* Billing Toggle */}
@@ -183,7 +183,7 @@ export default function PricingPage() {
                     >
                         Annual
                         <span className="text-[10px] bg-green-500/20 px-2 py-0.5 rounded-full text-green-400 font-bold uppercase tracking-tight">
-                            2 Months Free
+                            Annual savings
                         </span>
                     </button>
                 </div>
