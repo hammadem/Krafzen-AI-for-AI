@@ -399,10 +399,19 @@ export async function getExportsForProject(
 function normalizeList<T>(raw: unknown, keys: string[] = []): T[] {
     if (Array.isArray(raw)) return raw as T[];
     if (raw && typeof raw === "object") {
-        const source = raw as Record<string, uexport async function getUserExports(user: User | null): Promise<ApiRes> {
+        const source = raw as Record<string, unknown>;
+        for (const key of keys) {
+            const value = source[key];
+            if (Array.isArray(value)) return value as T[];
+        }
+    }
+    return [];
+}
+
+export async function getUserExports(user: User | null): Promise<ApiRes> {
     const pageSize = 100;
     const results: ExportDetails[] = [];
-    // API enforces a bounded page size; do not truncate history at 100 projects.
+    // The backend scopes every page to the authenticated requester.
     for (let page = 1; page <= 100; page++) {
         const response = await apiClient("GET", EXPORT_URLS.GET_MINE(page, pageSize), user);
         if (!response.ok) return response;
