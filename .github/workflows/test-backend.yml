@@ -165,3 +165,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://krafzen_ci:local_ci_only@127.0.0.1:5432/krafzen_ci
         run: python backend/scripts/verify_project_archive_migration.py
+
+      - name: Verify branding RLS and zero-credit signup migration on isolated PostgreSQL
+        env:
+          DATABASE_URL: postgresql://krafzen_ci:local_ci_only@127.0.0.1:5432/krafzen_ci
+        run: python backend/scripts/verify_branding_signup_security_migration.py
