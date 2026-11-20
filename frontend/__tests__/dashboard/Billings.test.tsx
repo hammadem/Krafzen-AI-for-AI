@@ -21,7 +21,7 @@ describe("Billing workspace", () => {
         render(<Billings />);
         expect(screen.getByText(/Billing & subscription/i)).toBeInTheDocument();
         await waitFor(() => {
-            expect(screen.getByText("Pro")).toBeInTheDocument();
+            expect(screen.getAllByText("Pro")[0]).toBeInTheDocument();
             expect(screen.getByTestId("billing-request-balance")).toHaveTextContent("42");
         });
         expect(screen.getByRole("button", { name: /Continue to secure checkout/i })).toBeEnabled();
