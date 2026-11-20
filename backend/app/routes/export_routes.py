@@ -215,7 +215,7 @@ async def get_export_artifact_route(
     if (not isinstance(artifact_path, str)
             or not artifact_path.startswith(expected_prefix)
             or any(segment in ("", ".", "..") for segment in artifact_path.split("/"))
-            or "\\\\" in artifact_path
+            or chr(92) in artifact_path
             or artifact.get("bucket") != bucket
             or (org_id and region != residency_ctx["region_code"])):
         raise HTTPException(status_code=409, detail="Export artifact storage metadata mismatch")
