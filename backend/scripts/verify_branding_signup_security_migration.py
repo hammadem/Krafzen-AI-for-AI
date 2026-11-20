@@ -85,7 +85,7 @@ def run():
                 WHERE p.oid = 'public.handle_new_user()'::regprocedure
             """)
             secdef, settings = cur.fetchone()
-            assert secdef and settings is not None and "search_path=" in settings
+            assert secdef and settings and any(value in ("search_path=", 'search_path=""') for value in settings)
 
             cur.execute("""CREATE TRIGGER test_new_user_signup
                 AFTER INSERT ON auth.users FOR EACH ROW
