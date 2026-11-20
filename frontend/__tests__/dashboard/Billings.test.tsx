@@ -1,16 +1,35 @@
 import Billings from "@/app/(dashboard)/workspace/billings/page";
-import { screen } from "@testing-library/react"
-import { renderWithAuth } from "../test-utils";
+import { render, screen, waitFor } from "@testing-library/react";
 
-describe("Billings components", () => {
-    // Billing is hidden until the Stripe integration ships (CEO request, 2026-08) — the route
-    // now renders a "coming soon" placeholder instead of the non-functional full page.
-    it("renders the Billing coming-soon placeholder", () => {
-        renderWithAuth(<Billings />);
+vi.mock("@/context/AuthContext", () => ({
+    useAuth: () => ({
+        user: { userId: "test-user", access_token: "test-token" },
+        refreshSubscription: vi.fn(),
+    }),
+}));
 
-        expect(screen.getByText(/Billing is coming soon/i)).toBeInTheDocument();
-        expect(
-            screen.getByText(/payment methods will be available here shortly/i)
-        ).toBeInTheDocument();
-    })
-})
+vi.mock("@/lib/api/payment", () => ({
+    getSubscriptionStatus: vi.fn().mockResolvedValue({
+        subscription: { plan_name: "professional", status: "active", billing_cycle: "monthly" },
+        balance: { plan_requests: 42, subscription_status: "active", plan_name: "professional" },
+    }),
+    createCheckoutSession: vi.fn(),
+}));
+
+describe("Billing workspace", () => {
+    it("loads the verified subscription and shows paid request balance", async () => {
+        render(<Billings />);
+        expect(screen.getByText(/Billing & subscription/i)).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.getByText("Pro")).toBeInTheDocument();
+            expect(screen.getByTestId("billing-request-balance")).toHaveTextContent("42");
+        });
+        expect(screen.getByRole("button", { name: /Continue to secure checkout/i })).toBeEnabled();
+    });
+
+    it("does not advertise fake free trials or pretend invoices work", async () => {
+        render(<Billings />);
+        await waitFor(() => expect(screen.getByText(/No free signup requests/i)).toBeInTheDocument());
+        expect(screen.getByText(/invoice history, payment-method changes and cancellation are not yet connected/i)).toBeInTheDocument();
+    });
+});
