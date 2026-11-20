@@ -4,6 +4,8 @@ import hashlib
 import hmac
 import json
 import logging
+import time
+from datetime import UTC, datetime
 from typing import Any
 
 import stripe
@@ -209,232 +211,104 @@ class PaymentService:
             logger.exception("Stripe Checkout Error")
             raise
 
+    @staticmethod
+    def _stripe_id(value):
+        if isinstance(value, str):
+            return value
+        if isinstance(value, dict):
+            return str(value.get("id") or "")
+        return ""
+
     async def handle_webhook(self, payload: bytes, sig_header: str):
-        """
-        Handles Stripe Webhooks to fulfill orders.
-        """
+        """Validate signed Stripe events, then atomically record entitlements."""
         if not settings.STRIPE_WEBHOOK_SECRET:
             raise RuntimeError("Stripe Webhook Secret not configured")
-
         try:
             event = stripe.Webhook.construct_event(
                 payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
             )
-        except ValueError:
-            # Invalid payload
-            raise ValueError("Invalid payload")
-        except stripe.error.SignatureVerificationError:
-            # Invalid signature
-            raise ValueError("Invalid signature")
+        except ValueError as exc:
+            raise ValueError("Invalid payload") from exc
+        except stripe.error.SignatureVerificationError as exc:
+            raise ValueError("Invalid signature") from exc
 
-        # Handle the event
-        event_type = event['type']
-        
-        if event_type == 'checkout.session.completed':
-            session = event['data']['object']
-            await self._handle_checkout_completed(session)
-        
-        elif event_type == 'customer.subscription.created':
-            subscription = event['data']['object']
-            await self._handle_subscription_created(subscription)
-        
-        elif event_type == 'customer.subscription.updated':
-            subscription = event['data']['object']
-            await self._handle_subscription_updated(subscription)
-        
-        elif event_type == 'customer.subscription.deleted':
-            subscription = event['data']['object']
-            await self._handle_subscription_deleted(subscription)
-        
-        elif event_type == 'invoice.payment_succeeded':
-            invoice = event['data']['object']
-            await self._handle_payment_succeeded(invoice)
-        
-        elif event_type == 'invoice.payment_failed':
-            invoice = event['data']['object']
-            await self._handle_payment_failed(invoice)
+        kind = str(event.get("type") or "")
+        event_id = str(event.get("id") or "")
+        if not event_id:
+            raise ValueError("Stripe event has no stable identifier")
+        event_time = datetime.fromtimestamp(int(event.get("created") or 0), tz=UTC)
+        if event_time.timestamp() <= 0:
+            raise ValueError("Stripe event has no creation timestamp")
+        data = event.get("data") or {}
+        item = data.get("object") or {}
 
-        return {"status": "success"}
+        if kind == "checkout.session.completed":
+            # Stripe's initial invoice can trigger both checkout and
+            # invoice.payment_succeeded. Deduplicate on the INVOICE ID, not
+            # the webhook delivery ID or checkout session ID.
+            if (item.get("mode") != "subscription"
+                    or item.get("payment_status") != "paid"):
+                return {"status": "ignored"}
+            invoice_id = self._stripe_id(item.get("invoice"))
+            subscription_id = self._stripe_id(item.get("subscription"))
+            metadata = item.get("metadata") or {}
+            if not invoice_id:
+                # Wait for the signed invoice.payment_succeeded event; never
+                # activate from an unlinked session.
+                return {"status": "ignored"}
+            result = await subscription_service.apply_verified_payment_event(
+                provider="stripe",
+                event_id=event_id,
+                kind="paid",
+                resource_id=invoice_id,
+                user_id=str(metadata.get("user_id") or ""),
+                subscription_id=subscription_id,
+                customer_id=self._stripe_id(item.get("customer")),
+                plan_name=metadata.get("plan_name"),
+                billing_cycle=metadata.get("billing_cycle"),
+                occurred_at=event_time,
+            )
+        elif kind in {"invoice.payment_succeeded", "invoice.payment_failed"}:
+            invoice_id = self._stripe_id(item.get("id"))
+            subscription_id = self._stripe_id(item.get("subscription"))
+            if not subscription_id:
+                return {"status": "ignored"}  # Non-subscription invoices.
+            if kind == "invoice.payment_succeeded":
+                if item.get("paid") is not True or int(item.get("amount_paid") or 0) <= 0:
+                    return {"status": "ignored"}
+            subscription = stripe.Subscription.retrieve(subscription_id)
+            metadata = subscription.get("metadata") or {}
+            result = await subscription_service.apply_verified_payment_event(
+                provider="stripe",
+                event_id=event_id,
+                kind="paid" if kind == "invoice.payment_succeeded" else "past_due",
+                resource_id=invoice_id,
+                user_id=str(metadata.get("user_id") or ""),
+                subscription_id=subscription_id,
+                customer_id=self._stripe_id(subscription.get("customer")),
+                plan_name=metadata.get("plan_name"),
+                billing_cycle=metadata.get("billing_cycle"),
+                occurred_at=event_time,
+            )
+        elif kind == "customer.subscription.deleted":
+            subscription_id = self._stripe_id(item.get("id"))
+            metadata = item.get("metadata") or {}
+            result = await subscription_service.apply_verified_payment_event(
+                provider="stripe",
+                event_id=event_id,
+                kind="canceled",
+                resource_id=subscription_id,
+                user_id=str(metadata.get("user_id") or ""),
+                subscription_id=subscription_id,
+                customer_id=self._stripe_id(item.get("customer")),
+                plan_name=metadata.get("plan_name"),
+                billing_cycle=metadata.get("billing_cycle"),
+                occurred_at=event_time,
+            )
+        else:
+            return {"status": "ignored"}
 
-    async def _handle_checkout_completed(self, session):
-        """
-        Handle checkout session completion.
-        Supports both dynamic sessions (with metadata) and static Payment Links (with client_reference_id).
-        """
-        metadata = session.get("metadata", {})
-        user_id = metadata.get("user_id") or session.get("client_reference_id")
-        event_type = metadata.get("type")
-        
-        if not user_id:
-            logger.error(f"Webhook missing user_id/client_reference_id in session {session.get('id')}")
-            return
-        
-        # If event_type is missing, it's likely a static Payment Link
-        if not event_type:
-            # We need to determine what they bought by looking at the line items/price
-            # For simplicity, we'll try to infer it from the amount or retrieve line items
-            try:
-                line_items = stripe.checkout.Session.list_line_items(session.get("id"), limit=1)
-                if line_items.data:
-                    price_id = line_items.data[0].price.id
-                    # You could map specific Price IDs here if you have them.
-                    # Use amount_subtotal to get the price before discounts are applied (crucial for 100% off coupons)
-                    amount = session.get("amount_subtotal", session.get("amount_total", 0)) / 100
-                    
-                    # Mapping based on the new prices provided by the user
-                    plan_map = {
-                        149: ("starter", "monthly"),
-                        1490: ("starter", "annual"),
-                        499: ("professional", "monthly"),
-                        4990: ("professional", "annual"),
-                        1499: ("enterprise", "monthly"),
-                        14990: ("enterprise", "annual")
-                    }
-                    
-                    # First try to match by Price ID in PLAN_CONFIG
-                    found_plan = None
-                    found_cycle = None
-                    for p_name, cycles in PLAN_CONFIG.items():
-                        for c_cycle, config in cycles.items():
-                            if config.get("stripe_price_id") == price_id:
-                                found_plan = p_name
-                                found_cycle = c_cycle
-                                break
-                        if found_plan:
-                            break
-                            
-                    if found_plan:
-                        plan_name, billing_cycle = found_plan, found_cycle
-                    else:
-                        plan_name, billing_cycle = plan_map.get(int(amount), (None, None))
-                    
-                    if plan_name:
-                        event_type = "subscription"
-                        metadata["plan_name"] = plan_name
-                        metadata["billing_cycle"] = billing_cycle
-                    else:
-                        logger.error(f"Could not infer plan for amount {amount}")
-            except (AttributeError, KeyError, TypeError, ValueError) as e:
-                logger.error(f"Error inferring plan from session: {e}")
-
-        if event_type == "subscription":
-            # Signed checkout completion is not sufficient unless payment settled.
-            if session.get("payment_status") != "paid" or not session.get("subscription"):
-                logger.warning("Subscription checkout is not paid; withholding access")
-                return
-            plan_name = metadata.get("plan_name")
-            billing_cycle = metadata.get("billing_cycle")
-            
-            if plan_name and billing_cycle:
-                logger.info(f"Starting subscription for user {user_id}: {plan_name} ({billing_cycle}) (payment completed)")
-                await subscription_service.start_subscription(
-                    user_id=user_id,
-                    plan_name=plan_name,
-                    billing_cycle=billing_cycle,
-                    stripe_customer_id=session.get("customer"),
-                    stripe_subscription_id=session.get("subscription"),
-                    payment_completed=True,
-                )
-        
-        elif event_type == "purchase_minutes":
-            # Legacy: one-time minute purchase
-            minutes_str = metadata.get("minutes_amount", "0")
-            if minutes_str:
-                minutes = float(minutes_str)
-                logger.info(f"Fulfilling legacy order for {user_id}: Adding {minutes} minutes")
-                await subscription_service.add_minutes(user_id, minutes)
-
-    async def _handle_subscription_created(self, subscription):
-        """
-        Handle subscription creation (after trial or immediate).
-        """
-        metadata = subscription.get("metadata", {})
-        user_id = metadata.get("user_id")
-        
-        if user_id:
-            logger.info(f"Subscription created for user {user_id}")
-            # Subscription is already started in checkout.session.completed
-            # This is just for logging/tracking
-
-    async def _handle_subscription_updated(self, subscription):
-        """
-        Handle subscription updates (plan changes, etc).
-        """
-        metadata = subscription.get("metadata", {})
-        user_id = metadata.get("user_id")
-        
-        if user_id:
-            status = subscription.get("status")
-            logger.info(f"Subscription updated for user {user_id}, status: {status}")
-            
-            # Update subscription status in database
-            if status == "active":
-                await subscription_service.activate_subscription(user_id)
-
-    async def _handle_subscription_deleted(self, subscription):
-        """
-        Handle subscription cancellation.
-        """
-        metadata = subscription.get("metadata", {})
-        user_id = metadata.get("user_id")
-        
-        if user_id:
-            logger.info(f"Subscription canceled for user {user_id}")
-            # Update status to canceled in database
-            from datetime import datetime
-
-            from app.db.supabase_client import db
-            
-            db.table("user_subscriptions").update({
-                "subscription_status": "canceled",
-                "updated_at": datetime.now().isoformat()
-            }).eq("user_id", user_id).execute()
-
-    async def _handle_payment_succeeded(self, invoice):
-        """
-        Handle successful recurring payment.
-        """
-        subscription_id = invoice.get("subscription")
-        
-        if subscription_id:
-            # Retrieve subscription to get user_id
-            try:
-                subscription = stripe.Subscription.retrieve(subscription_id)
-                metadata = subscription.get("metadata", {})
-                user_id = metadata.get("user_id")
-                
-                if user_id:
-                    logger.info(f"Payment succeeded for user {user_id}, resetting plan requests")
-                    # Reset plan requests for new billing cycle
-                    await subscription_service.reset_plan_requests(user_id)
-            except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError, ValueError) as e:
-                logger.error(f"Error handling payment success: {e}")
-
-    async def _handle_payment_failed(self, invoice):
-        """
-        Handle failed payment.
-        """
-        subscription_id = invoice.get("subscription")
-        
-        if subscription_id:
-            try:
-                subscription = stripe.Subscription.retrieve(subscription_id)
-                metadata = subscription.get("metadata", {})
-                user_id = metadata.get("user_id")
-                
-                if user_id:
-                    logger.warning(f"Payment failed for user {user_id}")
-                    # Update status to past_due
-                    from datetime import datetime
-
-                    from app.db.supabase_client import db
-                    
-                    db.table("user_subscriptions").update({
-                        "subscription_status": "past_due",
-                        "updated_at": datetime.now().isoformat()
-                    }).eq("user_id", user_id).execute()
-            except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError, ValueError) as e:
-                logger.error(f"Error handling payment failure: {e}")
+        return {"status": "success", "outcome": result}
 
     def verify_dodo_signature(self, payload: bytes, headers: dict[str, str]) -> bool:
         """
@@ -452,6 +326,16 @@ class PaymentService:
 
         if not (webhook_id and webhook_timestamp and webhook_signature):
             logger.warning("Missing required Dodo standard webhook signature headers.")
+            return False
+
+        # HMAC authenticates the timestamp, but an old signed payload remains
+        # replayable without a separate freshness check.
+        try:
+            signed_at = int(webhook_timestamp)
+            if signed_at <= 0 or abs(time.time() - signed_at) > 300:
+                logger.warning("Dodo webhook timestamp outside permitted window")
+                return False
+        except (ValueError, TypeError):
             return False
 
         try:
@@ -473,82 +357,73 @@ class PaymentService:
     async def handle_dodo_webhook(
         self, payload: bytes, headers: dict[str, str]
     ) -> dict[str, Any]:
-        """
-        Handles incoming Dodo Payments webhooks for payment and subscription events.
+        """Only verified positive payments with known products grant entitlements.
+
+        Provider ID, payment ID and subscription ID must be present. The
+        database RPC deduplicates both delivery IDs and payment resource IDs.
         """
         if not self.verify_dodo_signature(payload, headers):
             raise ValueError("Invalid Dodo webhook signature")
-
         try:
             event = json.loads(payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as e:
-            raise ValueError(f"Invalid JSON payload: {e}") from e
-
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Invalid Dodo webhook JSON") from exc
+        if not isinstance(event, dict):
+            raise ValueError("Malformed Dodo event")
         event_type = event.get("type")
-        event_data = event.get("data", {})
-        logger.info(f"Received verified Dodo Payments webhook: {event_type}")
+        if event_type != "payment.succeeded":
+            # Subscription state changes are not evidence of a settled invoice.
+            return {"status": "ignored", "event": event_type}
+        data = event.get("data") or {}
+        if not isinstance(data, dict):
+            raise ValueError("Malformed Dodo payment data")
 
-        # Resolve plan and billing cycle from product_id or amount
-        product_id = event_data.get("product_id")
-        plan_name = None
-        billing_cycle = None
-
-        if product_id:
-            for p_name, cycles in PLAN_CONFIG.items():
-                for c_cycle, config in cycles.items():
-                    if config.get("dodo_product_id") == product_id:
-                        plan_name = p_name
-                        billing_cycle = c_cycle
-                        break
-                if plan_name:
+        product_id = str(data.get("product_id") or "")
+        plan = None
+        for name, periods in PLAN_CONFIG.items():
+            for period, config in periods.items():
+                if config.get("dodo_product_id") and config["dodo_product_id"] == product_id:
+                    plan = (name, period)
                     break
+            if plan:
+                break
+        if not plan or PLAN_CONFIG[plan[0]][plan[1]]["price"] is None:
+            raise ValueError("Dodo payment product is not a recognized paid plan")
 
-        # Fallback to amount mapping
-        if not plan_name:
-            amount = event_data.get("amount") or event_data.get("total_amount") or event_data.get("recurring_pre_tax_amount")
-            if amount is not None:
-                amount_val = int(amount)
-                if amount_val > 100000 or amount_val in (14900, 49900, 149900):
-                    amount_val = amount_val // 100
-
-                plan_map = {
-                    149: ("starter", "monthly"),
-                    1490: ("starter", "annual"),
-                    499: ("professional", "monthly"),
-                    4990: ("professional", "annual"),
-                    1499: ("enterprise", "monthly"),
-                    14990: ("enterprise", "annual"),
-                }
-                plan_name, billing_cycle = plan_map.get(amount_val, (None, None))
-
-        metadata = event_data.get("metadata", {})
-        user_id = metadata.get("user_id") or metadata.get("internal_user_id")
-        customer = event_data.get("customer", {})
-
+        payment_id = str(data.get("payment_id") or "")
+        subscription_id = str(data.get("subscription_id") or "")
+        metadata = data.get("metadata") or {}
+        user_id = str(metadata.get("user_id") or metadata.get("internal_user_id") or "")
+        customer = data.get("customer") or {}
         customer_id = customer.get("customer_id") if isinstance(customer, dict) else None
-        subscription_id = event_data.get("subscription_id")
-        if not subscription_id and isinstance(event_data.get("subscription_ids"), list) and event_data["subscription_ids"]:
-            subscription_id = event_data["subscription_ids"][0]
+        if not payment_id or not subscription_id or not user_id:
+            raise ValueError("Dodo payment is missing an immutable account/payment/subscription ID")
+        amount = data.get("total_amount", data.get("amount"))
+        try:
+            if amount is None or int(amount) <= 0:
+                raise ValueError("Dodo payment has no positive paid amount")
+        except (ValueError, TypeError) as exc:
+            raise ValueError("Dodo payment has no positive paid amount") from exc
 
-        # Subscription creation alone is not proof of payment.
-        if event_type == "payment.succeeded":
-            if user_id and plan_name and billing_cycle:
-                logger.info(f"Fulfilling Dodo subscription for {user_id}: {plan_name} ({billing_cycle})")
-                await subscription_service.start_subscription(
-                    user_id=user_id,
-                    plan_name=plan_name,
-                    billing_cycle=billing_cycle,
-                    stripe_customer_id=customer_id or f"dodo_{customer_id or user_id}",
-                    stripe_subscription_id=subscription_id or f"dodo_sub_{customer_id or user_id}",
-                    payment_completed=True,
-                )
-            else:
-                logger.warning(
-                    "Dodo webhook missing trusted user_id or plan (%s/%s)",
-                    plan_name,
-                    billing_cycle,
-                )
-
-        return {"status": "success", "event": event_type}
+        event_id = str(next(
+            (v for k, v in headers.items() if str(k).lower() == "webhook-id"), ""
+        ))
+        signed_at = next(
+            (v for k, v in headers.items() if str(k).lower() == "webhook-timestamp"), ""
+        )
+        occurred_at = datetime.fromtimestamp(int(signed_at), tz=UTC)
+        outcome = await subscription_service.apply_verified_payment_event(
+            provider="dodo",
+            event_id=event_id,
+            kind="paid",
+            resource_id=payment_id,
+            user_id=user_id,
+            subscription_id=subscription_id,
+            customer_id=customer_id,
+            plan_name=plan[0],
+            billing_cycle=plan[1],
+            occurred_at=occurred_at,
+        )
+        return {"status": "success", "event": event_type, "outcome": outcome}
 
 payment_service = PaymentService()

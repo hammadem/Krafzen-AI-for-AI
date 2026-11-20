@@ -6,7 +6,7 @@ Enhanced for Regional Routing & Tenant Boundary Compliance
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.concurrency import run_in_threadpool
 
 from app.db.queries.export_queries import (
@@ -14,9 +14,9 @@ from app.db.queries.export_queries import (
     get_export,
     get_export_artifact,
     get_project_exports,
-    update_export_status,
+    list_user_exports,
+    retry_export,
 )
-from app.db.queries.file_queries import get_signed_url
 from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.models.export_model import ExportCreate, ExportResponse, ExportStatusUpdate
@@ -25,6 +25,34 @@ from app.services.supabase_service import supabase_service
 from app.utils.storage_service import storage_service
 
 router = APIRouter(prefix="/exports", tags=["Exports"])
+
+
+def _resolve_active_assignment(record: dict[str, Any]) -> tuple[str, str]:
+    """Fail closed when an organization has an invalid residency assignment.
+
+    An existing but suspended/malformed assignment must not be interpreted as
+    an unassigned global tenant during export queuing.
+    """
+    region = str(record.get("region_code") or "").strip().lower()
+    assignment_status = str(record.get("status") or "").strip().lower()
+    if assignment_status != "active" or not region or region == "global":
+        raise HTTPException(
+            status_code=503,
+            detail="Organization residency assignment is not active or valid",
+        )
+
+    region_entry = RegionRegistryService.get_region(region)
+    worker_pool = (
+        region_entry.processing_config.get("worker_pool")
+        if region_entry
+        else None
+    )
+    if not worker_pool:
+        raise HTTPException(
+            status_code=503,
+            detail="No supported regional export worker pool is configured",
+        )
+    return region, worker_pool
 
 
 async def _resolve_project_residency_context(project_id: str) -> dict[str, Any]:
@@ -61,13 +89,9 @@ async def _resolve_project_residency_context(project_id: str) -> dict[str, Any]:
     region_code = "global"
     worker_pool = "render-default-nodes"
 
-    if res_info.data and res_info.data[0].get("status") == "active":
-        region_code = res_info.data[0].get("region_code", "global")
-        region_entry = RegionRegistryService.get_region(region_code)
-        if region_entry:
-            worker_pool = region_entry.processing_config.get(
-                "worker_pool", "render-default-nodes"
-            )
+    if res_info.data:
+        # An explicit assignment can never silently degrade to global routing.
+        region_code, worker_pool = _resolve_active_assignment(res_info.data[0])
 
     _, bucket_name, _ = storage_service.resolve_target_bucket_and_client(
         UUID(str(workspace_id)) if workspace_id else None
@@ -111,6 +135,25 @@ async def create_export_route(
     )
 
 
+# LIST CURRENT USER'S EXPORTS (no 100-project truncation)
+@router.get("/", response_model=list[ExportResponse])
+async def list_my_exports_route(
+    page: int = Query(default=1, ge=1, le=10000),
+    limit: int = Query(default=100, ge=1, le=100),
+    user=Depends(require_auth),
+):
+    return await list_user_exports(user["user_id"], page=page, limit=limit)
+
+
+# RETRY AN OWNED FAILED / CANCELLED EXPORT
+@router.post("/{export_id}/retry", response_model=ExportResponse)
+async def retry_export_route(
+    export_id: str,
+    user=Depends(require_auth),
+):
+    return await retry_export(export_id, user["user_id"])
+
+
 # GET EXPORT BY ID
 @router.get("/{export_id}", response_model=ExportResponse)
 async def get_export_route(
@@ -150,17 +193,41 @@ async def get_export_artifact_route(
         else None
     )
 
-    # Check if regional signed URL applies
-    if org_id and residency_ctx and residency_ctx.get("region_code") != "global":
-        signed_url = await storage_service.get_cad_file_url(
-            project_id=str(project_id),
-            user_id=user["user_id"],
-            file_extension=artifact.get("file_type", "dxf"),
-            organization_id=org_id,
-            expires_in=3600,
+    # Export artifacts reference export_jobs, not ordinary jobs. Verify
+    # ownership through get_export() and use the export-bound artifact record
+    # rather than the regular /files/{id}/signed-url job authorization.
+    if export_record.get("status") != "completed":
+        raise HTTPException(status_code=409, detail="Export is not completed")
+    if (str(artifact.get("project_id") or "") != str(project_id)
+            or str(artifact.get("job_id") or "") != str(export_id)
+            or str(artifact.get("id") or "") != str(export_record.get("artifact_file_id") or "")):
+        raise HTTPException(status_code=409, detail="Export artifact does not match its job")
+
+    if org_id and (not residency_ctx or residency_ctx.get("region_code") == "global"):
+        raise HTTPException(status_code=503, detail="Regional export storage is not configured")
+
+    client, bucket, region = storage_service.resolve_target_bucket_and_client(org_id)
+    expected_prefix = (
+        f"tenants/{org_id}/cad/{project_id}/" if org_id
+        else f"{user['user_id']}/{project_id}/"
+    )
+    artifact_path = artifact.get("path")
+    if (not isinstance(artifact_path, str)
+            or not artifact_path.startswith(expected_prefix)
+            or any(segment in ("", ".", "..") for segment in artifact_path.split("/"))
+            or chr(92) in artifact_path
+            or artifact.get("bucket") != bucket
+            or (org_id and region != residency_ctx["region_code"])):
+        raise HTTPException(status_code=409, detail="Export artifact storage metadata mismatch")
+
+    result = await run_in_threadpool(
+        lambda: client.storage.from_(bucket).create_signed_url(
+            path=artifact_path, expires_in=3600
         )
-    else:
-        signed_url = await get_signed_url(artifact["id"], user)
+    )
+    signed_url = result.get("signedURL") or result.get("signed_url") or result.get("url")
+    if not signed_url:
+        raise HTTPException(status_code=503, detail="Export artifact URL is unavailable")
 
     return {
         "file_id": artifact["id"],
@@ -189,6 +256,9 @@ async def update_export_status_route(
     body: ExportStatusUpdate,
     user=Depends(require_auth),
 ):
-    return await update_export_status(
-        export_id, body.model_dump(exclude_unset=True), user["user_id"]
+    # Clients may inspect exports but cannot impersonate the internal worker
+    # by setting status=completed or providing arbitrary artifact_file_id.
+    raise HTTPException(
+        status_code=403,
+        detail="Export lifecycle updates are restricted to the internal worker",
     )

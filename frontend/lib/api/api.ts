@@ -29,7 +29,9 @@ const PROJECT_URLS = {
     GET_A_PROJECT: (projectId: string) => `/api/v1/projects/${projectId}`,
     GET_ALL_PROJECTS: (userId: string, page = 1, limit = 20) => `/api/v1/projects?user_id=${userId}&page=${page}&limit=${limit}`,
     // Archived projects (Yehor — `archived` flag/endpoint pending; page degrades to empty)
-    GET_ARCHIVED: (userId: string) => `/api/v1/projects?user_id=${userId}&archived=true`,
+    GET_ARCHIVED: () => `/api/v1/projects?archived=true&page=1&limit=100`,
+    ARCHIVE: (projectId: string) => `/api/v1/projects/${projectId}/archive`,
+    RESTORE: (projectId: string) => `/api/v1/projects/${projectId}/restore`,
     UPDATE: (projectId: string) => `/api/v1/projects/${projectId}`,
     DELETE: (projectId: string) => `/api/v1/projects/${projectId}`,
 } as const;
@@ -52,6 +54,8 @@ const TEMPLATE_URLS = {
 // Exports (Kiruthikha — Step 4 enriches this; endpoint pending, page degrades to empty)
 const EXPORT_URLS = {
     GET_PROJECT: (projectId: string) => `/api/v1/exports/project/${projectId}`,
+    GET_MINE: (page: number, limit: number) => `/api/v1/exports/?page=${page}&limit=${limit}`,
+    GET_ARTIFACT: (exportId: string) => `/api/v1/exports/${exportId}/artifact`,
     // Retry a failed/cancelled export (lifecycle: failed|cancelled → queued).
     // Path pending Kiruthikha's confirmation — she owns the export service.
     RETRY: (exportId: string) => `/api/v1/exports/${exportId}/retry`,
@@ -172,6 +176,30 @@ export async function parseAnInput(
     return apiClient("POST", GPT_PARSERS.PARSE(), user, body);
 }
 
+// Upload a real DXF to the authenticated server; never submit caller-controlled
+// storage buckets or paths. The backend scans, validates, stores and registers it.
+export async function importIfcFile(
+    user: User | null,
+    jobId: string,
+    file: File
+) {
+    const body = new FormData();
+    body.append("job_id", jobId);
+    body.append("upload", file, file.name);
+    return apiClient("POST", "/api/v1/files/import-ifc", user, body);
+}
+
+export async function importDxfFile(
+    user: User | null,
+    jobId: string,
+    file: File
+) {
+    const body = new FormData();
+    body.append("job_id", jobId);
+    body.append("upload", file, file.name);
+    return apiClient("POST", "/api/v1/files/import-dxf", user, body);
+}
+
 export async function createAFile(
     user: User | null,
     body: CreateFileReq
@@ -243,16 +271,26 @@ export async function deleteAProject(
 };
 export async function getArchivedProjects(
     user: User | null,
-    userId: string
+    _userId: string
 ) {
-    return apiClient("GET", PROJECT_URLS.GET_ARCHIVED(userId), user);
+    return apiClient("GET", PROJECT_URLS.GET_ARCHIVED(), user);
 };
+
+export async function archiveProject(user: User | null, projectId: string) {
+    return apiClient("POST", PROJECT_URLS.ARCHIVE(projectId), user);
+}
+
+export async function restoreArchivedProject(user: User | null, projectId: string) {
+    return apiClient("POST", PROJECT_URLS.RESTORE(projectId), user);
+}
 export async function updateAProject(
     user: User | null,
     projectId: string,
     data: string
 ) {
-    return apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, data);
+    // Browser edits are restricted to the description; only backend CAD
+    // workers can persist generated file URLs or parsed engineering metadata.
+    return apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, { input_text: data });
 }
 
 
@@ -371,21 +409,26 @@ function normalizeList<T>(raw: unknown, keys: string[] = []): T[] {
 }
 
 export async function getUserExports(user: User | null): Promise<ApiRes> {
-    const projectsRes = await getAllProjects(user, user?.userId ?? "", 1, 100);
-    if (!projectsRes.ok) return projectsRes;
+    const pageSize = 100;
+    const results: ExportDetails[] = [];
+    // The backend scopes every page to the authenticated requester.
+    for (let page = 1; page <= 100; page++) {
+        const response = await apiClient("GET", EXPORT_URLS.GET_MINE(page, pageSize), user);
+        if (!response.ok) return response;
+        const batch = normalizeList<ExportDetails>(response.data, ["exports", "data", "items"]);
+        results.push(...batch);
+        if (batch.length < pageSize) {
+            return { ok: true, data: results, error: null as unknown as AppError };
+        }
+    }
+    return {
+        ok: false, data: null,
+        error: { type: "APIERROR", message: "Export history exceeds the supported page range." },
+    };
+}
 
-    const projects = normalizeList<{ id?: string }>(projectsRes.data, ["projects", "data", "items"]);
-    const projectIds = projects.map((project) => project.id).filter((id): id is string => Boolean(id));
-
-    const exportResults = await Promise.all(projectIds.map((projectId) => getExportsForProject(user, projectId)));
-    const failed = exportResults.find((result) => !result.ok);
-    if (failed) return failed;
-
-    const exports = exportResults
-        .flatMap((result) => normalizeList<ExportDetails>(result.data, ["exports", "data", "items"]))
-        .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
-
-    return { ok: true, data: exports, error: null as unknown as AppError };
+export async function getExportArtifactSignedUrl(user: User | null, exportId: string) {
+    return apiClient("GET", EXPORT_URLS.GET_ARTIFACT(exportId), user);
 }
 
 // Retry a failed/cancelled export (Kiruthikha — retry path pending confirmation).

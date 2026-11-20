@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/supabaseClient";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
 import { getApiBaseUrl } from "@/lib/api/utils";
+import { clearCache } from "@/lib/api/cache";
 
 interface AuthContextType {
   user: User | null; // ← from your global types
@@ -129,6 +130,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // 2️⃣ Listen to auth changes (login, logout, refresh)
     const { data: listener } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
+      // Defense-in-depth for other consumers of the shared cache module.
+      clearCache();
       setSession(session || null);
 
       if (session?.user && session?.access_token) {
@@ -208,6 +211,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
+    clearCache();
     setLoading(true);
 
     try {

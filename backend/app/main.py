@@ -90,18 +90,24 @@ async def lifespan(app: FastAPI):
         target=_bootstrap_oda_bundle, daemon=True, name="oda-bundle-bootstrap"
     ).start()
 
-    # 5. Start background export job poller
-    poll_task = asyncio.create_task(_poll_export_jobs())
-    logger.info("[startup] Export job poller registered")
+    # 5. Avoid repeatedly polling a database that has no connection credentials.
+    # Environment changes cause a fresh deployment and the worker starts then.
+    poll_task = None
+    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+        poll_task = asyncio.create_task(_poll_export_jobs())
+        logger.info("[startup] Export job poller registered")
+    else:
+        logger.warning("[startup] Export poller disabled: database not configured")
 
     yield
 
     # Clean shutdown
-    poll_task.cancel()
-    try:
-        await poll_task
-    except asyncio.CancelledError:
-        logger.info("[shutdown] Export job poller cancelled successfully")
+    if poll_task is not None:
+        poll_task.cancel()
+        try:
+            await poll_task
+        except asyncio.CancelledError:
+            logger.info("[shutdown] Export job poller cancelled successfully")
 
 
 app = FastAPI(

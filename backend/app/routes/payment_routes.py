@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlsplit
 
 import stripe
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -69,6 +70,28 @@ class CreateEmbeddedCheckoutRequest(BaseModel):
     return_url: str
 
 
+def _is_allowed_checkout_return_url(url: str) -> bool:
+    """Only allow Stripe return URLs at the configured frontend origin."""
+    try:
+        target = urlsplit(url.strip())
+        configured = urlsplit((settings.FRONTEND_URL or "").strip())
+        if (target.scheme not in {"https", "http"}
+                or target.scheme != configured.scheme
+                or not target.hostname or not configured.hostname
+                or target.hostname.lower() != configured.hostname.lower()
+                or target.port != configured.port
+                or target.username is not None or target.password is not None
+                or configured.username is not None or configured.password is not None):
+            return False
+        if target.scheme == "http":
+            return (settings.ENVIRONMENT or "").lower() == "development" and (
+                target.hostname in {"localhost", "127.0.0.1"}
+            )
+        return True
+    except ValueError:
+        return False
+
+
 @router.post("/payments/create-embedded-checkout-session")
 async def create_embedded_checkout_session(
     request_data: CreateEmbeddedCheckoutRequest,
@@ -90,8 +113,11 @@ async def create_embedded_checkout_session(
             raise HTTPException(status_code=400, detail=f"Invalid plan name. Must be one of: {', '.join(valid_plans)}")
         if billing_cycle not in valid_cycles:
             raise HTTPException(status_code=400, detail=f"Invalid billing cycle. Must be one of: {', '.join(valid_cycles)}")
-        if not return_url or not return_url.startswith(("http://", "https://")):
-            raise HTTPException(status_code=400, detail="Valid return_url is required")
+        if not _is_allowed_checkout_return_url(return_url):
+            raise HTTPException(
+                status_code=400,
+                detail="Checkout return_url must use the configured KRAFZEN frontend origin",
+            )
 
         client_secret = await payment_service.create_embedded_checkout_session(
             user_id=user_id,

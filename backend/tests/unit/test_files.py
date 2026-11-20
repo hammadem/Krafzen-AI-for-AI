@@ -25,15 +25,12 @@ async def test_create_file():
         **payload,
         "bucket": "dxf-files",
     }
-    with patch("app.routes.file_routes.create_file", AsyncMock(return_value=created)):
+    with patch("app.routes.file_routes.create_file", AsyncMock(return_value=created)) as create:
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.post(BASE_URL + "/", json=payload)
 
-    assert response.status_code == 201
-    data = response.json()
-    assert data["path"] == payload["path"]
-    assert data["job_id"] == payload["job_id"]
-    assert "id" in data
+    assert response.status_code == 403
+    create.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -49,12 +46,12 @@ async def test_create_file_with_default_type():
         "bucket": "dxf-files",
         "file_type": "dxf",
     }
-    with patch("app.routes.file_routes.create_file", AsyncMock(return_value=created)):
+    with patch("app.routes.file_routes.create_file", AsyncMock(return_value=created)) as create:
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.post(BASE_URL + "/", json=payload)
 
-    assert response.status_code == 201
-    assert response.json()["file_type"] == "dxf"
+    assert response.status_code == 403
+    create.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -85,7 +82,7 @@ async def test_update_file():
             "file_type": "pdf"
         }
         response = await ac.patch(f"{BASE_URL}/{file_id}", json=update_data)
-        assert response.status_code in [200, 400, 404]
+        assert response.status_code == 422
 
 
 @pytest.mark.asyncio

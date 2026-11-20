@@ -33,7 +33,7 @@ RETRYABLE_STATES: frozenset[ExportStatus] = frozenset({
 # Allowed forward transitions — mirrors the status_machine order in workflow-spec
 # No skipping stages, no backwards movement (except retry → QUEUED)
 VALID_TRANSITIONS: dict[ExportStatus, frozenset[ExportStatus]] = {
-    ExportStatus.QUEUED:          frozenset({ExportStatus.PROCESSING, ExportStatus.CANCELLED}),
+    ExportStatus.QUEUED:          frozenset({ExportStatus.PROCESSING, ExportStatus.FAILED, ExportStatus.CANCELLED}),
     ExportStatus.PROCESSING:      frozenset({ExportStatus.VALIDATING, ExportStatus.FAILED, ExportStatus.CANCELLED}),
     ExportStatus.VALIDATING:      frozenset({ExportStatus.REQUIRES_REVIEW, ExportStatus.COMPLETED, ExportStatus.FAILED}),
     ExportStatus.REQUIRES_REVIEW: frozenset({ExportStatus.COMPLETED, ExportStatus.FAILED}),
@@ -189,10 +189,14 @@ async def advance_export_status(
         update_data["error_message"] = error_message
 
     try:
-        result = await _update_export_status(export_id, update_data, user["user_id"])
+        result = await _update_export_status(
+            export_id, update_data, user["user_id"], expected_status=current.value
+        )
     except HTTPException as e:
         return {"error": e.detail.get("error") if isinstance(e.detail, dict) else str(e.detail)}
 
-    if result and not result.get("error"):
+    if not result:
+        return {"error": "Export status changed concurrently; transition was not applied"}
+    if not result.get("error"):
         logger.info("[advance_export_status] Transition successful", export_id=export_id, from_status=current.value, to_status=next_status.value)
     return result

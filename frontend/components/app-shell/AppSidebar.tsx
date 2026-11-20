@@ -2,15 +2,15 @@
 
 // Shared left rail for the workspace app shell (CEO redesign, PR #1).
 // Visual reference: krafzen-product/style-guide.html + projects.html.
-// Real routes are active nav; CAD/BIM items are disabled "Soon" per Kiru's scope
-// (Imports / Reviews / Models / As-Built belong to the upcoming CAD/BIM track).
+// Real routes are active nav. Reviews / Models / As-Built remain disabled until
+// their actual backend workflows are implemented and verified.
 // No fake counts — data-driven badges come later when the backend exposes them.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
-    FolderKanban, Archive, Activity, FileDown, Users, Bell,
+    FolderKanban, Archive, Activity, FileDown, Users, Bell, CreditCard,
     Upload, ClipboardCheck, Box, Ruler, Settings, Plus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -24,14 +24,12 @@ const MAIN: NavItem[] = [
     { label: "Exports", href: "/workspace/exports", icon: FileDown },
     { label: "Members", href: "/workspace/members", icon: Users },
     { label: "Notifications", href: "/workspace/notifications", icon: Bell },
-    // Billing hidden until the Stripe integration ships (CEO request, 2026-08) — the page
-    // isn't functional yet (billing history / payment methods / upgrade flow). To restore:
-    // re-add the `CreditCard` import and { label: "Billing", href: "/workspace/billings", icon: CreditCard }.
+    { label: "Billing", href: "/workspace/billings", icon: CreditCard },
 ];
 
-// Upcoming CAD/BIM track — visible but disabled until backend contracts exist.
+// The Imports workflow uses existing scoped DXF/IFC processing; other tools remain pending.
 const CAD_BIM: NavItem[] = [
-    { label: "Imports", href: "#", icon: Upload, soon: true },
+    { label: "Imports", href: "/workspace/imports", icon: Upload },
     { label: "Reviews", href: "#", icon: ClipboardCheck, soon: true },
     { label: "Models", href: "#", icon: Box, soon: true },
     { label: "As-Built", href: "#", icon: Ruler, soon: true },

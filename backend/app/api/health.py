@@ -2,10 +2,14 @@
 Health check endpoints
 """
 
+import importlib.util
+import os
+import shutil
 import time
 from datetime import UTC, datetime
 
 from fastapi import APIRouter
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from httpx import HTTPError
 from postgrest.exceptions import APIError
@@ -35,6 +39,99 @@ async def health_check():
             "db": "unreachable",
         }
 
+@router.get("/ready")
+async def readiness_check():
+    """503 unless essential connected dependencies are usable.
+
+    Unlike /health, which is a liveness probe, /health/ready indicates
+    deployment readiness. Never include credentials or connection errors.
+    """
+    auth_ready = all((
+        settings.SUPABASE_PROJECT_ID,
+        settings.SUPABASE_JWT_SECRET,
+    ))
+    database_configured = bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY)
+    database_ready = False
+    if database_configured:
+        try:
+            result = await run_in_threadpool(supabase_service.test_connection)
+            database_ready = bool(result.get("connected"))
+        except Exception:
+            database_ready = False
+
+    ai_ready = bool(settings.GEMINI_API_KEY)
+    stripe_ready = bool(settings.STRIPE_SECRET_KEY and settings.STRIPE_WEBHOOK_SECRET)
+    dodo_key = (
+        settings.DODO_PAYMENTS_TEST_API_KEY
+        if settings.DODO_PAYMENTS_ENVIRONMENT == "test_mode"
+        else settings.DODO_PAYMENTS_API_KEY
+    )
+    dodo_ready = bool(dodo_key and settings.DODO_PAYMENTS_WEBHOOK_SECRET)
+    billing_ready = stripe_ready or dodo_ready
+
+    from app.services.dwg_converter_service import dwg_converter_service
+    dwg_ready = bool(dwg_converter_service.is_configured())
+    # A working web server does not imply imports can scan customer files.
+    scanner_detected = bool(shutil.which(os.getenv("CLAMSCAN_CMD", "clamscan")))
+    ifc_parser_installed = importlib.util.find_spec("ifcopenshell") is not None
+    potrace_detected = bool(shutil.which("potrace"))
+
+    ifc_schema_ready = False
+    if database_ready:
+        try:
+            # Real schema probe: a missing import_metadata migration must keep
+            # readiness red even when the database is reachable.
+            await run_in_threadpool(
+                lambda: db.table("files").select("import_metadata").limit(1).execute()
+            )
+            ifc_schema_ready = True
+        except Exception:
+            ifc_schema_ready = False
+
+    checks = {
+        "database": database_ready,
+        "authentication": auth_ready,
+        "ai_generation": ai_ready,
+        "billing": billing_ready,
+        "dwg_converter": dwg_ready,
+        "import_scanner_detected": scanner_detected,
+        "ifc_parser_installed": ifc_parser_installed,
+        "dxf_tracer_detected": potrace_detected,
+        "ifc_import_schema": ifc_schema_ready,
+    }
+    ready = all(checks.values())
+    payload = {
+        "status": "ready" if ready else "not_ready",
+        "dependencies": {
+            name: "ready" if is_ready else "unavailable"
+            for name, is_ready in checks.items()
+        },
+    }
+    if ready:
+        return payload
+    return JSONResponse(status_code=503, content=payload)
+
+
+@router.get("/imports")
+async def import_capabilities():
+    """Non-secret diagnostics of CAD/BIM import prerequisites.
+
+    Detection of a binary does not verify antivirus signatures or ability to
+    successfully process a model. Import endpoints still fail closed.
+    """
+    checks = {
+        "scanner_binary_detected": bool(shutil.which(os.getenv("CLAMSCAN_CMD", "clamscan"))),
+        "ifc_parser_installed": importlib.util.find_spec("ifcopenshell") is not None,
+        "dxf_tracer_detected": bool(shutil.which("potrace")),
+    }
+    return {
+        "status": "prerequisites_detected" if all(checks.values()) else "incomplete",
+        "dependencies": checks,
+        "scanner_signatures_verified": False,
+        "storage_upload_verified": False,
+    }
+
+
 @router.get("/detailed")
 async def detailed_health_check():
     """Detailed health check with system info"""
@@ -47,7 +144,7 @@ async def detailed_health_check():
     response_time = round((time.time() - start_time) * 1000, 2)  # in milliseconds
     
     return {
-        "status": "healthy",
+        "status": "healthy" if supabase_status["connected"] else "degraded",
         "timestamp": datetime.now(UTC).isoformat(),
         "service": "KRAFZEN AI Backend",
         "version": "0.1.0",

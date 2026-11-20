@@ -287,6 +287,10 @@ async def process_export_job(
             )
             if not created:
                 raise RuntimeError("Export artifact could not be recorded")
+            job["artifact_file_id"] = created["id"]
+
+        if not job.get("artifact_file_id"):
+            raise RuntimeError("Cannot complete an export without a persisted artifact reference")
 
         # VALIDATING → COMPLETED
         result = await advance_export_status(
@@ -339,7 +343,7 @@ async def _run_export_pipeline(job: dict[str, Any]) -> None:
         if artifact:
             job["artifact"] = artifact
         job.setdefault("metadata", {}).update(meta_patch)
-        job["metadata"]["stage"] = PipelineStage.EXPORT_GENERATION.value
+        job["metadata"]["stage"] = meta_patch.get("stage", PipelineStage.EXPORT_GENERATION.value)
         if "artifact_file_id" in meta_patch:
             job["artifact_file_id"] = meta_patch["artifact_file_id"]
 
@@ -404,6 +408,53 @@ async def emit_notification(
         )
 
 
+def _eligible_for_worker(job: dict[str, Any]) -> bool:
+    """Keep sovereign exports in their assigned queue/worker pool.
+
+    Every export is still revalidated against the project's authoritative
+    residency assignment when it actually begins processing. This lightweight
+    dispatch gate prevents a global poller from prematurely failing US jobs.
+    """
+    metadata = job.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        return False
+
+    region = str(metadata.get("region_code") or "").strip().lower()
+    organization = metadata.get("organization_id")
+    pool = str(metadata.get("worker_pool") or "").strip()
+
+    # Legacy individual projects (no organization) may be global. A missing
+    # region on an organization job is ambiguous and must not be guessed.
+    if not region:
+        if organization:
+            return False
+        region = "global"
+
+    if region == "global":
+        # Never process a central job on a sovereign-dedicated worker.
+        # Explicit worker-pool metadata must agree with the default pool.
+        return (
+            not organization or pool in ("", "render-default-nodes")
+        ) and CURRENT_REGION_CODE in ("", "global") and CURRENT_WORKER_POOL in (
+            "", "render-default-nodes"
+        )
+
+    if not organization:
+        return False
+
+    region_entry = RegionRegistryService.get_region(region)
+    expected_pool = (
+        region_entry.processing_config.get("worker_pool")
+        if region_entry else None
+    )
+    return bool(
+        expected_pool
+        and pool == expected_pool
+        and CURRENT_REGION_CODE == region
+        and CURRENT_WORKER_POOL == expected_pool
+    )
+
+
 async def _poll_export_jobs() -> None:
     """
     Background poller — runs as a startup asyncio task.
@@ -411,29 +462,47 @@ async def _poll_export_jobs() -> None:
     Registered in main.py startup via asyncio.create_task().
     """
     logger.info("[worker] Export job poller started")
+    # Avoid scheduling duplicates while a local task is still validating or
+    # generating an artifact. Cross-process exclusivity remains the database
+    # compare-and-swap QUEUED -> PROCESSING in update_export_status().
+    running: dict[str, asyncio.Task[None]] = {}
     while True:
         try:
-            response = await run_in_threadpool(
-                lambda: db.table("export_jobs")
-                .select("*")
-                .eq("status", ExportStatus.QUEUED.value)
-                .order("created_at", desc=False)
-                .limit(5)
-                .execute()
-            )
+            running = {job_id: task for job_id, task in running.items() if not task.done()}
+            def _fetch_affinity_candidates():
+                query = (
+                    db.table("export_jobs")
+                    .select("*")
+                    .eq("status", ExportStatus.QUEUED.value)
+                )
+                # Apply the same region partition in PostgREST before LIMIT.
+                # Otherwise 50 US jobs can starve global jobs (or vice versa).
+                if CURRENT_REGION_CODE and CURRENT_REGION_CODE != "global":
+                    query = query.eq("metadata->>region_code", CURRENT_REGION_CODE)
+                else:
+                    query = query.or_(
+                        "metadata->>region_code.eq.global,"
+                        "metadata->>region_code.is.null"
+                    )
+                return query.order("created_at", desc=False).limit(50).execute()
+
+            response = await run_in_threadpool(_fetch_affinity_candidates)
             jobs = response.data if response and response.data else []
             for job in jobs:
+                job_id = str(job.get("id") or "")
+                if not job_id or job_id in running or not _eligible_for_worker(job):
+                    continue
                 user_id = job.get("requested_by") or await _resolve_project_owner(
                     job.get("project_id")
                 )
                 if not user_id:
                     logger.warning(
                         "[worker] Could not resolve user_id for job",
-                        job_id=job.get("id"),
+                        job_id=job_id,
                     )
                     continue
                 system_user = {"user_id": user_id}
-                asyncio.create_task(process_export_job(job, system_user))
+                running[job_id] = asyncio.create_task(process_export_job(job, system_user))
         except Exception as e:  # noqa: BLE001 - keep the background poller alive after unexpected failures.
             logger.error("[worker] Poller error", error=str(e), exc_info=True)
 

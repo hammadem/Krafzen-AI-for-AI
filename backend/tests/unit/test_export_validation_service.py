@@ -44,5 +44,29 @@ async def test_postflight_passes_when_artifact_is_linked():
         "project_id": "p1",
         "format": "dxf",
         "artifact_file_id": "file-1",
+        "metadata": {"stage": "artifact_storage"},
     })
     assert report.passed is True
+
+
+
+@pytest.mark.asyncio
+async def test_postflight_rejects_artifact_without_storage_stage():
+    # A supplied file ID alone is not evidence of completed export storage.
+    report = await run_postflight({
+        "id": "exp-1", "project_id": "p1", "format": "dxf",
+        "artifact_file_id": "file-1",
+    })
+    assert report.passed is False
+    assert any(i.code == "EXPORT_INCOMPLETE_PIPELINE" for i in report.issues)
+
+
+@pytest.mark.asyncio
+async def test_postflight_rejects_earlier_pipeline_stage():
+    report = await run_postflight({
+        "id": "exp-1", "project_id": "p1", "format": "dwg",
+        "artifact_file_id": "file-1",
+        "metadata": {"stage": "export_generation"},
+    })
+    assert report.passed is False
+    assert any(i.code == "EXPORT_INCOMPLETE_PIPELINE" for i in report.issues)
