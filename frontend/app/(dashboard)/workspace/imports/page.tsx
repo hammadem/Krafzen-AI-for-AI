@@ -48,7 +48,7 @@ export default function ImportsPage() {
         const load = async () => {
             const found: ImportProject[] = [];
             for (let page = 1; page <= 100; page++) {
-                const result = await getAllProjects(user, user.userId, page, 100);
+                const result = await getAllProjects(user, user.userId || "", page, 100);
                 if (!active) return;
                 if (!result.ok) throw new Error(result.error?.message || "Cannot load projects.");
                 const batch = rows<ImportProject>(result.data, ["projects", "data", "items"]);
