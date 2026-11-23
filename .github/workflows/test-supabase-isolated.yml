@@ -48,6 +48,7 @@ jobs:
           supabase --version
           command -v tar
           test "$(uname -s)" = "Linux"
+          python -m py_compile backend/scripts/verify_local_supabase_stack.py
 
       - name: Start isolated native Supabase Postgres, Auth, REST and Storage
         env:
