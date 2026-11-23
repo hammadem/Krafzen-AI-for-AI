@@ -538,3 +538,19 @@ export async function getAsBuiltComparisons(user: User | null, projectId: string
 export async function getIfcModelSummary(user: User | null, fileId: string) {
     return apiClient("GET", `/api/v1/files/${encodeURIComponent(fileId)}/bim-summary`, user);
 }
+
+
+// Real project/drawing-bound redlines; backend verifies the stored file owner.
+export async function getDrawingRedlines(user: User | null, fileId: string) {
+    return apiClient("GET", `/api/v1/reviews/files/${encodeURIComponent(fileId)}/redlines`, user);
+}
+export async function createDrawingRedline(
+    user: User | null, fileId: string, payload: Record<string, unknown>
+) {
+    return apiClient("POST", `/api/v1/reviews/files/${encodeURIComponent(fileId)}/redlines`, user, payload);
+}
+export async function updateDrawingRedline(
+    user: User | null, redlineId: string, status: "open" | "resolved"
+) {
+    return apiClient("PATCH", `/api/v1/reviews/redlines/${encodeURIComponent(redlineId)}`, user, { status });
+}
