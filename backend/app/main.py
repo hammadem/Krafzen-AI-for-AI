@@ -25,6 +25,7 @@ from app.routes import (
     export_routes,
     export_validation_routes,
     file_routes,
+    field_routes,
     invite_routes,
     job_routes,
     notification_routes,
@@ -208,6 +209,7 @@ app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"], dependenc
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"], dependencies=paid_access)
 app.include_router(asbuilt_routes.router, prefix="/api/v1", tags=["As-Built"], dependencies=paid_access)
 app.include_router(review_routes.router, prefix="/api/v1", tags=["Reviews and Redlines"], dependencies=paid_access)
+app.include_router(field_routes.router, prefix="/api/v1", tags=["Field Inspections"], dependencies=paid_access)
 app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"], dependencies=paid_access)
 app.include_router(payment_routes.router, prefix="/api/v1", tags=["Payments"])
 app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
