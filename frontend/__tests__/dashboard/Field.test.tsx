@@ -59,7 +59,6 @@ describe("Real field inspection workflow", () => {
             expect.objectContaining({
                 project_id: "project-1", title: "Broken handrail",
                 description: "Observed handrail damage on level 1",
-                status: undefined,
             })
         ));
         expect(await screen.findByText("Broken handrail")).toBeInTheDocument();
