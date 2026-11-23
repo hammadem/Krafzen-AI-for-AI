@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
     FolderKanban, Archive, Activity, FileDown, Users, Bell, CreditCard, ClipboardList,
-    Upload, ClipboardCheck, Box, Ruler, Settings, Plus,
+    Upload, ClipboardCheck, Box, Ruler, DraftingCompass, Settings, Plus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -30,6 +30,7 @@ const MAIN: NavItem[] = [
 
 // Reviews support manual markups; IFC Models support inspected metadata, not 3D.
 const CAD_BIM: NavItem[] = [
+    { label: "CAD Room", href: "/workspace/cad", icon: DraftingCompass },
     { label: "Imports", href: "/workspace/imports", icon: Upload },
     { label: "Reviews", href: "/workspace/reviews", icon: ClipboardCheck },
     { label: "Models", href: "/workspace/models", icon: Box },
