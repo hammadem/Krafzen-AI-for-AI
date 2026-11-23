@@ -7,6 +7,9 @@ import { useAuth } from "@/context/AuthContext";
 import {
     createCheckoutSession,
     getSubscriptionStatus,
+    getCustomerInvoices,
+    createBillingPortalSession,
+    type StripeInvoice,
     type SubscriptionStatus,
 } from "@/lib/api/payment";
 
@@ -32,16 +35,26 @@ export default function Billings() {
     const [plan, setPlan] = useState<PaidPlan>("starter");
     const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
     const [checkoutLoading, setCheckoutLoading] = useState(false);
+    const [invoices, setInvoices] = useState<StripeInvoice[]>([]);
+    const [invoiceError, setInvoiceError] = useState<string | null>(null);
+    const [portalLoading, setPortalLoading] = useState(false);
 
     useEffect(() => {
         if (!user?.access_token) {
             setSubscription(null);
+            setInvoices([]);
             setLoading(false);
             return;
         }
         let cancelled = false;
         setLoading(true);
         setError(null);
+        setInvoiceError(null);
+        getCustomerInvoices(user).then((rows) => {
+            if (!cancelled) setInvoices(rows);
+        }).catch((reason: unknown) => {
+            if (!cancelled) setInvoiceError(reason instanceof Error ? reason.message : "Invoice history unavailable");
+        });
         getSubscriptionStatus(user)
             .then((response) => {
                 if (!cancelled) setSubscription(response);
@@ -64,6 +77,12 @@ export default function Billings() {
         try {
             setSubscription(await getSubscriptionStatus(user));
             await refreshSubscription();
+            setInvoiceError(null);
+            try {
+                setInvoices(await getCustomerInvoices(user));
+            } catch (reason) {
+                setInvoiceError(reason instanceof Error ? reason.message : "Invoice history unavailable");
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Unable to refresh subscription.");
         } finally {
@@ -88,6 +107,31 @@ export default function Billings() {
         } catch (err) {
             setError(err instanceof Error ? err.message : "Checkout is unavailable.");
             setCheckoutLoading(false);
+        }
+    };
+
+    const manageBilling = async () => {
+        if (!user?.access_token || portalLoading) return;
+        setPortalLoading(true);
+        setError(null);
+        try {
+            const url = await createBillingPortalSession(user);
+            window.location.assign(url);
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "Billing management unavailable");
+            setPortalLoading(false);
+        }
+    };
+
+    const formatAmount = (minor: number | null, currency: string | null) => {
+        if (typeof minor !== "number") return "—";
+        const iso = (currency || "usd").toUpperCase();
+        try {
+            const format = new Intl.NumberFormat("en-US", { style: "currency", currency: iso });
+            const digits = format.resolvedOptions().maximumFractionDigits;
+            return format.format(minor / (10 ** digits));
+        } catch {
+            return `${minor} ${iso} minor units`;
         }
     };
 
@@ -199,14 +243,45 @@ export default function Billings() {
                     </button>
                 </section>
 
-                <section className="rounded-xl border border-white/10 p-5 text-sm">
+                <section className="rounded-xl border border-white/10 p-5 space-y-4 text-sm">
                     <div className="flex items-center gap-2 font-medium">
                         <ShieldCheck className="h-5 w-5 text-[#54e3b5]" />
-                        Billing records and account changes
+                        Invoices and payment management
                     </div>
-                    <p className="mt-2 text-[#94a3b8]">
-                        Self-service invoice history, payment-method changes and cancellation are not yet connected to the
-                        billing provider. For an invoice or cancellation request, <Link href="/support" className="underline text-[#54e3b5]">contact support</Link>.
+                    <p className="text-[#94a3b8]">
+                        Invoices below come from your Stripe customer record. Billing changes are
+                        handled securely in Stripe's hosted customer portal when configured.
+                    </p>
+                    <button type="button" onClick={() => void manageBilling()}
+                        disabled={!user?.access_token || portalLoading}
+                        className="rounded-lg border border-white/20 px-4 py-2 disabled:opacity-40">
+                        {portalLoading ? "Opening billing portal…" : "Manage subscription, payment methods and cancellation"}
+                    </button>
+                    <h3 className="font-semibold">Invoice history</h3>
+                    {invoiceError && <p role="alert" className="text-amber-300">{invoiceError}</p>}
+                    {invoices.length === 0 && !invoiceError &&
+                        <p className="text-[#94a3b8]">No Stripe invoices found for this account.</p>}
+                    <div className="space-y-2">
+                        {invoices.map((invoice) => (
+                            <div key={invoice.id}
+                                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg border border-white/10 p-3">
+                                <div>
+                                    <p className="font-medium">{invoice.number || invoice.id}</p>
+                                    <p className="text-[#94a3b8]">
+                                        {invoice.created ? new Date(invoice.created * 1000).toLocaleDateString() : "Date unavailable"}
+                                        {" · "}{invoice.status || "Unknown"}
+                                        {" · "}{formatAmount(invoice.amount_paid ?? invoice.amount_due, invoice.currency)}
+                                    </p>
+                                </div>
+                                {invoice.hosted_invoice_url &&
+                                    <a href={invoice.hosted_invoice_url} target="_blank" rel="noopener noreferrer"
+                                        className="text-[#54e3b5] underline">View invoice</a>}
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-[#94a3b8]">
+                        The Stripe customer portal must have cancellation and payment-method features enabled
+                        in Stripe Dashboard. Provider setup and end-to-end payment verification are required.
                     </p>
                 </section>
             </div>
