@@ -117,6 +117,18 @@ def test_genuine_factual_report_pdf_contains_only_stored_observations():
     assert "Example fixture" not in content
 
 
+def test_field_report_paginate_long_notes_without_truncating_real_data():
+    notes = "LONG-NOTE " * 550
+    result = generate_field_report_pdf(PROJECT, [{
+        "title": "Observed wall condition", "description": notes, "status": "open",
+    }])
+    report = PdfReader(BytesIO(result))
+    assert len(report.pages) >= 2
+    extracted = " ".join(page.extract_text() for page in report.pages)
+    assert "Observed wall condition" in extracted
+    assert extracted.count("LONG-NOTE") == 550
+
+
 @pytest.mark.asyncio
 async def test_photo_upload_persists_scanned_redacted_bytes_and_metadata():
     sanitized = b"\xff\xd8saved-jpeg-binary\xff\xd9"
