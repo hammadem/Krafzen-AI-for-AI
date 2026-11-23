@@ -2,7 +2,7 @@
 import asyncio
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
@@ -11,6 +11,7 @@ from app.db.queries.project_queries import get_project
 from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.services.asbuilt_service import MAX_DXF_BYTES, compare_dxf_bytes
+from app.services.asbuilt_pdf_service import generate_asbuilt_comparison_pdf
 from app.utils.storage_service import storage_service
 
 router = APIRouter(prefix="/asbuilt", tags=["As-Built"])
@@ -151,3 +152,40 @@ async def read_saved_comparison(
         raise HTTPException(status_code=404, detail="Saved comparison not found")
     await _owned_project(str(row["project_id"]), user)
     return row
+
+
+@router.get("/comparisons/{comparison_id}/report.pdf")
+async def download_saved_comparison_pdf(
+    comparison_id: UUID,
+    user: dict = Depends(require_auth),
+):
+    """Download a factual PDF generated only from this user's persisted diff.
+
+    Reuses the saved-comparison ownership, project ACL and sovereign-region
+    guard; no user-supplied report body or invented field observations.
+    """
+    record = await read_saved_comparison(comparison_id, user=user)
+    try:
+        content = await asyncio.wait_for(
+            run_in_threadpool(generate_asbuilt_comparison_pdf, record),
+            timeout=20,
+        )
+    except TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="As-built report timed out") from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409, detail="Saved as-built comparison cannot be verified"
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="As-built PDF unavailable") from exc
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="krafzen_asbuilt_{comparison_id}.pdf"'
+            ),
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

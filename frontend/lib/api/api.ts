@@ -534,6 +534,37 @@ export async function getAsBuiltComparisons(user: User | null, projectId: string
 }
 
 
+/** Download a verified, persisted as-built comparison as a factual PDF. */
+export async function getAsBuiltComparisonPdf(
+    user: User | null,
+    comparisonId: string
+): Promise<Blob> {
+    if (!user?.access_token) throw new Error("Authentication required");
+    const response = await fetch(
+        `${getApiBaseUrl().replace(/\/$/, "")}/api/v1/asbuilt/comparisons/${encodeURIComponent(comparisonId)}/report.pdf`,
+        {
+            headers: {
+                Authorization: `Bearer ${user.access_token}`,
+                apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+                Accept: "application/pdf",
+            },
+            cache: "no-store",
+        }
+    );
+    if (!response.ok) {
+        throw new Error("Saved as-built PDF is unavailable or access was denied");
+    }
+    if (!response.headers.get("content-type")?.includes("application/pdf")) {
+        throw new Error("Server did not return a PDF");
+    }
+    const blob = await response.blob();
+    if (!blob.size || blob.size > 5 * 1024 * 1024) {
+        throw new Error("As-built PDF has an invalid size");
+    }
+    return blob;
+}
+
+
 /** Return the authenticated, genuinely parsed IFC import summary. */
 export async function getIfcModelSummary(user: User | null, fileId: string) {
     return apiClient("GET", `/api/v1/files/${encodeURIComponent(fileId)}/bim-summary`, user);
