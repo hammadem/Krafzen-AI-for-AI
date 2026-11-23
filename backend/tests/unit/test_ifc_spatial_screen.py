@@ -81,7 +81,7 @@ def test_partial_tessellation_blocks_any_fully_clear_claim():
     )
     assert report["candidate_count"] == 0
     assert report["analysis_partial"] is True
-    assert "not verified" in report["coordinate_alignment"]
+    assert report["coordinate_alignment"].endswith("_not_verified")
 
 
 @pytest.mark.parametrize("bad_vertex", [inf, float("nan"), "bad"])
