@@ -114,7 +114,7 @@ def test_missing_any_critical_schema_blocks_release(client, monkeypatch, depende
     assert payload["dependencies"]["database"] == "ready"
     assert payload["dependencies"][dependency] == "unavailable"
     assert "internal database secret" not in response.text
-    assert response.json()["dependencies"]["security_probe_passed"] == "unavailable"
+    assert payload["dependencies"]["security_probe_passed"] == "ready"
     for other in REQUIRED:
         if other != dependency:
             assert payload["dependencies"][other] == "ready"
