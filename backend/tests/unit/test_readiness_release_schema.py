@@ -45,13 +45,6 @@ def _db(missing=None):
 
         query.select.side_effect = select
         query.limit.return_value = query
-        if (table_name, "id") == missing or missing in (
-            (table_name, col) for tab, col in REQUIRED.values()
-            if tab == table_name
-        ):
-            # The exact column is checked below in execute().
-            pass
-
         def execute():
             if observed[-1] == missing:
                 raise RuntimeError("internal database secret: missing schema")
