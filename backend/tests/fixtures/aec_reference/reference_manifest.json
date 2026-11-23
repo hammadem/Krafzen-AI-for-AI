@@ -1,0 +1,86 @@
+{
+  "title": "KRAFZEN AEC objective QA reference set",
+  "as_of": "2026-11-24",
+  "source_repo": "buildingSMART/Certification-datasets",
+  "source_repository_url": "https://github.com/buildingSMART/Certification-datasets",
+  "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "© buildingSMART International Ltd.; original files copied without changes from the main branch.",
+  "scope": "Real reference IFC examples, not field-verified surveyed buildings; declared dimensions are source-model values, not certified engineering truth.",
+  "ifc_files": [
+    {
+      "name": "ifc4_wall_opening_window.ifc",
+      "schema": "IFC4",
+      "classification": "isolated wall/opening/window",
+      "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/wall-with-opening-and-window.ifc",
+      "blob": "8820193e625f693712be860d79291a0ee48eacd7",
+      "expected_min": {
+        "IfcWall": 1,
+        "IfcWindow": 1,
+        "IfcOpeningElement": 1
+      },
+      "verified_measurement": "Extruded wall body nominal 2000 mm depth (source #71), window IFC overall 1000×1000 mm (source #102); declared geometry only, not survey.",
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/wall-with-opening-and-window.ifc"
+    },
+    {
+      "name": "ifc2x3_architecture.ifc",
+      "schema": "IFC2X3",
+      "classification": "architectural scene schema legacy",
+      "source": "IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Building-Architecture.ifc",
+      "blob": "07f1b8014e74b950037f53a0547ded51b435953f",
+      "expected_min": {
+        "IfcWall": 4,
+        "IfcSlab": 3
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%202.3.0.1%20(IFC%202x3%20TC1)/Simple-Scene/Building-Architecture.ifc"
+    },
+    {
+      "name": "ifc4_architecture.ifc",
+      "schema": "IFC4",
+      "classification": "architectural scene",
+      "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Building-Architecture.ifc",
+      "blob": "ad4090b7fbdf7ab640e6bc66d3c66c086e9dc9dd",
+      "expected_min": {
+        "IfcWall": 4,
+        "IfcSlab": 3
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/Simple-Scene/Building-Architecture.ifc"
+    },
+    {
+      "name": "ifc4_structural.ifc",
+      "schema": "IFC4",
+      "classification": "structural scene beams and walls",
+      "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Building-Structural.ifc",
+      "blob": "0a0fc46360cd713fb92cf424f134356dc868a103",
+      "expected_min": {
+        "IfcBeam": 6,
+        "IfcWall": 4
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/Simple-Scene/Building-Structural.ifc"
+    },
+    {
+      "name": "ifc4_hvac.ifc",
+      "schema": "IFC4",
+      "classification": "HVAC/MEP scene",
+      "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/Simple-Scene/Building-Hvac.ifc",
+      "blob": "66b38c9e043c7b58f250835a1f1777f7428c43c5",
+      "expected_min": {
+        "IfcProject": 1
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/Simple-Scene/Building-Hvac.ifc"
+    },
+    {
+      "name": "ifc4x3_architecture.ifc",
+      "schema": "IFC4X3_ADD2",
+      "classification": "IFC 4.3 architectural interoperability",
+      "source": "IFC 4.3.2.0 (IFC 4.3 ADD2)/Simple-Scene/Building-Architecture.ifc",
+      "blob": "5b3509f37ca99ae1e889c9b10b0d79b809557f80",
+      "expected_min": {
+        "IfcWall": 4,
+        "IfcSlab": 3
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.3.2.0%20(IFC%204.3%20ADD2)/Simple-Scene/Building-Architecture.ifc"
+    }
+  ],
+  "generated_dxf": "Run python backend/scripts/generate_aec_reference_dxf.py --output-dir /tmp/krafzen-aec-dxf for independent known-coordinate DXF regression drawings. NOT surveyed architecture."
+}
