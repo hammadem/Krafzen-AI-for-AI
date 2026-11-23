@@ -1,5 +1,7 @@
 """Project-owned, source-derived IFC triangle mesh for real 3-D viewing."""
 import importlib.util
+import asyncio
+from hashlib import sha256
 import json
 import subprocess
 import sys
@@ -9,9 +11,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel
 
 from app.db.queries.file_queries import get_file
 from app.db.queries.project_queries import get_project
+from app.db.supabase_client import db
+from app.services.ifc_spatial_screen import screen_ifc_mesh_overlap
 from app.middlewares.auth import require_auth
 from app.utils.storage_service import storage_service
 
@@ -104,5 +109,118 @@ async def get_model_mesh(file_id: UUID, user: dict = Depends(require_auth)):
     return {
         "file_id": str(file_id),
         "project_id": project_id,
+        "source_sha256": sha256(raw).hexdigest(),
         "mesh": mesh,
     }
+
+
+class SpatialScreenRequest(BaseModel):
+    primary_file_id: UUID
+    secondary_file_id: UUID
+    same_origin_axes_and_scale_confirmed: bool = False
+
+
+@router.post("/projects/{project_id}/spatial-screens", status_code=201)
+async def screen_project_ifc_spatial_overlap(
+    project_id: UUID,
+    request: SpatialScreenRequest,
+    user: dict = Depends(require_auth),
+):
+    """Persist user-authorized broad-phase AABB candidates from actual IFC meshes.
+
+    This is NOT hard clash detection, automatic coordinate registration or
+    multi-discipline geometric certification.
+    """
+    pid = str(project_id)
+    a_id = str(request.primary_file_id)
+    b_id = str(request.secondary_file_id)
+    if a_id == b_id:
+        raise HTTPException(status_code=422, detail="Choose two different IFC files")
+    if not request.same_origin_axes_and_scale_confirmed:
+        raise HTTPException(
+            status_code=422,
+            detail="Confirm that both IFC files use the same origin, axes and scale",
+        )
+    project = await get_project(pid, user)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.get("workspace_id"):
+        raise HTTPException(
+            status_code=503,
+            detail="Regional BIM coordination processing is not verified",
+        )
+
+    # Verify BOTH source files belong to the chosen project before spawning
+    # costly IFC tessellation and before making any result persistent.
+    for file_id in (a_id, b_id):
+        file_row = await get_file(file_id, user)
+        if not file_row or str(file_row.get("project_id") or "") != pid:
+            raise HTTPException(status_code=404, detail="Project IFC source not found")
+        if str(file_row.get("file_type") or "").lower() != "ifc":
+            raise HTTPException(status_code=415, detail="Only IFC sources can be screened")
+
+    source = await get_model_mesh(request.primary_file_id, user=user)
+    target = await get_model_mesh(request.secondary_file_id, user=user)
+    if source["project_id"] != pid or target["project_id"] != pid:
+        raise HTTPException(status_code=404, detail="Project IFC source mismatch")
+    try:
+        result = await asyncio.wait_for(
+            run_in_threadpool(
+                screen_ifc_mesh_overlap,
+                source["mesh"], target["mesh"],
+                primary_file_id=a_id,
+                secondary_file_id=b_id,
+                primary_sha256=source["source_sha256"],
+                secondary_sha256=target["source_sha256"],
+            ),
+            timeout=15,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="IFC screening timed out") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    row = {
+        "project_id": pid,
+        "primary_file_id": a_id,
+        "secondary_file_id": b_id,
+        "created_by": str(user["user_id"]),
+        "alignment_user_asserted": True,
+        "result": result,
+    }
+    try:
+        persisted = await run_in_threadpool(
+            lambda: db.table("bim_spatial_screenings").insert(row).execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503, detail="BIM screening could not be saved"
+        ) from exc
+    if not persisted or not persisted.data:
+        raise HTTPException(status_code=503, detail="BIM screening was not persisted")
+    return persisted.data[0]
+
+
+@router.get("/projects/{project_id}/spatial-screens")
+async def list_project_ifc_spatial_screens(
+    project_id: UUID,
+    user: dict = Depends(require_auth),
+):
+    pid = str(project_id)
+    project = await get_project(pid, user)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.get("workspace_id"):
+        raise HTTPException(
+            status_code=503, detail="Regional BIM screening access is not verified"
+        )
+    try:
+        rows = await run_in_threadpool(
+            lambda: db.table("bim_spatial_screenings").select("*")
+            .eq("project_id", pid)
+            .eq("created_by", str(user["user_id"]))
+            .order("created_at", desc=True).limit(50).execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="BIM screening history unavailable") from exc
+    return rows.data if rows and rows.data else []

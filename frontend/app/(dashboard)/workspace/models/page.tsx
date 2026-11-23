@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Box, Download, Info, RefreshCw } from "lucide-react";
+import { Box, Download, Info, RefreshCw, GitCompareArrows } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getAllProjects, getAllJobs, getAllFiles, getFileSignedUrl, getIfcModelSummary } from "@/lib/api/api";
+import { getAllProjects, getAllJobs, getAllFiles, getFileSignedUrl, getIfcModelSummary, createIfcSpatialScreen, getIfcSpatialScreens } from "@/lib/api/api";
 import IfcGeometryViewer from "@/components/bim/IfcGeometryViewer";
 
 type Project = { id: string; input_text?: string | null };
@@ -21,6 +21,21 @@ type ModelSummary = {
     property_set_assignment_counts?: Record<string, number>;
     quantities_are_declared_not_measured?: boolean;
     geometry_validated: boolean; clash_detection_performed: boolean;
+};
+type SpatialCandidate = {
+    classification: string;
+    source: { file_id: string; guid: string; name: string; ifc_type: string };
+    target: { file_id: string; guid: string; name: string; ifc_type: string };
+    overlap_extents_model_coordinates: number[];
+};
+type SpatialScreen = {
+    id: string; created_at?: string; primary_file_id: string; secondary_file_id: string;
+    result: {
+        method: string; candidate_count: number; candidates: SpatialCandidate[];
+        analysis_partial: boolean; candidate_list_truncated: boolean;
+        coordinate_alignment: string; limitations: string;
+        hard_clashes_confirmed: number;
+    };
 };
 function unwrap<T>(data: unknown): T[] {
     if (Array.isArray(data)) return data as T[];
@@ -40,6 +55,13 @@ export default function ModelsPage() {
     const [files, setFiles] = useState<IFCFile[]>([]);
     const [fileId, setFileId] = useState("");
     const [model, setModel] = useState<ModelSummary | null>(null);
+    const [secondaryFileId, setSecondaryFileId] = useState("");
+    const [coordinatesConfirmed, setCoordinatesConfirmed] = useState(false);
+    const [screening, setScreening] = useState(false);
+    const [screenHistory, setScreenHistory] = useState<SpatialScreen[]>([]);
+    const [selectedScreen, setSelectedScreen] = useState<SpatialScreen | null>(null);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [screenRefresh, setScreenRefresh] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [refresh, setRefresh] = useState(0);
@@ -71,7 +93,7 @@ export default function ModelsPage() {
 
     useEffect(() => {
         if (!user?.access_token || !projectId) {
-            setFiles([]); setFileId(""); setModel(null); return;
+            setFiles([]); setFileId(""); setModel(null); setSecondaryFileId(""); return;
         }
         let active = true;
         setLoading(true); setError(null); setModel(null);
@@ -92,6 +114,8 @@ export default function ModelsPage() {
             const unique = [...new Map(found.map((f) => [f.id, f])).values()];
             setFiles(unique);
             setFileId((prior) => unique.some((f) => f.id === prior) ? prior : unique[0]?.id || "");
+            setSecondaryFileId((prior) => unique.some((f) => f.id === prior)
+                ? prior : unique[1]?.id || "");
         };
         void load().catch((reason: unknown) => {
             if (active) setError(reason instanceof Error ? reason.message : "Unable to load IFC models");
@@ -138,6 +162,56 @@ export default function ModelsPage() {
         }
     }
 
+    useEffect(() => {
+        if (!user?.access_token || !projectId) {
+            setScreenHistory([]); setSelectedScreen(null); return;
+        }
+        let active = true;
+        setSelectedScreen(null);
+        const read = async () => {
+            const response = await getIfcSpatialScreens(user, projectId);
+            if (!response.ok) throw new Error(
+                response.error?.message || "Saved BIM screening history unavailable"
+            );
+            const found = unwrap<SpatialScreen>(response.data);
+            if (active) {
+                setScreenHistory(found);
+                setSelectedScreen(found[0] || null);
+                setHistoryError(null);
+            }
+        };
+        void read().catch((reason: unknown) => {
+            if (active) {
+                setHistoryError(reason instanceof Error ? reason.message : "BIM history unavailable");
+            }
+        });
+        return () => { active = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.access_token, projectId, screenRefresh]);
+
+    async function runSpatialScreen() {
+        if (!user || !projectId || !fileId || !secondaryFileId ||
+            fileId === secondaryFileId || !coordinatesConfirmed || screening) return;
+        setScreening(true); setError(null);
+        try {
+            const response = await createIfcSpatialScreen(
+                user, projectId, fileId, secondaryFileId, true
+            );
+            if (!response.ok) throw new Error(response.error?.message || "BIM screen failed");
+            const saved = response.data as unknown as SpatialScreen;
+            if (!saved?.id || saved.result?.method !== "ifc_world_coordinate_aabb_broad_phase_v1") {
+                throw new Error("Server did not confirm a persisted IFC screening");
+            }
+            setSelectedScreen(saved);
+            setScreenHistory((prior) => [saved, ...prior.filter((x) => x.id !== saved.id)]);
+            setScreenRefresh((prior) => prior + 1);
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : "BIM screen could not be saved");
+        } finally {
+            setScreening(false);
+        }
+    }
+
     const quantities = model?.declared_quantities || [];
     return (
         <main className="flex-1 overflow-y-auto p-6 sm:p-8 text-white">
@@ -153,7 +227,7 @@ export default function ModelsPage() {
                 </div>
                 <div className="flex gap-3 rounded-lg border border-amber-300/20 bg-amber-500/10 p-4 text-sm text-amber-100">
                     <Info className="h-5 w-5 shrink-0" />
-                    This inspector does not provide a 3D geometry viewer, clash detection, measured takeoff or compliance approval. Values are declared in the uploaded IFC file, not independently measured.
+                    The viewer renders available IFC tessellation. Spatial screening below reports only possible 3D bounding-box overlaps across two models, never verified hard clashes, coordination sign-off, measured takeoff, or code approval. IFC quantities are declared, not independently measured.
                 </div>
                 {error && <p role="alert" className="rounded-lg border border-red-500/30 p-3 text-red-300">{error}</p>}
                 {!user?.access_token ? (
@@ -170,7 +244,7 @@ export default function ModelsPage() {
                                 </select>
                             </label>
                             <label className="block text-sm">IFC model
-                                <select aria-label="IFC model" value={fileId} onChange={(e) => setFileId(e.target.value)}
+                                <select aria-label="IFC model" value={fileId} onChange={(e) => { setFileId(e.target.value); setCoordinatesConfirmed(false); }}
                                     className="mt-2 w-full p-2 rounded-lg bg-slate-900 border border-white/20">
                                     {files.length === 0 && <option value="">No IFC files</option>}
                                     {files.map((f) => <option value={f.id} key={f.id}>{f.name || f.id}</option>)}
@@ -184,6 +258,89 @@ export default function ModelsPage() {
                                 <Download className="h-4 w-4" /> Download original IFC
                             </button>
                         </section>
+
+                        <section className="rounded-xl border border-white/10 p-5 space-y-4">
+                            <div className="flex items-center gap-2">
+                                <GitCompareArrows className="h-5 w-5" />
+                                <h2 className="font-semibold">Cross-file IFC spatial screening</h2>
+                            </div>
+                            <p className="text-sm text-amber-200">
+                                Potential AABB volume overlaps only; not verified geometric collisions.
+                                Select two imported IFC files with exactly the same model origin,
+                                coordinate axes and scale. This does not register models or perform
+                                clearance checks.
+                            </p>
+                            <label className="block text-sm">Second IFC model
+                                <select aria-label="Coordination IFC model"
+                                    value={secondaryFileId}
+                                    onChange={(event) => {
+                                        setSecondaryFileId(event.target.value);
+                                        setCoordinatesConfirmed(false);
+                                    }}
+                                    className="mt-2 w-full rounded-lg bg-slate-900 border border-white/20 p-2">
+                                    <option value="">Select second IFC</option>
+                                    {files.filter((file) => file.id !== fileId).map((file) => (
+                                        <option key={file.id} value={file.id}>{file.name || file.id}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="flex items-start gap-3 text-sm">
+                                <input type="checkbox" checked={coordinatesConfirmed}
+                                    onChange={(event) => setCoordinatesConfirmed(event.target.checked)}
+                                    className="mt-1" />
+                                I confirm the two source IFC models use the same origin, axes and scale.
+                                This confirmation is supplied by me; KRAFZEN does not verify alignment.
+                            </label>
+                            <button type="button" onClick={() => void runSpatialScreen()}
+                                disabled={screening || !fileId || !secondaryFileId ||
+                                    secondaryFileId === fileId || !coordinatesConfirmed}
+                                className="rounded-lg bg-emerald-300 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40">
+                                {screening ? "Screening IFC geometry…" : "Screen and save potential overlaps"}
+                            </button>
+                            {historyError && <p role="alert" className="text-sm text-amber-300">
+                                {historyError}
+                            </p>}
+                            <div className="space-y-2">
+                                <h3 className="font-semibold text-sm">Saved screenings ({screenHistory.length})</h3>
+                                {screenHistory.map((saved) => (
+                                    <button type="button" key={saved.id}
+                                        onClick={() => setSelectedScreen(saved)}
+                                        className="block w-full rounded-lg border border-white/10 p-2 text-left text-sm">
+                                        {saved.created_at || saved.id} — {saved.result.candidate_count} potential overlaps
+                                    </button>
+                                ))}
+                            </div>
+                            {selectedScreen && (
+                                <div className="rounded-lg border border-amber-300/20 p-4 space-y-3">
+                                    <p className="font-semibold">
+                                        {selectedScreen.result.candidate_count} unverified spatial candidates
+                                    </p>
+                                    <p className="text-sm text-amber-200">
+                                        {selectedScreen.result.analysis_partial
+                                            ? "Partial geometry: some IFC elements were omitted."
+                                            : "Screened the available limited IFC tessellation, not all possible geometric conflicts."}
+                                        {" "}No candidates does not prove clash-free construction.
+                                    </p>
+                                    {selectedScreen.result.candidate_list_truncated && (
+                                        <p className="text-sm text-amber-200">
+                                            Candidate list truncated; the stored count reflects all screened pairs.
+                                        </p>
+                                    )}
+                                    <p className="text-xs text-slate-400">{selectedScreen.result.limitations}</p>
+                                    {selectedScreen.result.candidates.slice(0, 40).map((candidate, index) => (
+                                        <div key={index} className="text-xs border-b border-white/10 py-2">
+                                            <p>{candidate.source.ifc_type} {candidate.source.guid} ↔
+                                                {" "}{candidate.target.ifc_type} {candidate.target.guid}</p>
+                                            <p className="text-slate-400">
+                                                AABB overlap extents (raw model coordinates):
+                                                {" "}{candidate.overlap_extents_model_coordinates.join(", ")}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+
                         {loading && <p role="status">Loading project IFC files…</p>}
                         {model && (
                             <>

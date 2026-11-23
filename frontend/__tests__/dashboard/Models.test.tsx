@@ -1,9 +1,10 @@
 import ModelsPage from "@/app/(dashboard)/workspace/models/page";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const { getAllProjects, getAllJobs, getAllFiles, getIfcModelSummary } = vi.hoisted(() => ({
+const { getAllProjects, getAllJobs, getAllFiles, getIfcModelSummary, getIfcSpatialScreens, createIfcSpatialScreen } = vi.hoisted(() => ({
     getAllProjects: vi.fn(), getAllJobs: vi.fn(), getAllFiles: vi.fn(),
-    getIfcModelSummary: vi.fn(),
+    getIfcModelSummary: vi.fn(), getIfcSpatialScreens: vi.fn(),
+    createIfcSpatialScreen: vi.fn(),
 }));
 
 vi.mock("@/context/AuthContext", () => ({
@@ -14,7 +15,7 @@ vi.mock("@/context/AuthContext", () => ({
 
 vi.mock("@/lib/api/api", () => ({
     getAllProjects, getAllJobs, getAllFiles, getIfcModelSummary,
-    getFileSignedUrl: vi.fn(),
+    getIfcSpatialScreens, createIfcSpatialScreen, getFileSignedUrl: vi.fn(),
 }));
 
 describe("Real IFC model inspector", () => {
@@ -28,6 +29,8 @@ describe("Real IFC model inspector", () => {
         getAllFiles.mockReset().mockResolvedValue({
             ok: true, data: [{ id: "ifc-1", name: "warehouse.ifc", file_type: "ifc" }]
         });
+        getIfcSpatialScreens.mockReset().mockResolvedValue({ ok: true, data: [] });
+        createIfcSpatialScreen.mockReset();
         getIfcModelSummary.mockReset().mockResolvedValue({
             ok: true, data: {
                 file_id: "ifc-1", project_id: "project-1",
@@ -49,15 +52,56 @@ describe("Real IFC model inspector", () => {
         });
     });
 
-    it("shows actual parsed IFC counts and declared quantity instead of dummy 3D", async () => {
+    it("shows actual parsed IFC counts, mesh viewer and declared quantity", async () => {
         render(<ModelsPage />);
         await waitFor(() => expect(getIfcModelSummary).toHaveBeenCalledWith(
             { userId: "user-1", access_token: "token-1" }, "ifc-1"
         ));
         expect(await screen.findByText("IfcWall")).toBeInTheDocument();
         expect(screen.getByText(/5.25 raw model units/i)).toBeInTheDocument();
-        expect(screen.getByText(/does not provide a 3D geometry viewer/i)).toBeInTheDocument();
+        expect(screen.getByText(/viewer renders available IFC tessellation/i)).toBeInTheDocument();
         expect(screen.getByText("Pset_WallCommon: 2")).toBeInTheDocument();
+    });
+
+
+    it("requires coordinate confirmation before saving real IFC spatial candidates", async () => {
+        getAllFiles.mockResolvedValueOnce({
+            ok: true, data: [
+                { id: "ifc-1", name: "architecture.ifc", file_type: "ifc" },
+                { id: "ifc-2", name: "mep.ifc", file_type: "ifc" },
+            ],
+        });
+        createIfcSpatialScreen.mockResolvedValueOnce({
+            ok: true, data: {
+                id: "screen-1", primary_file_id: "ifc-1", secondary_file_id: "ifc-2",
+                result: {
+                    method: "ifc_world_coordinate_aabb_broad_phase_v1",
+                    candidate_count: 1, analysis_partial: false,
+                    candidate_list_truncated: false, hard_clashes_confirmed: 0,
+                    coordinate_alignment: "user_asserted_same_origin_axes_and_scale_not_verified",
+                    limitations: "Broad-phase only.",
+                    candidates: [{
+                        classification: "potential_spatial_overlap_unverified",
+                        source: { file_id: "ifc-1", guid: "wall", name: "Wall", ifc_type: "IfcWall" },
+                        target: { file_id: "ifc-2", guid: "pipe", name: "Pipe", ifc_type: "IfcPipeSegment" },
+                        overlap_extents_model_coordinates: [0.2, 0.3, 0.4],
+                    }],
+                }
+            },
+        });
+        render(<ModelsPage />);
+        await screen.findAllByRole("option", { name: "mep.ifc" });
+        const second = screen.getByLabelText("Coordination IFC model");
+        fireEvent.change(second, { target: { value: "ifc-2" } });
+        const run = screen.getByRole("button", { name: "Screen and save potential overlaps" });
+        expect(run).toBeDisabled();
+        fireEvent.click(screen.getByRole("checkbox"));
+        expect(run).not.toBeDisabled();
+        fireEvent.click(run);
+        await waitFor(() => expect(createIfcSpatialScreen).toHaveBeenCalledWith(
+            { userId: "user-1", access_token: "token-1" },
+            "project-1", "ifc-1", "ifc-2", true,
+        ));
     });
 
     it("shows errors from unavailable IFC parsing", async () => {

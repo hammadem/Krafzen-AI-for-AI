@@ -90,6 +90,7 @@ async def readiness_check():
         "field_inspection_schema": ("field_inspections", "id"),
         "ada_assessment_schema": ("compliance_assessments", "id"),
         "field_photo_schema": ("field_photos", "id"),
+        "bim_spatial_screen_schema": ("bim_spatial_screenings", "id"),
     }
     schema_checks = {name: False for name in required_schema}
     if database_ready:
