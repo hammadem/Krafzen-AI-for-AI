@@ -93,6 +93,7 @@ def test_all_critical_schema_contracts_are_probed(client, monkeypatch):
         assert pair in observed
     assert len(observed) == len(REQUIRED)
     assert all(deps[name] == "ready" for name in SECURITY)
+    assert deps["security_probe_passed"] == "ready"
     fake.rpc.assert_called_once_with("krafzen_release_security_probe")
 
 
@@ -113,6 +114,7 @@ def test_missing_any_critical_schema_blocks_release(client, monkeypatch, depende
     assert payload["dependencies"]["database"] == "ready"
     assert payload["dependencies"][dependency] == "unavailable"
     assert "internal database secret" not in response.text
+    assert response.json()["dependencies"]["security_probe_passed"] == "unavailable"
     for other in REQUIRED:
         if other != dependency:
             assert payload["dependencies"][other] == "ready"
@@ -152,6 +154,7 @@ def test_security_drift_fails_release_readiness(client, monkeypatch, insecure):
     dependencies = response.json()["dependencies"]
     assert dependencies["database"] == "ready"
     assert dependencies[insecure] == "unavailable"
+    assert dependencies["security_probe_passed"] == "unavailable"
     assert all(dependencies[other] == "ready" for other in SECURITY
                if other != insecure)
 
