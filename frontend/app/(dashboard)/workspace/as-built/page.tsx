@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRightLeft, Download, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import {
-    createAsBuiltComparison, getAsBuiltComparisons, getAllProjects,
+    createAsBuiltComparison, getAsBuiltComparisons, getAsBuiltComparisonPdf, getAllProjects,
     getAllJobs, getAllFiles,
 } from "@/lib/api/api";
 
@@ -46,6 +46,7 @@ export default function AsBuiltPage() {
     const [selected, setSelected] = useState<Comparison | null>(null);
     const [loading, setLoading] = useState(false);
     const [running, setRunning] = useState(false);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [refresh, setRefresh] = useState(0);
 
@@ -142,6 +143,24 @@ export default function AsBuiltPage() {
         URL.revokeObjectURL(url);
     }
 
+    async function downloadPdf() {
+        if (!selected || !user || downloadingPdf) return;
+        setDownloadingPdf(true); setError(null);
+        try {
+            const bytes = await getAsBuiltComparisonPdf(user, selected.id);
+            const url = URL.createObjectURL(bytes);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `krafzen_asbuilt_${selected.id}.pdf`;
+            document.body.appendChild(link); link.click(); link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Cannot download PDF");
+        } finally {
+            setDownloadingPdf(false);
+        }
+    }
+
     const difference = selected?.result;
     return (
         <main className="flex-1 overflow-y-auto p-6 sm:p-8 text-white">
@@ -212,9 +231,17 @@ export default function AsBuiltPage() {
                             <section className="rounded-xl border border-white/10 p-5 space-y-4">
                                 <div className="flex items-center justify-between gap-2">
                                     <h2 className="font-semibold">Geometry comparison evidence</h2>
-                                    <button type="button" onClick={download} className="flex gap-2 text-sm underline">
-                                        <Download className="h-4 w-4" /> Export JSON
-                                    </button>
+                                    <div className="flex flex-wrap items-center gap-4">
+                                        <button type="button" onClick={download} className="flex gap-2 text-sm underline">
+                                            <Download className="h-4 w-4" /> Export JSON
+                                        </button>
+                                        <button type="button" onClick={() => void downloadPdf()}
+                                            disabled={downloadingPdf}
+                                            className="flex gap-2 text-sm underline disabled:opacity-40">
+                                            <Download className="h-4 w-4" />
+                                            {downloadingPdf ? "Generating PDF…" : "Export verified-source PDF"}
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-3 gap-3 text-center">
                                     <div><p className="text-2xl font-semibold">{difference.added_count}</p><p className="text-xs text-slate-400">Added</p></div>
