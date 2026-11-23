@@ -13,12 +13,24 @@ import requests
 
 
 def main() -> None:
-    info = json.loads(Path(os.environ["LOCAL_SUPABASE_STATUS_FILE"]).read_text())
-    api = info.get("PROJECT_URL") or info.get("API_URL") or info.get("API")
+    status_text = Path(os.environ["LOCAL_SUPABASE_STATUS_FILE"]).read_text()
+    # The official Supabase CLI --env output is a private local file, never
+    # printed in CI logs or committed (it contains ephemeral service credentials).
+    if status_text.lstrip().startswith("{"):
+        info = json.loads(status_text)
+    else:
+        info = {}
+        for raw_line in status_text.splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key_name, value = line.split("=", 1)
+            info[key_name.strip()] = value.strip().strip('"').strip("'")
+    api = info.get("PROJECT_URL") or info.get("API_URL") or info.get("SUPABASE_URL")
     key = info.get("SERVICE_ROLE_KEY") or info.get("SECRET_KEY")
     anon = info.get("ANON_KEY") or info.get("PUBLISHABLE_KEY")
     db_url = info.get("DB_URL")
-    assert isinstance(api, str) and api.startswith("http://127.0.0.1:")
+    assert isinstance(api, str) and api.startswith("http://127.0.0.1:"), (\n        "Missing local loopback project URL; available *field names* only: ",\n        sorted(info),\n    )
     assert isinstance(key, str) and len(key) > 10
     assert isinstance(db_url, str) and db_url.startswith("postgresql://")
     base = api.rstrip("/") + "/"
