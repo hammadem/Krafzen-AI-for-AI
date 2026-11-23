@@ -82,6 +82,138 @@ def _read_bounded(path: str, export_format: str) -> bytes:
     return data
 
 
+async def _load_imported_dxf(
+    job: dict[str, Any], project_id: str, user_id: str,
+) -> tuple[bytes, str, int]:
+    """Read a verified imported DXF from the same source job/project.
+
+    Never use a caller-provided storage path or fetch an external URL.
+    Return original bytes unchanged so DXF layers, coordinates, dimensional
+    entities and header unit metadata are preserved exactly.
+    """
+    from io import StringIO
+
+    source_job_id = str(job.get("source_job_id") or "")
+    metadata = job.get("metadata") or {}
+    if not isinstance(metadata, dict):
+        raise RuntimeError("Invalid export source metadata")
+    selected_file_id = str(metadata.get("source_file_id") or "")
+    if not source_job_id:
+        raise RuntimeError("A source import job is required for CAD-preserving export")
+    try:
+        UUID(source_job_id)
+        if selected_file_id:
+            UUID(selected_file_id)
+    except ValueError as exc:
+        raise RuntimeError("Invalid source job or selected drawing identifier") from exc
+
+    source_job_res = await run_in_threadpool(
+        lambda: db.table("jobs")
+        .select("project_id")
+        .eq("id", source_job_id)
+        .maybe_single()
+        .execute()
+    )
+    source_job = source_job_res.data if source_job_res else None
+    if not source_job or str(source_job.get("project_id") or "") != project_id:
+        raise PermissionError("Source job does not belong to the export project")
+
+    file_res = await run_in_threadpool(
+        lambda: db.table("files")
+        .select("id,project_id,job_id,file_type,bucket,path,size_bytes,archived_at")
+        .eq("job_id", source_job_id)
+        .eq("file_type", "dxf")
+        .limit(101)
+        .execute()
+    )
+    candidates = file_res.data if file_res and file_res.data else []
+    if selected_file_id:
+        matches = [
+            candidate for candidate in candidates
+            if str(candidate.get("id") or "") == selected_file_id
+        ]
+        if len(matches) != 1:
+            raise RuntimeError("Selected drawing was not found in the source job")
+        source = matches[0]
+    elif len(candidates) == 1:
+        source = candidates[0]
+    else:
+        raise RuntimeError(
+            "Source job must contain one unambiguous DXF, or select a source_file_id"
+        )
+
+    expected_prefix = f"{user_id}/{project_id}/imports/{source_job_id}/"
+    storage_client, bucket_name, region = (
+        storage_service.resolve_target_bucket_and_client(None)
+    )
+    path = source.get("path")
+    if (
+        str(source.get("job_id") or "") != source_job_id
+        or str(source.get("project_id") or "") != project_id
+        or source.get("archived_at") is not None
+        or str(source.get("bucket") or "") != bucket_name
+        or region != "global"
+        or not isinstance(path, str)
+        or not path.startswith(expected_prefix)
+        or not path.lower().endswith(".dxf")
+        or chr(92) in path
+        or any(segment in ("", ".", "..") for segment in path.split("/"))
+    ):
+        raise PermissionError("Untrusted or archived DXF source storage reference")
+
+    size = source.get("size_bytes")
+    if not isinstance(size, int) or size < 1 or size > 25 * 1024 * 1024:
+        raise RuntimeError("DXF source size is missing or exceeds import limits")
+    raw = await run_in_threadpool(
+        lambda: storage_client.storage.from_(bucket_name).download(path)
+    )
+    if not isinstance(raw, bytes) or not raw or len(raw) > 25 * 1024 * 1024:
+        raise RuntimeError("DXF source is empty, oversized or inaccessible")
+    if len(raw) != size:
+        raise RuntimeError("DXF source bytes do not match persisted file size")
+    if raw.startswith(b"AutoCAD Binary DXF") or b"\\x00" in raw[:1024]:
+        raise RuntimeError("Binary DXF is not supported")
+
+    try:
+        try:
+            decoded = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            decoded = raw.decode("cp1252")
+        doc = ezdxf.read(StringIO(decoded))
+        modelspace = doc.modelspace()
+        entities = 0
+        for entity in modelspace:
+            entities += 1
+            if entities > 50_000:
+                raise RuntimeError("DXF source exceeds 50,000 modelspace entities")
+        if not entities:
+            raise RuntimeError("DXF source has no modelspace geometry")
+        source_units = int(doc.header.get("$INSUNITS", 0))
+    except (ezdxf.DXFError, UnicodeError, TypeError, ValueError, OSError) as exc:
+        raise RuntimeError("Imported DXF source could not be parsed") from exc
+
+    return raw, str(source["id"]), source_units
+
+
+async def _convert_imported_dxf_to_dwg(raw: bytes) -> bytes:
+    """Use a genuine configured ODA conversion. Never rename DXF as DWG."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="krafzen-import-export-") as directory:
+        dxf_path = str(Path(directory) / "verified_source.dxf")
+        await asyncio.to_thread(Path(dxf_path).write_bytes, raw)
+        result = await asyncio.to_thread(
+            dwg_converter_service.convert_dxf_path_to_dwg, dxf_path
+        )
+        try:
+            return await asyncio.to_thread(_read_bounded, result.dwg_path, "dwg")
+        finally:
+            if result.work_dir:
+                await asyncio.to_thread(
+                    shutil.rmtree, result.work_dir, ignore_errors=True
+                )
+
+
 async def _generate_file(image_source: str, export_format: str) -> bytes:
     """Generate a real reference PDF or trace image to DXF/DWG via ODA."""
     if export_format == "pdf":
@@ -145,14 +277,37 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
     if org_id and not workspace:
         raise PermissionError("Export organization is not linked to source project")
 
-    source_image = _source_image(project)
+    # CAD import exports use the user's actual scanned drawing, NOT a raster
+    # trace. A file selection is fully revalidated at worker execution time.
+    source_file_id = None
+    units = None
+    if job.get("source_job_id") and export_format in ("dxf", "dwg"):
+        original_dxf, source_file_id, units = await _load_imported_dxf(
+            job, project_id, user_id
+        )
+        file_bytes = (
+            original_dxf if export_format == "dxf"
+            else await _convert_imported_dxf_to_dwg(original_dxf)
+        )
+        generation_method = "verified_imported_dxf"
+    else:
+        # Project image conversion remains a separate, explicitly unscaled
+        # reference path and is never described as dimensionally certified.
+        if (job.get("metadata") or {}).get("source_file_id"):
+            raise RuntimeError("Selected DXF source requires source_job_id")
+        image = _source_image(project)
+        file_bytes = await _generate_file(image, export_format)
+        generation_method = (
+            "project_raster_reference_pdf"
+            if export_format == "pdf" else "raster_vector_trace"
+        )
     logger.info(
         "[export_pipeline] generating real artifact",
         job_id=job_id,
         format=export_format,
         stage=PipelineStage.EXPORT_GENERATION.value,
+        generation_method=generation_method,
     )
-    file_bytes = await _generate_file(source_image, export_format)
     filename = (
         f"export_{project_id}_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_"
         f"{uuid4().hex[:12]}.{export_format}"
@@ -199,7 +354,9 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
         "metadata": {
             **(job.get("metadata") or {}),
             "stage": PipelineStage.ARTIFACT_STORAGE.value,
-            "generation_method": ("project_raster_reference_pdf" if export_format == "pdf" else "raster_vector_trace"),
+            "generation_method": generation_method,
+            "source_file_id": source_file_id,
+            "source_insunits": units,
             "engineering_accuracy_verified": False,
         },
     }
@@ -216,7 +373,9 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
         "artifact_url": artifact_url,
         "bucket": bucket_name,
         "file_path": storage_path,
-        "generation_method": ("project_raster_reference_pdf" if export_format == "pdf" else "raster_vector_trace"),
+        "generation_method": generation_method,
+        "source_file_id": source_file_id,
+        "source_insunits": units,
         "engineering_accuracy_verified": False,
     }
 
