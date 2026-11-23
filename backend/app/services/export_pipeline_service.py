@@ -216,7 +216,7 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
         "artifact_url": artifact_url,
         "bucket": bucket_name,
         "file_path": storage_path,
-        "generation_method": "raster_vector_trace",
+        "generation_method": ("project_raster_reference_pdf" if export_format == "pdf" else "raster_vector_trace"),
         "engineering_accuracy_verified": False,
     }
 
