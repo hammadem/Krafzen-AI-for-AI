@@ -128,7 +128,7 @@ export default function Billings() {
         const iso = (currency || "usd").toUpperCase();
         try {
             const format = new Intl.NumberFormat("en-US", { style: "currency", currency: iso });
-            const digits = format.resolvedOptions().maximumFractionDigits;
+            const digits = format.resolvedOptions().maximumFractionDigits ?? 2;
             return format.format(minor / (10 ** digits));
         } catch {
             return `${minor} ${iso} minor units`;
