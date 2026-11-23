@@ -10,6 +10,7 @@ import psycopg2
 
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "supabase/migrations/20261121000000_branding_rls_and_signup_hardening.sql"
+SECURITY_PROBE = ROOT / "supabase/migrations/20261124030000_release_security_probe.sql"
 NEW_USER = "00000000-0000-0000-0000-000000000222"
 OLD_USER = "00000000-0000-0000-0000-000000000223"
 BRANDING = (
@@ -73,6 +74,18 @@ def run():
             script = MIGRATION.read_text(encoding="utf-8")
             cur.execute(script)
             cur.execute(script)  # Repeat-safe migration.
+            probe = SECURITY_PROBE.read_text(encoding="utf-8")
+            cur.execute(probe)
+            cur.execute(probe)  # Service-role-only RPC must be repeat-safe too.
+            for role, allowed in (("anon", False), ("authenticated", False),
+                                  ("service_role", True)):
+                cur.execute(
+                    "SELECT has_function_privilege(%s,"
+                    "'public.krafzen_release_security_probe()','EXECUTE')",
+                    (role,),
+                )
+                assert cur.fetchone() == (allowed,), (role, "probe execute")
+
             for table in BRANDING:
                 cur.execute(
                     "SELECT relrowsecurity FROM pg_class WHERE oid = %s::regclass",
@@ -129,7 +142,40 @@ def run():
                 "FROM public.user_subscriptions WHERE user_id=%s", (NEW_USER,),
             )
             assert cur.fetchone() == (0, 0, 0), "New signup still has free credits"
-    print("PASS: four branding tables: RLS on, zero anon/auth privileges, service role retained, secure signup and paid credits intact.")
+            cur.execute("SELECT public.krafzen_release_security_probe()")
+            report = cur.fetchone()[0]
+            assert report["ready"] is True, report
+            assert all(report[key] is True for key in (
+                "branding_rls_and_privileges", "paid_only_signup_function",
+                "signup_trigger_enabled", "no_free_trial_balances",
+            ))
+            # A single accidental Data API grant must revoke readiness.
+            cur.execute("GRANT SELECT ON public.branding_versions TO anon")
+            cur.execute("SELECT public.krafzen_release_security_probe()")
+            assert cur.fetchone()[0]["branding_rls_and_privileges"] is False
+            cur.execute("REVOKE SELECT ON public.branding_versions FROM anon")
+            cur.execute("ALTER TABLE public.branding_versions DISABLE ROW LEVEL SECURITY")
+            cur.execute("SELECT public.krafzen_release_security_probe()")
+            assert cur.fetchone()[0]["ready"] is False
+            cur.execute("ALTER TABLE public.branding_versions ENABLE ROW LEVEL SECURITY")
+            cur.execute("SELECT public.krafzen_release_security_probe()")
+            assert cur.fetchone()[0]["ready"] is True
+            # A legacy complimentary balance also fails closed.
+            cur.execute(
+                "UPDATE public.user_subscriptions SET trial_requests_remaining = 1 "
+                "WHERE user_id = %s",
+                (OLD_USER,),
+            )
+            cur.execute("SELECT public.krafzen_release_security_probe()")
+            assert cur.fetchone()[0]["no_free_trial_balances"] is False
+            cur.execute(
+                "UPDATE public.user_subscriptions SET trial_requests_remaining = 0 "
+                "WHERE user_id = %s",
+                (OLD_USER,),
+            )
+            cur.execute("SELECT public.krafzen_release_security_probe()")
+            assert cur.fetchone()[0]["ready"] is True
+    print("PASS: private security probe and drift detection (anon grants, disabled RLS, legacy credits) on disposable DB.")
 
 
 if __name__ == "__main__":
