@@ -11,14 +11,18 @@ export default function DashboardPage() {
     const { refreshSubscription } = useAuth();
     const subscriptionSuccessHandled = useRef(false);
 
-    // After Stripe redirect: refresh subscription and show success once, then clean URL
+    // Stripe return URL is not proof of payment; verify backend entitlement.
     useEffect(() => {
         if (searchParams.get("subscription_success") !== "true") return;
         if (subscriptionSuccessHandled.current) return;
         subscriptionSuccessHandled.current = true;
         const run = async () => {
-            await refreshSubscription();
-            toast.success("Subscription activated successfully. Your plan is now active.");
+            const active = await refreshSubscription();
+            if (active) {
+                toast.success("Your paid subscription is active and verified.");
+            } else {
+                toast.info("Checkout returned, but activation is not yet confirmed. Check Billing or try again shortly.");
+            }
             router.replace("/workspace", { scroll: false });
         };
         void run();
