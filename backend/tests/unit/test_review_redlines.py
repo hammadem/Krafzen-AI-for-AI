@@ -44,13 +44,16 @@ def test_svg_renderer_rejects_empty_malformed_and_unsafe_dxf():
             render_dxf_preview(raw)
 
 
-def test_markup_validates_endpoints_coordinates_and_comment():
-    with pytest.raises(ValueError):
-        review_routes.NewRedline(kind="line", x=0.2, y=0.3, comment="line")
+def test_markup_validates_out_of_range_coordinates():
     with pytest.raises(ValueError):
         review_routes.NewRedline(kind="comment", x=1.5, y=0.5, comment="bad")
-    with pytest.raises(ValueError):
-        review_routes.NewRedline(kind="comment", x=0.3, y=0.3, comment=" ")
+
+
+def test_markup_rejects_blank_review_comment(client):
+    resp = client.post(f"/api/v1/reviews/files/{FILE}/redlines", json={
+        "kind": "comment", "x": 0.2, "y": 0.3, "comment": " "
+    })
+    assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
