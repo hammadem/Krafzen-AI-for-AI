@@ -36,6 +36,7 @@ class ExportFormat(str, Enum):
     DXF = "dxf"
     IFC = "ifc"
     DWG = "dwg"
+    PDF = "pdf"
     REVIT_PACKAGE = "revit_package"
 
 
