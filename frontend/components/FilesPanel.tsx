@@ -3,9 +3,9 @@
 import { useRef, useState } from "react";
 import FileManager from "@/components/FileManager";
 import { useAuth } from "@/context/AuthContext";
-import { importDxfFile, importIfcFile } from "@/lib/api/api";
+import { importDocumentFile, importDxfFile, importIfcFile } from "@/lib/api/api";
 
-/** Secure DXF upload entry point. The backend validates, scans and persists. */
+/** Authenticated multi-format upload. The backend scans, validates and persists. */
 export default function FilesPanel({ jobId }: { jobId: string }) {
     const { user } = useAuth();
     const fileInput = useRef<HTMLInputElement>(null);
@@ -18,13 +18,12 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
         if (!file) return;
         setError(null);
         setMessage(null);
-        const format = file.name.toLowerCase().endsWith(".ifc")
-            ? "ifc"
-            : file.name.toLowerCase().endsWith(".dxf")
-                ? "dxf"
-                : null;
-        if (!format) {
-            setError("Only DXF drawings and IFC BIM models are supported.");
+        const format = file.name.split(".").pop()?.toLowerCase() || "";
+        const documentTypes = new Set([
+            "pdf", "docx", "xlsx", "csv", "png", "jpg", "jpeg", "webp", "zip",
+        ]);
+        if (!["dxf", "ifc"].includes(format) && !documentTypes.has(format)) {
+            setError("Supported files: DXF, IFC, PDF, DOCX, XLSX, CSV, PNG, JPEG, WebP and ZIP.");
             return;
         }
         const limit = format === "ifc" ? 40 : 25;
@@ -36,15 +35,19 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
         try {
             const result = format === "ifc"
                 ? await importIfcFile(user, jobId, file)
-                : await importDxfFile(user, jobId, file);
+                : format === "dxf"
+                    ? await importDxfFile(user, jobId, file)
+                    : await importDocumentFile(user, jobId, file);
             if (!result.ok) {
                 setError(result.error?.message || "Import failed.");
                 return;
             }
             setRevision((count) => count + 1);
             setMessage(format === "ifc"
-                ? "IFC model imported. Parsed project and element metadata is available below."
-                : "DXF drawing imported and linked to this job.");
+                ? "IFC model imported with parsed project and element metadata."
+                : format === "dxf"
+                    ? "DXF drawing imported and linked to this job."
+                    : "Document scanned, parsed and saved to this project job.");
         } catch {
             setError("Import failed. Please retry.");
         } finally {
@@ -60,8 +63,8 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
                 <input
                     ref={fileInput}
                     type="file"
-                    accept=".dxf,.ifc,application/dxf,application/x-step"
-                    aria-label="Choose DXF drawing or IFC model"
+                    accept=".dxf,.ifc,.pdf,.docx,.xlsx,.csv,.png,.jpg,.jpeg,.webp,.zip"
+                    aria-label="Choose a CAD, BIM or document file"
                     className="sr-only"
                     onChange={(event) => void submitFile(event.currentTarget.files?.[0])}
                 />
@@ -71,7 +74,7 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
                     onClick={() => fileInput.current?.click()}
                     className="rounded-md bg-[#54e3b5] px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-50"
                 >
-                    {uploading ? "Validating…" : "Import DXF / IFC"}
+                    {uploading ? "Validating…" : "Import CAD / BIM / Docs"}
                 </button>
             </div>
             {error && <p role="alert" className="text-xs text-red-400">{error}</p>}

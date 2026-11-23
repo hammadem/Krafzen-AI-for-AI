@@ -145,9 +145,13 @@ export default function ImportsPage() {
                 </div>
 
                 <div className="rounded-xl border border-[#54e3b5]/20 bg-[#54e3b5]/5 p-4 text-sm text-[#c9d8d2]">
-                    Supported now: ASCII DXF (up to 25 MB) and IFC (up to 40 MB).
-                    The backend requires malware scanning, validates the file, and stores it in the selected job.
-                    DWG/RVT conversion and enterprise-sovereign imports are not enabled by this interface.
+                    Supported: ASCII DXF (25 MB), IFC (40 MB), PDF, DOCX, XLSX, CSV,
+                    PNG/JPEG/WebP images and ZIP packages (25 MB each). The backend
+                    scans, validates, extracts source metadata and stores every file
+                    in the selected project job. Document text/metadata extraction
+                    does not constitute engineering interpretation or OCR.
+                    DWG/RVT and sovereign-tenant imports remain unavailable until
+                    their verified conversion and regional pipelines exist.
                 </div>
 
                 {error && <div role="alert" className="flex gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">

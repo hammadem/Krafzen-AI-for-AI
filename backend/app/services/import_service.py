@@ -274,3 +274,141 @@ async def import_ifc_for_job(
         except Exception:
             pass
         raise HTTPException(status_code=503, detail="IFC import could not be finalized") from exc
+
+
+# Document/file classes use the SAME authenticated job/project, malware scanner,
+# private bucket, and cleanup transaction as DXF/IFC imports.
+DOCUMENT_FORMATS = {
+    "pdf": "application/pdf",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "csv": "text/csv",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "jpeg": "image/jpeg",
+    "webp": "image/webp",
+    "zip": "application/zip",
+}
+MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
+DOCUMENT_PARSE_TIMEOUT_SECONDS = 60
+
+
+def _scan_and_inspect_document(data: bytes, ext: str) -> dict:
+    """Scan first; inspect in a bounded subprocess, never execute uploaded data."""
+    with tempfile.TemporaryDirectory(prefix="krafzen-document-") as directory:
+        path = Path(directory) / ("upload." + ext)
+        path.write_bytes(data)
+        _scan_file(path)
+        try:
+            process = subprocess.run(
+                [sys.executable, "-m", "app.services.document_inspection", str(path), ext],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=DOCUMENT_PARSE_TIMEOUT_SECONDS,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise HTTPException(
+                status_code=503, detail="Document parser unavailable or timed out"
+            ) from exc
+        if process.returncode != 0:
+            raise HTTPException(
+                status_code=422,
+                detail="Document is malformed, unsafe, encrypted or unsupported",
+            )
+        try:
+            info = json.loads(process.stdout)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise HTTPException(status_code=503, detail="Document parser returned invalid metadata") from exc
+        if not isinstance(info, dict) or info.get("type") != "document" or info.get("format") != ext:
+            raise HTTPException(status_code=503, detail="Document metadata could not be verified")
+        # Only persisted after an actual malware scan and structured extraction.
+        info["malware_scan_completed"] = True
+        return info
+
+
+async def import_document_for_job(
+    *, job_id: str, upload: UploadFile, user: dict,
+) -> dict:
+    """Securely import PDFs, Office files, CSV, images and ZIPs into a real job."""
+    if not user or not user.get("user_id"):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        uuid.UUID(str(job_id))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="Invalid job ID") from exc
+    job = await get_job(job_id, user)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    project_id = str(job.get("project_id") or "")
+    project = await get_project(project_id, user)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.get("workspace_id"):
+        raise HTTPException(
+            status_code=503,
+            detail="Organization document imports require verified regional processing",
+        )
+    name = upload.filename or ""
+    if (
+        not name or len(name) > 255
+        or "/" in name or chr(92) in name
+        or name.startswith(".")
+        or "." not in name
+    ):
+        raise HTTPException(status_code=415, detail="Invalid document filename")
+    ext = name.rsplit(".", 1)[-1].lower()
+    if ext not in DOCUMENT_FORMATS:
+        raise HTTPException(status_code=415, detail="Document file format is not supported")
+    data = await upload.read(MAX_DOCUMENT_BYTES + 1)
+    if not data:
+        raise HTTPException(status_code=422, detail="Document is empty")
+    if len(data) > MAX_DOCUMENT_BYTES:
+        raise HTTPException(status_code=413, detail="Document exceeds 25 MB")
+
+    summary = await run_in_threadpool(_scan_and_inspect_document, data, ext)
+    user_id = str(user["user_id"])
+    filename = f"import_{uuid.uuid4().hex}.{ext}"
+    storage_path = f"{user_id}/{project_id}/imports/{job_id}/{filename}"
+    client, bucket, region = storage_service.resolve_target_bucket_and_client(None)
+    if region != "global":
+        raise HTTPException(status_code=503, detail="Unexpected storage region")
+    try:
+        await run_in_threadpool(
+            lambda: client.storage.from_(bucket).upload(
+                path=storage_path,
+                file=data,
+                file_options={
+                    "content-type": DOCUMENT_FORMATS[ext],
+                    "upsert": "false",
+                },
+            )
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Document storage upload failed") from exc
+    try:
+        record = await create_file(
+            {
+                "job_id": job_id,
+                "project_id": project_id,
+                "bucket": bucket,
+                "path": storage_path,
+                "file_type": ext,
+                "mime_type": DOCUMENT_FORMATS[ext],
+                "size_bytes": len(data),
+                "name": name,
+                "import_metadata": summary,
+            },
+            user,
+        )
+        if not record or record.get("error"):
+            raise RuntimeError("Document metadata registration failed")
+        return record
+    except Exception as exc:
+        try:
+            await run_in_threadpool(
+                lambda: client.storage.from_(bucket).remove([storage_path])
+            )
+        except Exception:
+            pass
+        raise HTTPException(status_code=503, detail="Document import could not be finalized") from exc
