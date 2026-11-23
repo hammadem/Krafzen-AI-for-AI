@@ -30,7 +30,7 @@ permissions:
 
 jobs:
   local-supabase:
-    name: Real local Supabase: Postgres, Auth, REST and private Storage
+    name: "Real local Supabase: Postgres, Auth, REST and private Storage"
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
