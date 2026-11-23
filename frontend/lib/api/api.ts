@@ -554,3 +554,17 @@ export async function updateDrawingRedline(
 ) {
     return apiClient("PATCH", `/api/v1/reviews/redlines/${encodeURIComponent(redlineId)}`, user, { status });
 }
+
+
+/** Authenticated and project-scoped field observations (no simulated site evidence). */
+export async function getFieldInspections(user: User | null, projectId: string) {
+    return apiClient("GET", `/api/v1/field/projects/${encodeURIComponent(projectId)}/inspections`, user);
+}
+export async function createFieldInspection(user: User | null, record: Record<string, unknown>) {
+    return apiClient("POST", "/api/v1/field/inspections", user, record);
+}
+export async function updateFieldInspectionStatus(
+    user: User | null, id: string, status: "open" | "in_progress" | "resolved" | "verified"
+) {
+    return apiClient("PATCH", `/api/v1/field/inspections/${encodeURIComponent(id)}/status`, user, { status });
+}
