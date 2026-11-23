@@ -171,7 +171,7 @@ async def _load_imported_dxf(
         raise RuntimeError("DXF source is empty, oversized or inaccessible")
     if len(raw) != size:
         raise RuntimeError("DXF source bytes do not match persisted file size")
-    if raw.startswith(b"AutoCAD Binary DXF") or b"\\x00" in raw[:1024]:
+    if raw.startswith(b"AutoCAD Binary DXF") or bytes([0]) in raw[:1024]:
         raise RuntimeError("Binary DXF is not supported")
 
     try:
