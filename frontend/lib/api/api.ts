@@ -532,3 +532,9 @@ export async function getAsBuiltComparisons(user: User | null, projectId: string
         "GET", `/api/v1/asbuilt/projects/${encodeURIComponent(projectId)}/comparisons`, user
     );
 }
+
+
+/** Return the authenticated, genuinely parsed IFC import summary. */
+export async function getIfcModelSummary(user: User | null, fileId: string) {
+    return apiClient("GET", `/api/v1/files/${encodeURIComponent(fileId)}/bim-summary`, user);
+}
