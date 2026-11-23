@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, RefreshCw } from "lucide-react";
+import { ClipboardList, FileDown, RefreshCw } from "lucide-react";
+import FieldEvidencePanel from "@/components/field/FieldEvidencePanel";
 import { useAuth } from "@/context/AuthContext";
 import {
     getAllProjects, getFieldInspections, createFieldInspection,
-    updateFieldInspectionStatus,
+    updateFieldInspectionStatus, getFieldReportPdf,
 } from "@/lib/api/api";
 
 type Project = { id: string; input_text?: string | null };
@@ -129,6 +130,26 @@ export default function FieldPage() {
         }
     }
 
+    const [downloadingReport, setDownloadingReport] = useState(false);
+
+    async function downloadFieldReport() {
+        if (!user || !projectId || downloadingReport) return;
+        setDownloadingReport(true); setError(null);
+        try {
+            const blob = await getFieldReportPdf(user, projectId);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `krafzen_field_observations_${projectId}.pdf`;
+            document.body.appendChild(link); link.click(); link.remove();
+            URL.revokeObjectURL(url);
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Cannot generate field report");
+        } finally {
+            setDownloadingReport(false);
+        }
+    }
+
     const actions: Record<InspectionStatus, InspectionStatus[]> = {
         open: ["in_progress", "resolved"],
         in_progress: ["open", "resolved"],
@@ -149,7 +170,7 @@ export default function FieldPage() {
                     </button>
                 </div>
                 <p className="rounded-xl border border-amber-300/20 bg-amber-500/10 p-4 text-sm">
-                    Records are written by users; none are generated from sensors or inferred from CAD. This workflow does not yet support photo evidence, offline sync, GPS proof, assignees or signed field reports.
+                    Records are written by users; none are generated from sensors or inferred from CAD. Photo evidence is ClamAV scanned and EXIF/GPS-stripped; reports use saved observations, not AI or site measurements. Offline sync, GPS verification, member assignment and engineer-signed certification remain unavailable.
                 </p>
                 {error && <p role="alert" className="rounded-xl border border-red-500/30 p-3 text-sm text-red-300">{error}</p>}
                 {!user?.access_token ? (
@@ -201,7 +222,15 @@ export default function FieldPage() {
                             </button>
                         </section>
                         <section className="space-y-3 rounded-xl border border-white/10 p-5">
-                            <h2 className="font-semibold">Inspection history ({history.length})</h2>
+                            <div className="flex items-center justify-between gap-3">
+                                <h2 className="font-semibold">Inspection history ({history.length})</h2>
+                                <button type="button" onClick={() => void downloadFieldReport()}
+                                    disabled={downloadingReport || !projectId}
+                                    className="flex items-center gap-2 text-xs underline disabled:opacity-40">
+                                    <FileDown className="h-4 w-4"/>
+                                    {downloadingReport ? "Generating PDF…" : "Download observed field report PDF"}
+                                </button>
+                            </div>
                             {loading && <p role="status">Loading saved field observations…</p>}
                             {!loading && history.length === 0 && (
                                 <p className="text-sm text-slate-400">No field observations recorded for this project.</p>
@@ -224,6 +253,7 @@ export default function FieldPage() {
                                             </button>
                                         ))}
                                     </div>
+                                    <FieldEvidencePanel inspectionId={item.id} user={user}/>
                                 </article>
                             ))}
                         </section>
