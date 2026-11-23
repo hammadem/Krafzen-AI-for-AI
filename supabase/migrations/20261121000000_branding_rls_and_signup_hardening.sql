@@ -9,6 +9,24 @@ ALTER TABLE public.branding_drafts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.branding_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.report_branding_snapshots ENABLE ROW LEVEL SECURITY;
 
+-- The live database previously granted anon SELECT/INSERT on these
+-- four customer/branding tables. Enabling RLS alone blocks rows but leaves
+-- the unnecessary Data API privileges in place. Remove the grants explicitly.
+-- Internal service-role access remains available for audited backend code.
+REVOKE ALL PRIVILEGES ON TABLE
+  public.branding_audit_events,
+  public.branding_drafts,
+  public.branding_versions,
+  public.report_branding_snapshots
+FROM PUBLIC, anon, authenticated;
+
+GRANT ALL PRIVILEGES ON TABLE
+  public.branding_audit_events,
+  public.branding_drafts,
+  public.branding_versions,
+  public.report_branding_snapshots
+TO service_role;
+
 -- Existing auth.users signup trigger is SECURITY DEFINER; keep it a trigger,
 -- but use a fixed empty search path and qualified identifiers throughout.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
