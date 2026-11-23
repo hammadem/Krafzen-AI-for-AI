@@ -106,6 +106,36 @@ async def readiness_check():
                 # all must block release readiness rather than be hidden.
                 schema_checks[name] = False
 
+    # Security is a release prerequisite independent of connectivity and
+    # table existence. The restricted database RPC inspects live RLS/grants,
+    # installed signup trigger and legacy free-credit balances. A missing
+    # migration or malformed response fails closed; no raw database rows or
+    # credential-bearing exception messages are exposed.
+    security_contracts = {
+        "branding_rls_and_privileges": False,
+        "paid_only_signup_function": False,
+        "signup_trigger_enabled": False,
+        "no_free_trial_balances": False,
+        "security_probe_passed": False,
+    }
+    if database_ready:
+        try:
+            report_response = await run_in_threadpool(
+                lambda: db.rpc("krafzen_release_security_probe").execute()
+            )
+            report = report_response.data if report_response else None
+            if isinstance(report, dict):
+                for key in security_contracts:
+                    if key != "security_probe_passed":
+                        security_contracts[key] = report.get(key) is True
+                security_contracts["security_probe_passed"] = (
+                    report.get("ready") is True
+                    and all(value for key, value in security_contracts.items()
+                            if key != "security_probe_passed")
+                )
+        except Exception:
+            pass
+
     checks = {
         "database": database_ready,
         "authentication": auth_ready,
@@ -116,6 +146,7 @@ async def readiness_check():
         "ifc_parser_installed": ifc_parser_installed,
         "dxf_tracer_detected": potrace_detected,
         **schema_checks,
+        **security_contracts,
     }
     ready = all(checks.values())
     payload = {

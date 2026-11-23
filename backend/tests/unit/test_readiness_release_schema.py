@@ -9,6 +9,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+SECURITY = (
+    "branding_rls_and_privileges",
+    "paid_only_signup_function",
+    "signup_trigger_enabled",
+    "no_free_trial_balances",
+)
+
+
 REQUIRED = {
     "ifc_import_schema": ("files", "import_metadata"),
     "paid_webhook_ledger_schema": ("payment_webhook_events", "event_id"),
@@ -33,7 +41,7 @@ def _configured(monkeypatch):
         monkeypatch.setattr(settings, field, "ci-nonsecret")
 
 
-def _db(missing=None):
+def _db(missing=None, insecure=None, unavailable_rpc=False):
     fake = MagicMock()
     observed = []
 
@@ -55,6 +63,17 @@ def _db(missing=None):
         return query
 
     fake.table.side_effect = table
+
+    def rpc(name):
+        assert name == "krafzen_release_security_probe"
+        if unavailable_rpc:
+            raise RuntimeError("internal database secret: missing readiness function")
+        query = MagicMock()
+        report = {key: key != insecure for key in SECURITY}
+        report["ready"] = all(report.values())
+        query.execute.return_value = SimpleNamespace(data=report)
+        return query
+    fake.rpc.side_effect = rpc
     return fake, observed
 
 
@@ -73,6 +92,9 @@ def test_all_critical_schema_contracts_are_probed(client, monkeypatch):
         assert deps[dependency] == "ready"
         assert pair in observed
     assert len(observed) == len(REQUIRED)
+    assert all(deps[name] == "ready" for name in SECURITY)
+    assert deps["security_probe_passed"] == "ready"
+    fake.rpc.assert_called_once_with("krafzen_release_security_probe")
 
 
 @pytest.mark.parametrize("dependency", sorted(REQUIRED))
@@ -92,6 +114,7 @@ def test_missing_any_critical_schema_blocks_release(client, monkeypatch, depende
     assert payload["dependencies"]["database"] == "ready"
     assert payload["dependencies"][dependency] == "unavailable"
     assert "internal database secret" not in response.text
+    assert payload["dependencies"]["security_probe_passed"] == "ready"
     for other in REQUIRED:
         if other != dependency:
             assert payload["dependencies"][other] == "ready"
@@ -112,3 +135,40 @@ def test_unreachable_database_skips_all_schema_probes(client, monkeypatch):
     assert dependencies["database"] == "unavailable"
     assert all(dependencies[dependency] == "unavailable" for dependency in REQUIRED)
     assert observed == []
+    fake.rpc.assert_not_called()
+    assert all(dependencies[check] == "unavailable" for check in SECURITY)
+
+
+
+@pytest.mark.parametrize("insecure", SECURITY)
+def test_security_drift_fails_release_readiness(client, monkeypatch, insecure):
+    _configured(monkeypatch)
+    fake, _ = _db(insecure=insecure)
+    with (
+        patch("app.api.health.supabase_service.test_connection",
+              return_value={"connected": True}),
+        patch("app.api.health.db", fake),
+    ):
+        response = client.get("/health/ready")
+    assert response.status_code == 503
+    dependencies = response.json()["dependencies"]
+    assert dependencies["database"] == "ready"
+    assert dependencies[insecure] == "unavailable"
+    assert dependencies["security_probe_passed"] == "unavailable"
+    assert all(dependencies[other] == "ready" for other in SECURITY
+               if other != insecure)
+
+
+def test_missing_security_rpc_never_passes_release(client, monkeypatch):
+    _configured(monkeypatch)
+    fake, _ = _db(unavailable_rpc=True)
+    with (
+        patch("app.api.health.supabase_service.test_connection",
+              return_value={"connected": True}),
+        patch("app.api.health.db", fake),
+    ):
+        response = client.get("/health/ready")
+    assert response.status_code == 503
+    assert all(response.json()["dependencies"][check] == "unavailable"
+               for check in SECURITY)
+    assert "internal database secret" not in response.text
