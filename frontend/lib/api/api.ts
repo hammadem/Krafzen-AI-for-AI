@@ -568,3 +568,18 @@ export async function updateFieldInspectionStatus(
 ) {
     return apiClient("PATCH", `/api/v1/field/inspections/${encodeURIComponent(id)}/status`, user, { status });
 }
+
+
+/** Enqueue a real file-bound export. Source file ID is revalidated server-side. */
+export async function createProjectExport(
+    user: User | null,
+    request: {
+        project_id: string;
+        source_job_id: string;
+        format: "dxf" | "dwg";
+        idempotency_key: string;
+        metadata: { source_file_id: string };
+    }
+) {
+    return apiClient("POST", "/api/v1/exports/", user, request);
+}
