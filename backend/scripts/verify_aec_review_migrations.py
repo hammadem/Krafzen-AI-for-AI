@@ -9,6 +9,7 @@ MIGRATIONS = [
     ROOT / "supabase/migrations/20261123000000_asbuilt_comparisons.sql",
     ROOT / "supabase/migrations/20261123010000_drawing_redlines.sql",
     ROOT / "supabase/migrations/20261123020000_field_inspections.sql",
+    ROOT / "supabase/migrations/20261124000000_compliance_assessments.sql",
 ]
 
 
@@ -34,7 +35,7 @@ def main():
                 for _ in range(2):
                     cursor.execute(query)
 
-            for table in ("asbuilt_comparisons", "drawing_redlines", "field_inspections"):
+            for table in ("asbuilt_comparisons", "drawing_redlines", "field_inspections", "compliance_assessments"):
                 cursor.execute(
                     "select relrowsecurity from pg_class "
                     "where oid = %s::regclass",
@@ -85,7 +86,15 @@ def main():
                           "location_label","discipline","severity","status",
                           "observed_at","created_at","resolved_at"):
                 assert field in field_columns, f"Missing field observation {field}"
-            print("PASS: three AEC migrations applied twice; RLS/grants/constraints verified")
+            cursor.execute(
+                "select column_name from information_schema.columns "
+                "where table_schema = 'public' and table_name = 'compliance_assessments'"
+            )
+            compliance_columns = {name for (name,) in cursor.fetchall()}
+            for col in ("id", "project_id", "source_file_id", "created_by",
+                        "jurisdiction", "measurements", "result", "review_status", "created_at"):
+                assert col in compliance_columns, f"Missing compliance assessment {col}"
+            print("PASS: four AEC migrations applied twice; RLS/grants/constraints verified")
 
 
 if __name__ == "__main__":
