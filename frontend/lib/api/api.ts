@@ -605,3 +605,13 @@ export async function createParametricRoom(
 ) {
     return apiClient("POST", "/api/v1/cad/rooms", user, request);
 }
+
+/** Upload a real document or image to the user's owned project job. */
+export async function importDocumentFile(
+    user: User | null, jobId: string, file: File
+) {
+    const form = new FormData();
+    form.append("job_id", jobId);
+    form.append("upload", file, file.name);
+    return apiClient("POST", "/api/v1/files/import-document", user, form);
+}
