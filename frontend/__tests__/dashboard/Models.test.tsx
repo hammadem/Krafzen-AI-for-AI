@@ -90,7 +90,8 @@ describe("Real IFC model inspector", () => {
             },
         });
         render(<ModelsPage />);
-        const second = await screen.findByLabelText("Coordination IFC model");
+        await screen.findByRole("option", { name: "mep.ifc" });
+        const second = screen.getByLabelText("Coordination IFC model");
         fireEvent.change(second, { target: { value: "ifc-2" } });
         const run = screen.getByRole("button", { name: "Screen and save potential overlaps" });
         expect(run).toBeDisabled();
