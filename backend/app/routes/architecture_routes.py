@@ -73,7 +73,7 @@ async def get_compliance_presets() -> CompliancePresetsResponse:
                     "implemented by this preset."
                 ),
                 default_approval_state=ApprovalState.PENDING_REVIEW,
-                rule_version="us_irc_baseline@1",
+                rule_version="not_implemented",
             )
         ]
     )
