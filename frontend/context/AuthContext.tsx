@@ -14,7 +14,7 @@ interface AuthContextType {
   setCurrentProject: (value: ProjectDetails | false | null) => void;
   setUser: (value: User) => void;
   /** Refetch subscription/balance from backend and update user (plan, requests). */
-  refreshSubscription: () => Promise<void>;
+  refreshSubscription: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -194,19 +194,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setCurrentProject(null);
   };
 
-  const refreshSubscription = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const session = sessionData?.session;
-    if (!session?.access_token) return;
-    const apiUrl = getApiBaseUrl();
+  const refreshSubscription = async (): Promise<boolean> => {
+    // A Stripe redirect query parameter is NOT proof of payment. Read the
+    // authenticated, webhook-updated subscription record instead.
     try {
-      const res = await fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentSession = sessionData?.session;
+      if (!currentSession?.access_token) return false;
+      const res = await fetch(`${getApiBaseUrl()}/api/v1/payments/subscription-status`, {
+        headers: { Authorization: `Bearer ${currentSession.access_token}` },
+        cache: "no-store",
       });
+      if (!res.ok) return false;
       const data = await res.json();
+      if (!data || typeof data !== "object" || !data.subscription || !data.balance) {
+        return false;
+      }
       updateUserFromSubscriptionStatus(data);
+      const plan = String(data.subscription.plan_name || "").toLowerCase();
+      return (
+        data.subscription.status === "active" &&
+        plan !== "free" && plan !== "" &&
+        data.balance.subscription_status === "active"
+      );
     } catch (err) {
-      console.error("Failed to refresh subscription:", err);
+      console.error("Failed to verify subscription status:", err);
+      return false;
     }
   };
 
