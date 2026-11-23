@@ -2,8 +2,8 @@
 
 // Shared left rail for the workspace app shell (CEO redesign, PR #1).
 // Visual reference: krafzen-product/style-guide.html + projects.html.
-// Real routes are active nav. Full Reviews remains disabled until its
-// underlying engineering workflow is verified.
+// Real project-linked drawing previews and manual DXF redlines are active;
+// automated review intelligence remains a separate pending workstream.
 // No fake counts — data-driven badges come later when the backend exposes them.
 
 import Link from "next/link";
@@ -27,10 +27,10 @@ const MAIN: NavItem[] = [
     { label: "Billing", href: "/workspace/billings", icon: CreditCard },
 ];
 
-// IFC metadata inspector is linked; full 3D model rendering is not claimed.
+// Reviews support manual markups; IFC Models support inspected metadata, not 3D.
 const CAD_BIM: NavItem[] = [
     { label: "Imports", href: "/workspace/imports", icon: Upload },
-    { label: "Reviews", href: "#", icon: ClipboardCheck, soon: true },
+    { label: "Reviews", href: "/workspace/reviews", icon: ClipboardCheck },
     { label: "Models", href: "/workspace/models", icon: Box },
     { label: "As-Built", href: "/workspace/as-built", icon: Ruler },
 ];
