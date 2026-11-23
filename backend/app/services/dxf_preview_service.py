@@ -6,7 +6,6 @@ All SVG markup is generated from numeric coordinates, not untrusted DXF text.
 """
 from io import StringIO
 from math import isfinite
-from xml.sax.saxutils import escape
 
 import ezdxf
 
