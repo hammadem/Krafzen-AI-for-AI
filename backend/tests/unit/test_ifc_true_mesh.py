@@ -102,8 +102,8 @@ async def test_private_model_geometry_route_reads_correct_owned_ifc(tmp_path):
     client = MagicMock()
     client.storage.from_.return_value.download.return_value = raw
 
-    async def inline(fn):
-        return fn()
+    async def inline(fn, *args, **kwargs):
+        return fn(*args, **kwargs)
 
     with (
         patch.object(routes, "get_file", AsyncMock(return_value=source)),
