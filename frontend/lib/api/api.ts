@@ -639,3 +639,9 @@ export async function getProjectAdaAssessments(
         user,
     );
 }
+
+
+/** Returns only actual triangulated IFC geometry from a stored, scanned model. */
+export async function getIfcModelMesh(user: User | null, fileId: string) {
+    return apiClient("GET", `/api/v1/bim/files/${encodeURIComponent(fileId)}/mesh`, user);
+}

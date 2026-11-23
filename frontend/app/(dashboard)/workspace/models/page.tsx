@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Box, Download, Info, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getAllProjects, getAllJobs, getAllFiles, getFileSignedUrl, getIfcModelSummary } from "@/lib/api/api";
+import IfcGeometryViewer from "@/components/bim/IfcGeometryViewer";
 
 type Project = { id: string; input_text?: string | null };
 type Job = { id: string };
@@ -186,6 +187,7 @@ export default function ModelsPage() {
                         {loading && <p role="status">Loading project IFC files…</p>}
                         {model && (
                             <>
+                                <IfcGeometryViewer fileId={fileId} user={user} />
                                 <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     {[
                                         ["Schema", model.schema],
