@@ -40,7 +40,7 @@ describe("Actual DXF export form", () => {
     it("queues selected imported DXF with job and file IDs, never client storage paths", async () => {
         const onCreated = vi.fn();
         render(<NewExportForm onCreated={onCreated} />);
-        const button = screen.getByRole("button", { name: "Queue CAD export" });
+        const button = await screen.findByRole("button", { name: "Queue CAD export" });
         await waitFor(() => expect(button).toBeEnabled());
         expect(screen.getByLabelText("Export source drawing")).toHaveValue("verified-file-1");
         fireEvent.click(button);
@@ -73,7 +73,7 @@ describe("Actual DXF export form", () => {
         });
         const onCreated = vi.fn();
         render(<NewExportForm onCreated={onCreated} />);
-        const button = screen.getByRole("button", { name: "Queue CAD export" });
+        const button = await screen.findByRole("button", { name: "Queue CAD export" });
         await waitFor(() => expect(button).toBeEnabled());
         fireEvent.click(button);
         expect(await screen.findByRole("alert")).toHaveTextContent("Source file is archived");
