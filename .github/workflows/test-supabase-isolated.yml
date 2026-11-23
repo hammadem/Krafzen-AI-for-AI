@@ -1,0 +1,79 @@
+name: Isolated Supabase Auth, Storage and AEC reference tests
+
+# No remote database credentials, cloud project ID or environment variables.
+# Every runner starts fresh Docker containers and destroys them on exit.
+on:
+  push:
+    branches:
+      - "test/**"
+      - "fix/**"
+    paths:
+      - "supabase/**"
+      - "backend/scripts/verify_local_supabase_stack.py"
+      - "backend/scripts/generate_aec_reference_dxf.py"
+      - "backend/tests/fixtures/aec_reference/**"
+      - ".github/workflows/test-supabase-isolated.yml"
+  pull_request:
+    branches:
+      - "fix/**"
+      - main
+    paths:
+      - "supabase/**"
+      - "backend/scripts/verify_local_supabase_stack.py"
+      - "backend/scripts/generate_aec_reference_dxf.py"
+      - "backend/tests/fixtures/aec_reference/**"
+      - ".github/workflows/test-supabase-isolated.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-supabase:
+    name: "Real local Supabase: Postgres, Auth, REST and private Storage"
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out source; never link to a remote project
+        uses: actions/checkout@v4
+
+      - name: Install official Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: "3.3.0"
+
+      - name: Check local Supabase CLI and native runtime prerequisites
+        run: |
+          set -euo pipefail
+          supabase --version
+          command -v tar
+          test "$(uname -s)" = "Linux"
+          python -m py_compile backend/scripts/verify_local_supabase_stack.py
+
+      - name: Start isolated native Supabase Postgres, Auth, REST and Storage
+        env:
+          SUPABASE_EXPERIMENTAL_STACK: "1"
+        run: |
+          set -euo pipefail
+          # Native Linux runtime avoids public ECR container pull rate limits.
+          # One GitHub runner = one fully isolated temporary Supabase project.
+          # Explicitly leave Auth, REST and private Storage enabled.
+          supabase start --runtime native --exclude studio,mail,analytics,realtime,functions,pooler --eager
+          supabase status --env > "$RUNNER_TEMP/local-supabase.env"
+          test -s "$RUNNER_TEMP/local-supabase.env"
+
+      - name: Verify full migration bootstrap, private storage and auth
+        env:
+          LOCAL_SUPABASE_STATUS_FILE: ${{ runner.temp }}/local-supabase.env
+        run: |
+          set -euo pipefail
+          python -m pip install requests==2.32.3 psycopg2-binary==2.9.10
+          python backend/scripts/verify_local_supabase_stack.py
+
+      - name: Stop and delete the ephemeral local Supabase stack
+        if: always()
+        env:
+          SUPABASE_EXPERIMENTAL_STACK: "1"
+        run: |
+          # No production/staging cloud resource is touched.
+          supabase stop || true
