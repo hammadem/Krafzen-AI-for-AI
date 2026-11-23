@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from app.db.queries.file_queries import get_file
 from app.db.supabase_client import db
@@ -24,15 +24,6 @@ class NewRedline(BaseModel):
     y2: float | None = Field(default=None, ge=0, le=1, allow_inf_nan=False)
     comment: str = Field(min_length=1, max_length=2000)
     severity: Literal["info", "low", "medium", "high", "critical"] = "info"
-
-    @model_validator(mode="after")
-    def require_endpoint(self):
-        if self.kind != "comment" and (self.x2 is None or self.y2 is None):
-            raise ValueError("Drawing shape requires both endpoint coordinates")
-        if not self.comment.strip():
-            raise ValueError("A markup comment cannot be blank")
-        return self
-
 
 class ReviewDecision(BaseModel):
     status: Literal["open", "resolved"]
@@ -101,6 +92,10 @@ async def create_drawing_redline(
     payload: NewRedline,
     user: dict = Depends(require_auth),
 ):
+    if payload.kind != "comment" and (payload.x2 is None or payload.y2 is None):
+        raise HTTPException(status_code=422, detail="A drawing shape needs two endpoints")
+    if not payload.comment.strip():
+        raise HTTPException(status_code=422, detail="A review comment is required")
     record = await _owned_dxf_record(str(file_id), user)
     row = {
         "project_id": str(record["project_id"]),
