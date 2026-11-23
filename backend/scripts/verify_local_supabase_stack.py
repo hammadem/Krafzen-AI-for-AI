@@ -14,7 +14,7 @@ import requests
 
 def main() -> None:
     info = json.loads(Path(os.environ["LOCAL_SUPABASE_STATUS_FILE"]).read_text())
-    api = info.get("API_URL") or info.get("API")
+    api = info.get("PROJECT_URL") or info.get("API_URL") or info.get("API")
     key = info.get("SERVICE_ROLE_KEY") or info.get("SECRET_KEY")
     anon = info.get("ANON_KEY") or info.get("PUBLISHABLE_KEY")
     db_url = info.get("DB_URL")
