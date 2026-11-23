@@ -58,12 +58,12 @@ jobs:
           # One GitHub runner = one fully isolated temporary Supabase project.
           # Explicitly leave Auth, REST and private Storage enabled.
           supabase start --runtime native --exclude studio,mail,analytics,realtime,functions,pooler --eager
-          supabase status --output-format json > "$RUNNER_TEMP/local-supabase.json"
-          test -s "$RUNNER_TEMP/local-supabase.json"
+          supabase status --env > "$RUNNER_TEMP/local-supabase.env"
+          test -s "$RUNNER_TEMP/local-supabase.env"
 
       - name: Verify full migration bootstrap, private storage and auth
         env:
-          LOCAL_SUPABASE_STATUS_FILE: ${{ runner.temp }}/local-supabase.json
+          LOCAL_SUPABASE_STATUS_FILE: ${{ runner.temp }}/local-supabase.env
         run: |
           set -euo pipefail
           python -m pip install requests==2.32.3 psycopg2-binary==2.9.10
