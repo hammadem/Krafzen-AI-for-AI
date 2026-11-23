@@ -35,9 +35,10 @@ def test_jurisdiction_contracts(client):
     assert len(data["jurisdictions"]) >= 1
     first = data["jurisdictions"][0]
     assert first["jurisdiction_id"] == "US_IRC_BASELINE"
-    assert "dwg" in first["supported_exports"]
-    assert "ifc" in first["supported_exports"]
-    assert "dxf" in first["supported_exports"]
+    # A schema-only jurisdiction must never advertise executable building
+    # code checks in any export format.
+    assert first["status"] == "not_implemented"
+    assert first["supported_exports"] == []
 
 
 def test_compliance_presets_contract(client):
