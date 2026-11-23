@@ -33,7 +33,7 @@ export default function FieldEvidencePanel({
             const response = await getFieldPhotos(user, inspectionId);
             if (!response.ok) throw new Error(response.error?.message || "Cannot load site photos");
             if (active) setPhotos(
-                Array.isArray(response.data) ? response.data as PhotoEvidence[] : []
+                Array.isArray(response.data) ? response.data as unknown as PhotoEvidence[] : []
             );
         }
         void load().catch((cause: unknown) => {
