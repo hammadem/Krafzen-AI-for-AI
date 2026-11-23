@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRightLeft, Download, RefreshCw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import AsBuiltDifferenceOverlay, { type AsBuiltPreview } from "@/components/asbuilt/AsBuiltDifferenceOverlay";
 import {
     createAsBuiltComparison, getAsBuiltComparisons, getAsBuiltComparisonPdf, getAllProjects,
     getAllJobs, getAllFiles,
@@ -16,6 +17,8 @@ type Comparison = {
     id: string; created_at?: string; original_file_id: string; revised_file_id: string;
     result: {
         method: string; insunits: number; added_count: number; removed_count: number;
+        alignment?: { kind: string; original_anchor_xy: number[]; revised_anchor_xy: number[]; revised_translation_xy: number[] } | null;
+        preview?: AsBuiltPreview;
         unchanged_count: number; comparison_complete: boolean; limitations: string;
         added_samples: { entity: string; layer: string; geometry: string; count: number }[];
         removed_samples: { entity: string; layer: string; geometry: string; count: number }[];
@@ -49,6 +52,12 @@ export default function AsBuiltPage() {
     const [downloadingPdf, setDownloadingPdf] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [refresh, setRefresh] = useState(0);
+    const [manualAlignment, setManualAlignment] = useState(false);
+    const [originalAnchorX, setOriginalAnchorX] = useState("");
+    const [originalAnchorY, setOriginalAnchorY] = useState("");
+    const [revisedAnchorX, setRevisedAnchorX] = useState("");
+    const [revisedAnchorY, setRevisedAnchorY] = useState("");
+    const [referenceConfirmed, setReferenceConfirmed] = useState(false);
 
     useEffect(() => {
         if (!user?.access_token || !user.userId) return;
@@ -116,7 +125,23 @@ export default function AsBuiltPage() {
         if (!user || !project || !original || !revised || original === revised || running) return;
         setRunning(true); setError(null);
         try {
-            const response = await createAsBuiltComparison(user, project, original, revised);
+            let alignment;
+            if (manualAlignment) {
+                const strings = [originalAnchorX, originalAnchorY, revisedAnchorX, revisedAnchorY];
+                const points = strings.map((text) => Number(text));
+                if (!referenceConfirmed || strings.some((text) => text.trim() === "") ||
+                    points.some((value) => !Number.isFinite(value) || Math.abs(value) > 1e8) ||
+                    Math.abs(points[0] - points[2]) > 1e7 ||
+                    Math.abs(points[1] - points[3]) > 1e7) {
+                    throw new Error("Provide valid matching drawing anchors in the same DXF units and confirm their identity");
+                }
+                alignment = {
+                    original: { x: points[0], y: points[1] },
+                    revised: { x: points[2], y: points[3] },
+                    same_reference_point_confirmed: true,
+                };
+            }
+            const response = await createAsBuiltComparison(user, project, original, revised, alignment);
             fail(response);
             const record = response.data as unknown as Comparison;
             if (!record?.id || !record.result) throw new Error("Server did not return a saved comparison");
@@ -176,7 +201,7 @@ export default function AsBuiltPage() {
                 </div>
                 <div className="flex gap-3 rounded-lg border border-amber-300/20 bg-amber-500/10 p-4 text-sm">
                     <AlertTriangle className="h-5 w-5 shrink-0 text-amber-300" />
-                    <p>Exact-coordinate DXF entity differences only. Both drawings must share the same coordinate system and declared units. Blocks, 3D solids, physical site verification and automatic alignment are not supported. A qualified reviewer must interpret differences.</p>
+                    <p>DXF comparison supports exact modelspace coordinates or a manual two-dimensional translation from matching reference points. Both drawings must use the same declared units, axes and scale. No automatic alignment, rotation, block/solid interpretation, or physical site verification. A qualified reviewer must interpret differences.</p>
                 </div>
                 {error && <p role="alert" className="rounded-lg border border-red-500/30 p-3 text-red-300">{error}</p>}
                 {!user?.access_token ? (
@@ -206,11 +231,56 @@ export default function AsBuiltPage() {
                                     </select>
                                 </label>
                             </div>
+                            <div className="space-y-3 rounded-lg border border-white/10 p-4">
+                                <label className="flex items-start gap-3 text-sm">
+                                    <input type="checkbox" checked={manualAlignment}
+                                        onChange={(event) => {
+                                            setManualAlignment(event.target.checked);
+                                            setReferenceConfirmed(false);
+                                        }} className="mt-1" />
+                                    Register revised drawing using a manually identified common XY point
+                                </label>
+                                {manualAlignment && (
+                                    <>
+                                        <p className="text-xs text-amber-200">
+                                            Enter the same physical/reference point as shown in each source drawing,
+                                            using raw DXF model units. The system applies translation only;
+                                            it cannot independently verify your point or correct rotation/scale.
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {([
+                                                ["Original anchor X", originalAnchorX, setOriginalAnchorX],
+                                                ["Original anchor Y", originalAnchorY, setOriginalAnchorY],
+                                                ["Revised anchor X", revisedAnchorX, setRevisedAnchorX],
+                                                ["Revised anchor Y", revisedAnchorY, setRevisedAnchorY],
+                                            ] as const).map(([label, value, setValue]) => (
+                                                <label className="block text-xs" key={label}>{label}
+                                                    <input type="number" step="any" required
+                                                        value={value}
+                                                        onChange={(event) => {
+                                                            setValue(event.target.value);
+                                                            setReferenceConfirmed(false);
+                                                        }}
+                                                        className="mt-1 w-full rounded-lg border border-white/20 bg-slate-900 p-2" />
+                                                </label>
+                                            ))}
+                                        </div>
+                                        <label className="flex items-start gap-3 text-sm">
+                                            <input type="checkbox" checked={referenceConfirmed}
+                                                onChange={(event) => setReferenceConfirmed(event.target.checked)}
+                                                className="mt-1" />
+                                            I confirm these two XY points represent the same real drawing reference,
+                                            and that units, rotation and scale are already compatible.
+                                        </label>
+                                    </>
+                                )}
+                            </div>
                             {files.length < 2 && !loading && (
                                 <p className="text-sm text-slate-400">Import two distinct DXF files into this project using <Link href="/workspace/imports" className="underline">Imports</Link>.</p>
                             )}
                             <button type="button" onClick={() => void compare()}
-                                disabled={loading || running || files.length < 2 || original === revised}
+                                disabled={loading || running || files.length < 2 || original === revised ||
+                                    (manualAlignment && !referenceConfirmed)}
                                 className="flex items-center gap-2 rounded-lg bg-emerald-300 px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40">
                                 <ArrowRightLeft className="h-4 w-4" />
                                 {running ? "Comparing…" : "Compare and save"}
@@ -249,6 +319,18 @@ export default function AsBuiltPage() {
                                     <div><p className="text-2xl font-semibold">{difference.unchanged_count}</p><p className="text-xs text-slate-400">Unchanged</p></div>
                                 </div>
                                 <p className="text-sm text-amber-200">{difference.comparison_complete ? "Supported geometric entity types compared." : "Partial comparison: unsupported entities present."}</p>
+                                {difference.alignment && (
+                                    <p className="text-sm text-amber-200">
+                                        Manually supplied revised drawing translation:
+                                        {" "}X={difference.alignment.revised_translation_xy[0]},
+                                        {" "}Y={difference.alignment.revised_translation_xy[1]} (DXF units).
+                                        The anchor identity was asserted by the user, not verified by KRAFZEN.
+                                    </p>
+                                )}
+                                <div className="space-y-3">
+                                    <h3 className="font-semibold text-sm">2D visual difference overlay</h3>
+                                    <AsBuiltDifferenceOverlay preview={difference.preview} />
+                                </div>
                                 <p className="text-xs text-slate-400">{difference.limitations}</p>
                                 {(["added_samples", "removed_samples"] as const).map((type) => (
                                     <div key={type}>
