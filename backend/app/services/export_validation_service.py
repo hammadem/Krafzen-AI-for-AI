@@ -43,8 +43,11 @@ def _issue(
         message=message,
         element_ref=element_ref,
         suggested_fix=suggested_fix,
-        jurisdiction="US_IRC_BASELINE",
-        rule_version="us_irc_baseline@1",
+        # Export integrity and worker routing are technical checks, NOT
+        # jurisdiction-specific building-code evaluations. Only an executed,
+        # versioned ruleset may supply non-null code provenance.
+        jurisdiction=None,
+        rule_version=None,
     )
 
 
