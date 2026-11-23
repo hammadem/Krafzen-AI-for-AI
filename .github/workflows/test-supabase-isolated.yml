@@ -40,7 +40,7 @@ jobs:
       - name: Install official Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: "3.3.0"
 
       - name: Check local Supabase CLI and native runtime prerequisites
         run: |
