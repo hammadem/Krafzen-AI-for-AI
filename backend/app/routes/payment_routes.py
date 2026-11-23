@@ -1,8 +1,10 @@
 import logging
+import re
 from urllib.parse import urlsplit
 
 import stripe
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from httpx import HTTPError
 from postgrest.exceptions import APIError
 from pydantic import BaseModel
@@ -251,6 +253,110 @@ async def get_subscription_status(user_data: dict = Depends(require_auth)):
     except (APIError, HTTPError, KeyError, RuntimeError, stripe.StripeError, TypeError) as e:
         logger.error(f"Failed to get subscription status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+def _verified_stripe_url(raw: object) -> str | None:
+    """Only return Stripe-owned HTTPS invoice/portal destinations."""
+    if not isinstance(raw, str):
+        return None
+    try:
+        parsed = urlsplit(raw)
+    except ValueError:
+        return None
+    host = (parsed.hostname or "").lower()
+    if (
+        parsed.scheme != "https" or
+        (host != "stripe.com" and not host.endswith(".stripe.com")) or
+        parsed.username or parsed.password
+    ):
+        return None
+    return raw
+
+
+async def _owned_stripe_customer(user_id: str) -> str | None:
+    """Never accept a Stripe customer ID from a browser parameter."""
+    subscription = await subscription_service.get_subscription(user_id)
+    customer = str(subscription.get("stripe_customer_id") or "")
+    if not customer:
+        return None
+    if not re.fullmatch(r"cus_[A-Za-z0-9]+", customer):
+        raise HTTPException(status_code=409, detail="Stored billing customer reference is invalid")
+    return customer
+
+
+@router.get("/payments/invoices")
+async def list_customer_invoices(user_data: dict = Depends(require_auth)):
+    """List actual provider invoices for this authenticated account only."""
+    if not settings.STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Stripe billing is not configured")
+    try:
+        customer = await _owned_stripe_customer(user_data["user_id"])
+        if not customer:
+            return {"invoices": []}
+        provider = await run_in_threadpool(
+            lambda: stripe.Invoice.list(customer=customer, limit=25)
+        )
+        data = provider.get("data") or []
+        invoices = []
+        for item in data:
+            invoices.append({
+                "id": item.get("id"),
+                "number": item.get("number"),
+                "created": item.get("created"),
+                "status": item.get("status"),
+                "currency": item.get("currency"),
+                "amount_due": item.get("amount_due"),
+                "amount_paid": item.get("amount_paid"),
+                "hosted_invoice_url": _verified_stripe_url(item.get("hosted_invoice_url")),
+                "invoice_pdf": _verified_stripe_url(item.get("invoice_pdf")),
+            })
+        return {"invoices": invoices}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Unable to load owned Stripe invoices")
+        raise HTTPException(status_code=503, detail="Invoice history is unavailable") from exc
+
+
+@router.post("/payments/portal-session")
+async def create_customer_portal(user_data: dict = Depends(require_auth)):
+    """Open Stripe-hosted plan/payment-method/cancellation controls.
+
+    What a user may change is controlled by the Stripe Billing Portal
+    configuration, not by browser-supplied customer/account identifiers.
+    """
+    if not settings.STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Stripe billing is not configured")
+    try:
+        customer = await _owned_stripe_customer(user_data["user_id"])
+        if not customer:
+            raise HTTPException(
+                status_code=409,
+                detail="No Stripe billing customer is linked to this account",
+            )
+        base = (settings.FRONTEND_URL or "").rstrip("/")
+        parsed = urlsplit(base)
+        if (
+            parsed.scheme != "https" and
+            not (parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"}
+                 and settings.ENVIRONMENT.lower() == "development")
+        ):
+            raise HTTPException(status_code=503, detail="Billing return URL is not configured securely")
+        session = await run_in_threadpool(
+            lambda: stripe.billing_portal.Session.create(
+                customer=customer,
+                return_url=f"{base}/workspace/billings",
+            )
+        )
+        url = _verified_stripe_url(session.get("url"))
+        if not url:
+            raise HTTPException(status_code=503, detail="Billing provider returned an invalid portal URL")
+        return {"url": url}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Unable to create authenticated customer billing portal")
+        raise HTTPException(status_code=503, detail="Billing portal is unavailable") from exc
+
 
 @router.post("/payments/webhook")
 async def payment_webhook(request: Request, stripe_signature: str = Header(None)):
