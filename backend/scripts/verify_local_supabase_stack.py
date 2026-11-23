@@ -30,7 +30,10 @@ def main() -> None:
     key = info.get("SERVICE_ROLE_KEY") or info.get("SECRET_KEY")
     anon = info.get("ANON_KEY") or info.get("PUBLISHABLE_KEY")
     db_url = info.get("DB_URL")
-    assert isinstance(api, str) and api.startswith("http://127.0.0.1:"), (\n        "Missing local loopback project URL; available *field names* only: ",\n        sorted(info),\n    )
+    assert isinstance(api, str) and api.startswith("http://127.0.0.1:"), (
+        "Missing local loopback project URL; available field names only:",
+        sorted(info),
+    )
     assert isinstance(key, str) and len(key) > 10
     assert isinstance(db_url, str) and db_url.startswith("postgresql://")
     base = api.rstrip("/") + "/"
