@@ -1,6 +1,7 @@
 """Exercise new AEC review/as-built schema on isolated PostgreSQL, never live DB."""
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import psycopg2
 
@@ -14,8 +15,36 @@ MIGRATIONS = [
 ]
 
 
+def require_disposable_database_url(raw: str) -> str:
+    """Refuse cloud hosts and libpq URI overrides before any SQL executes.
+
+    Local CI is intentionally pinned to the PostgreSQL service user, database,
+    loopback hostname and port. The caller cannot pass query parameters such
+    as hostaddr to redirect a seemingly local database URL.
+    """
+    try:
+        parsed = urlsplit(raw)
+        allowed = (
+            parsed.scheme == "postgresql"
+            and parsed.hostname in {"localhost", "127.0.0.1"}
+            and parsed.port == 5432
+            and parsed.username == "krafzen_ci"
+            and parsed.path == "/krafzen_ci"
+            and not parsed.query
+            and not parsed.fragment
+        )
+    except ValueError:
+        allowed = False
+    if not allowed:
+        raise RuntimeError(
+            "AEC schema migration verification is restricted to disposable "
+            "local CI PostgreSQL (krafzen_ci@127.0.0.1:5432/krafzen_ci)"
+        )
+    return raw
+
+
 def main():
-    url = os.environ["DATABASE_URL"]
+    url = require_disposable_database_url(os.environ.get("DATABASE_URL", ""))
     with psycopg2.connect(url) as db:
         db.autocommit = True
         with db.cursor() as cursor:
