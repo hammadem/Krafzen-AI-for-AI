@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MIGRATIONS = [
     ROOT / "supabase/migrations/20261123000000_asbuilt_comparisons.sql",
     ROOT / "supabase/migrations/20261123010000_drawing_redlines.sql",
+    ROOT / "supabase/migrations/20261123020000_field_inspections.sql",
 ]
 
 
@@ -33,7 +34,7 @@ def main():
                 for _ in range(2):
                     cursor.execute(query)
 
-            for table in ("asbuilt_comparisons", "drawing_redlines"):
+            for table in ("asbuilt_comparisons", "drawing_redlines", "field_inspections"):
                 cursor.execute(
                     "select relrowsecurity from pg_class "
                     "where oid = %s::regclass",
@@ -75,7 +76,16 @@ def main():
             ):
                 assert required in checks, f"Missing review constraint {required}"
 
-            print("PASS: two AEC migrations applied twice; RLS/grants/constraints verified")
+            cursor.execute(
+                "select column_name from information_schema.columns "
+                "where table_schema = 'public' and table_name = 'field_inspections'"
+            )
+            field_columns = {name for (name,) in cursor.fetchall()}
+            for field in ("id","project_id","title","description","created_by",
+                          "location_label","discipline","severity","status",
+                          "observed_at","created_at","resolved_at"):
+                assert field in field_columns, f"Missing field observation {field}"
+            print("PASS: three AEC migrations applied twice; RLS/grants/constraints verified")
 
 
 if __name__ == "__main__":
