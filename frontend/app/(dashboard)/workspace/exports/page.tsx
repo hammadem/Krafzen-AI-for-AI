@@ -8,6 +8,7 @@ import { useApiResource } from "@/hooks/useApiResource";
 import { useAuth } from "@/context/AuthContext";
 import { formatDate } from "@/lib/utils";
 import { toast } from "react-toastify";
+import NewExportForm from "@/components/exports/NewExportForm";
 
 // Aligned to the frozen contract: GET /api/v1/contracts/export-progress-contract
 // (architecture_routes.py) + ExportResponse in export_contracts.py. Fields,
@@ -150,6 +151,8 @@ export default function Exports() {
                         <h1 className="text-white font-semibold text-2xl sm:text-[4vh]">Exports</h1>
                         <p className="text-[#8F8F8F] text-sm mt-1">Track your CAD export jobs, statuses, and downloads.</p>
                     </div>
+
+                    <NewExportForm onCreated={() => { void refetch(); }} />
 
                     {/* Search + filters */}
                     <div className="flex flex-col sm:flex-row gap-3 text-[#8F8F8F]">
