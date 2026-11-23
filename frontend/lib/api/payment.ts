@@ -129,3 +129,42 @@ export async function getSubscriptionStatus(
 
     throw new Error(response.error?.message || "Failed to get subscription status");
 }
+
+
+/** Stripe invoices resolved server-side by the authenticated user's customer ID. */
+export interface StripeInvoice {
+    id: string;
+    number: string | null;
+    created: number | null;
+    status: string | null;
+    currency: string | null;
+    amount_due: number | null;
+    amount_paid: number | null;
+    hosted_invoice_url: string | null;
+    invoice_pdf: string | null;
+}
+
+export async function getCustomerInvoices(user: User | null): Promise<StripeInvoice[]> {
+    const response = await apiClient("GET", "/api/v1/payments/invoices", user);
+    if (!response.ok || !response.data) {
+        throw new Error(response.error?.message || "Invoice history unavailable");
+    }
+    const body = response.data as unknown as { invoices?: StripeInvoice[] };
+    if (!Array.isArray(body.invoices)) throw new Error("Invalid invoice response");
+    return body.invoices;
+}
+
+export async function createBillingPortalSession(user: User | null): Promise<string> {
+    const response = await apiClient("POST", "/api/v1/payments/portal-session", user);
+    if (!response.ok || !response.data) {
+        throw new Error(response.error?.message || "Billing portal unavailable");
+    }
+    const data = response.data as unknown as { url?: string };
+    if (!data.url) throw new Error("Billing portal did not return a URL");
+    const destination = new URL(data.url);
+    if (destination.protocol !== "https:" ||
+        (!destination.hostname.endsWith(".stripe.com") && destination.hostname !== "stripe.com")) {
+        throw new Error("Billing portal returned an unsafe URL");
+    }
+    return destination.toString();
+}
