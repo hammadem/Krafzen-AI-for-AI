@@ -14,6 +14,12 @@ vi.mock("@/lib/api/payment", () => ({
         balance: { plan_requests: 42, subscription_status: "active", plan_name: "professional" },
     }),
     createCheckoutSession: vi.fn(),
+    getCustomerInvoices: vi.fn().mockResolvedValue([{
+        id: "in_001", number: "INV-001", created: 1760000000, status: "paid",
+        currency: "usd", amount_due: 14900, amount_paid: 14900,
+        hosted_invoice_url: "https://invoice.stripe.com/i/test", invoice_pdf: null,
+    }]),
+    createBillingPortalSession: vi.fn().mockResolvedValue("https://billing.stripe.com/p/owned"),
 }));
 
 describe("Billing workspace", () => {
@@ -27,9 +33,13 @@ describe("Billing workspace", () => {
         expect(screen.getByRole("button", { name: /Continue to secure checkout/i })).toBeEnabled();
     });
 
-    it("does not advertise fake free trials or pretend invoices work", async () => {
+    it("shows actual provider invoice history without promising free signup credits", async () => {
         render(<Billings />);
         await waitFor(() => expect(screen.getByText(/No free signup requests/i)).toBeInTheDocument());
-        expect(screen.getByText(/invoice history, payment-method changes and cancellation are not yet connected/i)).toBeInTheDocument();
+        expect(await screen.findByText("INV-001")).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "View invoice" }))
+            .toHaveAttribute("href", "https://invoice.stripe.com/i/test");
+        expect(screen.getByRole("button", { name: /Manage subscription, payment methods and cancellation/i }))
+            .toBeEnabled();
     });
 });
