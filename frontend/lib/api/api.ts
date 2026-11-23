@@ -512,3 +512,23 @@ export async function transcribeAudio(
 
     return apiClient("POST", AUDIO_PARSER.PARSE(), user, formData);
 }
+
+// Server-authorized, saved comparison of two real imported DXF files.
+export async function createAsBuiltComparison(
+    user: User | null,
+    projectId: string,
+    originalFileId: string,
+    revisedFileId: string
+) {
+    return apiClient("POST", "/api/v1/asbuilt/compare", user, {
+        project_id: projectId,
+        original_file_id: originalFileId,
+        revised_file_id: revisedFileId,
+    });
+}
+
+export async function getAsBuiltComparisons(user: User | null, projectId: string) {
+    return apiClient(
+        "GET", `/api/v1/asbuilt/projects/${encodeURIComponent(projectId)}/comparisons`, user
+    );
+}

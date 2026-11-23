@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.logging_config import init_sentry
 from app.routes import (
     activity_routes,
+    asbuilt_routes,
     architecture_routes,
     branding_routes,
     chat_routes,
@@ -204,6 +205,7 @@ paid_access = [Depends(require_paid_subscription)]
 app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"], dependencies=paid_access)
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"], dependencies=paid_access)
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"], dependencies=paid_access)
+app.include_router(asbuilt_routes.router, prefix="/api/v1", tags=["As-Built"], dependencies=paid_access)
 app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"], dependencies=paid_access)
 app.include_router(payment_routes.router, prefix="/api/v1", tags=["Payments"])
 app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
