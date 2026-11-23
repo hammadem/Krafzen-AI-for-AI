@@ -1,0 +1,122 @@
+"""Paid, authenticated parametric drawing generation from explicit dimensions."""
+import hashlib
+from uuid import UUID, uuid4
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
+
+from app.db.queries.file_queries import create_file
+from app.db.queries.job_queries import get_job
+from app.db.queries.project_queries import get_project
+from app.middlewares.auth import require_auth
+from app.services.activity_service import record_audit_event
+from app.services.parametric_cad_service import build_room_dxf
+from app.utils.storage_service import storage_service
+
+router = APIRouter(prefix="/cad", tags=["CAD Generation"])
+
+
+class OpeningRequest(BaseModel):
+    kind: str
+    side: str
+    offset_m: float = Field(gt=0, allow_inf_nan=False)
+    clear_width_m: float = Field(gt=0, allow_inf_nan=False)
+
+
+class RoomRequest(BaseModel):
+    project_id: UUID
+    job_id: UUID
+    room_name: str = Field(min_length=1, max_length=80)
+    exterior_width_m: float = Field(ge=1, le=100, allow_inf_nan=False)
+    exterior_length_m: float = Field(ge=1, le=100, allow_inf_nan=False)
+    wall_thickness_m: float = Field(gt=0, le=5, allow_inf_nan=False)
+    openings: list[OpeningRequest] = Field(default_factory=list, max_length=20)
+
+
+@router.post("/rooms", status_code=201)
+async def create_parametric_room_drawing(
+    payload: RoomRequest,
+    user: dict = Depends(require_auth),
+):
+    """Generate, persist and return real unit-tagged DXF modelspace geometry."""
+    project_id = str(payload.project_id)
+    job_id = str(payload.job_id)
+    job = await get_job(job_id, user)
+    if not job or str(job.get("project_id") or "") != project_id:
+        raise HTTPException(status_code=404, detail="Project job not found")
+    project = await get_project(project_id, user)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.get("workspace_id"):
+        raise HTTPException(
+            status_code=503,
+            detail="Organization CAD generation requires verified regional processing",
+        )
+
+    try:
+        raw, geometry = await run_in_threadpool(
+            build_room_dxf,
+            name=payload.room_name,
+            width_m=payload.exterior_width_m,
+            length_m=payload.exterior_length_m,
+            wall_thickness_m=payload.wall_thickness_m,
+            openings=[opening.model_dump() for opening in payload.openings],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if len(raw) > 25 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Generated DXF exceeds file limit")
+    user_id = str(user["user_id"])
+    filename = f"room_{uuid4().hex}.dxf"
+    path = f"{user_id}/{project_id}/generated/{job_id}/{filename}"
+    client, bucket, region = storage_service.resolve_target_bucket_and_client(None)
+    if region != "global":
+        raise HTTPException(status_code=503, detail="Unexpected CAD storage region")
+    try:
+        await run_in_threadpool(
+            lambda: client.storage.from_(bucket).upload(
+                path=path,
+                file=raw,
+                file_options={"content-type": "application/dxf", "upsert": "false"},
+            )
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="CAD drawing storage unavailable") from exc
+
+    geometry["source_sha256"] = hashlib.sha256(raw).hexdigest()
+    try:
+        record = await create_file(
+            {
+                "job_id": job_id,
+                "project_id": project_id,
+                "bucket": bucket,
+                "path": path,
+                "file_type": "dxf",
+                "mime_type": "application/dxf",
+                "size_bytes": len(raw),
+                "name": f"{payload.room_name.strip()}.dxf",
+                "import_metadata": geometry,
+            },
+            user,
+        )
+        if not record or record.get("error"):
+            raise RuntimeError("CAD drawing metadata could not be saved")
+    except Exception as exc:
+        try:
+            await run_in_threadpool(lambda: client.storage.from_(bucket).remove([path]))
+        except Exception:
+            pass
+        raise HTTPException(status_code=503, detail="CAD drawing could not be persisted") from exc
+    # Audit is best effort; storage and project metadata are authoritative.
+    try:
+        await record_audit_event(
+            action="cad.room_generated", entity_type="file",
+            entity_id=str(record["id"]), actor_user_id=user_id,
+            project_id=project_id,
+            metadata={"generation_method": "parametric_room_v1"},
+        )
+    except Exception:
+        pass
+    return {"file": record, "geometry": geometry}
