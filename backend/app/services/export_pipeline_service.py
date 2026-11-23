@@ -1,4 +1,4 @@
-"""Project-backed DXF/DWG export pipeline.
+"""Project-backed DXF/DWG and visual-reference PDF export pipeline.
 
 Current implementation traces the persisted project image to vectors. It does NOT
 reconstruct dimensional CAD primitives or BIM geometry. IFC/Revit exports are not
@@ -25,6 +25,7 @@ from app.schemas.export_contracts import PipelineStage
 from app.services.dwg_converter_service import dwg_converter_service
 from app.services.export_validation_service import run_postflight, run_preflight
 from app.services.local_dxf_service import local_dxf_service
+from app.services.reference_pdf_service import create_reference_pdf
 from app.utils.logger import logger
 from app.utils.storage_service import MAX_FILE_SIZES_BYTES, storage_service
 
@@ -82,7 +83,9 @@ def _read_bounded(path: str, export_format: str) -> bytes:
 
 
 async def _generate_file(image_source: str, export_format: str) -> bytes:
-    """Trace a stored image to DXF, optionally converting it to DWG via ODA."""
+    """Generate a real reference PDF or trace image to DXF/DWG via ODA."""
+    if export_format == "pdf":
+        return await asyncio.to_thread(create_reference_pdf, image_source)
     dxf_path: str | None = None
     work_dir: str | None = None
     try:
@@ -107,9 +110,9 @@ async def _generate_file(image_source: str, export_format: str) -> bytes:
 
 
 async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
-    """Generate a real image-derived DXF/DWG and persist its artifact reference."""
+    """Generate a genuine project-backed file and persist the artifact reference."""
     export_format = str(job.get("format") or "").lower()
-    if export_format not in ("dxf", "dwg"):
+    if export_format not in ("dxf", "dwg", "pdf"):
         raise RuntimeError(
             f"Export format '{export_format}' has no implemented generator. "
             "IFC and Revit packages must not contain placeholder bytes."
@@ -196,7 +199,7 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
         "metadata": {
             **(job.get("metadata") or {}),
             "stage": PipelineStage.ARTIFACT_STORAGE.value,
-            "generation_method": "raster_vector_trace",
+            "generation_method": ("project_raster_reference_pdf" if export_format == "pdf" else "raster_vector_trace"),
             "engineering_accuracy_verified": False,
         },
     }
@@ -213,7 +216,7 @@ async def run_export_generation(job: dict[str, Any]) -> dict[str, Any]:
         "artifact_url": artifact_url,
         "bucket": bucket_name,
         "file_path": storage_path,
-        "generation_method": "raster_vector_trace",
+        "generation_method": ("project_raster_reference_pdf" if export_format == "pdf" else "raster_vector_trace"),
         "engineering_accuracy_verified": False,
     }
 

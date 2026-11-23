@@ -192,6 +192,7 @@ export default function Exports() {
                                     <SelectItem value="all">All Formats</SelectItem>
                                     <SelectItem value="dxf">DXF</SelectItem>
                                     <SelectItem value="dwg">DWG</SelectItem>
+                                    <SelectItem value="pdf">PDF (visual reference)</SelectItem>
                                     <SelectItem value="ifc">IFC</SelectItem>
                                     <SelectItem value="revit_package">Revit Package</SelectItem>
                                 </SelectGroup>

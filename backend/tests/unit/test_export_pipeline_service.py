@@ -61,7 +61,7 @@ async def test_dxf_export_uses_generated_project_vector_and_persists_artifact(tm
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("format", ["ifc", "revit_package", "pdf", ""])
+@pytest.mark.parametrize("format", ["ifc", "revit_package", ""])
 async def test_unsupported_formats_fail_without_upload(format):
     with patch.object(pipeline.storage_service, "upload_cad_file", AsyncMock()) as upload:
         with pytest.raises(RuntimeError, match="no implemented generator"):
