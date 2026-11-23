@@ -142,7 +142,8 @@ export default function FieldPage() {
             link.href = url;
             link.download = `krafzen_field_observations_${projectId}.pdf`;
             document.body.appendChild(link); link.click(); link.remove();
-            URL.revokeObjectURL(url);
+            // Leave the blob URL active until the browser has started its download.
+            window.setTimeout(() => URL.revokeObjectURL(url), 30000);
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Cannot generate field report");
         } finally {
