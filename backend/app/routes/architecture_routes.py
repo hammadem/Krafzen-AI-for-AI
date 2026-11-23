@@ -49,9 +49,10 @@ async def get_jurisdiction_contracts() -> JurisdictionContractsResponse:
         jurisdictions=[
             JurisdictionSummary(
                 jurisdiction_id="US_IRC_BASELINE",
-                label="USA (IRC baseline screening)",
+                label="US IRC reference contract (code rules not implemented)",
+                status="not_implemented",
                 schema_version=1,
-                supported_exports=[ExportFormat.DXF, ExportFormat.IFC, ExportFormat.DWG],
+                supported_exports=[],
             )
         ]
     )
@@ -65,10 +66,11 @@ async def get_compliance_presets() -> CompliancePresetsResponse:
             CompliancePresetSummary(
                 preset_id="us-irc-baseline-v1",
                 jurisdiction_id="US_IRC_BASELINE",
-                label="US IRC Baseline (MVP)",
+                label="US IRC reference only — unavailable for compliance decisions",
                 description=(
-                    "Screening-oriented baseline checks for room size, door width, "
-                    "stairs, and egress thresholds. Not legal approval."
+                    "Schema-only reference. No adopted jurisdiction, licensed code "
+                    "edition, deterministic egress rules or building-code approval is "
+                    "implemented by this preset."
                 ),
                 default_approval_state=ApprovalState.PENDING_REVIEW,
                 rule_version="us_irc_baseline@1",
