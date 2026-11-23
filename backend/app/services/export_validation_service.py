@@ -43,8 +43,9 @@ def _issue(
         message=message,
         element_ref=element_ref,
         suggested_fix=suggested_fix,
-        jurisdiction="US_IRC_BASELINE",
-        rule_version="us_irc_baseline@1",
+        # Technical export checks are not building-code determinations.
+        jurisdiction=None,
+        rule_version=None,
     )
 
 
