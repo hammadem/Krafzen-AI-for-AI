@@ -12,6 +12,7 @@ MIGRATIONS = [
     ROOT / "supabase/migrations/20261123020000_field_inspections.sql",
     ROOT / "supabase/migrations/20261124000000_compliance_assessments.sql",
     ROOT / "supabase/migrations/20261124010000_field_photo_evidence.sql",
+    ROOT / "supabase/migrations/20261124020000_bim_spatial_screenings.sql",
 ]
 
 
@@ -65,7 +66,7 @@ def main():
                 for _ in range(2):
                     cursor.execute(query)
 
-            for table in ("asbuilt_comparisons", "drawing_redlines", "field_inspections", "compliance_assessments", "field_photos"):
+            for table in ("asbuilt_comparisons", "drawing_redlines", "field_inspections", "compliance_assessments", "field_photos", "bim_spatial_screenings"):
                 cursor.execute(
                     "select relrowsecurity from pg_class "
                     "where oid = %s::regclass",
@@ -132,7 +133,22 @@ def main():
             for col in ("id", "project_id", "inspection_id", "created_by",
                         "bucket", "path", "mime_type", "size_bytes", "source_metadata"):
                 assert col in photo_columns, f"Missing field photo evidence column {col}"
-            print("PASS: five AEC migrations applied twice; RLS/grants/constraints verified")
+            cursor.execute(
+                "select column_name from information_schema.columns "
+                "where table_schema = 'public' and table_name = 'bim_spatial_screenings'"
+            )
+            spatial_columns = {name for (name,) in cursor.fetchall()}
+            for col in ("id", "project_id", "primary_file_id", "secondary_file_id",
+                        "created_by", "alignment_user_asserted", "result", "created_at"):
+                assert col in spatial_columns, f"Missing BIM screen evidence column {col}"
+            cursor.execute(
+                "select conname from pg_constraint "
+                "where conrelid = 'public.bim_spatial_screenings'::regclass "
+                "and contype = 'c'"
+            )
+            spatial_checks = {name for (name,) in cursor.fetchall()}
+            assert "bim_spatial_screenings_distinct_files" in spatial_checks
+            print("PASS: six AEC migrations applied twice; RLS/grants/constraints verified")
 
 
 if __name__ == "__main__":
