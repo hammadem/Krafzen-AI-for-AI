@@ -70,7 +70,7 @@ def _office_summary(raw: bytes, kind: str) -> dict:
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             entries = _archive_members(archive)
             names = {entry.filename for entry in entries}
-            if "[Content_Types].xml" not in names:
+            if kind in ("docx", "xlsx") and "[Content_Types].xml" not in names:
                 raise ValueError("Office package is missing content types")
             if any(name.lower().endswith("vbaproject.bin") for name in names):
                 raise ValueError("Macro-enabled documents are not supported")
