@@ -94,3 +94,21 @@ def test_known_structural_and_mep_measurements(tmp_path):
     assert truth["mep"]["3d_clash_verified"] is False
     saved=json.loads((tmp_path/"reference_ground_truth.json").read_text())
     assert saved==truth
+
+
+def test_external_wall_window_reference_has_actual_declared_dimensions():
+    """Measured source-model values, not a claimed field survey."""
+    model=ifcopenshell.open(str(SOURCE/"ifc4_wall_opening_window.ifc"))
+    length_units=[
+        unit for unit in model.by_type("IfcSIUnit")
+        if str(unit.UnitType)=="LENGTHUNIT"
+    ]
+    assert length_units and length_units[0].Prefix=="MILLI"
+    assert str(length_units[0].Name)=="METRE"
+    assert len(model.by_type("IfcWall"))==1
+    assert len(model.by_type("IfcWindow"))==1
+    window=model.by_type("IfcWindow")[0]
+    assert float(window.OverallHeight)==1000.0
+    assert float(window.OverallWidth)==1000.0
+    depths={float(element.Depth) for element in model.by_type("IfcExtrudedAreaSolid")}
+    assert 2000.0 in depths
