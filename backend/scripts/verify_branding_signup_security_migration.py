@@ -19,12 +19,29 @@ BRANDING = (
 
 
 def run():
-    url = urlsplit(os.getenv("DATABASE_URL", ""))
-    if url.hostname not in {"localhost", "127.0.0.1"} or url.username != "krafzen_ci":
-        raise RuntimeError("Only disposable local CI PostgreSQL is permitted")
+    # Never allow libpq hostaddr/service query overrides or cloud credentials.
+    raw = os.getenv("DATABASE_URL", "")
+    try:
+        url = urlsplit(raw)
+        safe = (
+            url.scheme == "postgresql"
+            and url.hostname in {"localhost", "127.0.0.1"}
+            and url.username == "krafzen_ci"
+            and url.path == "/krafzen_ci"
+            and url.port == 5432
+            and not url.query and not url.fragment
+        )
+    except ValueError:
+        safe = False
+    if not safe:
+        raise RuntimeError("Only disposable local krafzen_ci PostgreSQL is permitted")
     with psycopg2.connect(os.environ["DATABASE_URL"]) as conn:
         with conn.cursor() as cur:
             cur.execute("CREATE SCHEMA IF NOT EXISTS auth")
+            for role in ("anon", "authenticated", "service_role"):
+                cur.execute("SELECT 1 FROM pg_roles WHERE rolname=%s", (role,))
+                if cur.fetchone() is None:
+                    cur.execute(f"CREATE ROLE {role} NOLOGIN")
             # The payment CI step may already have created user_subscriptions.
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS public.user_subscriptions(
@@ -41,7 +58,8 @@ def run():
             cur.execute("CREATE TABLE IF NOT EXISTS auth.users(id UUID PRIMARY KEY)")
             for table in BRANDING:
                 cur.execute("CREATE TABLE IF NOT EXISTS public." + table + " (id INTEGER PRIMARY KEY)")
-                cur.execute("GRANT SELECT ON public." + table + " TO PUBLIC")
+                cur.execute("GRANT SELECT, INSERT ON public." + table +
+                            " TO PUBLIC, anon, authenticated")
                 cur.execute("INSERT INTO public." + table + " (id) VALUES (1) ON CONFLICT DO NOTHING")
             cur.execute(
                 """INSERT INTO public.user_subscriptions
@@ -68,6 +86,21 @@ def run():
                     (table,),
                 )
                 assert cur.fetchone() == (0,), table
+
+                # Verify zero effective browser privileges, rather than
+                # relying only on row-level security policy filtering.
+                for role in ("anon", "authenticated"):
+                    cur.execute(
+                        "SELECT has_table_privilege(%s,%s,'SELECT'),"
+                        "has_table_privilege(%s,%s,'INSERT')",
+                        (role, "public." + table, role, "public." + table),
+                    )
+                    assert cur.fetchone() == (False, False), (table, role)
+                cur.execute(
+                    "SELECT has_table_privilege('service_role',%s,'SELECT')",
+                    ("public." + table,),
+                )
+                assert cur.fetchone() == (True,), table
 
             cur.execute(
                 "SELECT trial_requests_total,trial_requests_remaining,plan_requests_remaining "
@@ -96,7 +129,7 @@ def run():
                 "FROM public.user_subscriptions WHERE user_id=%s", (NEW_USER,),
             )
             assert cur.fetchone() == (0, 0, 0), "New signup still has free credits"
-    print("PASS: 4 exposed tables have RLS, no public function EXECUTE, zero signup grants, paid credits intact.")
+    print("PASS: four branding tables: RLS on, zero anon/auth privileges, service role retained, secure signup and paid credits intact.")
 
 
 if __name__ == "__main__":
