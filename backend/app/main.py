@@ -22,6 +22,7 @@ from app.routes import (
     branding_routes,
     cad_generation_routes,
     chat_routes,
+    compliance_assessment_routes,
     dashboard_routes,
     export_routes,
     export_validation_routes,
@@ -210,6 +211,7 @@ app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"], dependenc
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"], dependencies=paid_access)
 app.include_router(asbuilt_routes.router, prefix="/api/v1", tags=["As-Built"], dependencies=paid_access)
 app.include_router(cad_generation_routes.router, prefix="/api/v1", tags=["CAD Generation"], dependencies=paid_access)
+app.include_router(compliance_assessment_routes.router, prefix="/api/v1", tags=["Measured Compliance"], dependencies=paid_access)
 app.include_router(review_routes.router, prefix="/api/v1", tags=["Reviews and Redlines"], dependencies=paid_access)
 app.include_router(field_routes.router, prefix="/api/v1", tags=["Field Inspections"], dependencies=paid_access)
 app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"], dependencies=paid_access)

@@ -35,6 +35,7 @@ const CAD_BIM: NavItem[] = [
     { label: "Reviews", href: "/workspace/reviews", icon: ClipboardCheck },
     { label: "Models", href: "/workspace/models", icon: Box },
     { label: "As-Built", href: "/workspace/as-built", icon: Ruler },
+    { label: "Compliance", href: "/workspace/compliance", icon: ClipboardCheck },
 ];
 
 function NavRow({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {

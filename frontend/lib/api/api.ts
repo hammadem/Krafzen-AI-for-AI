@@ -615,3 +615,27 @@ export async function importDocumentFile(
     form.append("upload", file, file.name);
     return apiClient("POST", "/api/v1/files/import-document", user, form);
 }
+
+
+/** Auditable, project-bound ADA 2010 measurements. These are NOT full compliance approvals. */
+export async function createAdaAssessment(
+    user: User | null,
+    payload: {
+        project_id: string;
+        source_file_id?: string | null;
+        jurisdiction: Record<string, unknown>;
+        measurements: Record<string, unknown>;
+    }
+) {
+    return apiClient("POST", "/api/v1/compliance/ada-measurements", user, payload);
+}
+
+export async function getProjectAdaAssessments(
+    user: User | null, projectId: string
+) {
+    return apiClient(
+        "GET",
+        `/api/v1/compliance/projects/${encodeURIComponent(projectId)}/ada-measurements`,
+        user,
+    );
+}
