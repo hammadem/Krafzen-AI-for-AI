@@ -583,3 +583,25 @@ export async function createProjectExport(
 ) {
     return apiClient("POST", "/api/v1/exports/", user, request);
 }
+
+
+/** Generate genuine project/job-linked dimensioned room geometry from explicit measurements. */
+export async function createParametricRoom(
+    user: User | null,
+    request: {
+        project_id: string;
+        job_id: string;
+        room_name: string;
+        exterior_width_m: number;
+        exterior_length_m: number;
+        wall_thickness_m: number;
+        openings: Array<{
+            kind: "door" | "window";
+            side: "north" | "south" | "east" | "west";
+            offset_m: number;
+            clear_width_m: number;
+        }>;
+    }
+) {
+    return apiClient("POST", "/api/v1/cad/rooms", user, request);
+}
