@@ -2,8 +2,8 @@
 
 // Shared left rail for the workspace app shell (CEO redesign, PR #1).
 // Visual reference: krafzen-product/style-guide.html + projects.html.
-// Real routes are active nav. Reviews / Models / As-Built remain disabled until
-// their actual backend workflows are implemented and verified.
+// Real routes are active nav. Reviews and Models remain disabled until their
+// underlying engineering viewers and persisted operations are verified.
 // No fake counts — data-driven badges come later when the backend exposes them.
 
 import Link from "next/link";
@@ -27,12 +27,12 @@ const MAIN: NavItem[] = [
     { label: "Billing", href: "/workspace/billings", icon: CreditCard },
 ];
 
-// The Imports workflow uses existing scoped DXF/IFC processing; other tools remain pending.
+// Imports and limited DXF as-built diff are functional routes; the rest remain pending.
 const CAD_BIM: NavItem[] = [
     { label: "Imports", href: "/workspace/imports", icon: Upload },
     { label: "Reviews", href: "#", icon: ClipboardCheck, soon: true },
     { label: "Models", href: "#", icon: Box, soon: true },
-    { label: "As-Built", href: "#", icon: Ruler, soon: true },
+    { label: "As-Built", href: "/workspace/as-built", icon: Ruler },
 ];
 
 function NavRow({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {
