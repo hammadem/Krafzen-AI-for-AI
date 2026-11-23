@@ -121,7 +121,7 @@ export default function FieldEvidencePanel({
                             </button>
                             {photoLinks[photo.id] && (
                                 <a href={photoLinks[photo.id]} target="_blank" rel="noopener noreferrer"
-                                    className="text-emerald-300 underline">Open original observation photo</a>
+                                    className="text-emerald-300 underline">Open privacy-sanitized observation photo</a>
                             )}
                         </div>
                     ))}
