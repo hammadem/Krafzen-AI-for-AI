@@ -63,6 +63,62 @@ def inspect_ifc_file(path: str) -> dict:
             }
             break
 
+    # Read *declared* IFC quantities and property sets actually assigned to
+    # model products. Never estimate dimensions from counts or claim a geometric
+    # takeoff without evaluating representations.
+    quantity_totals: dict[str, dict] = {}
+    property_set_counts: Counter = Counter()
+    quantity_relations = 0
+    for rel in model.by_type("IfcRelDefinesByProperties")[:50000]:
+        definition = getattr(rel, "RelatingPropertyDefinition", None)
+        if not definition:
+            continue
+        assigned = sum(
+            1 for obj in (getattr(rel, "RelatedObjects", ()) or ())
+            if obj.is_a("IfcProduct")
+        )
+        if not assigned:
+            continue
+        if definition.is_a("IfcPropertySet"):
+            property_set_counts[str(definition.Name or "Unnamed")[:120]] += assigned
+            continue
+        if not definition.is_a("IfcElementQuantity"):
+            continue
+        quantity_relations += 1
+        set_name = str(definition.Name or "Unnamed")[:100]
+        for qty in (getattr(definition, "Quantities", ()) or ()):
+            kind = str(qty.is_a())
+            value_attr = {
+                "IfcQuantityLength": "LengthValue",
+                "IfcQuantityArea": "AreaValue",
+                "IfcQuantityVolume": "VolumeValue",
+                "IfcQuantityCount": "CountValue",
+                "IfcQuantityWeight": "WeightValue",
+                "IfcQuantityTime": "TimeValue",
+            }.get(kind)
+            if not value_attr:
+                continue
+            try:
+                value = float(getattr(qty, value_attr))
+            except (TypeError, ValueError, AttributeError):
+                continue
+            if not (-1e15 <= value <= 1e15):
+                continue
+            name = str(qty.Name or kind)[:100]
+            unit = getattr(qty, "Unit", None)
+            # Unit overrides are not silently combined with project defaults.
+            unit_key = f"{unit.is_a()}:{unit.id()}" if unit else "project_declared"
+            key = f"{set_name}/{name}/{kind}/{unit_key}"
+            if key not in quantity_totals and len(quantity_totals) >= 300:
+                continue
+            item = quantity_totals.setdefault(key, {
+                "set": set_name, "name": name, "type": kind,
+                "unit": unit_key,
+                "sum_raw": 0.0, "item_count": 0,
+            })
+            item["sum_raw"] += value * assigned
+            item["item_count"] += assigned
+
     return {
         "type": "ifc",
         "schema": schema,
@@ -79,6 +135,10 @@ def inspect_ifc_file(path: str) -> dict:
         "storey_count": len(storeys),
         "length_unit": length_unit,
         "represented_product_count": represented,
+        "declared_quantities": list(quantity_totals.values()),
+        "quantity_relation_count": quantity_relations,
+        "property_set_assignment_counts": dict(sorted(property_set_counts.items())[:200]),
+        "quantities_are_declared_not_measured": True,
         "entity_counts": dict(sorted(counts.items())[:80]),
         "geometry_validated": False,
         "clash_detection_performed": False,
