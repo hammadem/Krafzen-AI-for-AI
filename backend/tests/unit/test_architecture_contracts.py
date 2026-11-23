@@ -35,9 +35,8 @@ def test_jurisdiction_contracts(client):
     assert len(data["jurisdictions"]) >= 1
     first = data["jurisdictions"][0]
     assert first["jurisdiction_id"] == "US_IRC_BASELINE"
-    assert "dwg" in first["supported_exports"]
-    assert "ifc" in first["supported_exports"]
-    assert "dxf" in first["supported_exports"]
+    assert first["status"] == "not_implemented"
+    assert first["supported_exports"] == []
 
 
 def test_compliance_presets_contract(client):
