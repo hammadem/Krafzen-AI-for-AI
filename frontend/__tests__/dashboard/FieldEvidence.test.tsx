@@ -48,7 +48,7 @@ describe("Persisted field photo evidence", () => {
         );
         expect(screen.getByText(/200 × 100 px/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole("button", { name: "Request private photo link" }));
-        expect(await screen.findByRole("link", { name: "Open original observation photo" }))
+        expect(await screen.findByRole("link", { name: "Open privacy-sanitized observation photo" }))
             .toHaveAttribute("href", "https://private.example/field/photo?token=valid");
     });
 
