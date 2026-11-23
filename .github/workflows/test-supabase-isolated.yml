@@ -58,7 +58,7 @@ jobs:
           # One GitHub runner = one fully isolated temporary Supabase project.
           # Explicitly leave Auth, REST and private Storage enabled.
           supabase start --runtime native --exclude studio,mail,analytics,realtime,functions,pooler --eager
-          supabase status --output json > "$RUNNER_TEMP/local-supabase.json"
+          supabase status --output-format json > "$RUNNER_TEMP/local-supabase.json"
           test -s "$RUNNER_TEMP/local-supabase.json"
 
       - name: Verify full migration bootstrap, private storage and auth
@@ -75,4 +75,4 @@ jobs:
           SUPABASE_EXPERIMENTAL_STACK: "1"
         run: |
           # No production/staging cloud resource is touched.
-          supabase stop --no-backup || true
+          supabase stop || true
