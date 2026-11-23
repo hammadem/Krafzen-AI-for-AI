@@ -138,7 +138,7 @@ async def test_assessment_requires_source_file_in_owned_project():
         patch.object(routes, "get_file", AsyncMock(return_value={
             "id": FILE, "project_id": "00000000-0000-0000-0000-000000000099"
         })),
-        patch.object(routes, "db") as db,
+        patch.object(routes, "db", MagicMock()) as db,
     ):
         with pytest.raises(HTTPException) as error:
             await routes.create_ada_measurement_assessment(request(), user=USER)
