@@ -32,6 +32,7 @@ from app.routes import (
     project_routes,
     region_routes,
     report_routes,
+    review_routes,
     user_routes,
     workspace_routes,
 )
@@ -206,6 +207,7 @@ app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"], d
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"], dependencies=paid_access)
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"], dependencies=paid_access)
 app.include_router(asbuilt_routes.router, prefix="/api/v1", tags=["As-Built"], dependencies=paid_access)
+app.include_router(review_routes.router, prefix="/api/v1", tags=["Reviews and Redlines"], dependencies=paid_access)
 app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"], dependencies=paid_access)
 app.include_router(payment_routes.router, prefix="/api/v1", tags=["Payments"])
 app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
