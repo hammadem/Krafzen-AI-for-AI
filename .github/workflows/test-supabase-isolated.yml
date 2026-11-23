@@ -42,18 +42,22 @@ jobs:
         with:
           version: latest
 
-      - name: Check local Supabase CLI version and available Docker
+      - name: Check local Supabase CLI and native runtime prerequisites
         run: |
           set -euo pipefail
           supabase --version
-          docker info >/dev/null
+          command -v tar
+          test "$(uname -s)" = "Linux"
 
-      - name: Start isolated local Auth, Data API, Storage and Postgres
+      - name: Start isolated native Supabase Postgres, Auth, REST and Storage
+        env:
+          SUPABASE_EXPERIMENTAL_STACK: "1"
         run: |
           set -euo pipefail
-          # Exclude unnecessary heavy services; keep auth, PostgREST, storage.
-          # Starts and applies ALL repository migrations on an empty Postgres.
-          supabase start -x studio,imgproxy,realtime,logflare,vector,mailpit,edge-runtime,postgres-meta,supavisor
+          # Native Linux runtime avoids public ECR container pull rate limits.
+          # One GitHub runner = one fully isolated temporary Supabase project.
+          # Explicitly leave Auth, REST and private Storage enabled.
+          supabase start --runtime native --exclude studio,mail,analytics,realtime,functions,pooler --eager
           supabase status --output json > "$RUNNER_TEMP/local-supabase.json"
           test -s "$RUNNER_TEMP/local-supabase.json"
 
@@ -67,6 +71,8 @@ jobs:
 
       - name: Stop and delete the ephemeral local Supabase stack
         if: always()
+        env:
+          SUPABASE_EXPERIMENTAL_STACK: "1"
         run: |
           # No production/staging cloud resource is touched.
           supabase stop --no-backup || true
