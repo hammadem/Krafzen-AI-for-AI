@@ -10,7 +10,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
-    FolderKanban, Archive, Activity, FileDown, Users, Bell, CreditCard,
+    FolderKanban, Archive, Activity, FileDown, Users, Bell, CreditCard, ClipboardList,
     Upload, ClipboardCheck, Box, Ruler, Settings, Plus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -21,6 +21,7 @@ const MAIN: NavItem[] = [
     { label: "Projects", href: "/workspace/projects", icon: FolderKanban },
     { label: "Archive", href: "/workspace/archive", icon: Archive },
     { label: "Activity", href: "/workspace/activity", icon: Activity },
+    { label: "Field", href: "/workspace/field", icon: ClipboardList },
     { label: "Exports", href: "/workspace/exports", icon: FileDown },
     { label: "Members", href: "/workspace/members", icon: Users },
     { label: "Notifications", href: "/workspace/notifications", icon: Bell },
