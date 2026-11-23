@@ -565,6 +565,29 @@ export async function getAsBuiltComparisonPdf(
 }
 
 
+/** Save project-owned broad-phase IFC AABB overlap candidates. */
+export async function createIfcSpatialScreen(
+    user: User | null, projectId: string, primaryFileId: string,
+    secondaryFileId: string, sameCoordinatesConfirmed: boolean
+) {
+    return apiClient(
+        "POST", `/api/v1/bim/projects/${encodeURIComponent(projectId)}/spatial-screens`,
+        user, {
+            primary_file_id: primaryFileId,
+            secondary_file_id: secondaryFileId,
+            same_origin_axes_and_scale_confirmed: sameCoordinatesConfirmed,
+        }
+    );
+}
+
+export async function getIfcSpatialScreens(user: User | null, projectId: string) {
+    return apiClient(
+        "GET", `/api/v1/bim/projects/${encodeURIComponent(projectId)}/spatial-screens`,
+        user,
+    );
+}
+
+
 /** Return the authenticated, genuinely parsed IFC import summary. */
 export async function getIfcModelSummary(user: User | null, fileId: string) {
     return apiClient("GET", `/api/v1/files/${encodeURIComponent(fileId)}/bim-summary`, user);
