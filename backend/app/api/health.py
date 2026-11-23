@@ -116,6 +116,7 @@ async def readiness_check():
         "paid_only_signup_function": False,
         "signup_trigger_enabled": False,
         "no_free_trial_balances": False,
+        "security_probe_passed": False,
     }
     if database_ready:
         try:
@@ -123,9 +124,15 @@ async def readiness_check():
                 lambda: db.rpc("krafzen_release_security_probe").execute()
             )
             report = report_response.data if report_response else None
-            if (isinstance(report, dict) and report.get("ready") is True):
+            if isinstance(report, dict):
                 for key in security_contracts:
-                    security_contracts[key] = report.get(key) is True
+                    if key != "security_probe_passed":
+                        security_contracts[key] = report.get(key) is True
+                security_contracts["security_probe_passed"] = (
+                    report.get("ready") is True
+                    and all(value for key, value in security_contracts.items()
+                            if key != "security_probe_passed")
+                )
         except Exception:
             pass
 
