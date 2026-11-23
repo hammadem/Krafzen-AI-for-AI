@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 from urllib.parse import urlsplit
 
@@ -28,7 +29,7 @@ async def create_checkout_session(
 ):
     """
     Creates a Stripe Checkout session for a paid subscription (package requests).
-    Signup free requests are separate and do not require a card.
+    No free signup request balance is granted. Paid activation requires verified billing.
     """
     try:
         user_id = user_data["user_id"]
@@ -159,11 +160,21 @@ class MockSubscribeRequest(BaseModel):
     payment_completed: bool = False  # If True, simulate payment so user gets package requests
 
 
-def _is_mock_payments_allowed() -> bool:
-    """Mock payments require explicit development mode and a local frontend."""
+def _is_mock_payments_allowed(request: Request) -> bool:
+    """Explicit opt-in, loopback-only development billing fixtures.
+
+    A misconfigured ENVIRONMENT=development must not silently activate unpaid
+    subscriptions on a reachable server. Never enable this in an environment
+    containing real users or payment/customer records.
+    """
+    if os.getenv("KRAFZEN_LOCAL_MOCK_BILLING_ENABLED", "").strip() != "yes":
+        return False
     if getattr(settings, "STRIPE_LIVE_MODE", False):
         return False
     if (settings.ENVIRONMENT or "").lower() != "development":
+        return False
+    client = request.client
+    if client is None or client.host not in {"127.0.0.1", "::1"}:
         return False
     url = (settings.FRONTEND_URL or "").strip().lower()
     return url.startswith("http://localhost:") or url.startswith("http://127.0.0.1:")
@@ -172,13 +183,14 @@ def _is_mock_payments_allowed() -> bool:
 @router.post("/payments/mock-subscribe")
 async def mock_subscribe(
     request_data: MockSubscribeRequest,
+    request: Request,
     user_data: dict = Depends(require_auth),
 ):
     """
     In local dev only: create a subscription for the current user without Stripe.
     Lets you test the full flow (Pay now -> profile reflects plan and requests).
     """
-    if not _is_mock_payments_allowed():
+    if not _is_mock_payments_allowed(request):
         raise HTTPException(status_code=404, detail="Not available")
     try:
         user_id = user_data["user_id"]
@@ -207,11 +219,11 @@ async def mock_subscribe(
 
 
 @router.post("/payments/mock-activate-plan")
-async def mock_activate_plan(user_data: dict = Depends(require_auth)):
+async def mock_activate_plan(request: Request, user_data: dict = Depends(require_auth)):
     """
-    In local dev only: grant package requests after "payment" (user was on trial).
+    Explicit local-only developer fixture. Not an actual payment or trial.
     """
-    if not _is_mock_payments_allowed():
+    if not _is_mock_payments_allowed(request):
         raise HTTPException(status_code=404, detail="Not available")
     try:
         user_id = user_data["user_id"]
