@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api/utils";
+import { apiClient, getApiBaseUrl } from "@/lib/api/utils";
 
 // Files (Yehor — files_routes). Worker uploads to storage + POSTs metadata;
 // frontend only GET/rename/delete + fetch a signed URL for preview/download.
@@ -644,4 +644,52 @@ export async function getProjectAdaAssessments(
 /** Returns only actual triangulated IFC geometry from a stored, scanned model. */
 export async function getIfcModelMesh(user: User | null, fileId: string) {
     return apiClient("GET", `/api/v1/bim/files/${encodeURIComponent(fileId)}/mesh`, user);
+}
+
+
+/** Attach a real scanned EXIF-stripped photograph to one owned inspection. */
+export async function uploadFieldPhoto(
+    user: User | null, inspectionId: string, photo: File
+) {
+    const form = new FormData();
+    form.append("photo", photo, photo.name);
+    return apiClient(
+        "POST", `/api/v1/field/inspections/${encodeURIComponent(inspectionId)}/photos`,
+        user, form,
+    );
+}
+
+export async function getFieldPhotos(user: User | null, inspectionId: string) {
+    return apiClient(
+        "GET", `/api/v1/field/inspections/${encodeURIComponent(inspectionId)}/photos`, user
+    );
+}
+
+export async function getFieldPhotoSignedUrl(user: User | null, photoId: string) {
+    return apiClient(
+        "GET", `/api/v1/field/photos/${encodeURIComponent(photoId)}/signed-url`, user
+    );
+}
+
+export async function getFieldReportPdf(user: User | null, projectId: string): Promise<Blob> {
+    if (!user?.access_token) throw new Error("Authentication required");
+    const response = await fetch(
+        `${getApiBaseUrl().replace(/\/$/, "")}/api/v1/field/projects/${encodeURIComponent(projectId)}/report.pdf`,
+        {
+            headers: {
+                Authorization: `Bearer ${user.access_token}`,
+                apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+            },
+            cache: "no-store",
+        }
+    );
+    if (!response.ok) throw new Error("Real field inspection report is unavailable");
+    if (!response.headers.get("content-type")?.includes("application/pdf")) {
+        throw new Error("Server did not return a PDF report");
+    }
+    const bytes = await response.blob();
+    if (!bytes.size || bytes.size > 5 * 1024 * 1024) {
+        throw new Error("Field report has an invalid file size");
+    }
+    return bytes;
 }
