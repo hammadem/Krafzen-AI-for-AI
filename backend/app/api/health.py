@@ -76,17 +76,29 @@ async def readiness_check():
     ifc_parser_installed = importlib.util.find_spec("ifcopenshell") is not None
     potrace_detected = bool(shutil.which("potrace"))
 
-    ifc_schema_ready = False
+    # A reachable database with missing migrations is NOT deployment-ready.
+    # Every probe is a bounded, read-only server-side SELECT of one column.
+    # Never infer migrations were applied from repository files or green CI.
+    required_schema = {
+        "ifc_import_schema": ("files", "import_metadata"),
+        "payment_webhook_schema": ("payment_webhook_events", "event_id"),
+        "paid_subscription_schema": ("user_subscriptions", "last_paid_at"),
+        "project_archive_schema": ("projects", "archived_at"),
+        "asbuilt_comparison_schema": ("asbuilt_comparisons", "id"),
+        "drawing_redline_schema": ("drawing_redlines", "id"),
+        "field_inspection_schema": ("field_inspections", "id"),
+    }
+    schema_checks = {name: False for name in required_schema}
     if database_ready:
-        try:
-            # Real schema probe: a missing import_metadata migration must keep
-            # readiness red even when the database is reachable.
-            await run_in_threadpool(
-                lambda: db.table("files").select("import_metadata").limit(1).execute()
-            )
-            ifc_schema_ready = True
-        except Exception:
-            ifc_schema_ready = False
+        for name, (table, column) in required_schema.items():
+            try:
+                await run_in_threadpool(
+                    lambda table=table, column=column: db.table(table)
+                    .select(column).limit(1).execute()
+                )
+                schema_checks[name] = True
+            except Exception:
+                schema_checks[name] = False
 
     checks = {
         "database": database_ready,
@@ -97,7 +109,7 @@ async def readiness_check():
         "import_scanner_detected": scanner_detected,
         "ifc_parser_installed": ifc_parser_installed,
         "dxf_tracer_detected": potrace_detected,
-        "ifc_import_schema": ifc_schema_ready,
+        **schema_checks,
     }
     ready = all(checks.values())
     payload = {
