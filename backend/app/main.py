@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import re
 import threading
 import traceback
@@ -93,11 +94,20 @@ async def lifespan(app: FastAPI):
     # 5. Avoid repeatedly polling a database that has no connection credentials.
     # Environment changes cause a fresh deployment and the worker starts then.
     poll_task = None
-    if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+    # An HTTP API process must not start destructive background work simply
+    # because it has database credentials. Staging may share infrastructure
+    # with another environment; only dedicated, explicitly configured workers
+    # are permitted to dequeue exports.
+    worker_enabled = os.getenv("KRAFZEN_EXPORT_WORKER_ENABLED", "").strip().lower() in {
+        "1", "true", "yes"
+    }
+    if worker_enabled and settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
         poll_task = asyncio.create_task(_poll_export_jobs())
-        logger.info("[startup] Export job poller registered")
+        logger.info("[startup] Export worker explicitly enabled")
+    elif worker_enabled:
+        logger.error("[startup] Export worker requested but Supabase credentials are missing")
     else:
-        logger.warning("[startup] Export poller disabled: database not configured")
+        logger.info("[startup] Export worker disabled by default (safe API-only mode)")
 
     yield
 
