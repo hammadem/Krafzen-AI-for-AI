@@ -83,18 +83,40 @@ def generate_field_report_pdf(project_id: str, rows: list[dict]) -> bytes:
 
     def line(text: object, size: int = 10, bold: bool = False) -> None:
         nonlocal y
-        if y < 85:
-            document.showPage()
-            y = page_height - 45
-        document.setFont("Helvetica-Bold" if bold else "Helvetica", size)
-        # Avoid report formatting or hidden/newline injection through user text.
-        clean = " ".join(str(text or "").split()).encode("latin-1", errors="replace").decode("latin-1")
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+
+        font = "Helvetica-Bold" if bold else "Helvetica"
+        document.setFont(font, size)
+        # Normalize user text; enforce physical line width and check EVERY
+        # resulting line for a page break, even for 4,000-character notes.
+        clean = " ".join(str(text or "").split()).encode(
+            "latin-1", errors="replace"
+        ).decode("latin-1")
+        available = page_width - 70
+        if not clean:
+            clean = " "
         while clean:
-            document.drawString(35, y, clean[:105])
-            clean = clean[105:]
+            low, high = 1, len(clean)
+            while low < high:
+                middle = (low + high + 1) // 2
+                if stringWidth(clean[:middle], font, size) <= available:
+                    low = middle
+                else:
+                    high = middle - 1
+            end = max(low, 1)
+            # Preserve word breaks where possible; split very long words
+            # safely instead of rendering text beyond the page edge.
+            if end < len(clean):
+                whitespace = clean.rfind(" ", 0, end + 1)
+                if whitespace > max(1, end // 2):
+                    end = whitespace
+            if y < 85:
+                document.showPage()
+                y = page_height - 45
+                document.setFont(font, size)
+            document.drawString(35, y, clean[:end].strip())
             y -= size + 5
-        if not text:
-            y -= size + 5
+            clean = clean[end:].lstrip()
 
     document.setTitle("KRAFZEN Field Observations — Pending Professional Review")
     line("FIELD INSPECTION OBSERVATIONS", 15, True)
