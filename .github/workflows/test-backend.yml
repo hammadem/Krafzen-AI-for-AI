@@ -170,3 +170,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://krafzen_ci:local_ci_only@127.0.0.1:5432/krafzen_ci
         run: python backend/scripts/verify_branding_signup_security_migration.py
+
+      - name: Verify AEC comparison and redline migrations on isolated PostgreSQL
+        env:
+          DATABASE_URL: postgresql://krafzen_ci:local_ci_only@127.0.0.1:5432/krafzen_ci
+        run: python backend/scripts/verify_aec_review_migrations.py
