@@ -6,6 +6,7 @@ sample datasets, supplied the counts and geometrical difference samples.
 """
 from datetime import UTC, datetime
 from io import BytesIO
+from math import isfinite
 from string import hexdigits
 
 from reportlab.lib.pagesizes import letter
@@ -34,8 +35,33 @@ def _validate_saved_record(record: dict) -> dict:
         if not isinstance(record.get(field), str) or not record[field].strip():
             raise ValueError("Saved comparison is missing required project/file references")
     result = record["result"]
-    if result.get("method") != "exact_coordinate_entity_diff_v1":
+    method = result.get("method")
+    if method not in (
+        "exact_coordinate_entity_diff_v1",
+        "manual_translation_entity_diff_v2",
+    ):
         raise ValueError("Saved comparison uses an unsupported method")
+    alignment = result.get("alignment")
+    if method == "manual_translation_entity_diff_v2":
+        if not isinstance(alignment, dict) or alignment.get("kind") != "manual_2d_reference_translation":
+            raise ValueError("Manual alignment metadata is missing")
+        if alignment.get("user_confirmed_same_reference_point") is not True:
+            raise ValueError("Common reference confirmation is missing")
+        if alignment.get("automatically_verified") is not False:
+            raise ValueError("Manual registration must not claim independent verification")
+        for name in ("original_anchor_xy", "revised_anchor_xy", "revised_translation_xy"):
+            values = alignment.get(name)
+            if (not isinstance(values, list) or len(values) != 2 or
+                any(type(value) not in (float, int) or not isfinite(value)
+                    or abs(value) > 1e8 for value in values)):
+                raise ValueError("Invalid saved manual registration coordinates")
+        for idx in (0, 1):
+            actual = alignment["original_anchor_xy"][idx] - alignment["revised_anchor_xy"][idx]
+            if abs(actual - alignment["revised_translation_xy"][idx]) > 0.0000011:
+                raise ValueError("Saved anchor translation is inconsistent")
+    elif alignment is not None:
+        raise ValueError("Exact comparison must not claim applied translation")
+
     if not all(_valid_hash(result.get(field)) for field in (
         "source_hash_sha256", "revised_hash_sha256"
     )):
@@ -139,6 +165,12 @@ def generate_asbuilt_comparison_pdf(record: dict) -> bytes:
     line("Saved at: " + str(record.get("created_at") or "not supplied"))
     line("Report generated UTC: " + datetime.now(UTC).isoformat())
     line("Method: " + result["method"])
+    if result.get("alignment"):
+        alignment = result["alignment"]
+        line("Manual original anchor XY: " + str(alignment["original_anchor_xy"]))
+        line("Manual revised anchor XY: " + str(alignment["revised_anchor_xy"]))
+        line("User-asserted translation XY: " + str(alignment["revised_translation_xy"]))
+        line("Alignment was NOT independently verified; no rotation or scale correction.")
     line("DXF INSUNITS code: " + str(result["insunits"]))
     line("Original file SHA-256: " + result["source_hash_sha256"])
     line("Revised file SHA-256: " + result["revised_hash_sha256"])
@@ -177,7 +209,7 @@ def generate_asbuilt_comparison_pdf(record: dict) -> bytes:
     section("Interpretation and restrictions")
     line(str(result.get("limitations") or "Source limitations not supplied")[:700])
     line("A change in two drawings is not proof of a physical construction deviation.")
-    line("No automatic drawing registration, site-survey validation, structural approval,")
+    line("No automatic/verified registration, site-survey validation, structural approval,")
     line("full BIM geometry comparison, dimensional certification or code approval.")
     line("Status: REQUIRES REVIEW BY A QUALIFIED PROFESSIONAL.", 10, True)
     page_footer()

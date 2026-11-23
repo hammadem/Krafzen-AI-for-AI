@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.db.queries.file_queries import get_file
 from app.db.queries.project_queries import get_project
@@ -17,10 +17,22 @@ from app.utils.storage_service import storage_service
 router = APIRouter(prefix="/asbuilt", tags=["As-Built"])
 
 
+class ReferencePoint(BaseModel):
+    x: float = Field(ge=-1e8, le=1e8, allow_inf_nan=False)
+    y: float = Field(ge=-1e8, le=1e8, allow_inf_nan=False)
+
+
+class ManualAlignment(BaseModel):
+    original: ReferencePoint
+    revised: ReferencePoint
+    same_reference_point_confirmed: bool
+
+
 class CompareRequest(BaseModel):
     project_id: UUID
     original_file_id: UUID
     revised_file_id: UUID
+    alignment: ManualAlignment | None = None
 
 
 async def _owned_project(project_id: str, user: dict) -> dict:
@@ -76,13 +88,20 @@ async def compare_project_drawings(
     revised_id = str(request.revised_file_id)
     if original_id == revised_id:
         raise HTTPException(status_code=422, detail="Select two different imported DXF files")
+    if request.alignment is not None and not request.alignment.same_reference_point_confirmed:
+        raise HTTPException(status_code=422, detail="Common drawing reference point confirmation is required")
     await _owned_project(pid, user)
     original = await _read_dxf(original_id, pid, user)
     revised = await _read_dxf(revised_id, pid, user)
 
     try:
         result = await asyncio.wait_for(
-            run_in_threadpool(compare_dxf_bytes, original, revised),
+            run_in_threadpool(
+                lambda: compare_dxf_bytes(
+                    original, revised,
+                    alignment=request.alignment.model_dump() if request.alignment else None,
+                )
+            ),
             timeout=45,
         )
     except TimeoutError as exc:

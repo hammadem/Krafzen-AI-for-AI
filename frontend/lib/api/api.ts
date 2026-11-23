@@ -514,16 +514,24 @@ export async function transcribeAudio(
 }
 
 // Server-authorized, saved comparison of two real imported DXF files.
+export type AsBuiltManualAlignment = {
+    original: { x: number; y: number };
+    revised: { x: number; y: number };
+    same_reference_point_confirmed: boolean;
+};
+
 export async function createAsBuiltComparison(
     user: User | null,
     projectId: string,
     originalFileId: string,
-    revisedFileId: string
+    revisedFileId: string,
+    alignment?: AsBuiltManualAlignment
 ) {
     return apiClient("POST", "/api/v1/asbuilt/compare", user, {
         project_id: projectId,
         original_file_id: originalFileId,
         revised_file_id: revisedFileId,
+        ...(alignment ? { alignment } : {}),
     });
 }
 
