@@ -4,10 +4,18 @@ import { createClient } from "@/lib/supabase/supabaseClient";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "react-toastify";
+import { assertProviderEnabled, type SocialProvider } from "@/lib/auth/oauthProviders";
+import { useState } from "react";
 
 export default function Login() {
-    const handleLogin = async (provider: 'google' | 'facebook' | 'apple' | 'linkedin') => {
+    const [pending, setPending] = useState(false);
+    const [providerError, setProviderError] = useState("");
+    const handleLogin = async (provider: SocialProvider) => {
+        if (pending) return;
+        setPending(true);
+        setProviderError("");
         try {
+            await assertProviderEnabled(provider);
             const supabase = createClient();
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: provider,
@@ -17,9 +25,11 @@ export default function Login() {
             });
             if (error) throw error;
         } catch (error: unknown) {
-            console.error("Login error:", error);
             const errorMessage = error instanceof Error ? error.message : "Failed to login";
+            setProviderError(errorMessage);
             toast.error(errorMessage);
+        } finally {
+            setPending(false);
         }
     };
 
@@ -37,6 +47,7 @@ export default function Login() {
                         <Button
                             variant="secondary"
                             className="h-12 rounded-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-white/30 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-all duration-300"
+                            disabled={pending}
                             onClick={() => handleLogin('google')}
                         >
                             <Image
@@ -49,6 +60,7 @@ export default function Login() {
                         <Button
                             variant="secondary"
                             className="h-12 rounded-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)] transition-all duration-300"
+                            disabled={pending}
                             onClick={() => handleLogin('facebook')}
                         >
                             <div className="w-5 h-5 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold">f</div>
@@ -57,6 +69,7 @@ export default function Login() {
                         <Button
                             variant="secondary"
                             className="h-12 rounded-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-white/30 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)] transition-all duration-300"
+                            disabled={pending}
                             onClick={() => handleLogin('apple')}
                         >
                             <div className="w-5 h-5 bg-black rounded-full flex items-center justify-center text-white text-[10px] pb-0.5 border border-white/20"></div>
@@ -65,7 +78,8 @@ export default function Login() {
                         <Button
                             variant="secondary"
                             className="h-12 rounded-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 text-white hover:bg-white/10 hover:border-blue-400/50 hover:shadow-[0_0_15px_rgba(96,165,250,0.3)] transition-all duration-300"
-                            onClick={() => handleLogin('linkedin')}
+                            disabled={pending}
+                            onClick={() => handleLogin('linkedin_oidc')}
                         >
                             <Image
                                 width={20}
@@ -77,6 +91,7 @@ export default function Login() {
                         </Button>
                     </div>
 
+                    {providerError && <p role="alert" className="text-sm text-amber-200">{providerError}</p>}
                     <div className="relative my-2">
                         <div className="absolute inset-0 flex items-center">
                             <span className="w-full border-t border-white/10" />
