@@ -100,8 +100,9 @@ def _verify_hs256_with_auth_server(token: str, issuer: str):
 def decode_supabase_token(token: str):
     """Return only verified Supabase authenticated-user claims, or None.
 
-    Legacy HS256 requires the operator's actual JWT signing secret; asymmetric
-    Supabase signing keys are discovered from the trusted project's JWKS. Never
+    Legacy HS256 is verified either with the operator's signing secret or
+    directly by the trusted Supabase Auth server; asymmetric signing keys
+    are discovered from the configured project's public JWKS. Never
     allow 'none' or algorithm confusion, an unsigned decode, missing expiry,
     wrong issuer/audience, or a service-role token.
     """
