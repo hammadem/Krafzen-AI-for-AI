@@ -127,7 +127,7 @@ def main():
                 with browser.new_context() as context:
                     expired=context.new_page()
                     expired.goto(WEB+"/?error=access_denied&error_code=otp_expired",wait_until="domcontentloaded")
-                    expect(expired.get_by_role("alert")).to_contain_text("invalid or has expired",timeout=60000)
+                    expect(expired.locator("p[role=alert]")).to_contain_text("invalid or has expired",timeout=60000)
                     expired.get_by_role("link",name="Request a new verification email").click()
                     expect(expired.get_by_role("heading",name="Resend verification email")).to_be_visible(timeout=60000)
                     expired.close()
