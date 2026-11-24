@@ -35,6 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       subscription_status?: string;
       plan_name?: string;
       can_make_request?: boolean;
+      can_access_workspace?: boolean;
       in_free_signup_tier?: boolean;
     };
   }) => {
@@ -47,7 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const planTotal = sub.plan_requests_total ?? 0;
     // Frontend is advisory only. The backend enforces paid entitlements for
     // every protected API route, even if the user modifies this state.
-    const hasPaidSubscription = planName !== "free" && status === "active";
+    const hasPaidSubscription = balance.can_access_workspace === true;
     const canAccessWorkspace = hasPaidSubscription;
     const displayPlan =
       planName === "free" ? "Free" : planName.charAt(0).toUpperCase() + planName.slice(1);
@@ -211,12 +212,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
       updateUserFromSubscriptionStatus(data);
-      const plan = String(data.subscription.plan_name || "").toLowerCase();
-      return (
-        data.subscription.status === "active" &&
-        plan !== "free" && plan !== "" &&
-        data.balance.subscription_status === "active"
-      );
+      return data.balance.can_access_workspace === true;
     } catch (err) {
       console.error("Failed to verify subscription status:", err);
       return false;
