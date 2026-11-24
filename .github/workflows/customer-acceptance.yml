@@ -38,6 +38,12 @@ jobs:
         run: |
           supabase start --runtime native --exclude studio,mail,analytics,realtime,functions,pooler --eager
           supabase status --env > "$RUNNER_TEMP/local-supabase.env"
+      - name: Apply proposed ACL and verify real browser write denials
+        working-directory: backend
+        env:
+          LOCAL_SUPABASE_STATUS_FILE: ${{ runner.temp }}/local-supabase.env
+          PYTHONPATH: .
+        run: python scripts/verify_paid_api_acl.py
       - name: Execute real application acceptance checkpoints
         working-directory: backend
         env:
