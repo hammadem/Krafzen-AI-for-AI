@@ -86,6 +86,10 @@ def main():
                 stdout=backlog,stderr=subprocess.STDOUT)
             processes.append(backend)
             wait_http(API+"/health",backend)
+            preflight=requests.options(API+"/api/v1/projects/",headers={"Origin":WEB,"Access-Control-Request-Method":"POST","Access-Control-Request-Headers":"authorization,content-type,apikey"},timeout=20)
+            assert preflight.headers.get("Access-Control-Allow-Origin")==WEB
+            assert {"authorization","content-type","apikey"} <= {h.strip().lower() for h in preflight.headers.get("Access-Control-Allow-Headers","").split(",")}
+            note("Actual backend CORS preflight permits authenticated frontend API headers")
             frontend=subprocess.Popen(["npm","run","dev","--","--hostname","127.0.0.1"],
                 cwd=ROOT/"frontend",env=frontend_env,stdout=weblog,stderr=subprocess.STDOUT)
             processes.append(frontend)
