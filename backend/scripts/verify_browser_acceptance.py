@@ -125,6 +125,13 @@ def main():
                         raise
                     return page
                 with browser.new_context() as context:
+                    provider_page=context.new_page()
+                    provider_page.goto(WEB+"/login",wait_until="load")
+                    provider_page.get_by_role("button",name="Google").click()
+                    expect(provider_page.get_by_role("alert")).to_contain_text("not enabled",timeout=30000)
+                    assert urlsplit(provider_page.url).netloc==urlsplit(WEB).netloc
+                    note("Disabled Google OAuth stays on application and offers email fallback")
+                    provider_page.close()
                     page=login(context,unpaid_email,unpaid_password)
                     page.goto(WEB+"/workspace/projects")
                     expect(page.get_by_role("heading",name="An active paid subscription is required")).to_be_visible(timeout=60000)
