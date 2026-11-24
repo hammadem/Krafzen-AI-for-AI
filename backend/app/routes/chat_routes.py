@@ -6,7 +6,8 @@ import shutil
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
+from app.db.queries.project_queries import get_project
 from fastapi.responses import FileResponse, StreamingResponse
 from httpx import HTTPError
 from postgrest.exceptions import APIError
@@ -212,6 +213,11 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             else:
                 session_project_id = session_record.get("project_id")
         
+        if session_project_id:
+            linked_project = await get_project(session_project_id, user_data)
+            if not linked_project or linked_project.get("archived_at"):
+                raise HTTPException(status_code=409, detail="Restore the linked project before generating a design")
+
         # 2. Persist User Message
         await chat_history_service.add_message(session_id, "user", request.message)
 
@@ -547,16 +553,31 @@ async def create_chat_session(request: CreateSessionRequest, user_data: dict = D
     """
     user_id = user_data["user_id"]
     try:
-        session_id = await chat_history_service.create_session(user_id, title=request.title or "New Chat")
+        project_id = str(request.project_id) if request.project_id else None
+        if project_id:
+            project = await get_project(project_id, user_data)
+            if not project:
+                raise HTTPException(status_code=404, detail="Project not found")
+            if project.get("archived_at"):
+                raise HTTPException(status_code=409, detail="Restore project before editing")
+            sessions = await chat_history_service.get_user_sessions(user_id)
+            existing = next((s for s in sessions if s.get("project_id") == project_id), None)
+            if existing:
+                return existing
+            session_id = await chat_history_service.create_session(user_id, title=(project.get("input_text") or "Project")[:200], project_id=project_id)
+        else:
+            session_id = await chat_history_service.create_session(user_id, title=request.title or "New Chat")
         sessions = await chat_history_service.get_user_sessions(user_id)
         # Return the newly created session
         new_session = next((s for s in sessions if s["id"] == session_id), None)
         if new_session:
             return new_session
-        return {"id": session_id, "title": request.title or "New Chat", "created_at": None, "updated_at": None}
-    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
+        raise RuntimeError("Created chat session could not be read")
+    except HTTPException:
+        raise
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError):
         logger.exception("Error creating session")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=503, detail="Chat session unavailable")
 
 @router.get("/chat/history")
 async def get_chat_history(user_data: dict = Depends(require_auth)):
@@ -564,14 +585,17 @@ async def get_chat_history(user_data: dict = Depends(require_auth)):
     Get all chat sessions for the user.
     """
     user_id = user_data["user_id"]
-    return await chat_history_service.get_user_sessions(user_id)
+    try:
+        return await chat_history_service.get_user_sessions(user_id)
+    except (APIError, HTTPError, RuntimeError, TypeError, ValueError):
+        raise HTTPException(status_code=503, detail="Chat history unavailable")
 
 @router.get("/chat/history/{session_id}")
 async def get_session_history(
     session_id: str,
     response: Response,
-    limit: int = 30,
-    before: str | None = None,
+    limit: int = Query(30, ge=1, le=100),
+    before: str | None = Query(None, max_length=100),
     user_data: dict = Depends(require_auth)
 ):
     """
@@ -588,7 +612,10 @@ async def get_session_history(
     if not any(s['id'] == session_id for s in sessions):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    result = await chat_history_service.get_session_messages(session_id, limit=limit, before=before)
+    try:
+        result = await chat_history_service.get_session_messages(session_id, limit=limit, before=before)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Chat messages unavailable")
 
     t_end = time.perf_counter()
     auth_ms = round((t_auth - t_start) * 1000, 2)

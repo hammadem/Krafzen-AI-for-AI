@@ -14,13 +14,15 @@ class ChatHistoryService:
     Service to manage persistent chat history in Supabase.
     """
 
-    async def create_session(self, user_id: str, title: str = "New Chat") -> str:
+    async def create_session(self, user_id: str, title: str = "New Chat", project_id: str | None = None) -> str:
         """Creates a new chat session and returns its ID."""
         try:
             data = {
                 "user_id": user_id,
                 "title": title,
             }
+            if project_id:
+                data["project_id"] = project_id
             response = db.table("chat_sessions").insert(data).execute()
             if response.data:
                 return response.data[0]["id"]
@@ -85,10 +87,12 @@ class ChatHistoryService:
         try:
             # Order by updated_at descending
             response = db.table("chat_sessions").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
-            return response.data
-        except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
-            logger.error(f"Error fetching sessions: {e}")
-            return []
+            if response is None:
+                raise RuntimeError("Missing chat session response")
+            return response.data or []
+        except (APIError, HTTPError, KeyError, TypeError, ValueError, RuntimeError):
+            logger.exception("Error fetching sessions")
+            raise
 
     async def get_session_messages(
         self,
@@ -159,12 +163,7 @@ class ChatHistoryService:
             }
         except Exception as e:
             logger.exception("Error fetching messages")
-            return {
-                "messages": [],
-                "has_more": False,
-                "next_cursor": None,
-                "metrics": {"error": str(e)},
-            }
+            raise RuntimeError("Chat history unavailable") from e
 
 
     async def _get_feedback_for_message_ids(self, message_ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -288,7 +287,7 @@ class ChatHistoryService:
                 "updated_at": datetime.now().isoformat()
             }).eq("id", session_id).execute()
 
-            return response.data is not None
+            return bool(response.data)
         except Exception:
             logger.exception("Error updating session title")
             raise
