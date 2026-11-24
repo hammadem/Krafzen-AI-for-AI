@@ -12,7 +12,7 @@ permissions:
 jobs:
   acceptance:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,6 +29,7 @@ jobs:
           sudo systemctl stop clamav-freshclam || true
           sudo timeout 120 freshclam || echo "::warning::Signature refresh failed; scan availability will be tested without bypass"
       - name: Start disposable Supabase
+        id: local_stack
         env:
           SUPABASE_EXPERIMENTAL_STACK: "1"
         run: |
@@ -41,6 +42,27 @@ jobs:
           ACCEPTANCE_RESULT_FILE: ${{ runner.temp }}/customer-acceptance.json
           PYTHONPATH: .
         run: python scripts/verify_customer_acceptance.py
+      - uses: actions/setup-node@v4
+        if: always() && steps.local_stack.outcome == 'success'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install real frontend and browser
+        id: browser_dependencies
+        if: always() && steps.local_stack.outcome == 'success'
+        run: |
+          npm ci --prefix frontend
+          python -m pip install playwright==1.51.0
+          python -m playwright install --with-deps chromium
+      - name: Real browser acceptance with local API and Supabase
+        if: always() && steps.browser_dependencies.outcome == 'success'
+        working-directory: backend
+        env:
+          LOCAL_SUPABASE_STATUS_FILE: ${{ runner.temp }}/local-supabase.env
+          BROWSER_ACCEPTANCE_RESULT: ${{ runner.temp }}/browser-acceptance.json
+          PYTHONPATH: .
+        run: python scripts/verify_browser_acceptance.py
       - name: Read-only staging smoke
         if: always()
         run: |
@@ -60,7 +82,9 @@ jobs:
         if: always()
         with:
           name: customer-acceptance-checkpoints
-          path: ${{ runner.temp }}/customer-acceptance.json
+          path: |
+            ${{ runner.temp }}/customer-acceptance.json
+            ${{ runner.temp }}/browser-acceptance.json
           if-no-files-found: warn
       - name: Stop disposable stack
         if: always()
