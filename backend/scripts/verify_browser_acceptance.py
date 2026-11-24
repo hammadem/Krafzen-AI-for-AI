@@ -55,9 +55,9 @@ def main():
         output.write_text(json.dumps({"scope": "isolated real Chromium frontend acceptance; local QA entitlement", "checks": evidence}, indent=2))
         print("BROWSER PASS: " + step, flush=True)
     def account(paid=False):
-        email = "bqa-" + secrets.token_hex(5) + "@example.com"
-        password = "Qa!" + secrets.token_urlsafe(16) + "9a"
-        assert len(email) <= 32 and 8 <= len(password) <= 32, "QA credentials must satisfy the existing form schema"
+        email = "browser-acceptance-" + secrets.token_hex(12) + "@example.com"
+        password = "Qa!" + secrets.token_urlsafe(32) + "9a"
+        assert 32 < len(email) <= 254 and 32 < len(password) <= 72, "Exercise the corrected login validation limits"
         r = requests.post(supabase+"/auth/v1/admin/users",
           headers={"apikey":role,"Authorization":"Bearer "+role},
           json={"email":email,"password":password,"email_confirm":True},timeout=20)
@@ -132,10 +132,19 @@ def main():
                     assert urlsplit(provider_page.url).netloc==urlsplit(WEB).netloc
                     note("Disabled Google OAuth stays on application and offers email fallback")
                     provider_page.close()
+                    validation_page=context.new_page()
+                    validation_page.goto(WEB+"/logincred",wait_until="load")
+                    expect(validation_page.get_by_role("button",name="Submit",exact=True)).to_be_enabled()
+                    validation_page.get_by_placeholder("Email",exact=True).fill("not-an-email")
+                    validation_page.get_by_role("button",name="Submit",exact=True).click()
+                    expect(validation_page.get_by_text("Enter a valid email address.",exact=True)).to_be_visible()
+                    expect(validation_page.get_by_text("Password is required.",exact=True)).to_be_visible()
+                    validation_page.close()
+                    note("Browser login validation gives correct email and password errors")
                     page=login(context,unpaid_email,unpaid_password)
                     page.goto(WEB+"/workspace/projects")
                     expect(page.get_by_role("heading",name="An active paid subscription is required")).to_be_visible(timeout=60000)
-                    note("Real browser login: unpaid customer cannot enter workspace")
+                    note("Real browser login with email and password longer than 32 characters: unpaid customer cannot enter workspace")
                 with browser.new_context() as context:
                     page=login(context,email,password)
                     page.goto(WEB+"/workspace/projects")
