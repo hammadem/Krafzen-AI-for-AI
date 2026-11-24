@@ -24,8 +24,8 @@ export default function IFCValidationPanel({user,fileId}:Props) {
         try {
             const response=create?await runIfcModelValidation(user,fileId):await getIfcModelValidations(user,fileId);
             if(!response.ok) throw new Error(response.error?.message || "IFC validation evidence unavailable");
-            const found=(create?[response.data]:response.data) as RecordRow[];
-            if(!Array.isArray(found)||found.some(row=>row.file_id!==fileId||row.result?.method!=="ifcopenshell_source_validation_v1")) {
+            const found=(create?[response.data]:response.data) as unknown as RecordRow[];
+            if(!Array.isArray(found)||found.some(row=>!row||row.file_id!==fileId||row.result?.method!=="ifcopenshell_source_validation_v1")) {
                 throw new Error("Unexpected validation record");
             }
             setRows(previous=>create?[...found,...previous.filter(r=>r.id!==found[0]?.id)]:found);
