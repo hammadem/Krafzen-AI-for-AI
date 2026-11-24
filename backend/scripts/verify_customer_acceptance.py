@@ -139,6 +139,14 @@ def main():
 
         p,j=project("Residential QA fixture")
         note("A","Create project and job")
+        check(client.post(base+"/projects/",headers=headers,json={"input_text":"   "}),422)
+        check(client.post(base+"/projects/",headers=headers,json={"input_text":""}),422)
+        check(client.post(base+"/projects/",headers=headers,json={"input_text":"x"*20001}),422)
+        own_search=check(client.get(base+"/projects/",headers=headers,params={"q":"Residential QA"})).json()
+        assert {row["id"] for row in own_search} == {p}
+        assert check(client.get(base+"/projects/",headers=other,params={"q":"Residential QA"})).json() == []
+        check(client.delete(base+"/projects/"+p,headers=other),403)
+        note("Projects","Reject blank/oversized inputs, search only owned rows and deny cross-account deletion")
         # Workspace setup is explicitly a local-only prerequisite because
         # the existing API does not expose organization creation.
         with psycopg2.connect(dsn) as con, con.cursor() as cur:

@@ -35,10 +35,13 @@ export function useCreateProject(
             const controller = new AbortController();
             controllerRef.current = controller;
 
-            if (!input.trim()) setApiError({
-                type: "INVALID",
-                message: "Input field cannot be empty"
-            });
+            if (!input.trim() || input.length > 20000) {
+                setApiError({ type: "INVALID", message: "Enter project text of 1–20,000 characters" });
+                setStatus("error");
+                controllerRef.current = null;
+                return;
+            }
+            setApiError(null);
 
             setStatus("prompting");
             // the above means prompt being sent we could use recording if recording is happening
@@ -46,6 +49,7 @@ export function useCreateProject(
 
             const { error, ok, data } = await createAProject(user, input, controller);
 
+            if (controller.signal.aborted || controllerRef.current !== controller) return;
             if (ok) {
                 const project = data as ProjectDetails;
                 setCurrentProject(project);
