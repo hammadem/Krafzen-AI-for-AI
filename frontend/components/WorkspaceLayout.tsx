@@ -133,6 +133,8 @@ export default function WorkspaceLayout() {
   const { user, logout, session } = useAuth();
   
   const [activeTab, setActiveTab] = useState('parameters');
+  const [designSearch, setDesignSearch] = useState('');
+  const filteredSessions = sessions.filter(s => s.title.toLowerCase().includes(designSearch.trim().toLowerCase()));
   const [isRecording, setIsRecording] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -560,7 +562,7 @@ export default function WorkspaceLayout() {
           </button>
           <div className="workspace-rail-search">
             <Search className="w-3.5 h-3.5" />
-            <input type="search" placeholder="Search designs…" aria-label="Search designs" />
+            <input type="search" placeholder="Search designs…" aria-label="Search designs" value={designSearch} onChange={e=>setDesignSearch(e.target.value)} />
           </div>
         </div>
 
@@ -570,11 +572,11 @@ export default function WorkspaceLayout() {
             const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const yesterdayStart = new Date(todayStart.getTime() - 86400000);
             const groups: { label: string; items: typeof sessions }[] = [
-              { label: 'Today', items: sessions.filter(s => new Date(s.updated_at) >= todayStart) },
-              { label: 'Yesterday', items: sessions.filter(s => { const d = new Date(s.updated_at); return d >= yesterdayStart && d < todayStart; }) },
-              { label: 'Earlier', items: sessions.filter(s => new Date(s.updated_at) < yesterdayStart) },
+              { label: 'Today', items: filteredSessions.filter(s => new Date(s.updated_at) >= todayStart) },
+              { label: 'Yesterday', items: filteredSessions.filter(s => { const d = new Date(s.updated_at); return d >= yesterdayStart && d < todayStart; }) },
+              { label: 'Earlier', items: filteredSessions.filter(s => new Date(s.updated_at) < yesterdayStart) },
             ].filter(g => g.items.length > 0);
-            if (groups.length === 0) groups.push({ label: 'Recent', items: sessions });
+            if (groups.length === 0) return <p className="px-3 text-xs text-gray-400">{designSearch ? 'No matching designs' : 'No saved designs'}</p>;
             return groups.map(group => (
               <React.Fragment key={group.label}>
                 <div className="workspace-rail-group-label">{group.label} <span className="count">{group.items.length}</span></div>

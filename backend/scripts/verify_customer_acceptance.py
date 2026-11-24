@@ -139,6 +139,15 @@ def main():
 
         p,j=project("Residential QA fixture")
         note("A","Create project and job")
+        session_path = base + "/chat/session"
+        linked = check(client.post(session_path,headers=headers,json={"project_id":p})).json()
+        assert linked["project_id"] == p
+        assert check(client.post(session_path,headers=headers,json={"project_id":p})).json()["id"] == linked["id"]
+        check(client.post(session_path,headers=other,json={"project_id":p}),403)
+        check(client.get(base+"/chat/history/"+linked["id"],headers=other),403)
+        assert check(client.get(base+"/chat/history/"+linked["id"],headers=headers)).json()["messages"] == []
+        check(client.get(base+"/chat/history/"+linked["id"],headers=headers,params={"limit":101}),422)
+        note("Chat","Existing project links to persistent owner-scoped design session; reuse and tenant isolation verified without paid AI calls")
         check(client.post(base+"/projects/",headers=headers,json={"input_text":"   "}),422)
         check(client.post(base+"/projects/",headers=headers,json={"input_text":""}),422)
         check(client.post(base+"/projects/",headers=headers,json={"input_text":"x"*20001}),422)

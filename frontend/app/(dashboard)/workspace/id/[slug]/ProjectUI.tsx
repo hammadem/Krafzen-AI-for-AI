@@ -1,11 +1,13 @@
 "use client"
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
+import { useChat } from "@/context/ChatContext";
+import { useRouter } from "next/navigation";
 import { useDashboard } from "@/context/DashboardContext";
 import { useApiResource } from "@/hooks/useApiResource";
 import { getAProject, getAllJobs, getDashboardActivity } from "@/lib/api/api";
 import FilesPanel from "@/components/FilesPanel";
-import { AlertCircle, Check, Copy, Mic, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, Copy, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 
@@ -197,6 +199,9 @@ function ProjectFilesPanel({ projectId }: { projectId: string }) {
 
 export default function ProjectUI({ slug }: { slug: string }) {
     const { currentProject, user, setCurrentProject } = useAuth();
+    const { openProjectChat, isLoadingMessages } = useChat();
+    const router = useRouter();
+    const [opening, setOpening] = useState(false);
     const { setUserAction } = useDashboard();
     const [copied, setCopied] = useState<boolean>(false);
     const [status, setStatus] = useState<ReqState>("idle");
@@ -217,7 +222,9 @@ export default function ProjectUI({ slug }: { slug: string }) {
 
                 const { data, error, ok } = await getAProject(user, slug);
 
+                if (!isMounted) return;
                 if (!ok || error) {
+                    setCurrentProject(null);
                     setApiError(error);
                     setStatus("error");
                     return;
@@ -273,7 +280,7 @@ export default function ProjectUI({ slug }: { slug: string }) {
         );
     }
 
-    if (status === "inprogress" || !currentProject) {
+    if (status !== "success" || !currentProject || currentProject.id !== slug) {
         return (
             <div className="w-full h-full flex flex-col gap-6 p-8 bg-black">
                 {/* User message skeleton */}
@@ -304,11 +311,12 @@ export default function ProjectUI({ slug }: { slug: string }) {
                                     <h1 className="text-white font-normal">{currentProject?.input_text}</h1>
                                 </div>
                                 <span className="self-end flex gap-2 mt-3">
-                                    <Mic className="cursor-pointer"
-                                        onClick={() => {
-
-                                        }}
-                                    />
+                                    <button type="button" disabled={opening || isLoadingMessages} className="text-emerald-300 underline disabled:opacity-50" onClick={async () => {
+                                        setOpening(true);
+                                        try { await openProjectChat(slug); router.push("/workspace"); }
+                                        catch (error) { toast.error(error instanceof Error ? error.message : "Could not open design"); }
+                                        finally { setOpening(false); }
+                                    }}>{opening ? "Opening design…" : "Open AI design chat"}</button>
                                     {copied ? (
                                         <Check className="text-white cursor-pointer" />
                                     ) : (
