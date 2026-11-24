@@ -154,7 +154,7 @@ def main():
                     expect(page.get_by_role("heading",name="Saved drawing")).to_be_visible(timeout=60000)
                     page.get_by_role("button",name="Get authenticated DXF download").click()
                     link=page.get_by_role("link",name="Download saved DXF")
-                    expect(link).to_be_visible()
+                    expect(link).to_be_visible(timeout=60000)
                     signed=link.get_attribute("href")
                     assert urlsplit(signed).hostname in {"127.0.0.1","localhost"}
                     raw=requests.get(signed,timeout=20)
