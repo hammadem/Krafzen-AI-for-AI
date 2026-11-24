@@ -25,7 +25,7 @@ export const formSchema = z.object({
         .max(32, "Phone number must be at most 32 characters."),
     message: z.string().trim()
         .min(20, "Message must be at least 20 characters.")
-        .max(100, "Message must be at most 100 characters."),
+        .max(4000, "Message must be at most 4000 characters."),
 });
 
 export const loginSchema = z.object({

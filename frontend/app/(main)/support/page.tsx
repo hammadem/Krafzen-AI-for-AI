@@ -10,19 +10,19 @@ export default function SupportPage() {
     const faqs = [
         {
             q: "How do I export to my CAD software?",
-            a: "Every plan supports DWG, DXF, and Revit (RVT) export. Click Export in the top‑right of the workspace. Pro and above also include CSV and direct connectors to Google Drive and Dropbox."
+            a: "Open CAD to generate a dimensioned DXF, or Exports to download supported project files. DWG requires a configured converter. Native RVT generation and direct cloud-drive connectors are not currently verified."
         },
         {
             q: "How do I report an inaccuracy in a generated drawing?",
-            a: "Inside the workspace, use the Comment tool on the canvas to flag the specific element. Send the comment thread URL to hello@krafzen.com. We log accuracy reports against the model so the issue is fixed for everyone using your account."
+            a: "Use Reviews to record drawing findings and redlines, then contact hello@krafzen.com with the project identifier and a description of the issue. Do not rely on an unreviewed generated drawing for construction."
         },
         {
             q: "I got rate‑limited. What now?",
-            a: "Your plan has a per‑minute and per‑month request budget. Hitting the per‑minute cap usually means the queue is backed up — wait 30 seconds. If you&apos;re hitting the per‑month cap, you can upgrade in the workspace or contact us for a one‑time top‑up."
+            a: "Check the usage and entitlement status in your workspace. If a temporary limit is reported, retry later; if your allowance has been exhausted, contact support."
         },
         {
             q: "How is billing handled?",
-            a: "Monthly and annual subscriptions are billed via Stripe. Annual plans are 2 months free. Cancel anytime — your account stays active through the end of the paid period. Enterprise contracts are invoiced separately."
+            a: "Workspace access requires a verified subscription entitlement. Online checkout is currently deferred on the integration deployment; contact support for account-access questions."
         }
     ];
 

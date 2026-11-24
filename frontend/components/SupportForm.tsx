@@ -58,7 +58,7 @@ export default function SupportForm() {
                 result = undefined;
             }
 
-            if (!res.ok || result?.success === false) {
+            if (!res.ok || result?.success !== true) {
                 const message =
                     result?.error ||
                     result?.message ||
@@ -183,12 +183,13 @@ export default function SupportForm() {
                                                 id="message"
                                                 placeholder="Message"
                                                 rows={6}
+                                                maxLength={4000}
                                                 className="min-h-32 resize-none p-4 bg-transparent border-0 focus:ring-0"
                                                 aria-invalid={fieldState.invalid}
                                             />
                                             <InputGroupAddon align="block-end" className="border-t border-white/10 bg-zinc-900/50">
                                                 <InputGroupText className="tabular-nums text-xs text-gray-400 p-2">
-                                                    {field.value.length}/100 characters
+                                                    {field.value.length}/4000 characters
                                                 </InputGroupText>
                                             </InputGroupAddon>
                                         </InputGroup>
