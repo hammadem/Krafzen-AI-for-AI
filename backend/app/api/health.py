@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.security import _trusted_issuer
 from app.db.supabase_client import db
 from app.services.supabase_service import supabase_service
+from app.services.scanner_readiness import scanner_status
 
 router = APIRouter()
 
@@ -78,7 +79,11 @@ async def readiness_check():
     from app.services.dwg_converter_service import dwg_converter_service
     dwg_ready = bool(dwg_converter_service.is_configured())
     # A working web server does not imply imports can scan customer files.
-    scanner_detected = bool(shutil.which(os.getenv("CLAMSCAN_CMD", "clamscan")))
+    try:
+        scanner = await run_in_threadpool(scanner_status)
+    except Exception:
+        scanner = {"scanner_binary_detected": False, "scanner_signature_metadata_current": False}
+    scanner_detected = scanner["scanner_binary_detected"]
     ifc_parser_installed = importlib.util.find_spec("ifcopenshell") is not None
     potrace_detected = bool(shutil.which("potrace"))
 
@@ -93,6 +98,8 @@ async def readiness_check():
         "paid_webhook_ledger_schema": ("payment_webhook_events", "event_id"),
         "paid_subscription_schema": ("user_subscriptions", "last_paid_at"),
         "project_archive_schema": ("projects", "archived_at"),
+        "project_metadata_schema": ("projects", "title,description,project_type,lifecycle_stage"),
+        "field_notes_schema": ("field_observation_notes", "id,inspection_id,kind,body"),
         "asbuilt_comparison_schema": ("asbuilt_comparisons", "id"),
         "drawing_redline_schema": ("drawing_redlines", "id"),
         "field_inspection_schema": ("field_inspections", "id"),
@@ -151,6 +158,7 @@ async def readiness_check():
         "billing": billing_ready,
         "dwg_converter": dwg_ready,
         "import_scanner_detected": scanner_detected,
+        "import_signature_metadata_current": scanner["scanner_signature_metadata_current"],
         "ifc_parser_installed": ifc_parser_installed,
         "dxf_tracer_detected": potrace_detected,
         **schema_checks,
@@ -177,7 +185,7 @@ async def import_capabilities():
     successfully process a model. Import endpoints still fail closed.
     """
     checks = {
-        "scanner_binary_detected": bool(shutil.which(os.getenv("CLAMSCAN_CMD", "clamscan"))),
+        **(await run_in_threadpool(scanner_status)),
         "ifc_parser_installed": importlib.util.find_spec("ifcopenshell") is not None,
         "dxf_tracer_detected": bool(shutil.which("potrace")),
     }
@@ -185,6 +193,7 @@ async def import_capabilities():
         "status": "prerequisites_detected" if all(checks.values()) else "incomplete",
         "dependencies": checks,
         "scanner_signatures_verified": False,
+        "diagnostic_scope": "Binary and signature date only; actual scanning and storage are verified separately.",
         "storage_upload_verified": False,
     }
 

@@ -13,6 +13,7 @@ import importlib.util
 import shutil
 import subprocess
 import tempfile
+from threading import Lock
 import uuid
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from app.utils.storage_service import storage_service
 MAX_DXF_BYTES = 25 * 1024 * 1024
 MAX_IFC_BYTES = 40 * 1024 * 1024
 SCAN_TIMEOUT_SECONDS = 60
+_scan_slot = Lock()
 IFC_PARSE_TIMEOUT_SECONDS = 90
 
 
@@ -38,9 +40,13 @@ def _scan_file(path: Path) -> None:
         raise HTTPException(
             status_code=503, detail="Import scanner is not configured; upload rejected."
         )
+    if not _scan_slot.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="Scanner is busy; retry later.")
     try:
         scan = subprocess.run(
-            [scanner, "--no-summary", str(path)],
+            [scanner, "--no-summary", "--official-db-only=yes", "--fail-if-cvd-older-than=3",
+             "--max-filesize=50M", "--max-scansize=150M", "--alert-exceeds-max=yes",
+             "--alert-encrypted=yes", str(path)],
             capture_output=True,
             text=True,
             timeout=SCAN_TIMEOUT_SECONDS,
@@ -50,8 +56,10 @@ def _scan_file(path: Path) -> None:
         raise HTTPException(
             status_code=503, detail="Import scanner unavailable or timed out."
         ) from exc
+    finally:
+        _scan_slot.release()
     if scan.returncode == 1:
-        raise HTTPException(status_code=422, detail="Upload rejected by malware scanner.")
+        raise HTTPException(status_code=422, detail="Upload rejected by malware scanner or scan safety limits.")
     if scan.returncode != 0:
         raise HTTPException(status_code=503, detail="Import scanner could not validate the file.")
 

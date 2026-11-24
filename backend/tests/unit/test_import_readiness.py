@@ -38,7 +38,7 @@ def test_readiness_reports_ifc_migration_missing(client, monkeypatch):
         patch(
             "app.api.health.run_in_threadpool",
             new_callable=AsyncMock,
-            side_effect=[{"connected": True}, RuntimeError("column missing")],
+            side_effect=[{"connected": True}, {"scanner_binary_detected":False,"scanner_signature_metadata_current":False}, RuntimeError("column missing")]+[RuntimeError("missing")]*20,
         ),
     ):
         response = client.get("/health/ready")
