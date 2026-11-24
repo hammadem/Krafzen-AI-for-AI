@@ -24,6 +24,7 @@ VALID_NOTIFICATION_TYPES = {
     "export_requires_review",
     "validation_update",
     "import_completed",
+    "project_assignment",
 }
 
 
