@@ -1567,7 +1567,7 @@ export default function WorkspaceLayout() {
             className="workspace-prompt-input" 
             id="promptInput" 
             rows={1} 
-            placeholder="Iterate on this design... e.g. 'add a kitchen island 6 feet wide'" 
+            placeholder="Describe a design, or type /reference IFC walls to search references" 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(selectedMsg?.imageUrl || undefined); } }}
