@@ -23,7 +23,16 @@ interface ApiReqJob {
     jobId: string | undefined
 }
 
+type ProjectType = "residential" | "commercial" | "industrial" | "institutional" | "infrastructure" | "mixed_use" | "other";
+type ProjectStage = "draft" | "in_progress" | "in_review" | "completed";
+interface ProjectMetadata { title: string; description: string; project_type: ProjectType | null; lifecycle_stage: ProjectStage }
 interface ProjectDetails {
+    title?: string | null;
+    description?: string | null;
+    project_type?: ProjectType | null;
+    lifecycle_stage?: ProjectStage;
+    archived_at?: string | null;
+    archived_by?: string | null;
     created_at: string;
     dxf_url: string | null;
     dwg_url?: string | null;

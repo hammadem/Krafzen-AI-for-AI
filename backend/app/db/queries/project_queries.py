@@ -1,4 +1,5 @@
 import uuid
+import json
 from datetime import UTC, datetime
 from typing import Any
 
@@ -24,6 +25,7 @@ async def create_project(project_data: ProjectCreate, user: dict[str, Any]) -> d
         payload = {
             "user_id": user["user_id"],
             "input_text": project_data.input_text,
+            **project_data.model_dump(exclude={"input_text"}, exclude_unset=True),
             "parsed_json": None,
             "created_at": datetime.now(UTC).isoformat(),
         }
@@ -46,7 +48,7 @@ async def create_project(project_data: ProjectCreate, user: dict[str, Any]) -> d
         return None  
 
 # GET ALL PROJECTS FOR THE LOGGED-IN USER
-async def get_projects(user: dict[str, Any], page: int = 1, limit: int = 10, status: str | None = None, archived: bool = False, search: str | None = None) -> list[dict[str, Any]]:  
+async def get_projects(user: dict[str, Any], page: int = 1, limit: int = 10, status: str | None = None, archived: bool = False, search: str | None = None, project_type: str | None = None, lifecycle_stage: str | None = None) -> list[dict[str, Any]]:  
     if not user or "user_id" not in user:
         logger.warning("[get_projects] Invalid user context")
         return []
@@ -65,10 +67,16 @@ async def get_projects(user: dict[str, Any], page: int = 1, limit: int = 10, sta
                 query = query.filter("archived_at", "not.is", "null")
             else:
                 query = query.is_("archived_at", "null")
+            if project_type:
+                query = query.eq("project_type", project_type)
+            if lifecycle_stage:
+                query = query.eq("lifecycle_stage", lifecycle_stage)
             if search and search.strip():
                 # Escape SQL LIKE wildcards; the value is a PostgREST filter, never SQL.
                 term = search.strip().replace(chr(92), chr(92) * 2).replace("%", chr(92) + "%").replace("_", chr(92) + "_")
-                query = query.ilike("input_text", "%" + term + "%")
+                # Quoted PostgREST filter values prevent commas/parentheses in names from becoming filter syntax.
+                pattern = json.dumps("%" + term + "%", ensure_ascii=False)
+                query = query.or_(",".join(f"{column}.ilike.{pattern}" for column in ("input_text", "title", "description")))
             return query.order("created_at", desc=True).order("id", desc=True).range(offset, offset + limit - 1).execute()
         response = await run_in_threadpool(build_query)
 
@@ -147,8 +155,8 @@ async def update_project(project_id: str, update_data: ProjectUpdate, user: dict
         if existing.get("archived_at"):
             raise HTTPException(status_code=409, detail="Restore project before editing")
         payload = update_data.model_dump(exclude_unset=True)
-        if set(payload) != {"input_text"} or not isinstance(payload["input_text"], str) or not payload["input_text"].strip():
-            raise HTTPException(status_code=422, detail="Only nonempty project text can be edited")
+        if not payload or ("input_text" in payload and (not isinstance(payload["input_text"], str) or not payload["input_text"].strip())):
+            raise HTTPException(status_code=422, detail="Provide valid project information to update")
         payload["updated_at"] = datetime.now(UTC).isoformat()  
         response = await run_in_threadpool(
             lambda: db.table("projects")

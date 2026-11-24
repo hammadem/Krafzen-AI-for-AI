@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 const DEFAULT_LIMIT = 20;
 
 /** Paginated owner-scoped catalog. Old requests cannot overwrite a new search or session. */
-export function useFetchProjects(initialPage = 1, search = "", archived = false) {
+export function useFetchProjects(initialPage = 1, search = "", archived = false, projectType?: ProjectType, lifecycleStage?: ProjectStage) {
     const { user } = useAuth();
     const [projects, setProjects] = useState<ProjectDetails[]>([]);
     const [status, setStatus] = useState<ReqState>("idle");
@@ -26,7 +26,7 @@ export function useFetchProjects(initialPage = 1, search = "", archived = false)
         setStatus("inprogress");
         setApiError(null);
         const timer = window.setTimeout(async () => {
-            const response = await getAllProjects(user, principal, page, DEFAULT_LIMIT, {search, archived});
+            const response = await getAllProjects(user, principal, page, DEFAULT_LIMIT, {search, archived, projectType, lifecycleStage});
             if (generation.current !== current) return;
             if (!response.ok) {
                 setProjects([]); setHasMore(false); setStatus("error"); setApiError(response.error);
@@ -53,7 +53,7 @@ export function useFetchProjects(initialPage = 1, search = "", archived = false)
         return () => { window.clearTimeout(timer); ++generation.current; };
         // Authorization depends on the actual principal/token rather than unrelated profile refreshes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [principal, token, page, search, archived, reload]);
+    }, [principal, token, page, search, archived, projectType, lifecycleStage, reload]);
 
     const forceRefetch = useCallback(() => setReload((value) => value + 1), []);
     const nextPage = useCallback(() => { if (hasMore) setPage((p) => p + 1); }, [hasMore]);

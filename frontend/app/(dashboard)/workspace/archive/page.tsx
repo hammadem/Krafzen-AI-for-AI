@@ -156,7 +156,7 @@ export default function ArchivePage() {
                                     <Folder className="w-4 h-4 text-[#94a3b8] group-hover:text-[#54e3b5]" />
                                 </span>
                                 <span className="text-sm text-white truncate group-hover:text-[#54e3b5] transition-colors">
-                                    {p.input_text || "Untitled Project"}
+                                    {p.title || p.input_text || "Untitled Project"}
                                 </span>
                             </Link>
                             <span className="text-[11px] font-mono text-[#94a3b8] flex items-center gap-1.5 uppercase">
@@ -168,7 +168,7 @@ export default function ArchivePage() {
                                 disabled={restoring === p.id}
                                 onClick={() => void restore(p.id)}
                                 className="text-[11px] font-semibold text-[#54e3b5] uppercase tracking-wider justify-self-end hover:underline disabled:opacity-50"
-                                aria-label={`Restore ${p.input_text || "Untitled Project"}`}
+                                aria-label={`Restore ${p.title || p.input_text || "Untitled Project"}`}
                             >
                                 {restoring === p.id ? "Restoring…" : "Restore"}
                             </button>
