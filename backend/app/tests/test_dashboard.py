@@ -5,6 +5,7 @@ Owner: Tazwar
 
 import time
 from unittest.mock import AsyncMock, patch
+from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
@@ -243,40 +244,54 @@ async def test_workspace_summary_counts_by_status():
         assert data["requires_attention"] == 1  # only failed (no requires_review in mock)
 
 
+NOTIFICATION_ID = "00000000-0000-0000-0000-000000000012"
+PERSISTED_NOTIFICATION = {
+    "id": NOTIFICATION_ID,
+    "type": "import_completed",
+    "message": "Imported and validated drawing.dxf",
+    "is_read": False,
+    "created_at": "2026-11-24T12:00:00+00:00",
+}
+
+
 @pytest.mark.asyncio
 async def test_notifications_return_sunny_expected_shape():
-    with patch("app.routes.dashboard_routes.get_projects", new=AsyncMock(return_value=MOCK_PROJECTS)), \
-         patch("app.routes.dashboard_routes.get_jobs", new=AsyncMock(return_value=MOCK_JOBS)), \
-         patch("app.middlewares.auth.require_auth", return_value=MOCK_USER):
+    with patch("app.routes.dashboard_routes.get_notification_page", new=AsyncMock(return_value=([PERSISTED_NOTIFICATION], 1))) as get_page:
         async with AsyncClient(app=app, base_url="http://test") as ac:
             resp = await ac.get(BASE + "/notifications")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "notifications" in data
-        assert "total" in data
-        notif = data["notifications"][0]
-        # Sunny's exact required fields
-        assert "id" in notif
-        assert "title" in notif
-        assert "message" in notif
-        assert "read" in notif
-        assert "created_at" in notif
-        assert "type" in notif
-        assert notif["type"] in ("success", "error", "warning", "info")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    notification = resp.json()["notifications"][0]
+    assert datetime.fromisoformat(notification["created_at"].replace("Z", "+00:00")) == datetime.fromisoformat(PERSISTED_NOTIFICATION["created_at"])
+    assert {k: v for k, v in notification.items() if k != "created_at"} == {
+        "id": NOTIFICATION_ID, "title": "Import completed",
+        "message": PERSISTED_NOTIFICATION["message"], "read": False, "type": "success",
+    }
+    assert get_page.await_args.args[1:] == (False, 20, 0)
 
 
 @pytest.mark.asyncio
 async def test_notifications_unread_only_filter():
-    with patch("app.routes.dashboard_routes.get_projects", new=AsyncMock(return_value=MOCK_PROJECTS)), \
-         patch("app.routes.dashboard_routes.get_jobs", new=AsyncMock(return_value=MOCK_JOBS)), \
-         patch("app.middlewares.auth.require_auth", return_value=MOCK_USER):
+    with patch("app.routes.dashboard_routes.get_notification_page", new=AsyncMock(return_value=([PERSISTED_NOTIFICATION], 5))) as get_page:
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            resp = await ac.get(BASE + "/notifications?unread_only=true")
-        assert resp.status_code == 200
-        data = resp.json()
-        # All returned notifications must be unread
-        for n in data["notifications"]:
-            assert n["read"] is False
+            resp = await ac.get(BASE + "/notifications?unread_only=true&limit=1&offset=2")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 5
+    assert resp.json()["notifications"][0]["read"] is False
+    assert get_page.await_args.args[1:] == (True, 1, 2)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("updated,expected_status", [(True, 200), (False, 404)])
+async def test_notification_read_updates_persisted_record(updated, expected_status):
+    with patch("app.routes.dashboard_routes.mark_as_read", new=AsyncMock(return_value=updated)) as mark:
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            resp = await ac.patch(BASE + "/notifications/" + NOTIFICATION_ID + "/read")
+    assert resp.status_code == expected_status
+    assert mark.await_args.args[0] == NOTIFICATION_ID
+    assert mark.await_args.args[1]
+    if updated:
+        assert resp.json() == {"id": NOTIFICATION_ID, "read": True}
 
 
 @pytest.mark.asyncio

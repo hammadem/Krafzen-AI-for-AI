@@ -19,6 +19,7 @@ from app.db.queries.file_queries import (
 from app.middlewares.auth import require_auth
 from app.models.file_model import FileCreate, FileResponse, FileUpdate
 from app.services.import_service import import_document_for_job, import_dxf_for_job, import_ifc_for_job
+from app.services.notification_service import create_notification
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -48,7 +49,13 @@ async def import_dxf_route(
 ):
     """Accept a DXF into a verified project/job after mandatory scanning."""
     try:
-        return await import_dxf_for_job(job_id=job_id, upload=upload, user=user)
+        record = await import_dxf_for_job(job_id=job_id, upload=upload, user=user)
+        await create_notification(
+            user_id=user["user_id"], notification_type="import_completed",
+            message="Imported and validated " + record["name"],
+            project_id=record["project_id"], metadata={"file_id": record["id"]},
+        )
+        return record
     finally:
         await upload.close()
 
@@ -61,7 +68,13 @@ async def import_ifc_route(
 ):
     """Import scanned and parsed IFC models with stored BIM metadata."""
     try:
-        return await import_ifc_for_job(job_id=job_id, upload=upload, user=user)
+        record = await import_ifc_for_job(job_id=job_id, upload=upload, user=user)
+        await create_notification(
+            user_id=user["user_id"], notification_type="import_completed",
+            message="Imported and validated " + record["name"],
+            project_id=record["project_id"], metadata={"file_id": record["id"]},
+        )
+        return record
     finally:
         await upload.close()
 
@@ -74,7 +87,13 @@ async def import_document_route(
 ):
     """Import an authenticated, scanned and parsed project document."""
     try:
-        return await import_document_for_job(job_id=job_id, upload=upload, user=user)
+        record = await import_document_for_job(job_id=job_id, upload=upload, user=user)
+        await create_notification(
+            user_id=user["user_id"], notification_type="import_completed",
+            message="Imported and validated " + record["name"],
+            project_id=record["project_id"], metadata={"file_id": record["id"]},
+        )
+        return record
     finally:
         await upload.close()
 

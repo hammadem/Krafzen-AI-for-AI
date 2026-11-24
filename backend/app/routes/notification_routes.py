@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, Query
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.middlewares.auth import require_auth
 from app.services.notification_service import get_notifications, mark_as_read
@@ -15,6 +17,7 @@ async def list_notifications(
 
 
 @router.patch("/{notification_id}/read")
-async def read_notification(notification_id: str, user=Depends(require_auth)):
-    success = await mark_as_read(notification_id, user["user_id"])
-    return {"success": success}
+async def read_notification(notification_id: UUID, user=Depends(require_auth)):
+    if not await mark_as_read(str(notification_id), user["user_id"]):
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"success": True}

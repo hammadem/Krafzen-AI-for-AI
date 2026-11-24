@@ -356,11 +356,12 @@ export async function restoreFileRevision(user: User | null, revisionId: string)
 // Notifications (auth-scoped). Supports unread_only + limit.
 export async function getDashboardNotifications(
     user: User | null,
-    opts?: { unreadOnly?: boolean; limit?: number }
+    opts?: { unreadOnly?: boolean; limit?: number; offset?: number }
 ) {
     const qs = new URLSearchParams();
     if (opts?.unreadOnly) qs.set("unread_only", "true");
     if (opts?.limit) qs.set("limit", String(opts.limit));
+    if (opts?.offset) qs.set("offset", String(opts.offset));
     const query = qs.toString() ? `?${qs.toString()}` : "";
     return apiClient("GET", DASHBOARD_URLS.GET_NOTIFICATIONS(query), user);
 }

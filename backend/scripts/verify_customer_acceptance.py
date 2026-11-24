@@ -269,6 +269,23 @@ def main():
             a=upload(j,"original.dxf",drawing())
             b=upload(j,"revised.dxf",drawing(100,-50,True))
             note("A/D","Actual scanned original and revised DXF imports")
+            inbox_path = base + "/dashboard/notifications"
+            unread = check(client.get(inbox_path,headers=headers,params={"unread_only":True,"limit":1})).json()
+            assert unread["total"] >= 2 and len(unread["notifications"]) == 1
+            notification = unread["notifications"][0]
+            assert notification["title"] == "Import completed" and notification["read"] is False
+            second = check(client.get(inbox_path,headers=headers,params={"unread_only":True,"limit":1,"offset":1})).json()
+            assert second["notifications"][0]["id"] != notification["id"]
+            notification_id = notification["id"]
+            check(client.patch(inbox_path+"/"+notification_id+"/read",headers=other),404)
+            assert all(row["id"] != notification_id for row in check(client.get(inbox_path,headers=other)).json()["notifications"])
+            check(client.patch(inbox_path+"/"+notification_id+"/read",headers=headers))
+            refreshed = check(client.get(inbox_path,headers=headers)).json()["notifications"]
+            assert any(row["id"] == notification_id and row["read"] for row in refreshed)
+            assert all(row["id"] != notification_id for row in check(client.get(inbox_path,headers=headers,params={"unread_only":True})).json()["notifications"])
+            direct = check(client.get(base+"/notifications/",headers=headers)).json()
+            assert any(row["id"] == notification_id and row["is_read"] for row in direct)
+            note("Notifications","Real scanned import emits a persisted inbox notification; pagination, read-state persistence and tenant isolation verified")
             result=check(client.post(base+"/asbuilt/compare",headers=headers,json={
               "project_id":p,"original_file_id":a,"revised_file_id":b,
               "alignment":{"original":{"x":0,"y":0},"revised":{"x":100,"y":-50},
