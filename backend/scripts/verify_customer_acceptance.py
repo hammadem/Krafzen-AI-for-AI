@@ -156,6 +156,25 @@ def main():
         assert check(client.get(base+"/projects/",headers=other,params={"q":"Residential QA"})).json() == []
         check(client.delete(base+"/projects/"+p,headers=other),403)
         note("Projects","Reject blank/oversized inputs, search only owned rows and deny cross-account deletion")
+        metadata = {"title":"Campus, Phase (2)", "description":"Detailed commercial design", "project_type":"commercial", "lifecycle_stage":"in_review"}
+        detailed = check(client.post(base+"/projects/",headers=headers,json={**metadata,"input_text":"Campus structured project"}),201).json()
+        detailed_id = detailed["id"]
+        assert all(detailed[key] == value for key,value in metadata.items())
+        check(client.patch(base+"/projects/"+detailed_id,headers=other,json={"title":"Unauthorized"}),403)
+        changed = check(client.patch(base+"/projects/"+detailed_id,headers=headers,json={"title":"Campus, Phase (3)","lifecycle_stage":"completed"})).json()
+        assert changed["title"] == "Campus, Phase (3)" and changed["lifecycle_stage"] == "completed"
+        assert check(client.get(base+"/projects/"+detailed_id,headers=headers)).json()["description"] == metadata["description"]
+        assert {row["id"] for row in check(client.get(base+"/projects/",headers=headers,params={"q":"Campus, Phase (3)","project_type":"commercial","lifecycle_stage":"completed"})).json()} == {detailed_id}
+        assert check(client.get(base+"/projects/",headers=other,params={"q":"Campus, Phase (3)"})).json() == []
+        check(client.patch(base+"/projects/"+detailed_id,headers=headers,json={"title":"   "}),422)
+        check(client.patch(base+"/projects/"+detailed_id,headers=headers,json={"lifecycle_stage":"fake"}),422)
+        check(client.patch(base+"/projects/"+detailed_id,headers=headers,json={"dxf_url":"https://fake.example/dxf"}),422)
+        check(client.post(base+"/projects/"+detailed_id+"/archive",headers=headers))
+        check(client.patch(base+"/projects/"+detailed_id,headers=headers,json={"title":"Archived edit"}),409)
+        check(client.post(base+"/projects/"+detailed_id+"/restore",headers=headers))
+        assert check(client.get(base+"/projects/"+detailed_id,headers=headers)).json()["title"] == "Campus, Phase (3)"
+        check(client.delete(base+"/projects/"+detailed_id,headers=headers))
+        note("Projects","Structured project metadata persists, filters correctly, and remains protected by owner and archive rules")
         check(client.post(base+"/workspaces/",headers=headers,json={"name":"   "}),422)
         created = check(client.post(base+"/workspaces/",headers=headers,json={"name":"Isolated collaboration QA"}),201).json()
         ws = created["id"]

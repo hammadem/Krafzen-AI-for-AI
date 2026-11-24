@@ -564,7 +564,7 @@ async def create_chat_session(request: CreateSessionRequest, user_data: dict = D
             existing = next((s for s in sessions if s.get("project_id") == project_id), None)
             if existing:
                 return existing
-            session_id = await chat_history_service.create_session(user_id, title=(project.get("input_text") or "Project")[:200], project_id=project_id)
+            session_id = await chat_history_service.create_session(user_id, title=(project.get("title") or project.get("input_text") or "Project")[:200], project_id=project_id)
         else:
             session_id = await chat_history_service.create_session(user_id, title=request.title or "New Chat")
         sessions = await chat_history_service.get_user_sessions(user_id)
