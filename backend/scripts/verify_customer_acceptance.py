@@ -52,9 +52,12 @@ def main():
     from pypdf import PdfReader
 
     evidence = []
+    def save_evidence():
+        Path(os.environ.get("ACCEPTANCE_RESULT_FILE","customer-acceptance.json")).write_text(json.dumps({"scope":"isolated backend API checkpoints; not full customer acceptance","payment":"deferred; local QA fixture only","checks":evidence},indent=2))
     def note(case, step, status="PASS"):
         evidence.append(dict(case=case, step=step, status=status))
         print(f"{status}: {case} | {step}", flush=True)
+        save_evidence()
 
     def user():
         email = "qa-" + secrets.token_hex(8) + "@example.com"
@@ -115,7 +118,8 @@ def main():
         other_uid, other = user()
         with psycopg2.connect(dsn) as con, con.cursor() as cur:
             cur.execute("SELECT trial_requests_remaining, plan_requests_remaining FROM public.user_subscriptions WHERE user_id=%s", (uid,))
-            assert cur.fetchone() == (0, 0)
+            balance = cur.fetchone()
+            assert balance == (0, 0), f"Expected zero signup balance; subscription row={balance is not None}"
         check(client.post(base+"/projects/", json={"input_text":"unauthenticated"}),401)
         check(client.post(base+"/projects/", headers=headers, json={"input_text":"unpaid"}),402)
         note("E", "Real Auth account + login; signup credits zero; unpaid and anonymous access rejected")
@@ -148,6 +152,17 @@ def main():
         signed=check(client.get(base+"/files/"+fid+"/signed-url",headers=headers)).json()
         assert signed.get("signed_url") or signed.get("signedUrl") or signed.get("url")
         note("A","Real dimensioned CAD generation persisted in private storage; signed link")
+        # Check actual signed storage bytes and dimensional DXF entities.
+        signed_path = signed.get("signed_url") or signed.get("signedUrl") or signed.get("url")
+        signed_parsed = urlsplit(signed_path)
+        assert signed_parsed.hostname in {"127.0.0.1", "localhost"}
+        downloaded = requests.get(signed_path, timeout=20)
+        assert downloaded.status_code == 200
+        doc = ezdxf.read(io.StringIO(downloaded.content.decode("utf-8")))
+        assert doc.header["$INSUNITS"] == 6
+        assert len(doc.modelspace().query("DIMENSION")) >= 2
+        note("A","Downloaded private DXF parses with real dimension entities and metre units")
+
         preview=check(client.get(base+"/reviews/files/"+fid+"/preview.svg",headers=headers))
         assert b"<svg" in preview.content
         note("A","Actual CAD preview SVG")
@@ -218,7 +233,22 @@ def main():
                 files={"upload":("original.dxf",drawing(),"application/dxf")})
             check(response,503)
             note("A/C/D","Imports and dependent comparison/coordination: real scanner unavailable; import fails closed","BLOCKED")
-        note("B","Commercial multidisciplinary assignment, adopted-code full review, member audit","NOT_RUN")
+        if base+"/compliance/building-code-measurements" in paths:
+            from tests.unit.test_building_code_measurement_rules import CONTEXT, MEASURES
+            commercial,cj=project("Commercial QA fixture")
+            commercial_cad=check(client.post(base+"/cad/rooms",headers=headers,json={
+                "project_id":commercial,"job_id":cj,"room_name":"Commercial test source","exterior_width_m":10,
+                "exterior_length_m":8,"wall_thickness_m":0.2}),201).json()["file"]["id"]
+            code=check(client.post(base+"/compliance/building-code-measurements",headers=headers,json={
+                "project_id":commercial,"source_file_id":commercial_cad,
+                "jurisdiction":CONTEXT,"measurements":MEASURES}),201).json()
+            assert code["result"]["counts"]=={"pass":7,"fail":1,"unknown":0}
+            assert code["result"]["complete_code_compliance_determined"] is False
+            pdf(client.get(base+"/compliance/assessments/"+code["id"]+"/report.pdf",headers=headers))
+            note("B","Commercial project; real saved IBC/NFPA numeric screening and report using declared QA measurements")
+        else:
+            note("B","IBC/NFPA assessment route not in tested revision","BLOCKED")
+        note("B","Full multidisciplinary assignment, adopted-code comprehensive review, member audit","NOT_RUN")
         note("C","Browser interaction, properties/quantities, IFC revision comparison, comprehensive model validation","NOT_RUN")
         note("D","Full review and export workflow","NOT_RUN")
 
