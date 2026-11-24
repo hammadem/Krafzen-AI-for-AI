@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
-import type { Session } from "@supabase/supabase-js";
+import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
 import { getApiBaseUrl } from "@/lib/api/utils";
 import { clearCache } from "@/lib/api/cache";
 import { authLinkError } from "@/lib/auth/emailLinks";
@@ -86,6 +86,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       window.location.replace("/auth/callback?error_code=" + encodeURIComponent(authLinkError(url)!));
       return;
     }
+    if (url.pathname === "/" && url.searchParams.has("code")) {
+      void supabase.auth.getSession().then(() => { if (active) window.location.replace("/auth/callback"); }).catch(() => { if (active) window.location.replace("/auth/callback?error_code=access_denied"); });
+      return () => { active = false; };
+    }
     const adopt = (next: Session | null) => {
       if (!active) return;
       const epoch = ++authEpoch.current;
@@ -106,15 +110,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       const token = next.access_token;
       const metadata = next.user.user_metadata;
-      setUser({
+      setUser(prev => ({
+        ...(prev?.userId === id ? prev : {}),
         userId: id, email: next.user.email,
         access_token: token,
         firstname: metadata?.firstname || metadata?.full_name?.split(" ")[0],
         lastname: metadata?.lastname || metadata?.full_name?.split(" ").slice(1).join(" "),
         avatar_url: metadata?.avatar_url || metadata?.picture,
-        subscription_plan: "Free", can_access_workspace: false, has_active_subscription: false,
-        remaining_minutes: 0, total_minutes_purchased: 0,
-      });
+        subscription_plan: prev?.userId === id ? prev.subscription_plan : "Free",
+        can_access_workspace: prev?.userId === id && prev.can_access_workspace === true,
+        has_active_subscription: prev?.userId === id && prev.has_active_subscription === true,
+        remaining_minutes: prev?.userId === id ? prev.remaining_minutes : 0,
+        total_minutes_purchased: prev?.userId === id ? prev.total_minutes_purchased : 0,
+      }));
       setLoading(true);
       const controller = new AbortController();
       request = controller;
@@ -130,19 +138,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (typeof data?.balance?.can_access_workspace !== "boolean") throw new Error("Account access response incomplete.");
           if (active && epoch === authEpoch.current) updateUserFromSubscriptionStatus(data, token);
         } catch {
-          if (active && epoch === authEpoch.current) setAccessError("Account access could not be verified. Retry or sign in again.");
+          if (active && epoch === authEpoch.current) {
+            setUser(prev => prev?.access_token === token ? {...prev, can_access_workspace: false, has_active_subscription: false} : prev);
+            setAccessError("Account access could not be verified. Retry or sign in again.");
+          }
         } finally {
           if (active && epoch === authEpoch.current) setLoading(false);
         }
       }, 0);
     };
     let receivedEvent = false;
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, next: Session | null) => {
       receivedEvent = true;
       adopt(next);
     });
     // Also support clients that cannot deliver an initial auth event.
-    void supabase.auth.getSession().then(({ data }) => {
+    void supabase.auth.getSession().then(({ data }: {data: {session: Session | null}}) => {
       if (!receivedEvent) adopt(data.session ?? null);
     }).catch(() => { if (!receivedEvent) adopt(null); });
     return () => {
