@@ -1,10 +1,11 @@
+"""Authenticated Supabase user boundary for all paid and private APIs."""
 import logging
 from typing import Any
 
 from fastapi import Header, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
-from app.core.config import settings
 from app.core.security import decode_supabase_token
 
 
@@ -13,68 +14,50 @@ class ErrorResponse(BaseModel):
 
 
 async def require_auth(authorization: str = Header(None)) -> dict[str, Any]:
-
+    """Reject any token whose signing key/claims cannot be verified."""
     if not authorization:
         raise HTTPException(
             status_code=401,
-            detail=ErrorResponse(error="Missing Authorization header").model_dump()
+            detail=ErrorResponse(error="Missing Authorization header").model_dump(),
         )
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=401,
-            detail=ErrorResponse(error="Invalid Authorization format").model_dump()
+            detail=ErrorResponse(error="Invalid Authorization format").model_dump(),
         )
-
-    token = authorization.split(" ")[1].strip()
-
-    payload = decode_supabase_token(token)
-    if not payload:
-        logging.getLogger(__name__).error("Token decode failed or returned None")
+    token = authorization[7:].strip()
+    if not token or any(ch.isspace() for ch in token):
         raise HTTPException(
             status_code=401,
-            detail=ErrorResponse(error="Invalid or expired token").model_dump()
+            detail=ErrorResponse(error="Invalid Authorization format").model_dump(),
         )
 
-
+    # An asymmetric-key fetch may take network time. Never block the async
+    # event loop while validating a public Supabase JWKS signature.
+    payload = await run_in_threadpool(decode_supabase_token, token)
+    if not payload:
+        logging.getLogger(__name__).warning("Rejected unverified user access token")
+        raise HTTPException(
+            status_code=401,
+            detail=ErrorResponse(error="Invalid or expired token").model_dump(),
+        )
 
     user_id = payload.get("sub")
-    if not user_id:
-        logging.getLogger(__name__).error(f"Token missing user ID. Payload keys: {payload.keys()}")
+    if not isinstance(user_id, str) or not user_id.strip():
         raise HTTPException(
             status_code=401,
-            detail=ErrorResponse(error="Token missing user ID").model_dump()
+            detail=ErrorResponse(error="Invalid user access token").model_dump(),
         )
-    issuer = payload.get("iss", "").rstrip("/")
-
-    expected_base = settings.SUPABASE_URL.rstrip("/")
-
-    # Normalize issuer for check (handle trailing slash mismatch)
-    if not issuer.startswith(expected_base):
-        logging.getLogger(__name__).error(f"Invalid issuer: {issuer}. Expected startswith: {expected_base}")
-        raise HTTPException(
-            status_code=401,
-            detail=ErrorResponse(
-                error=f"Invalid issuer. Expected startswith {expected_base}, got {issuer}"
-            ).model_dump()
-        )
-
-    # Authentication success
+    # Issuer, authenticated role, expiry and audience were checked inside the
+    # same cryptographically verified decode; never re-read untrusted claims.
     return {"user_id": user_id}
 
 
 async def require_auth_optional(
-    authorization: str | None = Header(None)
+    authorization: str | None = Header(None),
 ) -> dict[str, Any] | None:
-    """
-    Optional version.
-    Returns:
-      - dict(user_id=...) if valid
-      - None if missing/invalid
-    """
-
     if not authorization:
         return None
-
     try:
         return await require_auth(authorization)
     except HTTPException:
