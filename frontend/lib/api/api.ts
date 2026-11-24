@@ -692,6 +692,19 @@ export async function createAdaAssessment(
     return apiClient("POST", "/api/v1/compliance/ada-measurements", user, payload);
 }
 
+/** Save edition-specific IBC/NFPA measurement evidence. */
+export async function createBuildingCodeAssessment(
+    user: User | null,
+    payload: {
+        project_id: string;
+        source_file_id?: string | null;
+        jurisdiction: Record<string, unknown>;
+        measurements: Record<string, unknown>;
+    }
+) {
+    return apiClient("POST", "/api/v1/compliance/building-code-measurements", user, payload);
+}
+
 export async function getProjectAdaAssessments(
     user: User | null, projectId: string
 ) {
