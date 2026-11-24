@@ -11,7 +11,7 @@ from app.db.queries.project_queries import (
     update_project,
 )
 from app.middlewares.auth import require_auth
-from app.models.project_model import ProjectCreate, ProjectOut, ProjectUpdate
+from app.models.project_model import ProjectCreate, ProjectOut, ProjectUpdate, ProjectType, ProjectStage
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -35,12 +35,14 @@ async def list_projects(
     status: str | None = Query(default=None),
     archived: bool = Query(default=False),
     q: str | None = Query(default=None, max_length=200),
+    project_type: ProjectType | None = Query(default=None),
+    lifecycle_stage: ProjectStage | None = Query(default=None),
 ):
     if status not in (None, "active", "archived"):
         raise HTTPException(status_code=422, detail="Invalid project status filter")
     if status == "active" and archived:
         raise HTTPException(status_code=422, detail="Conflicting archive filters")
-    projects = await get_projects(user, page=page, limit=limit, status=status, archived=archived, **({"search": q} if q else {}))
+    projects = await get_projects(user, page=page, limit=limit, status=status, archived=archived, **({"search": q} if q else {}), **({"project_type": project_type} if project_type else {}), **({"lifecycle_stage": lifecycle_stage} if lifecycle_stage else {}))
     return projects
 
 
