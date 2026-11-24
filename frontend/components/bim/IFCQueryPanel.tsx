@@ -33,7 +33,7 @@ export default function IFCQueryPanel({user,fileId}:{user:User|null;fileId:strin
             finally{setBusy(false);}
         }}>
             <label className="block text-sm">Model question<select className="block w-full bg-slate-900 border rounded p-2" value={mode} onChange={e=>setMode(e.target.value)}>{modes.map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label>
-            {mode!=="properties"&&<><label className="block text-sm">IFC element class<select className="block w-full bg-slate-900 border rounded p-2" value={kind} onChange={e=>setKind(e.target.value)}>{classes.map(v=><option key={v}>{v}</option>)}</select></label>
+            {mode!=="properties"&&<><label className="block text-sm">IFC element class<select className="block w-full bg-slate-900 border rounded p-2" value={kind} onChange={e=>setKind(e.target.value)}>{classes.map(v=><option key={v} value={v}>{v.replace(/^Ifc/,"")} ({v})</option>)}</select></label>
             <label className="block text-sm">Storey GlobalId (optional, direct containment)<input maxLength={22} value={storey} onChange={e=>setStorey(e.target.value)} className="block w-full bg-slate-900 border rounded p-2"/></label>
             {!!storeys.length&&<div className="flex gap-2 flex-wrap">{storeys.map(f=><button key={f.guid} type="button" className="text-xs underline" onClick={()=>setStorey(f.guid)}>{f.name||f.guid}</button>)}</div>}</>}
             {mode==="properties"&&<label className="block text-sm">Element GlobalId<input required minLength={22} maxLength={22} value={guid} onChange={e=>setGuid(e.target.value)} className="block w-full bg-slate-900 border rounded p-2"/></label>}
