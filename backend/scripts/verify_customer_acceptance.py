@@ -239,6 +239,11 @@ def main():
         assert check(client.get(base+"/activity/workspace/"+ws,headers=other)).json() == []
         note("B/Members","Real API workspace creation, catalog, invite, revoke, reissue, accept, role change, removal and scoped audit history")
 
+        prefs_path=base+"/notifications/preferences"
+        defaults=check(client.get(prefs_path,headers=headers)).json()
+        assert all(defaults.values())
+        assert check(client.put(prefs_path,headers=headers,json={**defaults,"field":False})).json()["field"] is False
+        assert check(client.get(prefs_path,headers=other)).json()["field"] is True
         inspection = check(client.post(base+"/field/inspections",headers=headers,json={
             "project_id":p,"title":"QA observation","description":"Recorded site observation",
             "discipline":"architecture","severity":"medium"}),201).json()
@@ -266,6 +271,13 @@ def main():
         pdf(report)
         assert "QA observation" in "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(report.content)).pages)
         note("Field","Real observation persistence, status transitions, authorization and parsed PDF report")
+        assert not any(row["type"]=="field_update" for row in check(client.get(base+"/notifications/",headers=headers)).json())
+        check(client.put(prefs_path,headers=headers,json=defaults))
+        check(client.patch(status_path,headers=headers,json={"status":"open"}))
+        assert any(row["type"]=="field_update" and row["metadata"]["source_id"]==inspection_id for row in check(client.get(base+"/notifications/",headers=headers)).json())
+        check(client.post(base+"/notifications/read-all",headers=headers))
+        assert check(client.get(base+"/notifications/",headers=headers,params={"unread_only":True})).json()==[]
+        note("Notifications","Persistent category preference suppresses real field events, reenable restores delivery, mark all read scoped to owner")
         forbidden=client.get(base+"/projects/"+p,headers=other)
         assert forbidden.status_code in (403,404)
         note("A","Different paid account cannot open project")
