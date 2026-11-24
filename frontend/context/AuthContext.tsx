@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       can_access_workspace?: boolean;
       in_free_signup_tier?: boolean;
     };
-  }) => {
+  }, token: string) => {
     const sub = data.subscription || {};
     const balance = data.balance || {};
     const planNameRaw = sub.plan_name || balance.plan_name || "free";
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const displayPlan =
       planName === "free" ? "Free" : planName.charAt(0).toUpperCase() + planName.slice(1);
     setUser((prev) =>
-      prev
+      prev?.access_token === token
         ? {
             ...prev,
             subscription_plan: displayPlan,
@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             trial_end_date: sub.trial_end_date ?? undefined,
             in_free_signup_tier: false,
           }
-        : null
+        : prev
     );
   };
 
@@ -115,7 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           });
           if (subRes.ok) {
             const subJson = await subRes.json();
-            updateUserFromSubscriptionStatus(subJson);
+            updateUserFromSubscriptionStatus(subJson, data.session.access_token);
           }
         } catch (err) {
           console.error("Failed to fetch subscription status:", err);
@@ -161,12 +161,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           .then(res => (res.status === 401 ? null : res.json()))
           .then(data => {
             if (data && typeof data === "object")
-              setUser(prev => prev ? {
+              setUser(prev => prev?.access_token === token ? {
                 ...prev,
                 remaining_minutes: data.remaining_minutes,
                 total_minutes_purchased: data.total_minutes_purchased,
                 subscription_plan: data.plan_tier || prev.subscription_plan
-              } : null);
+              } : prev);
           })
           .catch(() => {});
 
@@ -175,7 +175,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           headers: { Authorization: `Bearer ${token}` },
         })
           .then(res => (res.status === 401 ? null : res.json()))
-          .then(data => data && typeof data === "object" ? updateUserFromSubscriptionStatus(data) : undefined)
+          .then(data => data && typeof data === "object" ? updateUserFromSubscriptionStatus(data, token) : undefined)
           .catch(() => {});
 
       } else {
@@ -211,7 +211,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!data || typeof data !== "object" || !data.subscription || !data.balance) {
         return false;
       }
-      updateUserFromSubscriptionStatus(data);
+      updateUserFromSubscriptionStatus(data, currentSession.access_token);
       return data.balance.can_access_workspace === true;
     } catch (err) {
       console.error("Failed to verify subscription status:", err);
