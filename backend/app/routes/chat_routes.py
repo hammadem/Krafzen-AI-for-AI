@@ -517,7 +517,7 @@ async def generate_chat_response_stream(request: ChatRequest, user_data: dict = 
             raise HTTPException(status_code=404, detail="Chat session not found")
 
     def event(data):
-        return "data: " + json.dumps(data, ensure_ascii=False, allow_nan=False) + "\\n\\n"
+        return "data: " + json.dumps(data, ensure_ascii=False, allow_nan=False) + "\n\n"
 
     async def sse_generator():
         yield event({"type": "progress", "stage": "generating"})
