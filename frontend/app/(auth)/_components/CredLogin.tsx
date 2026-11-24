@@ -18,7 +18,6 @@ import { loginCredSchema } from "@/lib/validation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { toast } from "react-toastify";
-import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
@@ -32,7 +31,6 @@ export default function LoginWithCred() {
             password: "",
         },
     });
-    const { setUser } = useAuth();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
     const [hydrated, setHydrated] = useState(false);
@@ -55,21 +53,12 @@ export default function LoginWithCred() {
                 return;
             }
 
-            setUser({
-                userId: user?.user?.id,
-                email: user?.user?.email,
-                firstname: user?.user?.user_metadata?.firstname,
-                lastname: user?.user?.user_metadata?.lastname,
-                avatar_url: user?.user?.user_metadata?.avatar_url,
-                subscription_plan: "Free",
-                can_access_workspace: false,
-                has_active_subscription: false,
-                access_token: user?.session?.access_token,
-                remaining_minutes: 0,
-                total_minutes_purchased: 0
-            })
-
-            router.push("/auth/callback");
+            if (!user?.session?.access_token) {
+                toast.error("No authenticated session returned");
+                return;
+            }
+            // The AuthProvider owns session state; avoid racing its navigation.
+            router.replace("/auth/callback");
         } catch (err) {
             console.log(err);
             toast.error("Server Error");
