@@ -75,17 +75,13 @@ def coordinate_ifc_models(first, second, clearance_m=0.05):
         # Single thread keeps native memory/CPU demand bounded on free hosting.
         iterator = ifcopenshell.geom.iterator(settings, model, 1, include=usable)
         tree.add_iterator(iterator)
-        # Verify that the BVH actually contains each indexed element. A failed
-        # iterator must not result in an apparent clash-free model.
-        indexed = []
-        for element in usable:
-            try:
-                if any(p == element for p in tree.select_box(element)):
-                    indexed.append(element)
-            except Exception:
-                continue
-        if not indexed:
-            raise ValueError("Native geometry index is empty")
+        # BVH backends do not support select_box (that is a BRep-tree operation).
+        # Prevalidated shapes are inserted through the native iterator. If its
+        # geometry processing reports an error, refuse the whole result rather
+        # than treating absent shapes as clearance.
+        if iterator.had_error_processing_elements():
+            raise ValueError("Native IFC index failed to process selected geometry")
+        indexed = usable
         groups.append(indexed)
         memberships.append({_guid(e): e for e in indexed})
         summaries.append({
@@ -103,13 +99,28 @@ def coordinate_ifc_models(first, second, clearance_m=0.05):
         issues.append({"classification": "shared_global_id_across_sources",
                        "guid": guid, "severity": "review"})
 
-    def _ref(raw, model_index):
+    def _ref(raw):
         guid = str(raw.get_argument(0))
-        element = memberships[model_index].get(guid)
-        if element is None:
+        possible = [(i, group[guid]) for i, group in enumerate(memberships) if guid in group]
+        if len(possible) > 1:
+            actual = ifcopenshell.entity_instance(raw)
+            possible = [(i, entity) for i, entity in possible if entity == actual]
+        if len(possible) != 1:
             raise ValueError("Clash could not be attributed to its source model")
+        model_index, element = possible[0]
         return {"model_index": model_index, "guid": guid,
                 "ifc_type": element.is_a(), "name": str(element.Name or "")[:120]}
+
+    def _pair(result):
+        # IfcOpenShell may reverse its returned penetration direction to
+        # describe the deepest point. Keep each point attached to its element.
+        a, b = _ref(result.a), _ref(result.b)
+        p1, p2 = _point(result.p1), _point(result.p2)
+        if a["model_index"] == 1 and b["model_index"] == 0:
+            return b, a, p2, p1
+        if a["model_index"] != 0 or b["model_index"] != 1:
+            raise ValueError("Native result is not a cross-model pair")
+        return a, b, p1, p2
 
     findings = []
     counts = Counter()
@@ -118,7 +129,7 @@ def coordinate_ifc_models(first, second, clearance_m=0.05):
         groups[0], groups[1], tolerance=HARD_TOLERANCE_M, check_all=True
     ):
         kind = ("protrusion", "pierce", "collision", "clearance")[result.clash_type]
-        a, b = _ref(result.a, 0), _ref(result.b, 1)
+        a, b, p1, p2 = _pair(result)
         distance = float(result.distance)
         if not math.isfinite(distance) or distance < 0:
             raise ValueError("Invalid intersection distance")
@@ -130,12 +141,12 @@ def coordinate_ifc_models(first, second, clearance_m=0.05):
             findings.append({"classification": classification, "engine_type": kind,
                              "severity": "high" if classification == "hard_clash" else "review",
                              "source": a, "target": b, "distance_m": distance,
-                             "location_a_m": _point(result.p1),
-                             "location_b_m": _point(result.p2)})
+                             "location_a_m": p1,
+                             "location_b_m": p2})
     for result in tree.clash_clearance_many(
         groups[0], groups[1], clearance=clearance_m, check_all=True
     ):
-        a, b = _ref(result.a, 0), _ref(result.b, 1)
+        a, b, p1, p2 = _pair(result)
         if (a["guid"], b["guid"]) in hard_pairs:
             continue
         distance = float(result.distance)
@@ -149,8 +160,8 @@ def coordinate_ifc_models(first, second, clearance_m=0.05):
                              "engine_type": "clearance", "severity": "review",
                              "source": a, "target": b, "distance_m": distance,
                              "required_clearance_m": clearance_m,
-                             "location_a_m": _point(result.p1),
-                             "location_b_m": _point(result.p2)})
+                             "location_a_m": p1,
+                             "location_b_m": p2})
     total = sum(counts.values())
     return {
         "method": "ifcopenshell_native_intersection_clearance_v1",
