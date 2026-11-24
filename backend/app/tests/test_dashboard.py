@@ -5,6 +5,7 @@ Owner: Tazwar
 
 import time
 from unittest.mock import AsyncMock, patch
+from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
@@ -261,10 +262,10 @@ async def test_notifications_return_sunny_expected_shape():
     assert resp.status_code == 200
     assert resp.json()["total"] == 1
     notification = resp.json()["notifications"][0]
-    assert notification == {
+    assert datetime.fromisoformat(notification["created_at"].replace("Z", "+00:00")) == datetime.fromisoformat(PERSISTED_NOTIFICATION["created_at"])
+    assert {k: v for k, v in notification.items() if k != "created_at"} == {
         "id": NOTIFICATION_ID, "title": "Import completed",
-        "message": PERSISTED_NOTIFICATION["message"], "read": False,
-        "created_at": PERSISTED_NOTIFICATION["created_at"], "type": "success",
+        "message": PERSISTED_NOTIFICATION["message"], "read": False, "type": "success",
     }
     assert get_page.await_args.args[1:] == (False, 20, 0)
 
