@@ -85,8 +85,12 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.0-flash-exp" # Keep the smart tex model
     GEMINI_IMAGE_MODEL: str = "models/nano-banana-pro-preview" # Restoring the working image model
 
-    # USA IRC baseline screening (LLM JSON + rule engine). Disabled entirely when False.
-    COMPLIANCE_US_IRC_ENABLED: bool = True
+    # A six-threshold IRC-style prototype is NOT adopted jurisdictional code
+    # compliance and currently lacks verified code-edition/section provenance.
+    # Keep disabled for customer chat by default. The prototype may be
+    # explicitly enabled only in isolated evaluation environments until a
+    # licensed, jurisdiction-aware rule engine has qualified evidence.
+    COMPLIANCE_US_IRC_ENABLED: bool = False
     
     # Stable Diffusion / Image Config
     USE_GEMINI_FOR_IMAGE: bool = True
