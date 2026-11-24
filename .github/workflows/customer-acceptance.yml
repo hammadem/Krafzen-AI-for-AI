@@ -3,7 +3,7 @@ name: Isolated customer acceptance checkpoints
 on:
   pull_request:
     branches: ["fix/**"]
-    paths: ["backend/**", "supabase/**", ".github/workflows/customer-acceptance.yml"]
+    paths: ["backend/**", "frontend/**", "supabase/**", ".github/workflows/customer-acceptance.yml"]
   workflow_dispatch:
 
 permissions:
