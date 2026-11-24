@@ -54,6 +54,19 @@ def main() -> None:
             """)
             verified = cur.fetchone()
             assert all(verified), f"Missing post-migration tables: {verified}"
+            cur.execute(
+                "SELECT id, public, file_size_limit FROM storage.buckets "
+                "WHERE id IN ('dxf-files','krafzen-us-files') ORDER BY id"
+            )
+            storage_config = {row[0]: row[1:] for row in cur.fetchall()}
+            assert storage_config.get("dxf-files") == (False, 52428800), (
+                "CAD/BIM import bucket missing or publicly readable",
+                storage_config,
+            )
+            assert storage_config.get("krafzen-us-files", (False,))[0] is False, (
+                "Regional customer files must not be public",
+                storage_config,
+            )
             cur.execute("""
                 select relrowsecurity from pg_class
                 where oid = 'public.field_photos'::regclass
@@ -77,17 +90,9 @@ def main() -> None:
         "Local GoTrue auth service unavailable", auth.status_code
     )
 
-    bucket = "krafzen-ci-private"
-    create = requests.post(
-        urljoin(base, "storage/v1/bucket"),
-        headers={**headers, "Content-Type": "application/json"},
-        json={"id": bucket, "name": bucket, "public": False},
-        timeout=25,
-    )
-    assert create.status_code in (200, 201), (
-        "Could not create isolated private storage bucket",
-        create.status_code, create.text[:200],
-    )
+    # Exercise the *real* default bucket, not a synthetic CI-only bucket.
+    # It must already exist from the versioned schema migration.
+    bucket = "dxf-files"
     content = b"krafzen-ci-storage-object\n"
     relative = f"storage/v1/object/{bucket}/known.txt"
     saved = requests.post(
