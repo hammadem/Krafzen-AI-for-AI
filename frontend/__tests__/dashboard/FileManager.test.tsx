@@ -7,7 +7,7 @@ const { getAllFiles, getFileActivity } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/context/AuthContext", () => ({
-    useAuth: () => ({ user: { userId: "user-1" } }),
+    useAuth: () => ({ user: { userId: "user-1", access_token: "test-token" } }),
 }));
 
 vi.mock("@/lib/api/api", () => ({
@@ -61,7 +61,7 @@ describe("FileManager activity", () => {
         expect(await screen.findByText("Uploaded FloorPlan_V3.dwg")).toBeInTheDocument();
         expect(screen.getByText(/Khadija/)).toBeInTheDocument();
         expect(getFileActivity).toHaveBeenCalledWith(
-            { userId: "user-1" },
+            { userId: "user-1", access_token: "test-token" },
             "file-1",
         );
     });
