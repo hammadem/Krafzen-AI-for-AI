@@ -7,11 +7,12 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.db.queries.file_queries import get_file
 from app.db.queries.project_queries import get_project
@@ -23,6 +24,8 @@ from app.utils.storage_service import storage_service
 router = APIRouter(prefix="/bim", tags=["IFC 3D Geometry"])
 MAX_IFC_BYTES = 40 * 1024 * 1024
 MAX_MESH_JSON_BYTES = 8 * 1024 * 1024
+MAX_COORDINATION_PAIR_BYTES = 20 * 1024 * 1024
+_coordination_slot = asyncio.Semaphore(1)
 
 
 def _extract_bounded_mesh(raw: bytes) -> dict:
@@ -60,8 +63,7 @@ def _extract_bounded_mesh(raw: bytes) -> dict:
     return data
 
 
-@router.get("/files/{file_id}/mesh")
-async def get_model_mesh(file_id: UUID, user: dict = Depends(require_auth)):
+async def _read_verified_ifc(file_id: UUID, user: dict):
     record = await get_file(str(file_id), user)
     if not record:
         raise HTTPException(status_code=404, detail="IFC file not found")
@@ -105,6 +107,12 @@ async def get_model_mesh(file_id: UUID, user: dict = Depends(require_auth)):
     if not isinstance(raw, bytes) or len(raw) != size:
         raise HTTPException(status_code=503, detail="Stored IFC size or bytes mismatch")
 
+    return project_id, raw
+
+
+@router.get("/files/{file_id}/mesh")
+async def get_model_mesh(file_id: UUID, user: dict = Depends(require_auth)):
+    project_id, raw = await _read_verified_ifc(file_id, user)
     mesh = await run_in_threadpool(_extract_bounded_mesh, raw)
     return {
         "file_id": str(file_id),
@@ -114,10 +122,44 @@ async def get_model_mesh(file_id: UUID, user: dict = Depends(require_auth)):
     }
 
 
+def _native_coordination(first: bytes, second: bytes, clearance_m: float) -> dict:
+    if len(first) + len(second) > MAX_COORDINATION_PAIR_BYTES:
+        raise HTTPException(status_code=413, detail="IFC coordination pair exceeds 20 MB")
+    for raw in (first, second):
+        if (not raw.lstrip().startswith(b"ISO-10303-21;")
+            or b"END-ISO-10303-21;" not in raw[-256:]):
+            raise HTTPException(status_code=422, detail="Invalid IFC STEP document")
+    if importlib.util.find_spec("ifcopenshell") is None:
+        raise HTTPException(status_code=503, detail="Native IFC geometry engine unavailable")
+    with tempfile.TemporaryDirectory(prefix="krafzen-coordination-") as folder:
+        a, b = Path(folder) / "a.ifc", Path(folder) / "b.ifc"
+        a.write_bytes(first)
+        b.write_bytes(second)
+        try:
+            process = subprocess.run(
+                [sys.executable, "-m", "app.services.ifc_native_coordination",
+                 str(a), str(b), str(clearance_m)],
+                capture_output=True, check=False, timeout=90,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise HTTPException(status_code=503, detail="Native IFC coordination timed out") from exc
+    if process.returncode != 0 or len(process.stdout) > MAX_MESH_JSON_BYTES:
+        raise HTTPException(status_code=422, detail="Native IFC coordination could not process these models")
+    try:
+        result = json.loads(process.stdout)
+    except (ValueError, UnicodeError) as exc:
+        raise HTTPException(status_code=503, detail="Native IFC coordination returned invalid data") from exc
+    if not isinstance(result, dict) or result.get("method") != "ifcopenshell_native_intersection_clearance_v1":
+        raise HTTPException(status_code=503, detail="Native IFC coordination evidence missing")
+    return result
+
+
 class SpatialScreenRequest(BaseModel):
     primary_file_id: UUID
     secondary_file_id: UUID
     same_origin_axes_and_scale_confirmed: bool = False
+    mode: Literal["broad_phase", "native_coordination"] = "broad_phase"
+    clearance_m: float = Field(default=0.05, ge=0.001, le=1, allow_inf_nan=False)
 
 
 @router.post("/projects/{project_id}/spatial-screens", status_code=201)
@@ -126,10 +168,10 @@ async def screen_project_ifc_spatial_overlap(
     request: SpatialScreenRequest,
     user: dict = Depends(require_auth),
 ):
-    """Persist user-authorized broad-phase AABB candidates from actual IFC meshes.
+    """Persist selected broad-phase or native geometry review findings.
 
-    This is NOT hard clash detection, automatic coordinate registration or
-    multi-discipline geometric certification.
+    Both modes require project-owned scanned IFC sources and asserted alignment.
+    Neither certifies physical construction or independent model registration.
     """
     pid = str(project_id)
     a_id = str(request.primary_file_id)
@@ -159,26 +201,45 @@ async def screen_project_ifc_spatial_overlap(
         if str(file_row.get("file_type") or "").lower() != "ifc":
             raise HTTPException(status_code=415, detail="Only IFC sources can be screened")
 
-    source = await get_model_mesh(request.primary_file_id, user=user)
-    target = await get_model_mesh(request.secondary_file_id, user=user)
-    if source["project_id"] != pid or target["project_id"] != pid:
-        raise HTTPException(status_code=404, detail="Project IFC source mismatch")
-    try:
-        result = await asyncio.wait_for(
-            run_in_threadpool(
-                screen_ifc_mesh_overlap,
-                source["mesh"], target["mesh"],
-                primary_file_id=a_id,
-                secondary_file_id=b_id,
-                primary_sha256=source["source_sha256"],
-                secondary_sha256=target["source_sha256"],
-            ),
-            timeout=15,
-        )
-    except asyncio.TimeoutError as exc:
-        raise HTTPException(status_code=503, detail="IFC screening timed out") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if request.mode == "native_coordination":
+        if _coordination_slot.locked():
+            raise HTTPException(status_code=429, detail="Another native IFC calculation is running")
+        async with _coordination_slot:
+            source_pid, source_raw = await _read_verified_ifc(request.primary_file_id, user)
+            target_pid, target_raw = await _read_verified_ifc(request.secondary_file_id, user)
+            if source_pid != pid or target_pid != pid:
+                raise HTTPException(status_code=404, detail="Project IFC source mismatch")
+            result = await run_in_threadpool(
+                _native_coordination, source_raw, target_raw, request.clearance_m
+            )
+            result["source_files"] = [
+                {"file_id": a_id, "sha256": sha256(source_raw).hexdigest()},
+                {"file_id": b_id, "sha256": sha256(target_raw).hexdigest()},
+            ]
+            for finding in result["candidates"]:
+                finding["source"]["file_id"] = a_id
+                finding["target"]["file_id"] = b_id
+    else:
+        source = await get_model_mesh(request.primary_file_id, user=user)
+        target = await get_model_mesh(request.secondary_file_id, user=user)
+        if source["project_id"] != pid or target["project_id"] != pid:
+            raise HTTPException(status_code=404, detail="Project IFC source mismatch")
+        try:
+            result = await asyncio.wait_for(
+                run_in_threadpool(
+                    screen_ifc_mesh_overlap,
+                    source["mesh"], target["mesh"],
+                    primary_file_id=a_id,
+                    secondary_file_id=b_id,
+                    primary_sha256=source["source_sha256"],
+                    secondary_sha256=target["source_sha256"],
+                ),
+                timeout=15,
+            )
+        except asyncio.TimeoutError as exc:
+            raise HTTPException(status_code=503, detail="IFC screening timed out") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     row = {
         "project_id": pid,
