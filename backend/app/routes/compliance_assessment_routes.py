@@ -2,7 +2,7 @@
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -11,6 +11,8 @@ from app.db.queries.project_queries import get_project
 from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.services.ada_measurement_rules import evaluate_ada_measurements
+from app.services.building_code_measurement_rules import evaluate_building_code_measurements
+from app.services.compliance_pdf_service import build_compliance_pdf
 
 router = APIRouter(prefix="/compliance", tags=["Measured Compliance"])
 
@@ -141,3 +143,100 @@ async def get_ada_measurement_assessment(
         raise HTTPException(status_code=404, detail="Assessment not found")
     await _owned_nonsovereign_project(str(record["project_id"]), user)
     return record
+
+
+class BuildingCodeJurisdiction(BaseModel):
+    state: str = Field(min_length=2, max_length=100)
+    municipality: str = Field(min_length=2, max_length=100)
+    project_address: str = Field(min_length=5, max_length=250)
+    occupancy: str = Field(min_length=1, max_length=100)
+    building_type: str = Field(min_length=2, max_length=100)
+    construction_type: str = Field(min_length=1, max_length=100)
+    building_height_ft: float | None = Field(default=None, gt=0, le=10000, allow_inf_nan=False)
+    building_area_sqft: float | None = Field(default=None, gt=0, le=1e9, allow_inf_nan=False)
+    ibc_edition: str = Field(max_length=30)
+    nfpa101_edition: str = Field(max_length=30)
+    ibc_applicability_confirmed: bool = False
+    nfpa101_applicability_confirmed: bool = False
+    local_amendments_reviewed_no_conflict: bool = False
+    adoption_reference: str = Field(default="", max_length=1000)
+    reviewer_name: str = Field(default="", max_length=150)
+
+
+class BuildingCodeMeasurements(BaseModel):
+    egress_factor_basis: Literal["standard_confirmed", "sprinkler_voice_exception_confirmed", "unknown_or_other"] = "unknown_or_other"
+    qualifying_sprinkler_system_confirmed: bool | None = None
+    qualifying_voice_alarm_confirmed: bool | None = None
+    other_egress_exceptions_excluded: bool | None = None
+    stair_occupant_load: int | None = Field(default=None, gt=0, le=1000000, strict=True)
+    stair_clear_width_in: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
+    other_occupant_load: int | None = Field(default=None, gt=0, le=1000000, strict=True)
+    other_clear_width_in: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
+    emergency_lighting_required_confirmed: bool | None = None
+    floor_level_egress_photometry_confirmed: bool | None = None
+    emergency_duration_minutes: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    initial_average_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    initial_minimum_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    final_average_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    final_minimum_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    measured_maximum_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    measured_minimum_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+
+
+class NewBuildingCodeAssessment(BaseModel):
+    project_id: UUID
+    source_file_id: UUID | None = None
+    jurisdiction: BuildingCodeJurisdiction
+    measurements: BuildingCodeMeasurements
+
+
+@router.post("/building-code-measurements", status_code=201)
+async def create_building_code_measurement_assessment(
+    body: NewBuildingCodeAssessment, user: dict = Depends(require_auth),
+):
+    """Save versioned IBC/NFPA numerical findings for professional review."""
+    pid = str(body.project_id)
+    await _owned_nonsovereign_project(pid, user)
+    source_id = str(body.source_file_id) if body.source_file_id else None
+    if source_id:
+        evidence = await get_file(source_id, user)
+        if not evidence or str(evidence.get("project_id") or "") != pid:
+            raise HTTPException(status_code=404, detail="Evidence file not found in this project")
+        if evidence.get("archived_at"):
+            raise HTTPException(status_code=409, detail="Cannot cite an archived evidence file")
+    context = body.jurisdiction.model_dump()
+    measurements = body.measurements.model_dump()
+    result = evaluate_building_code_measurements(
+        context=context, measurements=measurements, source_file_id=source_id,
+    )
+    payload = {
+        "project_id": pid, "source_file_id": source_id,
+        "created_by": user["user_id"], "jurisdiction": context,
+        "measurements": measurements, "result": result,
+        "review_status": "pending_qualified_review",
+    }
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("compliance_assessments").insert(payload).execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Code assessment could not be saved") from exc
+    if not response or not response.data:
+        raise HTTPException(status_code=503, detail="Code assessment was not persisted")
+    return response.data[0]
+
+
+@router.get("/assessments/{assessment_id}/report.pdf")
+async def download_compliance_report(
+    assessment_id: UUID, user: dict = Depends(require_auth),
+):
+    record = await get_ada_measurement_assessment(assessment_id, user=user)
+    try:
+        pdf = await run_in_threadpool(build_compliance_pdf, record)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="Assessment evidence is incomplete or inconsistent") from exc
+    return Response(content=pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="compliance-{assessment_id}.pdf"',
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+    })

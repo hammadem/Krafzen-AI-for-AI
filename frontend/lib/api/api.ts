@@ -709,6 +709,19 @@ export async function createAdaAssessment(
     return apiClient("POST", "/api/v1/compliance/ada-measurements", user, payload);
 }
 
+/** Save edition-specific IBC/NFPA measurement evidence. */
+export async function createBuildingCodeAssessment(
+    user: User | null,
+    payload: {
+        project_id: string;
+        source_file_id?: string | null;
+        jurisdiction: Record<string, unknown>;
+        measurements: Record<string, unknown>;
+    }
+) {
+    return apiClient("POST", "/api/v1/compliance/building-code-measurements", user, payload);
+}
+
 export async function getProjectAdaAssessments(
     user: User | null, projectId: string
 ) {
@@ -771,4 +784,34 @@ export async function getFieldReportPdf(user: User | null, projectId: string): P
         throw new Error("Field report has an invalid file size");
     }
     return bytes;
+}
+
+
+export async function getComplianceReportPdf(
+    user: User | null,
+    assessmentId: string
+): Promise<Blob> {
+    if (!user?.access_token) throw new Error("Authentication required");
+    const response = await fetch(
+        `${getApiBaseUrl().replace(/\/$/, "")}/api/v1/compliance/assessments/${encodeURIComponent(assessmentId)}/report.pdf`,
+        {
+            headers: {
+                Authorization: `Bearer ${user.access_token}`,
+                apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+                Accept: "application/pdf",
+            },
+            cache: "no-store",
+        }
+    );
+    if (!response.ok) {
+        throw new Error("Saved compliance PDF is unavailable or access was denied");
+    }
+    if (!response.headers.get("content-type")?.includes("application/pdf")) {
+        throw new Error("Server did not return a PDF");
+    }
+    const blob = await response.blob();
+    if (!blob.size || blob.size > 5 * 1024 * 1024) {
+        throw new Error("Compliance PDF has an invalid size");
+    }
+    return blob;
 }

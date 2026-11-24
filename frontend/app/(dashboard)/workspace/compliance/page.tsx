@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, ClipboardCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import BuildingCodePanel from "@/components/compliance/BuildingCodePanel";
 import {
     createAdaAssessment, getAllFiles, getAllJobs, getAllProjects,
-    getProjectAdaAssessments,
+    getProjectAdaAssessments, getComplianceReportPdf,
 } from "@/lib/api/api";
 
 type Project = { id: string; input_text?: string | null };
@@ -21,6 +22,8 @@ type Assessment = {
         overall_status: string; disclaimer: string; counts: Record<string, number>;
         rule_results: Finding[]; missing_information: string[];
         complete_code_compliance_determined: boolean;
+        assessment_kind?: string;
+        coverage?: Array<{code_family: string; category: string; coverage: string; full_category_compliance: string}>;
     };
 };
 function list<T>(value: unknown): T[] {
@@ -71,6 +74,7 @@ export default function CompliancePage() {
     const [rampException, setRampException] = useState("unknown");
     const [newConstruction, setNewConstruction] = useState("unknown");
     const [saving, setSaving] = useState(false);
+    const [buildingCodeOpen, setBuildingCodeOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -202,14 +206,14 @@ export default function CompliancePage() {
             <div className="max-w-6xl space-y-6">
                 <div className="flex items-center gap-2">
                     <ClipboardCheck className="h-6 w-6 text-emerald-300"/>
-                    <h1 className="text-2xl font-semibold">Traceable ADA Measurement Screening</h1>
+                    <h1 className="text-2xl font-semibold">Traceable ADA Measurement Screening and Building Codes</h1>
                 </div>
                 <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
                     <AlertTriangle className="inline h-4 w-4 mr-1"/>
                     Only three numerical checks from the official 2010 ADA Standards are supported here:
                     manual door clear width (§404.2.3), nominal walking surface width (§403.5.1)
                     and new-construction ramp running slope (§405.2). No AI-derived measurements,
-                    IBC/NFPA conclusions or code approval. A qualified reviewer must determine
+                    complete IBC/NFPA conclusions or code approval. Expand the IBC/NFPA section for additional bounded numeric rules. A qualified reviewer must determine
                     jurisdictional adoption, exceptions and all remaining requirements.
                 </p>
                 {error && <p role="alert" className="text-red-300">{error}</p>}
@@ -282,19 +286,42 @@ export default function CompliancePage() {
                                 {saving ? "Evaluating and saving…" : "Run checks and save evidence"}
                             </button>
                         </section>
+                        <button type="button" onClick={() => setBuildingCodeOpen(value => !value)}
+                            className="rounded-lg border border-white/20 px-4 py-2 text-sm">
+                            {buildingCodeOpen ? "Hide IBC/NFPA numerical screening" : "Open IBC/NFPA numerical screening"}
+                        </button>
+                        {buildingCodeOpen && (
+                            <BuildingCodePanel key={projectId} user={user} projectId={projectId} sourceFile={sourceFile}
+                                context={{state, municipality, project_address: address, occupancy, building_type: building}}
+                                onSaved={value => {
+                                    const record = value as Assessment;
+                                    if (!record?.id || !record?.result?.rule_results) throw new Error("No persisted code evidence returned");
+                                    setHistory(previous => [record, ...previous.filter(r => r.id !== record.id)]);
+                                    setSelected(record);
+                                }}/>
+                        )}
                         <section className="rounded-xl border border-white/10 p-5 space-y-3">
                             <h2 className="font-semibold">Saved project screenings ({history.length})</h2>
                             {history.length === 0 && <p className="text-sm text-slate-400">No saved screenings.</p>}
                             {history.map(row => (
                                 <button key={row.id} type="button" onClick={() => setSelected(row)}
                                     className={`w-full rounded-lg border p-3 text-left text-sm ${row.id === selected?.id ? "border-emerald-300" : "border-white/10"}`}>
-                                    {row.created_at || row.id} · {row.review_status}
+                                    {row.created_at || row.id} · {row.result.assessment_kind === "ibc_nfpa_measurements_v1" ? "IBC/NFPA" : "ADA"} · {row.review_status}
                                 </button>
                             ))}
                         </section>
                         {selected && (
                             <section className="rounded-xl border border-white/10 p-5 space-y-4">
                                 <h2 className="font-semibold">Traceable rule findings (pending review)</h2>
+                                <button type="button" className="rounded border border-white/20 px-3 py-2 text-sm" onClick={async () => {
+                                    try {
+                                        const blob = await getComplianceReportPdf(user, selected.id);
+                                        const url = URL.createObjectURL(blob);
+                                        const link = document.createElement("a");
+                                        link.href = url; link.download = `compliance-${selected.id}.pdf`; link.click();
+                                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                                    } catch (cause) { setError(cause instanceof Error ? cause.message : "PDF unavailable"); }
+                                }}>Download compliance PDF</button>
                                 <p className="text-sm text-amber-200">{selected.result.disclaimer}</p>
                                 {selected.result.rule_results.map(finding => (
                                     <div key={finding.rule_id} className="rounded-lg border border-white/10 p-4 space-y-2 text-sm">
@@ -308,9 +335,28 @@ export default function CompliancePage() {
                                             Threshold: {finding.threshold ?? "not established"} {finding.unit}
                                         </p>
                                         <a href={finding.source_url} target="_blank" rel="noopener noreferrer"
-                                            className="text-emerald-300 underline">Official 2010 ADA reference</a>
+                                            className="text-emerald-300 underline">{finding.rule_id.startsWith("ADA-") ? "Official 2010 ADA reference" : "Official code reference"}</a>
                                     </div>
                                 ))}
+                                {selected.result.coverage && (
+                                    <div className="space-y-2">
+                                        <h3 className="font-semibold text-sm">Complete category coverage register</h3>
+                                        <p className="text-xs text-amber-200">Full category compliance is unknown. Unimplemented provisions need separate qualified review.</p>
+                                        {selected.result.coverage.map(item => (
+                                            <p key={item.code_family + item.category} className="text-xs text-slate-300">
+                                                {item.code_family} · {item.category.replaceAll("_", " ")} — {item.coverage.replaceAll("_", " ")}
+                                            </p>
+                                        ))}
+                                    </div>
+                                )}
+                                <button type="button" onClick={() => {
+                                    const url = URL.createObjectURL(new Blob([JSON.stringify(selected, null, 2)], {type:"application/json"}));
+                                    const link = document.createElement("a");
+                                    link.href = url; link.download = `compliance-${selected.id}.json`;
+                                    link.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                                }} className="rounded border border-white/20 px-3 py-2 text-xs">
+                                    Download saved compliance report (JSON)
+                                </button>
                                 <h3 className="font-semibold text-sm">Unresolved information</h3>
                                 {selected.result.missing_information.length === 0 ?
                                     <p className="text-xs text-slate-400">All fields for these narrow checks were supplied; other code requirements remain unassessed.</p> :
