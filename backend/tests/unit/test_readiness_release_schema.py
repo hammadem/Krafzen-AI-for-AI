@@ -19,6 +19,8 @@ SECURITY = (
 
 REQUIRED = {
     "ifc_import_schema": ("files", "import_metadata"),
+    "file_storage_metadata_schema": ("files", "project_id,bucket,path,mime_type,size_bytes,version,archived_at,approval_state,reviewed_by,reviewed_at"),
+    "activity_audit_schema": ("activity_events", "event_id,action,entity_type,entity_id,file_id,organization_id,workspace_id,timestamp"),
     "paid_webhook_ledger_schema": ("payment_webhook_events", "event_id"),
     "paid_subscription_schema": ("user_subscriptions", "last_paid_at"),
     "project_archive_schema": ("projects", "archived_at"),

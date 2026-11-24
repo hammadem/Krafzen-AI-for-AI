@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 from typing import Any
 
 from fastapi import HTTPException
@@ -26,32 +27,61 @@ async def create_invite(workspace_id: str, email: str, role: str, user_id: str) 
         if workspace["owner_id"] != user_id:
             raise HTTPException(status_code=403, detail={"error": "Only owner can invite members"})
 
-        # duplicate check
+        # One row per workspace/email is enforced by the database. Reissue
+        # revoked or expired invitations instead of inserting a duplicate row.
         existing = await run_in_threadpool(
             lambda: db.table("workspace_invites")
-                .select("id, status")
+                .select("id, status, token, expires_at")
                 .eq("workspace_id", workspace_id)
                 .eq("email", email)
                 .maybe_single()
                 .execute()
         )
-
-        if existing and existing.data and existing.data["status"] == "pending":
-            raise HTTPException(status_code=409, detail={"error": "Invite already sent to this email"})
-            
-        res = await run_in_threadpool(
-            lambda: db.table("workspace_invites")
-                .insert({
-                    "workspace_id": workspace_id,
-                    "email": email,
-                    "invited_by": user_id,
-                    "role": role
-                })
-                .execute()
-        )
-
-        if not res or not res.data:
-            raise HTTPException(status_code=500, detail={"error": "Failed to create invite"})
+        current = existing.data if existing and existing.data else None
+        now = datetime.now(UTC)
+        if current:
+            status = current["status"]
+            expired_pending = status == "pending" and datetime.fromisoformat(current["expires_at"]) <= now
+            if status == "pending" and not expired_pending:
+                raise HTTPException(status_code=409, detail={"error": "Invite already sent to this email"})
+            if status not in ("revoked", "expired") and not expired_pending:
+                raise HTTPException(status_code=409, detail={"error": "Invitation has already been accepted"})
+            res = await run_in_threadpool(
+                lambda: db.table("workspace_invites")
+                    .update({
+                        "status": "pending",
+                        "token": str(uuid4()),
+                        "invited_by": user_id,
+                        "role": role,
+                        "created_at": now.isoformat(),
+                        "expires_at": (now + timedelta(days=7)).isoformat(),
+                    })
+                    .eq("id", current["id"])
+                    .eq("workspace_id", workspace_id)
+                    .eq("status", status)
+                    .eq("token", current["token"])
+                    .execute()
+            )
+            if not res or not res.data:
+                raise HTTPException(status_code=409, detail={"error": "Invitation changed; reload and try again"})
+        else:
+            try:
+                res = await run_in_threadpool(
+                    lambda: db.table("workspace_invites")
+                        .insert({
+                            "workspace_id": workspace_id,
+                            "email": email,
+                            "invited_by": user_id,
+                            "role": role,
+                        })
+                        .execute()
+                )
+            except APIError as exc:
+                if exc.code == "23505":
+                    raise HTTPException(status_code=409, detail={"error": "Invitation already exists; reload and try again"}) from exc
+                raise
+            if not res or not res.data:
+                raise HTTPException(status_code=500, detail={"error": "Failed to create invite"})
 
         invite = res.data[0]
         await record_workspace_event(
@@ -74,7 +104,9 @@ async def create_invite(workspace_id: str, email: str, role: str, user_id: str) 
     
 
 #REVOKE INVITE
-async def revoke_invite(invite_id: str ,user_id: str) -> bool:
+async def revoke_invite(workspace_id: str, invite_id: str, user_id: str) -> bool:
+    if not _valid_uuid(workspace_id):
+        raise HTTPException(status_code=400, detail={"error": "Invalid workspace_id"})
     if not _valid_uuid(invite_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid invite_id"})
     
@@ -83,6 +115,7 @@ async def revoke_invite(invite_id: str ,user_id: str) -> bool:
             lambda: db.table("workspace_invites")
             .select("*")
             .eq("id", invite_id)
+            .eq("workspace_id", workspace_id)
             .maybe_single()
             .execute()
         )
@@ -100,6 +133,9 @@ async def revoke_invite(invite_id: str ,user_id: str) -> bool:
             lambda: db.table("workspace_invites")
                 .update({"status": "revoked"})
                 .eq("id", invite_id)
+                .eq("workspace_id", workspace_id)
+                .eq("invited_by", user_id)
+                .eq("token", invite.data["token"])
                 .eq("status", "pending")
                 .execute()
         )
@@ -153,6 +189,7 @@ async def accept_invite(token: str, user_id: str) -> dict[str, Any]:
                 lambda: db.table("workspace_invites")
                     .update({"status": "expired"})
                     .eq("id", invite["id"])
+                    .eq("token", token)
                     .eq("status", "pending")
                     .execute()
             )
@@ -181,6 +218,7 @@ async def accept_invite(token: str, user_id: str) -> dict[str, Any]:
             lambda: db.table("workspace_invites")
                 .update({"status": "accepted"})
                 .eq("id", invite["id"])
+                .eq("token", token)
                 .eq("status", "pending")
                 .execute()
         )
@@ -204,6 +242,7 @@ async def accept_invite(token: str, user_id: str) -> dict[str, Any]:
                 lambda: db.table("workspace_invites")
                     .update({"status": "pending"})
                     .eq("id", invite["id"])
+                    .eq("token", token)
                     .eq("status", "accepted")
                     .execute()
             )
@@ -266,12 +305,17 @@ async def validate_invite(token: str) -> dict[str, Any]:
         if invite["status"] == "accepted":
             return {"valid": False, "message": "Invite already accepted"}
 
+        if invite["status"] != "pending":
+            return {"valid": False, "message": "Invite is not pending"}
+
         expires_at = datetime.fromisoformat(invite["expires_at"])
         if datetime.now(UTC) > expires_at:
             await run_in_threadpool(
                 lambda: db.table("workspace_invites")
                     .update({"status": "expired"})
                     .eq("id", invite["id"])
+                    .eq("token", token)
+                    .eq("status", "pending")
                     .execute()
             )
             return {"valid": False, "message": "Invite has expired"}

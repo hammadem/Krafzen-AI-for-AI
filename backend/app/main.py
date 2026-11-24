@@ -169,15 +169,16 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
             response = Response()
             if is_allowed:
                 response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Vary"] = "Origin"
                 response.headers["Access-Control-Allow-Credentials"] = "true"
                 response.headers["Access-Control-Allow-Methods"] = (
                     "GET, POST, PUT, DELETE, OPTIONS, PATCH"
                 )
                 response.headers["Access-Control-Allow-Headers"] = (
-                    "Authorization, Content-Type, Idempotency-Key, If-Match, Accept"
+                    "Authorization, Content-Type, Idempotency-Key, If-Match, Accept, apikey"
                 )
                 response.headers["Access-Control-Expose-Headers"] = (
-                    "Idempotency-Key, ETag"
+                    "Idempotency-Key, ETag, Content-Disposition"
                 )
                 response.headers["Access-Control-Max-Age"] = "600"
             return response
@@ -193,15 +194,16 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
 
         if is_allowed:
             response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = (
                 "GET, POST, PUT, DELETE, OPTIONS, PATCH"
             )
             response.headers["Access-Control-Allow-Headers"] = (
-                "Authorization, Content-Type, Idempotency-Key, If-Match, Accept"
+                "Authorization, Content-Type, Idempotency-Key, If-Match, Accept, apikey"
             )
             response.headers["Access-Control-Expose-Headers"] = (
-                "Idempotency-Key, ETag"
+                "Idempotency-Key, ETag, Content-Disposition"
             )
 
         return response

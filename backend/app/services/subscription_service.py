@@ -307,6 +307,7 @@ class SubscriptionService:
             "total_requests": remaining,
             "usable_requests": remaining,
             "can_make_request": paid and remaining > 0,
+            "can_access_workspace": paid,
             "in_trial_period": False,
             "in_free_signup_tier": False,
             "subscription_status": sub.get("subscription_status", "inactive"),
