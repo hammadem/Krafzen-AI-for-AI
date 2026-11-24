@@ -74,7 +74,9 @@ async def create_invite(workspace_id: str, email: str, role: str, user_id: str) 
     
 
 #REVOKE INVITE
-async def revoke_invite(invite_id: str ,user_id: str) -> bool:
+async def revoke_invite(workspace_id: str, invite_id: str, user_id: str) -> bool:
+    if not _valid_uuid(workspace_id):
+        raise HTTPException(status_code=400, detail={"error": "Invalid workspace_id"})
     if not _valid_uuid(invite_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid invite_id"})
     
@@ -83,6 +85,7 @@ async def revoke_invite(invite_id: str ,user_id: str) -> bool:
             lambda: db.table("workspace_invites")
             .select("*")
             .eq("id", invite_id)
+            .eq("workspace_id", workspace_id)
             .maybe_single()
             .execute()
         )
@@ -100,6 +103,8 @@ async def revoke_invite(invite_id: str ,user_id: str) -> bool:
             lambda: db.table("workspace_invites")
                 .update({"status": "revoked"})
                 .eq("id", invite_id)
+                .eq("workspace_id", workspace_id)
+                .eq("invited_by", user_id)
                 .eq("status", "pending")
                 .execute()
         )
@@ -266,12 +271,16 @@ async def validate_invite(token: str) -> dict[str, Any]:
         if invite["status"] == "accepted":
             return {"valid": False, "message": "Invite already accepted"}
 
+        if invite["status"] != "pending":
+            return {"valid": False, "message": "Invite is not pending"}
+
         expires_at = datetime.fromisoformat(invite["expires_at"])
         if datetime.now(UTC) > expires_at:
             await run_in_threadpool(
                 lambda: db.table("workspace_invites")
                     .update({"status": "expired"})
                     .eq("id", invite["id"])
+                    .eq("status", "pending")
                     .execute()
             )
             return {"valid": False, "message": "Invite has expired"}
