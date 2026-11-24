@@ -12,6 +12,7 @@ from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.routes.asbuilt_routes import _owned_project, _read_dxf
 from app.services.dxf_preview_service import render_dxf_preview
+from app.services.review_pdf_service import build_review_pdf
 
 router = APIRouter(prefix="/reviews", tags=["Reviews and Redlines"])
 
@@ -153,3 +154,23 @@ async def update_redline_status(
     if not updated or not updated.data:
         raise HTTPException(status_code=409, detail="Redline status changed concurrently")
     return updated.data[0]
+
+@router.get("/files/{file_id}/marked-up.pdf")
+async def export_drawing_review(file_id: UUID, user: dict = Depends(require_auth)):
+    record = await _owned_dxf_record(str(file_id), user)
+    marks = await run_in_threadpool(lambda: db.table("drawing_redlines").select("*")
+        .eq("file_id", str(file_id)).eq("project_id", str(record["project_id"]))
+        .eq("created_by", user["user_id"]).order("created_at").limit(201).execute())
+    if not marks or marks.data is None:
+        raise HTTPException(status_code=503, detail="Redline register unavailable")
+    raw = await _read_dxf(str(file_id), str(record["project_id"]), user)
+    try:
+        result = await asyncio.wait_for(run_in_threadpool(build_review_pdf, raw, record, marks.data), timeout=30)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="Review export timed out") from exc
+    return Response(content=result, media_type="application/pdf", headers={
+        "Cache-Control":"private, no-store", "X-Content-Type-Options":"nosniff",
+        "Content-Disposition": f'attachment; filename="review-{file_id}.pdf"',
+    })

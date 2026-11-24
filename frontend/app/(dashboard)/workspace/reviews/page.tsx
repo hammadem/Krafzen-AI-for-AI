@@ -48,6 +48,7 @@ export default function ReviewsPage() {
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [reload, setReload] = useState(0);
+    const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
         if (!user?.access_token || !user.userId) return;
@@ -197,6 +198,28 @@ export default function ReviewsPage() {
         }
     }
 
+    async function exportReview() {
+        if (!user?.access_token || !fileId || exporting) return;
+        setExporting(true); setError(null);
+        try {
+            const response = await fetch(`${getApiBaseUrl().replace(/\/$/, "")}/api/v1/reviews/files/${encodeURIComponent(fileId)}/marked-up.pdf`, {
+                headers: { Authorization: `Bearer ${user.access_token}`, apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "" },
+            });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload.detail || "Review export unavailable");
+            }
+            if (!response.headers.get("content-type")?.includes("application/pdf")) throw new Error("Expected a PDF report");
+            const url = URL.createObjectURL(await response.blob());
+            const link = document.createElement("a");
+            link.href = url; link.download = `review-${fileId}.pdf`;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "Review export failed");
+        } finally { setExporting(false); }
+    }
+
     const point = (x: number) => x * 1000;
     return (
         <main className="flex-1 overflow-y-auto p-6 sm:p-8 text-white">
@@ -310,6 +333,7 @@ export default function ReviewsPage() {
                                 </label>
                                 <p className="text-xs text-slate-400">{firstPoint ? "First point selected. Click the endpoint." : "Enter a comment and click the drawing to save."}</p>
                                 <h3 className="font-semibold text-sm">Saved redlines ({redlines.length})</h3>
+                                <button type="button" disabled={!fileId || exporting} onClick={() => void exportReview()} className="rounded-lg border border-white/20 px-3 py-2 text-sm disabled:opacity-40">{exporting ? "Exporting…" : "Download marked-up PDF"}</button>
                                 {redlines.map((mark) => (
                                     <div key={mark.id} className="rounded-lg border border-white/10 p-3 text-sm">
                                         <p className="font-semibold">{mark.kind} · {mark.severity}</p>
