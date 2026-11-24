@@ -335,7 +335,7 @@ export default function CompliancePage() {
                                             Threshold: {finding.threshold ?? "not established"} {finding.unit}
                                         </p>
                                         <a href={finding.source_url} target="_blank" rel="noopener noreferrer"
-                                            className="text-emerald-300 underline">Official code reference</a>
+                                            className="text-emerald-300 underline">{finding.rule_id.startsWith("ADA-") ? "Official 2010 ADA reference" : "Official code reference"}</a>
                                     </div>
                                 ))}
                                 {selected.result.coverage && (
