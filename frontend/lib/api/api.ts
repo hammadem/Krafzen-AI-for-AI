@@ -605,6 +605,13 @@ export async function createIfcNativeCoordination(
     );
 }
 
+export async function createIfcRevisionComparison(user: User | null, projectId: string, originalId: string, revisedId: string) {
+    return apiClient("POST", `/api/v1/bim/projects/${encodeURIComponent(projectId)}/spatial-screens`, user, {
+        primary_file_id: originalId, secondary_file_id: revisedId,
+        same_origin_axes_and_scale_confirmed: true, mode: "revision_comparison",
+    });
+}
+
 export async function getIfcSpatialScreens(user: User | null, projectId: string) {
     return apiClient(
         "GET", `/api/v1/bim/projects/${encodeURIComponent(projectId)}/spatial-screens`,

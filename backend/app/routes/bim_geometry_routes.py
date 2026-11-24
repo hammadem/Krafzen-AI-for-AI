@@ -18,6 +18,7 @@ from app.db.queries.file_queries import get_file
 from app.db.queries.project_queries import get_project
 from app.db.supabase_client import db
 from app.services.ifc_spatial_screen import screen_ifc_mesh_overlap
+from app.services.ifc_revision_service import compare_ifc_mesh_revisions
 from app.middlewares.auth import require_auth
 from app.utils.storage_service import storage_service
 
@@ -158,7 +159,7 @@ class SpatialScreenRequest(BaseModel):
     primary_file_id: UUID
     secondary_file_id: UUID
     same_origin_axes_and_scale_confirmed: bool = False
-    mode: Literal["broad_phase", "native_coordination"] = "broad_phase"
+    mode: Literal["broad_phase", "native_coordination", "revision_comparison"] = "broad_phase"
     clearance_m: float = Field(default=0.05, ge=0.001, le=1, allow_inf_nan=False)
 
 
@@ -219,6 +220,19 @@ async def screen_project_ifc_spatial_overlap(
             for finding in result["candidates"]:
                 finding["source"]["file_id"] = a_id
                 finding["target"]["file_id"] = b_id
+    elif request.mode == "revision_comparison":
+        if _coordination_slot.locked():
+            raise HTTPException(status_code=429, detail="Another IFC calculation is running")
+        async with _coordination_slot:
+            source = await get_model_mesh(request.primary_file_id, user=user)
+            target = await get_model_mesh(request.secondary_file_id, user=user)
+            if source["project_id"] != pid or target["project_id"] != pid:
+                raise HTTPException(status_code=404, detail="Project IFC source mismatch")
+            result = await run_in_threadpool(compare_ifc_mesh_revisions, source["mesh"], target["mesh"])
+            result["source_files"] = [
+                {"file_id": a_id, "sha256": source["source_sha256"]},
+                {"file_id": b_id, "sha256": target["source_sha256"]},
+            ]
     else:
         source = await get_model_mesh(request.primary_file_id, user=user)
         target = await get_model_mesh(request.secondary_file_id, user=user)

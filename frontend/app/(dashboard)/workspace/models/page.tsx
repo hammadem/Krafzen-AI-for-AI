@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Box, Download, Info, RefreshCw, GitCompareArrows } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getAllProjects, getAllJobs, getAllFiles, getFileSignedUrl, getIfcModelSummary, createIfcSpatialScreen, createIfcNativeCoordination, getIfcSpatialScreens } from "@/lib/api/api";
+import { getAllProjects, getAllJobs, getAllFiles, getFileSignedUrl, getIfcModelSummary, createIfcSpatialScreen, createIfcNativeCoordination, createIfcRevisionComparison, getIfcSpatialScreens } from "@/lib/api/api";
 import IfcGeometryViewer from "@/components/bim/IfcGeometryViewer";
 
 type Project = { id: string; input_text?: string | null };
@@ -39,6 +39,7 @@ type SpatialScreen = {
         hard_clashes_confirmed: number;
         clearance_conflict_count?: number; surface_conflict_count?: number;
         shared_global_id_count?: number; clearance_threshold_m?: number;
+        revision?: { counts: Record<string, number>; unchanged_mesh_and_identity_count: number; ambiguous_duplicate_guids: string[]; missing_guid_count: number; changes: Array<{guid: string; change: string; ifc_type: string; name: string}>; changes_truncated: boolean };
     };
 };
 function unwrap<T>(data: unknown): T[] {
@@ -195,7 +196,7 @@ export default function ModelsPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.access_token, projectId, screenRefresh]);
 
-    async function runSpatialScreen(native = false) {
+    async function runSpatialScreen(native = false, revision = false) {
         if (!user || !projectId || !fileId || !secondaryFileId ||
             fileId === secondaryFileId || !coordinatesConfirmed || screening) return;
         setScreening(true); setError(null);
@@ -204,12 +205,12 @@ export default function ModelsPage() {
             if (native && (!Number.isFinite(mm) || mm < 1 || mm > 1000)) {
                 throw new Error("Clearance must be between 1 and 1000 mm");
             }
-            const response = native
+            const response = revision ? await createIfcRevisionComparison(user, projectId, fileId, secondaryFileId) : native
                 ? await createIfcNativeCoordination(user, projectId, fileId, secondaryFileId, mm / 1000)
                 : await createIfcSpatialScreen(user, projectId, fileId, secondaryFileId, true);
             if (!response.ok) throw new Error(response.error?.message || "BIM screen failed");
             const saved = response.data as unknown as SpatialScreen;
-            if (!saved?.id || saved.result?.method !== (native ? "ifcopenshell_native_intersection_clearance_v1" : "ifc_world_coordinate_aabb_broad_phase_v1")) {
+            if (!saved?.id || saved.result?.method !== (revision ? "ifc_guid_mesh_revision_v1" : native ? "ifcopenshell_native_intersection_clearance_v1" : "ifc_world_coordinate_aabb_broad_phase_v1")) {
                 throw new Error("Server did not confirm a persisted IFC screening");
             }
             setSelectedScreen(saved);
@@ -322,6 +323,8 @@ export default function ModelsPage() {
                                     {screening ? "Calculating IFC geometry…" : "Run native clash and clearance analysis"}
                                 </button>
                             </div>
+                            <button type="button" onClick={() => void runSpatialScreen(false, true)} disabled={screening || !fileId || !secondaryFileId || secondaryFileId === fileId || !coordinatesConfirmed} className="rounded-lg border border-white/20 px-4 py-2 text-sm disabled:opacity-40">Compare original and revised IFC meshes</button>
+                            <p className="text-xs text-slate-400">For revisions, the selected model is the original and the second model is the revision. Stable GlobalIds and the same coordinates are required.</p>
                             <p className="text-xs text-slate-400">Clearance is your coordination tolerance, not a building-code threshold. Native analysis is bounded to small IFC pairs and can take longer than a bounding-box screen.</p>
                             {historyError && <p role="alert" className="text-sm text-amber-300">
                                 {historyError}
@@ -332,14 +335,14 @@ export default function ModelsPage() {
                                     <button type="button" key={saved.id}
                                         onClick={() => setSelectedScreen(saved)}
                                         className="block w-full rounded-lg border border-white/10 p-2 text-left text-sm">
-                                        {saved.created_at || saved.id} — {saved.result.candidate_count} coordination findings
+                                        {saved.created_at || saved.id} — {saved.result.candidate_count} {saved.result.revision ? "revision findings" : "coordination findings"}
                                     </button>
                                 ))}
                             </div>
                             {selectedScreen && (
                                 <div className="rounded-lg border border-amber-300/20 p-4 space-y-3">
                                     <p className="font-semibold">
-                                        {selectedScreen.result.candidate_count} {selectedScreen.result.method === "ifcopenshell_native_intersection_clearance_v1" ? "native coordination findings" : "unverified spatial candidates"}
+                                        {selectedScreen.result.candidate_count} {selectedScreen.result.revision ? "revision findings" : selectedScreen.result.method === "ifcopenshell_native_intersection_clearance_v1" ? "native coordination findings" : "unverified spatial candidates"}
                                     </p>
                                     {selectedScreen.result.method === "ifcopenshell_native_intersection_clearance_v1" && (
                                         <div className="grid grid-cols-2 gap-2 text-sm">
@@ -347,6 +350,14 @@ export default function ModelsPage() {
                                             <p>Clearance conflicts: {selectedScreen.result.clearance_conflict_count ?? 0}</p>
                                             <p>Surface conflicts: {selectedScreen.result.surface_conflict_count ?? 0}</p>
                                             <p>Shared model identifiers: {selectedScreen.result.shared_global_id_count ?? 0}</p>
+                                        </div>
+                                    )}
+                                    {selectedScreen.result.revision && (
+                                        <div className="space-y-2 text-sm">
+                                            <p>Unchanged observed meshes: {selectedScreen.result.revision.unchanged_mesh_and_identity_count}</p>
+                                            {Object.entries(selectedScreen.result.revision.counts).map(([label, count]) => <p key={label}>{label.replaceAll("_", " ")}: {count}</p>)}
+                                            <p>Ambiguous duplicate identifiers: {selectedScreen.result.revision.ambiguous_duplicate_guids.length}; missing identifiers: {selectedScreen.result.revision.missing_guid_count}</p>
+                                            {selectedScreen.result.revision.changes.slice(0,40).map(change => <p key={change.guid} className="text-xs">{change.guid} · {change.ifc_type} · {change.change.replaceAll("_", " ")}</p>)}
                                         </div>
                                     )}
                                     <button type="button" onClick={() => {
@@ -361,7 +372,7 @@ export default function ModelsPage() {
                                         {selectedScreen.result.analysis_partial
                                             ? "Partial geometry: some IFC elements were omitted."
                                             : "Screened the available limited IFC tessellation, not all possible geometric conflicts."}
-                                        {" "}No candidates does not prove clash-free construction.
+                                        {" "}{selectedScreen.result.revision ? "No observed changes does not establish full model equivalence." : "No candidates does not prove clash-free construction."}
                                     </p>
                                     {selectedScreen.result.candidate_list_truncated && (
                                         <p className="text-sm text-amber-200">
