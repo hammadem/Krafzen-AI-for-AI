@@ -210,3 +210,18 @@ async def test_failed_persistence_must_not_report_succeeded_rule_assessment():
         with pytest.raises(HTTPException) as error:
             await routes.create_ada_measurement_assessment(request(), user=USER)
     assert error.value.status_code == 503
+
+def test_extended_rules_exact_boundaries_and_unknown_scope():
+    data=checks(extended_checks=True,extended_scope_confirmed=True,
+        circular_turn_diameter_in=60,clear_floor_width_in=30,clear_floor_length_in=48,
+        walking_running_slope_pct=5,walking_cross_slope_pct=100/48,
+        ramp_run_clear_width_in=36,ramp_single_run_rise_in=30,ramp_landing_clear_length_in=60)
+    report=evaluate_ada_measurements(context=CONTEXT,measurements=data)
+    assert report["counts"]=={"pass":11,"fail":0,"unknown":0}
+    report=evaluate_ada_measurements(context=CONTEXT,measurements={**data,"walking_cross_slope_pct":2.1,"clear_floor_length_in":47.99})
+    assert report["counts"]["fail"]==2
+    report=evaluate_ada_measurements(context=CONTEXT,measurements={**data,"extended_scope_confirmed":False})
+    assert report["counts"]["unknown"]==8
+    assert report["complete_code_compliance_determined"] is False
+    report=evaluate_ada_measurements(context=CONTEXT,measurements={**data,"walking_cross_slope_pct":0})
+    assert report["counts"]["pass"]==11

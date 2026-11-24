@@ -73,6 +73,10 @@ export default function CompliancePage() {
     const [rampRun, setRampRun] = useState("");
     const [rampException, setRampException] = useState("unknown");
     const [newConstruction, setNewConstruction] = useState("unknown");
+    const [extendedChecks,setExtendedChecks]=useState(false);
+    const [extendedScope,setExtendedScope]=useState(false);
+    const [extended,setExtended]=useState<Record<string,string>>({});
+    const extraFields=[["circular_turn_diameter_in","Circular turning space diameter (in)"],["clear_floor_width_in","Clear floor space width (in)"],["clear_floor_length_in","Clear floor space length (in)"],["walking_running_slope_pct","Walking surface running slope (%)"],["walking_cross_slope_pct","Walking surface cross slope (%)"],["ramp_run_clear_width_in","Ramp clear width between handrails (in)"],["ramp_single_run_rise_in","Single ramp run rise (in)"],["ramp_landing_clear_length_in","Ramp landing clear length (in)"]];
     const [saving, setSaving] = useState(false);
     const [buildingCodeOpen, setBuildingCodeOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -163,6 +167,9 @@ export default function CompliancePage() {
                     ramp_horizontal_run_in: optionalValue(rampRun),
                     new_construction: tri(newConstruction),
                     ramp_alteration_exception_applies: tri(rampException),
+                    extended_checks:extendedChecks,
+                    extended_scope_confirmed:extendedChecks&&extendedScope,
+                    ...(extendedChecks?Object.fromEntries(extraFields.map(([key])=>[key,extended[key]?.trim()?Number(extended[key]):null])):{}),
                 },
             });
             if (!response.ok) throw new Error(response.error?.message || "Assessment could not be saved");
@@ -210,9 +217,9 @@ export default function CompliancePage() {
                 </div>
                 <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
                     <AlertTriangle className="inline h-4 w-4 mr-1"/>
-                    Only three numerical checks from the official 2010 ADA Standards are supported here:
+                    Three baseline numerical checks from the official 2010 ADA Standards are supported here:
                     manual door clear width (§404.2.3), nominal walking surface width (§403.5.1)
-                    and new-construction ramp running slope (§405.2). No AI-derived measurements,
+                    and new-construction ramp running slope (§405.2). Opt in to eight additional ordinary-element measurements below. No AI-derived measurements,
                     complete IBC/NFPA conclusions or code approval. Expand the IBC/NFPA section for additional bounded numeric rules. A qualified reviewer must determine
                     jurisdictional adoption, exceptions and all remaining requirements.
                 </p>
@@ -281,6 +288,11 @@ export default function CompliancePage() {
                                 {yesNo("New construction ramp", newConstruction, setNewConstruction)}
                                 {yesNo("Ramp alteration exception applies", rampException, setRampException)}
                             </div>
+                            <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={extendedChecks} onChange={e=>setExtendedChecks(e.target.checked)}/>Include additional ADA numeric thresholds</label>
+                            {extendedChecks&&<div className="space-y-3 border border-white/10 rounded p-3">
+                                <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={extendedScope} onChange={e=>setExtendedScope(e.target.checked)}/>Qualified reviewer confirms each measured ordinary element is subject to the cited section, correct measurement method, and no special provisions or exceptions apply.</label>
+                                <div className="grid sm:grid-cols-2 gap-3">{extraFields.map(([key,label])=><label key={key} className="block text-sm">{label}<input aria-label={label} type="number" min={key.endsWith("_pct")?0:0.001} step="any" max={key.endsWith("_pct")?100:1000} value={extended[key]||""} onChange={e=>setExtended(old=>({...old,[key]:e.target.value}))} className="block w-full bg-slate-900 border border-white/20 p-2"/></label>)}</div>
+                            </div>}
                             <button type="button" onClick={() => void submit()} disabled={!projectId || saving}
                                 className="rounded-lg bg-emerald-300 px-5 py-2 text-slate-950 font-semibold disabled:opacity-40">
                                 {saving ? "Evaluating and saving…" : "Run checks and save evidence"}

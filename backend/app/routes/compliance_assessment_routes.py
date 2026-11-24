@@ -38,6 +38,16 @@ class MeasurementsInput(BaseModel):
     ramp_horizontal_run_in: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
     new_construction: bool | None = None
     ramp_alteration_exception_applies: bool | None = None
+    extended_checks: bool = False
+    extended_scope_confirmed: bool = False
+    circular_turn_diameter_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    clear_floor_width_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    clear_floor_length_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    walking_running_slope_pct: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
+    walking_cross_slope_pct: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
+    ramp_run_clear_width_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    ramp_single_run_rise_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    ramp_landing_clear_length_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
 
 
 class NewAssessment(BaseModel):

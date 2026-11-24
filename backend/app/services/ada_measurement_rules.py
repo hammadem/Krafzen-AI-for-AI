@@ -1,6 +1,6 @@
 """Evidence-based, narrowly scoped ADA 2010 numerical measurement checks.
 
-Only official 2010 ADA Standards sections 404.2.3, 403.5.1 and 405.2.
+Official 2010 ADA Standards narrow numerical rules, with opt-in extended checks.
 This module does NOT determine which standards apply to a project, nor does
 passing a threshold establish code compliance, approval or professional review.
 Unknown edition/applicability/exception/measurement -> UNKNOWN, never PASS.
@@ -181,6 +181,37 @@ def evaluate_ada_measurements(
                    "landings, clear width, handrails, cross slope and total rise are unassessed.",
         )
 
+    # Additional independent numeric checks are opt-in; old saved screenings
+    # retain their original scope. A qualified reviewer must first confirm
+    # that these ordinary element types apply and special exceptions are absent.
+    if measurements.get("extended_checks") is True:
+        scope_ready = base_ready and measurements.get("extended_scope_confirmed") is True
+        definitions = [
+            ("304.3.1","circular_turn_diameter_in","Circular turning-space diameter only",60.0,"in","min"),
+            ("305.3","clear_floor_width_in","Clear floor space width only",30.0,"in","min"),
+            ("305.3","clear_floor_length_in","Clear floor space length only",48.0,"in","min"),
+            ("403.3","walking_running_slope_pct","Ordinary accessible walking surface running slope",5.0,"%","max"),
+            ("403.3","walking_cross_slope_pct","Ordinary accessible walking surface cross slope",100/48,"%","max"),
+            ("405.5","ramp_run_clear_width_in","Ramp run clear width between handrails, where present",36.0,"in","min"),
+            ("405.6","ramp_single_run_rise_in","Rise of a single ordinary ramp run",30.0,"in","max"),
+            ("405.7.3","ramp_landing_clear_length_in","Ordinary ramp landing clear length only",60.0,"in","min"),
+        ]
+        for section,key,description,threshold,unit,direction in definitions:
+            raw=measurements.get(key)
+            measured=_measurement(raw)
+            if unit=="%" and isinstance(raw,(int,float)) and not isinstance(raw,bool) and raw==0:
+                measured=0.0
+            if not scope_ready or measured is None:
+                status="unknown"
+                reason="Measurement, edition, applicability or ordinary-element scope and exceptions have not been confirmed."
+            else:
+                passed=(measured>=threshold if direction=="min" else measured<=threshold+1e-12)
+                status="pass" if passed else "fail"
+                reason=f"Declared value {measured:.4g} {unit} {'meets' if passed else 'does not meet'} the selected numerical threshold. All other element conditions remain unassessed."
+            append(rule_id="ADA-"+section+"-"+key,section=section,description=description,
+                expected=threshold,measured=measured,basis=f"{direction} threshold {threshold:.8g} {unit}",
+                unit=unit,prerequisites=[key,"extended_scope_confirmed"],status=status,reason=reason)
+
     counts = {
         state: sum(1 for row in findings if row["result"] == state)
         for state in ("pass", "fail", "unknown")
@@ -190,6 +221,8 @@ def evaluate_ada_measurements(
         for field in finding["required_inputs"]
         if measurements.get(field) is None and context.get(field) is None
     })
+    if measurements.get("extended_checks") is True and measurements.get("extended_scope_confirmed") is not True:
+        missing.append("extended ordinary-element applicability and exceptions confirmed")
     if not edition_supported:
         missing.append("supported standard_edition=2010_ADA")
     if not applicability:
