@@ -60,7 +60,7 @@ async def create_notification(
             logger.info("[notification_service] Notification created", type=notification_type, user_id=user_id[:8])
             return response.data[0]
         return None
-    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
         logger.error("[notification_service] Insert failed", error=str(e), exc_info=True)
         return None
 
@@ -81,7 +81,7 @@ async def get_notification_page(
         if response is None or response.count is None:
             raise HTTPException(status_code=503, detail="Notification history unavailable")
         return response.data or [], response.count
-    except (APIError, HTTPError, KeyError, TypeError, ValueError) as exc:
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as exc:
         logger.error("[notification_service] Fetch failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=503, detail="Notification history unavailable") from exc
 
@@ -103,6 +103,6 @@ async def mark_as_read(notification_id: str, user_id: str) -> bool:
         if response is None:
             raise HTTPException(status_code=503, detail="Notification update unavailable")
         return bool(response.data)
-    except (APIError, HTTPError, KeyError, TypeError, ValueError) as exc:
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as exc:
         logger.error("[notification_service] Mark-read failed", error=str(exc), exc_info=True)
         raise HTTPException(status_code=503, detail="Notification update unavailable") from exc
