@@ -1,10 +1,10 @@
 "use client";
 import { Archive, Folder, Clock, RefreshCw, AlertCircle, Search, Lock } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { getArchivedProjects, restoreArchivedProject } from "@/lib/api/api";
+import { restoreArchivedProject } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
-import { useApiResource } from "@/hooks/useApiResource";
+import { useFetchProjects } from "@/hooks/useFetchProjects";
 import { formatDate } from "@/lib/utils";
 
 // Reference layout (krafzen-product/archive.html): tabbed archive with table rows.
@@ -29,25 +29,9 @@ export default function ArchivePage() {
     const [restoring, setRestoring] = useState<string | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
 
-    const {
-        data: projects,
-        isLoading,
-        isError,
-        error,
-        refetch,
-    } = useApiResource<ProjectDetails[]>({
-        fetcher: (user) => getArchivedProjects(user, user.userId ?? ""),
-        select: (raw) => {
-            if (Array.isArray(raw)) return raw as ProjectDetails[];
-            if (raw && typeof raw === "object") {
-                const obj = raw as Record<string, unknown>;
-                const arr = obj.projects ?? obj.data ?? obj.items ?? [];
-                return Array.isArray(arr) ? (arr as ProjectDetails[]) : [];
-            }
-            return [];
-        },
-        fallback: [],
-    });
+    const { projects, status, apiError: error, forceRefetch: refetch, page, hasMore, nextPage, prevPage, firstPage } = useFetchProjects(1, search, true);
+    const isLoading = status === "inprogress";
+    const isError = status === "error";
 
     const restore = async (projectId: string) => {
         if (restoring) return;
@@ -67,11 +51,7 @@ export default function ArchivePage() {
         }
     };
 
-    const visible = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        if (!q) return projects;
-        return projects.filter((p) => p.input_text?.toLowerCase().includes(q));
-    }, [projects, search]);
+    const visible = projects;
 
     return (
         <div className="flex-1 flex flex-col p-8 gap-6 overflow-y-auto custom-scrollbar">
@@ -120,7 +100,8 @@ export default function ArchivePage() {
                 <input
                     type="text"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    maxLength={200}
+                    onChange={(e) => { firstPage(); setSearch(e.target.value); }}
                     placeholder="Search archived projects..."
                     className="bg-transparent border-none text-sm text-white focus:ring-0 outline-none placeholder:text-[#94a3b8]/50 flex-1"
                 />
@@ -196,6 +177,13 @@ export default function ArchivePage() {
                 </div>
             )}
 
+            {!isLoading && !isError && (page > 1 || hasMore) && (
+                <div className="flex items-center justify-between text-sm text-white">
+                    <button type="button" disabled={page <= 1 || !!restoring} onClick={prevPage} className="underline disabled:opacity-40">Previous archived projects</button>
+                    <span>Page {page}</span>
+                    <button type="button" disabled={!hasMore || !!restoring} onClick={nextPage} className="underline disabled:opacity-40">Next archived projects</button>
+                </div>
+            )}
             {/* Empty */}
             {!isLoading && !isError && visible.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl">
@@ -204,12 +192,10 @@ export default function ArchivePage() {
                     </div>
                     <div className="text-center">
                         <h3 className="text-white font-semibold text-lg">
-                            {projects.length === 0 ? "Nothing archived" : "No matches"}
+                            {search.trim() ? "No matches" : "Nothing archived"}
                         </h3>
                         <p className="text-[#94a3b8] text-sm mt-1">
-                            {projects.length === 0
-                                ? "Projects you archive will be kept here."
-                                : "Try a different search."}
+                            {search.trim() ? "Try a different search." : "Projects you archive will be kept here."}
                         </p>
                     </div>
                 </div>

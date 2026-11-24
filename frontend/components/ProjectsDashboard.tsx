@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useFetchProjects } from '@/hooks/useFetchProjects';
 import { useAuth } from '@/context/AuthContext';
 import { archiveProject } from '@/lib/api/api';
@@ -35,9 +35,9 @@ function ReadyBadge({ ready }: { ready: boolean }) {
 }
 
 export default function ProjectsDashboard() {
-  const { projects, status, apiError, forceRefetch } = useFetchProjects();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
+  const { projects, status, apiError, forceRefetch, page, hasMore, nextPage, prevPage, firstPage } = useFetchProjects(1, query);
   const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
@@ -61,14 +61,9 @@ export default function ProjectsDashboard() {
     }
   };
 
-  // Client-side filter over the already-loaded list (frontend-only, API-safe).
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => (p.input_text || '').toLowerCase().includes(q));
-  }, [projects, query]);
+  const visible = projects;
 
-  if (status === 'inprogress') {
+  if (status === 'inprogress' && !query && projects.length === 0) {
     return (
       <div className="flex-1 flex flex-col p-8 gap-8 overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between">
@@ -151,7 +146,7 @@ export default function ProjectsDashboard() {
             <Folder className="w-5 h-5 text-[#54e3b5]" />
           </div>
           <div className="text-2xl font-bold text-white">{projects.length}</div>
-          <div className="text-xs text-[#94a3b8] uppercase tracking-wider mt-1">Total Projects</div>
+          <div className="text-xs text-[#94a3b8] uppercase tracking-wider mt-1">Projects on this page</div>
         </div>
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
           <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center mb-3 border border-blue-500/20">
@@ -178,7 +173,8 @@ export default function ProjectsDashboard() {
             <input
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              maxLength={200}
+              onChange={(e) => { firstPage(); setQuery(e.target.value); }}
               placeholder="Search projects..."
               className="bg-transparent border-none text-sm text-white focus:ring-0 outline-none placeholder:text-[#94a3b8]/50 w-40 sm:w-56"
             />
@@ -186,7 +182,9 @@ export default function ProjectsDashboard() {
         </div>
 
         {/* Empty (no projects at all) */}
-        {projects.length === 0 ? (
+        {status === 'inprogress' ? (
+          <p role="status" className="text-sm text-[#94a3b8]">Loading projects…</p>
+        ) : projects.length === 0 && !query.trim() ? (
           <div className="flex-1 py-20 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-3xl gap-4">
             <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
               <Folder className="w-6 h-6 text-[#54e3b5]/60" />
@@ -240,7 +238,7 @@ export default function ProjectsDashboard() {
                     <div className="flex items-center justify-between pt-3 border-t border-white/5 text-[11px] text-[#94a3b8] font-mono">
                       <span className="flex items-center gap-1.5">
                         {ready ? <FileCheck className="w-3 h-3 text-[#54e3b5]" /> : <Loader className="w-3 h-3" />}
-                        {ready ? 'CAD ready' : 'In progress'}
+                        {ready ? 'CAD ready' : 'Draft'}
                       </span>
                       <span className="flex items-center gap-1.5 uppercase">
                         <Clock className="w-3 h-3" />
@@ -254,6 +252,13 @@ export default function ProjectsDashboard() {
           </div>
         )}
       </div>
+      {status === 'success' && ((page ?? 1) > 1 || hasMore) && (
+        <div className="flex items-center justify-between text-sm text-white">
+          <button type="button" disabled={(page ?? 1) <= 1} onClick={prevPage} className="underline disabled:opacity-40">Previous projects</button>
+          <span>Page {page}</span>
+          <button type="button" disabled={!hasMore} onClick={nextPage} className="underline disabled:opacity-40">Next projects</button>
+        </div>
+      )}
       {archiveTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div role="alertdialog" aria-modal="true" aria-labelledby="archive-dialog-title" className="w-full max-w-md rounded-2xl border border-white/15 bg-[#101722] p-6 shadow-2xl">

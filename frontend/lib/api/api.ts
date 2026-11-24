@@ -259,9 +259,14 @@ export async function getAllProjects(
     user: User | null,
     userId: string,
     page = 1,
-    limit = 20
+    limit = 20,
+    options?: { search?: string; archived?: boolean }
 ) {
-    return apiClient("GET", PROJECT_URLS.GET_ALL_PROJECTS(userId, page, limit), user);
+    const query = new URLSearchParams();
+    if (options?.search?.trim()) query.set("q", options.search.trim());
+    if (options?.archived) query.set("archived", "true");
+    const suffix = query.size ? `&${query.toString()}` : "";
+    return apiClient("GET", PROJECT_URLS.GET_ALL_PROJECTS(userId, page, limit) + suffix, user);
 };
 export async function deleteAProject(
     user: User | null,

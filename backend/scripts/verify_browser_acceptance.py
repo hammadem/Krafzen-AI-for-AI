@@ -179,10 +179,23 @@ def main():
                     page.get_by_role("button",name="Restore "+names[0],exact=True).click()
                     expect(page.get_by_role("button",name="Restore "+names[0],exact=True)).to_have_count(0)
                     note("Browser archive and restore workflow")
+                    # Old projects must remain discoverable beyond the first 20 rows.
+                    for index in range(21):
+                        r=requests.post(API+"/api/v1/projects/",headers=headers,json={"input_text":f"Pagination QA filler {index:02d}"},timeout=20)
+                        assert r.status_code==201
+                    page.goto(WEB+"/workspace/projects")
+                    expect(page.get_by_role("button",name="Next projects")).to_be_enabled(timeout=60000)
+                    page.get_by_role("button",name="Next projects").click()
+                    expect(page.get_by_text(names[0],exact=True)).to_be_visible(timeout=60000)
+                    page.get_by_placeholder("Search projects...").fill("Browser residential")
+                    expect(page.get_by_text(names[0],exact=True)).to_be_visible(timeout=60000)
+                    expect(page.get_by_text("Pagination QA filler 00",exact=True)).to_have_count(0)
+                    note("Real browser searches older saved projects across pages")
                 # New context has no previous browser storage or cookies.
                 with browser.new_context() as context:
                     page=login(context,email,password)
                     page.goto(WEB+"/workspace/projects")
+                    page.get_by_placeholder("Search projects...").fill("Browser")
                     for name in names:
                         expect(page.get_by_text(name,exact=True)).to_be_visible(timeout=60000)
                     response=requests.get(API+"/api/v1/files/",headers=headers,params={"job_id":projects[0][1]},timeout=20)

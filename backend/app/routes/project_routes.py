@@ -34,12 +34,13 @@ async def list_projects(
     limit: int = Query(default=10,ge=1,le=100),
     status: str | None = Query(default=None),
     archived: bool = Query(default=False),
+    q: str | None = Query(default=None, max_length=200),
 ):
     if status not in (None, "active", "archived"):
         raise HTTPException(status_code=422, detail="Invalid project status filter")
     if status == "active" and archived:
         raise HTTPException(status_code=422, detail="Conflicting archive filters")
-    projects = await get_projects(user, page=page, limit=limit, status=status, archived=archived)
+    projects = await get_projects(user, page=page, limit=limit, status=status, archived=archived, **({"search": q} if q else {}))
     return projects
 
 

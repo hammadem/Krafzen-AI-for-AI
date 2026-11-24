@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProjectCreate(BaseModel): 
-    input_text: str
+    input_text: str = Field(min_length=1, max_length=20000)
 
 class ProjectUpdate(BaseModel):
     """Browser users may edit text, not forge AI analyses or generated CAD."""

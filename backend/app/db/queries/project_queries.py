@@ -18,6 +18,8 @@ async def create_project(project_data: ProjectCreate, user: dict[str, Any]) -> d
         logger.warning("[create_project] Invalid user context")
         return None
 
+    if not project_data.input_text.strip():
+        raise HTTPException(status_code=422, detail="Project text cannot be blank")
     try:
         payload = {
             "user_id": user["user_id"],
@@ -44,7 +46,7 @@ async def create_project(project_data: ProjectCreate, user: dict[str, Any]) -> d
         return None  
 
 # GET ALL PROJECTS FOR THE LOGGED-IN USER
-async def get_projects(user: dict[str, Any], page: int = 1, limit: int = 10, status: str | None = None, archived: bool = False) -> list[dict[str, Any]]:  
+async def get_projects(user: dict[str, Any], page: int = 1, limit: int = 10, status: str | None = None, archived: bool = False, search: str | None = None) -> list[dict[str, Any]]:  
     if not user or "user_id" not in user:
         logger.warning("[get_projects] Invalid user context")
         return []
@@ -63,14 +65,20 @@ async def get_projects(user: dict[str, Any], page: int = 1, limit: int = 10, sta
                 query = query.filter("archived_at", "not.is", "null")
             else:
                 query = query.is_("archived_at", "null")
-            return query.order("created_at", desc=True).range(offset, offset + limit - 1).execute()
+            if search and search.strip():
+                # Escape SQL LIKE wildcards; the value is a PostgREST filter, never SQL.
+                term = search.strip().replace(chr(92), chr(92) * 2).replace("%", chr(92) + "%").replace("_", chr(92) + "_")
+                query = query.ilike("input_text", "%" + term + "%")
+            return query.order("created_at", desc=True).order("id", desc=True).range(offset, offset + limit - 1).execute()
         response = await run_in_threadpool(build_query)
 
-        projects = response.data if (response and response.data) else []
+        if response is None:
+            raise RuntimeError("Project storage returned no response")
+        projects = response.data or []
         logger.debug(f"[get_projects] Retrieved {len(projects)} projects for user {user_id[:8]}...")
         return projects
 
-    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
         # An unavailable DB must NEVER appear as an empty project repository.
         # Otherwise users are prompted to recreate existing projects.
         logger.error("[get_projects] Error", user_id=user["user_id"], error=str(e), exc_info=True)
@@ -114,7 +122,7 @@ async def get_project(project_id: str, user: dict[str, Any]) -> dict[str, Any] |
         raise
     except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_project] Error", project_id=project_id, error=str(e), exc_info=True)
-        return None
+        raise HTTPException(status_code=503, detail="Project storage temporarily unavailable") from e
 
 # UPDATE PROJECT
 async def update_project(project_id: str, update_data: ProjectUpdate, user: dict[str, Any]) -> dict[str, Any] | None:  
@@ -189,6 +197,7 @@ async def delete_project(project_id: str, user: dict[str, Any]) -> bool:
             lambda: db.table("projects")
                 .delete()
                 .eq("id", project_id)
+                .eq("user_id", user["user_id"])
                 .execute()
         )
 
@@ -199,9 +208,11 @@ async def delete_project(project_id: str, user: dict[str, Any]) -> bool:
             logger.warning("[delete_project] Delete failed", project_id=project_id)
         return success
 
-    except (APIError, HTTPError, HTTPException, KeyError, TypeError, ValueError) as e:
+    except HTTPException:
+        raise
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
         logger.error("[delete_project] Error", project_id=project_id, error=str(e), exc_info=True)
-        return False
+        raise HTTPException(status_code=503, detail="Project deletion unavailable") from e
 
 async def archive_project(project_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
     """Soft-archive only a project owned by the current authenticated user."""

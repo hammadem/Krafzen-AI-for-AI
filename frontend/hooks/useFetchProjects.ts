@@ -1,68 +1,63 @@
-// this needs to be optimized yet
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { getAllProjects } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
-import { deleteCacheByPrefix } from "@/lib/api/cache";
 
 const DEFAULT_LIMIT = 20;
 
-export function useFetchProjects(initialPage = 1) {
+/** Paginated owner-scoped catalog. Old requests cannot overwrite a new search or session. */
+export function useFetchProjects(initialPage = 1, search = "", archived = false) {
     const { user } = useAuth();
     const [projects, setProjects] = useState<ProjectDetails[]>([]);
     const [status, setStatus] = useState<ReqState>("idle");
     const [apiError, setApiError] = useState<AppError | null>(null);
-    const [page, setPage] = useState<number>(initialPage);
-    const [hasMore, setHasMore] = useState<boolean>(true);
+    const [page, setPage] = useState(initialPage);
+    const [hasMore, setHasMore] = useState(false);
+    const [reload, setReload] = useState(0);
+    const generation = useRef(0);
+    const principal = user?.userId;
+    const token = user?.access_token;
 
-    const fetchProjects = useCallback(async (pageToFetch = 1) => {
-        if (!user?.userId) return;
+    useEffect(() => {
+        const current = ++generation.current;
+        if (!principal || !token || !user) {
+            setProjects([]); setHasMore(false); setStatus("idle"); setApiError(null);
+            return;
+        }
         setStatus("inprogress");
-        const { ok, data, error } = await getAllProjects(user, user.userId, pageToFetch, DEFAULT_LIMIT);
-
-        if (ok) {
-            // Handle both response shapes:
-            // 1. Array directly: ProjectDetails[]
-            // 2. Object with key: { projects: [...] } or { data: [...] }
-            let items: ProjectDetails[] = [];
-
-            if (Array.isArray(data)) {
-                items = data as ProjectDetails[];
-            } else if (data && typeof data === "object") {
-                const obj = data as Record<string, unknown>;
-                const arr = obj.projects ?? obj.data ?? obj.items ?? [];
-                items = Array.isArray(arr) ? (arr as ProjectDetails[]) : [];
+        setApiError(null);
+        const timer = window.setTimeout(async () => {
+            const response = await getAllProjects(user, principal, page, DEFAULT_LIMIT, {search, archived});
+            if (generation.current !== current) return;
+            if (!response.ok) {
+                setProjects([]); setHasMore(false); setStatus("error"); setApiError(response.error);
+                return;
             }
-
+            const raw = response.data;
+            const candidate = Array.isArray(raw) ? raw : raw && typeof raw === "object"
+                ? (raw as Record<string, unknown>).projects ?? (raw as Record<string, unknown>).data ?? (raw as Record<string, unknown>).items
+                : null;
+            if (!Array.isArray(candidate)) {
+                setProjects([]); setHasMore(false); setStatus("error");
+                setApiError({type: "UNKNOWN", message: "Invalid project list response"});
+                return;
+            }
+            const items = candidate as ProjectDetails[];
+            if (items.length === 0 && page > 1) {
+                setPage(page - 1);
+                return;
+            }
             setProjects(items);
             setHasMore(items.length === DEFAULT_LIMIT);
             setStatus("success");
-        } else {
-            setStatus("error");
-            setApiError(error);
-        }
+        }, search.trim() ? 250 : 0);
+        return () => { window.clearTimeout(timer); ++generation.current; };
+        // Authorization depends on the actual principal/token rather than unrelated profile refreshes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [principal, token, page, search, archived, reload]);
 
-    }, [user]);
-
-    useEffect(() => {
-        const load = async () => await fetchProjects(page);
-        load();
-    }, [fetchProjects, page]);
-
-    const forceRefetch = useCallback(() => {
-        if (!user) return;
-        // Clear every cached projects-list page (any params) so a freshly created/updated
-        // project shows immediately — robust to page/limit/URL changes, unlike an exact key.
-        deleteCacheByPrefix(`GET:/api/v1/projects`);
-        fetchProjects(page);
-    }, [user, fetchProjects, page]);
-
-    const nextPage = useCallback(() => {
-        if (hasMore) setPage((p) => p + 1);
-    }, [hasMore]);
-
-    const prevPage = useCallback(() => {
-        setPage((p) => Math.max(1, p - 1));
-    }, []);
-
-    return { projects, forceRefetch, status, apiError, page, hasMore, nextPage, prevPage };
+    const forceRefetch = useCallback(() => setReload((value) => value + 1), []);
+    const nextPage = useCallback(() => { if (hasMore) setPage((p) => p + 1); }, [hasMore]);
+    const prevPage = useCallback(() => setPage((p) => Math.max(1, p - 1)), []);
+    const firstPage = useCallback(() => setPage(1), []);
+    return { projects, forceRefetch, status, apiError, page, hasMore, nextPage, prevPage, firstPage };
 }
