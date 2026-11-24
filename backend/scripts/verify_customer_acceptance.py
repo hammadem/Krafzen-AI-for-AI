@@ -157,6 +157,11 @@ def main():
             json={"path": "untrusted/replacement.dxf"}, timeout=20)
         assert browser.status_code in (401, 403), f"Browser metadata mutation HTTP {browser.status_code}"
         note("A","Direct browser metadata modification rejected")
+        events=check(client.get(base+"/dashboard/activity",headers=headers,params={"project_id":p})).json()["events"]
+        assert any(e.get("action") == "file.uploaded" and e.get("entity_id") == fid for e in events)
+        assert any(e.get("action") == "revision.created" and e.get("entity_id") == fid for e in events)
+        assert check(client.get(base+"/dashboard/activity",headers=other,params={"project_id":p})).json()["events"] == []
+        note("A","Real canonical file and revision audit events; cross-account isolation")
         note("A","Real dimensioned CAD generation persisted in private storage; signed link")
         # Check actual signed storage bytes and dimensional DXF entities.
         signed_path = signed.get("signed_url") or signed.get("signedUrl") or signed.get("url")
