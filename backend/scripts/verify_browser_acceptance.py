@@ -128,7 +128,7 @@ def main():
                     provider_page=context.new_page()
                     provider_page.goto(WEB+"/login",wait_until="load")
                     provider_page.get_by_role("button",name="Google").click()
-                    expect(provider_page.get_by_role("alert")).to_contain_text("not enabled",timeout=30000)
+                    expect(provider_page.locator("p[role=alert]")).to_contain_text("not enabled",timeout=30000)
                     assert urlsplit(provider_page.url).netloc==urlsplit(WEB).netloc
                     note("Disabled Google OAuth stays on application and offers email fallback")
                     provider_page.close()
