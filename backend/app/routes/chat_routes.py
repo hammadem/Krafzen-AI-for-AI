@@ -11,7 +11,10 @@ from app.db.queries.project_queries import get_project
 from fastapi.responses import FileResponse, StreamingResponse
 from httpx import HTTPError
 from postgrest.exceptions import APIError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from uuid import UUID
+from fastapi.concurrency import run_in_threadpool
+from app.services.reference_retrieval import retrieve_reference, format_reference_answer, reference_register
 
 from app.compliance.extraction_fallback import merge_heuristic_layout
 from app.compliance.models import LayoutExtract
@@ -544,6 +547,53 @@ async def generate_chat_response_stream(request: ChatRequest, user_data: dict = 
     return StreamingResponse(sse_generator(), media_type="text/event-stream", headers={
         "Cache-Control": "no-store", "X-Accel-Buffering": "no",
     })
+
+
+class ReferenceRequest(BaseModel):
+    session_id: UUID
+    question: str = Field(min_length=1, max_length=500)
+
+
+@router.get("/chat/reference-register")
+async def get_reference_register(user_data: dict = Depends(require_auth)):
+    try:
+        return await run_in_threadpool(reference_register)
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail="Approved reference index unavailable") from exc
+
+
+@router.post("/chat/reference")
+async def answer_reference_question(request: ReferenceRequest, user_data: dict = Depends(require_auth)):
+    """Retrieve approved sources locally; no external inference or customer indexing."""
+    question = request.question.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="Enter a technical reference question")
+    session_id = str(request.session_id)
+    try:
+        sessions = await chat_history_service.get_user_sessions(user_data["user_id"])
+        session = next((s for s in sessions if str(s["id"]) == session_id), None)
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+        if session.get("project_id"):
+            project = await get_project(session["project_id"], user_data)
+            if not project or project.get("archived_at"):
+                raise HTTPException(status_code=409, detail="Restore project before writing chat messages")
+        hits = await run_in_threadpool(retrieve_reference, question)
+        answer = format_reference_answer(hits)
+        user_message = await chat_history_service.add_message(session_id, "user", "/reference " + question)
+        if not user_message.get("id"):
+            raise RuntimeError("Reference question was not saved")
+        assistant = await chat_history_service.add_message(session_id, "assistant", answer)
+        if not assistant.get("id"):
+            raise RuntimeError("Reference response was not saved")
+        return {"session_id":session_id, "message_id":assistant["id"], "original_prompt":question,
+                "ollama_response":"", "validated_response":answer, "image_url":"",
+                "references":hits, "mode":"local_approved_reference_retrieval"}
+    except HTTPException:
+        raise
+    except (APIError, HTTPError, KeyError, TypeError, ValueError, OSError, RuntimeError) as exc:
+        logger.exception("Reference retrieval unavailable")
+        raise HTTPException(status_code=503, detail="Approved reference retrieval or persistence unavailable") from exc
 
 
 @router.post("/chat/session")

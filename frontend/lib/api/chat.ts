@@ -48,12 +48,18 @@ export async function sendChatMessage(
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const body: Record<string, unknown> = { message, history };
-    if (sessionId) body.session_id = sessionId;
-    if (jurisdiction === "US_IRC_BASELINE") body.jurisdiction = "US_IRC_BASELINE";
-    if (previousImageUrl) body.previous_image_url = previousImageUrl;
+    const reference = /^\/reference(?:\s|$)/i.test(message.trim());
+    if (reference && !sessionId) throw new Error("Open a saved design session first.");
+    const body: Record<string, unknown> = reference
+        ? {session_id:sessionId, question:message.trim().replace(/^\/reference\s*/i,"")}
+        : { message, history };
+    if (!reference) {
+        if (sessionId) body.session_id = sessionId;
+        if (jurisdiction === "US_IRC_BASELINE") body.jurisdiction = "US_IRC_BASELINE";
+        if (previousImageUrl) body.previous_image_url = previousImageUrl;
+    }
 
-    const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/generate`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/${reference ? "reference" : "generate"}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),

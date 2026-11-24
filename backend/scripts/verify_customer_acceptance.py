@@ -148,6 +148,16 @@ def main():
         assert check(client.get(base+"/chat/history/"+linked["id"],headers=headers)).json()["messages"] == []
         check(client.get(base+"/chat/history/"+linked["id"],headers=headers,params={"limit":101}),422)
         note("Chat","Existing project links to persistent owner-scoped design session; reuse and tenant isolation verified without paid AI calls")
+        register = check(client.get(base+"/chat/reference-register",headers=headers)).json()
+        assert register["dataset_count"] >= 6
+        ref_answer = check(client.post(base+"/chat/reference",headers=headers,json={"session_id":linked["id"],"question":"IFC wall opening window"})).json()
+        assert ref_answer["mode"] == "local_approved_reference_retrieval" and ref_answer["references"]
+        assert "CC BY 4.0" in ref_answer["validated_response"] and "buildingSMART" in ref_answer["validated_response"]
+        assert ref_answer["image_url"] == ""
+        check(client.post(base+"/chat/reference",headers=other,json={"session_id":linked["id"],"question":"IFC walls"}),404)
+        saved = check(client.get(base+"/chat/history/"+linked["id"],headers=headers)).json()["messages"]
+        assert any(row["id"] == ref_answer["message_id"] and "buildingSMART" in row["content"] for row in saved)
+        note("Knowledge","Approved IFC source index, licensed references, saved chat response and tenant isolation verified without paid AI")
         check(client.post(base+"/projects/",headers=headers,json={"input_text":"   "}),422)
         check(client.post(base+"/projects/",headers=headers,json={"input_text":""}),422)
         check(client.post(base+"/projects/",headers=headers,json={"input_text":"x"*20001}),422)
