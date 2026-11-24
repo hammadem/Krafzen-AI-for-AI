@@ -5,11 +5,13 @@ import { listWorkspaces, createWorkspace, acceptWorkspaceInvite } from "@/lib/ap
 import { useApiResource } from "@/hooks/useApiResource";
 import MemberManagement from "@/components/members/MemberManagement";
 
+type OwnedWorkspaceInfo = WorkspaceInfo & { owner_id: string };
+
 export default function MembersPage() {
     const {user} = useAuth();
-    const {data: workspaces, isLoading, isError, error, refetch} = useApiResource<WorkspaceInfo[]>({
+    const {data: workspaces, isLoading, isError, error, refetch} = useApiResource<OwnedWorkspaceInfo[]>({
         fetcher: u => listWorkspaces(u),
-        select: raw => Array.isArray(raw) ? raw as unknown as WorkspaceInfo[] : [],
+        select: raw => Array.isArray(raw) ? raw as unknown as OwnedWorkspaceInfo[] : [],
         fallback: [],
     });
     const [selectedId, setSelectedId] = useState("");
