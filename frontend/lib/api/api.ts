@@ -258,6 +258,12 @@ export async function createAProject(
 ) {
     return apiClient("POST", PROJECT_URLS.POST(), user, { user_id: user?.userId, input_text: body }, "application/json", controller);
 };
+export async function saveProjectMetadata(user: User | null, data: ProjectMetadata, projectId?: string) {
+    return projectId
+        ? apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, {...data})
+        : apiClient("POST", PROJECT_URLS.POST(), user, {...data, input_text: data.description.trim() || data.title});
+}
+
 export async function queryIfcSource(user: User | null, fileId: string, query: {mode:string;entity_class:string;storey_guid?:string;element_guid?:string;set_name?:string;property_name?:string}) {
     return apiClient("POST", `/api/v1/bim/files/${encodeURIComponent(fileId)}/query`, user, query);
 }
@@ -273,11 +279,13 @@ export async function getAllProjects(
     userId: string,
     page = 1,
     limit = 20,
-    options?: { search?: string; archived?: boolean }
+    options?: { search?: string; archived?: boolean; projectType?: ProjectType; lifecycleStage?: ProjectStage }
 ) {
     const query = new URLSearchParams();
     if (options?.search?.trim()) query.set("q", options.search.trim());
     if (options?.archived) query.set("archived", "true");
+    if (options?.projectType) query.set("project_type", options.projectType);
+    if (options?.lifecycleStage) query.set("lifecycle_stage", options.lifecycleStage);
     const suffix = query.size ? `&${query.toString()}` : "";
     return apiClient("GET", PROJECT_URLS.GET_ALL_PROJECTS(userId, page, limit) + suffix, user);
 };
