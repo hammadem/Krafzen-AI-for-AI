@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import BuildingCodePanel from "@/components/compliance/BuildingCodePanel";
 import {
     createAdaAssessment, getAllFiles, getAllJobs, getAllProjects,
-    getProjectAdaAssessments,
+    getProjectAdaAssessments, getComplianceReportPdf,
 } from "@/lib/api/api";
 
 type Project = { id: string; input_text?: string | null };
@@ -206,7 +206,7 @@ export default function CompliancePage() {
             <div className="max-w-6xl space-y-6">
                 <div className="flex items-center gap-2">
                     <ClipboardCheck className="h-6 w-6 text-emerald-300"/>
-                    <h1 className="text-2xl font-semibold">Traceable Building-Code Measurement Screening</h1>
+                    <h1 className="text-2xl font-semibold">Traceable ADA Measurement Screening and Building Codes</h1>
                 </div>
                 <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
                     <AlertTriangle className="inline h-4 w-4 mr-1"/>
@@ -313,6 +313,15 @@ export default function CompliancePage() {
                         {selected && (
                             <section className="rounded-xl border border-white/10 p-5 space-y-4">
                                 <h2 className="font-semibold">Traceable rule findings (pending review)</h2>
+                                <button type="button" className="rounded border border-white/20 px-3 py-2 text-sm" onClick={async () => {
+                                    try {
+                                        const blob = await getComplianceReportPdf(user, selected.id);
+                                        const url = URL.createObjectURL(blob);
+                                        const link = document.createElement("a");
+                                        link.href = url; link.download = `compliance-${selected.id}.pdf`; link.click();
+                                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                                    } catch (cause) { setError(cause instanceof Error ? cause.message : "PDF unavailable"); }
+                                }}>Download compliance PDF</button>
                                 <p className="text-sm text-amber-200">{selected.result.disclaimer}</p>
                                 {selected.result.rule_results.map(finding => (
                                     <div key={finding.rule_id} className="rounded-lg border border-white/10 p-4 space-y-2 text-sm">
