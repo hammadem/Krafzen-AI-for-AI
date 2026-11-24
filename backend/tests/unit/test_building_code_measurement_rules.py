@@ -100,3 +100,15 @@ def test_missing_photometry_and_insufficient_duration():
 def test_invalid_occupant_load_is_not_a_valid_calculation(load):
     r = evaluate(measures={**MEASURES, "stair_occupant_load": load})
     assert finding(r, "IBC-2024-1005.3.1")["result"] == "unknown"
+
+
+def test_pdf_uses_persisted_evidence_and_rejects_inconsistent_counts():
+    from app.services.compliance_pdf_service import build_compliance_pdf
+    report = evaluate()
+    row = {"id": "fixture-assessment", "project_id": "fixture-project",
+           "source_file_id": "fixture-file", "jurisdiction": CONTEXT,
+           "measurements": MEASURES, "result": report}
+    assert build_compliance_pdf(row).startswith(b"%PDF-")
+    report["counts"]["pass"] = 99
+    with pytest.raises(ValueError, match="count mismatch"):
+        build_compliance_pdf(row)
