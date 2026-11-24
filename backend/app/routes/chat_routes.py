@@ -207,9 +207,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             sessions = await chat_history_service.get_user_sessions(user_id)
             session_record = next((s for s in sessions if s["id"] == session_id), None)
             if not session_record:
-                # Session doesn't exist or doesn't belong to user, create a new one
-                logger.warning(f"Session {session_id} not found for user {user_id}, creating new session")
-                session_id = await chat_history_service.create_session(user_id, title=request.message[:30] + "...")
+                # Never silently reuse or replace a client-supplied foreign session.
+                raise HTTPException(status_code=404, detail="Chat session not found")
             else:
                 session_project_id = session_record.get("project_id")
         
@@ -368,6 +367,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             image_url = image_result
         else:
             generation_stage = "image_generation"
+            if gemini_service is None:
+                raise HTTPException(status_code=503, detail="Image generation provider unavailable")
             image_url = await gemini_service.generate_image(
                 cad_dsl,
                 original_prompt=request.message,
@@ -375,7 +376,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
                 drawing_standard=drawing_standard,
             )
 
-        if image_url.startswith("https://placehold.co/"):
+        if not isinstance(image_url, str) or not image_url.strip() or image_url.startswith("https://placehold.co/"):
             raise HTTPException(
                 status_code=502,
                 detail="Image generation failed. Check the backend logs and Gemini configuration.",
@@ -500,54 +501,44 @@ async def _record_generation_failure(
 
 @router.post("/chat/generate/stream")
 async def generate_chat_response_stream(request: ChatRequest, user_data: dict = Depends(require_auth)):
-    """
-    Process chat message and stream AI response tokens in real-time using Server-Sent Events (SSE).
-    Fulfills Acceptance Test 7.
+    """SSE delivery of the same verified, persisted generation as /chat/generate.
+
+    Providers currently return complete output, not a token stream. Emit a
+    progress event while the shared pipeline runs; only deliver generated
+    content after it has passed validation, persistence and request deduction.
     """
     user_id = user_data["user_id"]
     balance_info = await subscription_service.check_request_balance(user_id)
     if not balance_info.get("can_make_request"):
         raise HTTPException(status_code=402, detail="Insufficient requests.")
+    if request.session_id:
+        sessions = await chat_history_service.get_user_sessions(user_id)
+        if not any(str(row.get("id")) == request.session_id for row in sessions):
+            raise HTTPException(status_code=404, detail="Chat session not found")
 
-    session_id = request.session_id
-    if not session_id:
-        session_id = await chat_history_service.create_session(user_id, title=request.message[:30] + "...")
-
-    await chat_history_service.add_message(session_id, "user", request.message)
+    def event(data):
+        return "data: " + json.dumps(data, ensure_ascii=False, allow_nan=False) + "\\n\\n"
 
     async def sse_generator():
+        yield event({"type": "progress", "stage": "generating"})
         try:
-            # Event 1: Session initialization
-            yield f"data: {json.dumps({'type': 'init', 'session_id': session_id})}\n\n"
+            result = await generate_chat_response(request, user_data)
+            payload = result.model_dump(mode="json")
+            yield event({"type": "init", "session_id": payload["session_id"]})
+            if payload.get("validated_response"):
+                yield event({"type": "token", "token": payload["validated_response"]})
+            yield event({**payload, "type": "complete"})
+        except HTTPException as exc:
+            logger.warning("Shared chat generation failed with HTTP %s", exc.status_code)
+            yield event({"type": "error", "error": "Generation could not complete. Check access, available requests, and AI configuration.", "status": exc.status_code})
+        except Exception:
+            logger.exception("Streaming generation failed")
+            yield event({"type": "error", "error": "Generation failed."})
 
-            dxf_instruction = request.message
-            cad_dsl = await cadllm_service.enhance_prompt(dxf_instruction) if cadllm_service else dxf_instruction
+    return StreamingResponse(sse_generator(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-store", "X-Accel-Buffering": "no",
+    })
 
-            # Stream tokens chunk by chunk
-            words = (cad_dsl or "").split(" ")
-            accumulated = ""
-            for word in words:
-                chunk = word + " "
-                accumulated += chunk
-                yield f"data: {json.dumps({'type': 'token', 'token': chunk})}\n\n"
-                await asyncio.sleep(0.02)
-
-            # Generate image / compliance
-            image_url = await gemini_service.generate_image(cad_dsl, original_prompt=request.message) if gemini_service else ""
-
-            assistant_msg = await chat_history_service.add_message(
-                session_id, "assistant", cad_dsl, image_url=image_url
-            )
-            message_id = assistant_msg.get("id") if assistant_msg else None
-
-            await subscription_service.deduct_request(user_id)
-
-            yield f"data: {json.dumps({'type': 'complete', 'session_id': session_id, 'message_id': message_id, 'image_url': image_url, 'validated_response': cad_dsl})}\n\n"
-        except Exception as err:
-            logger.exception("Streaming error")
-            yield f"data: {json.dumps({'type': 'error', 'error': str(err)})}\n\n"
-
-    return StreamingResponse(sse_generator(), media_type="text/event-stream")
 
 @router.post("/chat/session")
 async def create_chat_session(request: CreateSessionRequest, user_data: dict = Depends(require_auth)):
