@@ -11,7 +11,7 @@ vi.mock("@/context/AuthContext", () => ({
     }),
 }));
 vi.mock("@/lib/api/api", () => ({
-    getAllProjects: projects, getAllJobs: jobs,
+    getAllProjects: projects, getAllJobs: jobs, getAllFiles: vi.fn().mockResolvedValue({ok:true,data:[]}),
     createParametricRoom: createRoom, getFileSignedUrl: signedUrl,
 }));
 

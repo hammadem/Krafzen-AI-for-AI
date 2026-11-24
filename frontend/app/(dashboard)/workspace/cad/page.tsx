@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import RoomCommandPanel from "@/components/cad/RoomCommandPanel";
 import Link from "next/link";
 import { DraftingCompass, FileDown } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -285,6 +286,7 @@ export default function RoomCadPage() {
                         </Link>
                     </section>
                 )}
+                {jobId && <RoomCommandPanel key={(user?.userId || "")+":"+jobId} user={user} jobId={jobId}/>}
             </div>
         </main>
     );

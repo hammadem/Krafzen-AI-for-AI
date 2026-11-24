@@ -300,6 +300,17 @@ def main():
         assert doc.header["$INSUNITS"] == 6
         assert len(doc.modelspace().query("DIMENSION")) >= 2
         note("A","Downloaded private DXF parses with real dimension entities and metre units")
+        edit_path=base+"/cad/rooms/"+fid
+        command={"command":"set width to 6000 mm"}
+        proposed=check(client.post(edit_path+"/edit-preview",headers=headers,json=command)).json()
+        assert proposed["geometry"]["exterior_width_m"]==6
+        check(client.post(edit_path+"/edit",headers=headers,json=command),422)
+        assert client.post(edit_path+"/edit-preview",headers=other,json=command).status_code in (403,404)
+        revised=check(client.post(edit_path+"/edit",headers=headers,json={**command,"expected_sha256":proposed["source_sha256"]}),201).json()
+        assert revised["file"]["id"]!=fid and revised["geometry"]["parent_file_id"]==fid
+        assert revised["geometry"]["exterior_width_m"]==6
+        assert check(client.get(base+"/files/"+fid,headers=headers)).json()["import_metadata"]["exterior_width_m"]==5
+        note("CAD","Explicit-unit command preview, confirmed source-linked revision, original preserved and tenant denial")
 
         preview=check(client.get(base+"/reviews/files/"+fid+"/preview.svg",headers=headers))
         assert b"<svg" in preview.content
