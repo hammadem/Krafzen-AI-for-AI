@@ -256,6 +256,31 @@ async def test_invite_creation_records_inviter_as_actor():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("status,expires_at", [
+    ("revoked", None),
+    ("expired", None),
+    ("pending", (datetime.now(UTC) - timedelta(days=1)).isoformat()),
+])
+async def test_reissue_inactive_invite_rotates_token(status, expires_at):
+    old = make_invite(status=status, expires_at=expires_at)
+    database = FakeDatabase({"workspace_invites": [old]})
+    record_event = AsyncMock()
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "get_workspace", new=AsyncMock(return_value={"owner_id": ACTOR_ID})), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(invite_queries, "record_workspace_event", new=record_event):
+        result = await invite_queries.create_invite(WORKSPACE_ID, "invitee@example.com", "viewer", ACTOR_ID)
+        assert (await invite_queries.validate_invite(INVITE_TOKEN))["valid"] is False
+        assert (await invite_queries.validate_invite(result["token"]))["valid"] is True
+    assert len(database.tables["workspace_invites"]) == 1
+    assert result["id"] == INVITE_ID
+    assert result["token"] != INVITE_TOKEN
+    assert result["status"] == "pending" and result["role"] == "viewer"
+    assert datetime.fromisoformat(result["expires_at"]) > datetime.now(UTC)
+    record_event.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_invite_revocation_records_inviter_as_actor():
     database = FakeDatabase({"workspace_invites": [make_invite()]})
     record_event = AsyncMock()
