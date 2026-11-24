@@ -24,25 +24,26 @@ export default function SetNewPassword() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Establish session from recovery link (code in URL or hash)
+  // createBrowserClient initializes the PKCE session from the URL.
+  // Do not consume the same one-time recovery code a second time.
   useEffect(() => {
+    let active = true;
     const supabase = createClient();
-    const run = async () => {
-      const code = searchParams.get("code");
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          console.error("Code exchange error:", error);
-          setSessionReady(false);
+    async function run() {
+      try {
+        if (searchParams.has("error") || searchParams.has("error_code") ||
+            new URLSearchParams(window.location.hash.slice(1)).has("error")) {
+          if (active) setSessionReady(false);
           return;
         }
-        // Remove code from URL without full navigation
-        window.history.replaceState({}, "", window.location.pathname);
+        const { data, error } = await supabase.auth.getSession();
+        if (active) setSessionReady(!error && !!data.session?.access_token);
+      } catch {
+        if (active) setSessionReady(false);
       }
-      const { data } = await supabase.auth.getSession();
-      setSessionReady(!!data.session);
-    };
-    run();
+    }
+    void run();
+    return () => { active = false; };
   }, [searchParams]);
 
   const form = useForm<z.infer<typeof changePassword>>({
@@ -55,12 +56,18 @@ export default function SetNewPassword() {
       toast.error("Passwords must match");
       return;
     }
+    if (sessionReady !== true || loading) return;
     try {
       setLoading(true);
       const supabase = createClient();
       const { error } = await supabase.auth.updateUser({ password: data.password });
       if (error) {
         toast.error(error.message);
+        return;
+      }
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+      if (signOutError) {
+        toast.success("Password updated. Sign out before signing in again.");
         return;
       }
       toast.success("Password updated. You can now log in.");
