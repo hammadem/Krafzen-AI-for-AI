@@ -238,6 +238,20 @@ def main():
             assert clash["result"]["hard_clashes_confirmed"]>=1
             assert any(x["id"]==clash["id"] for x in check(client.get(base+"/bim/projects/"+bp+"/spatial-screens",headers=headers)).json())
             note("C","Native IFC hard clash and persisted result")
+            validation_path=base+"/bim/files/"+a+"/validations"
+            diagnostic=check(client.post(validation_path,headers=headers),201).json()
+            assert diagnostic["result"]["geometry_checked_count"]==1
+            assert diagnostic["result"]["geometry_failed_count"]==0
+            assert diagnostic["result"]["complete_model_validity_determined"] is False
+            assert any(x["id"]==diagnostic["id"] for x in check(client.get(validation_path,headers=headers)).json())
+            assert client.get(validation_path,headers=other).status_code in (403,404)
+            note("C","Real native IFC validation evidence, history and cross-account isolation")
+            revision=check(client.post(base+"/bim/projects/"+bp+"/spatial-screens",headers=headers,json={
+                "primary_file_id":a,"secondary_file_id":b,"same_origin_axes_and_scale_confirmed":True,
+                "mode":"revision_comparison"}),201).json()
+            assert revision["result"]["method"]=="ifc_guid_mesh_revision_v1"
+            assert revision["result"]["revision"]["counts"]=={"added_to_mesh":1,"removed_from_mesh":1}
+            note("C","Actual bounded IFC revision comparison and saved evidence")
         else:
             # A real scanner failure is evidence of a blocker, not permission to bypass it.
             response=client.post(base+"/files/import-dxf",headers=headers,data={"job_id":j},
@@ -260,7 +274,7 @@ def main():
         else:
             note("B","IBC/NFPA assessment route not in tested revision","BLOCKED")
         note("B","Full multidisciplinary assignment, adopted-code comprehensive review, member audit","NOT_RUN")
-        note("C","Browser interaction, properties/quantities, IFC revision comparison, comprehensive model validation","NOT_RUN")
+        note("C","Browser interaction, full quantities and comprehensive model validity","NOT_RUN")
         note("D","Full review and export workflow","NOT_RUN")
 
     Path(os.environ.get("ACCEPTANCE_RESULT_FILE","customer-acceptance.json")).write_text(
