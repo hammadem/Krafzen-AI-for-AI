@@ -21,7 +21,7 @@ COPY docker /tmp/docker-build/
 
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends potrace; \
+    apt-get install -y --no-install-recommends potrace clamav clamav-freshclam; \
     if [ -n "$DWG_ODA_DEB_URL" ]; then \
       /tmp/install_oda_file_converter.sh from-url "$DWG_ODA_DEB_URL"; \
     elif [ -f /tmp/docker-build/oda-file-converter.deb ]; then \
