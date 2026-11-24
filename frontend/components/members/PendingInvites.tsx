@@ -4,6 +4,7 @@
 // Revoke is optimistic in the parent, so a confirmed row disappears instantly.
 
 import { Mail, X } from "lucide-react";
+import { toast } from "react-toastify";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -59,6 +60,7 @@ export default function PendingInvites({
                             Pending
                         </span>
 
+                        {inv.token && <button type="button" className="text-xs underline" onClick={async()=>{try{await navigator.clipboard.writeText(inv.token);toast.success("Invitation code copied.");}catch{toast.error("Could not copy invitation code.");}}}>Copy invitation code</button>}
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <button

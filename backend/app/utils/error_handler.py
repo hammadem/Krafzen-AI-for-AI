@@ -29,7 +29,13 @@ def add_exception_handlers(app: FastAPI) -> None:
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         return JSONResponse(
             status_code=422,
-            content={"message": "Validation Error", "detail": exc.errors()},
+            content={
+                "message": "Validation Error",
+                "detail": [
+                    {"loc": list(error.get("loc", ())), "msg": str(error.get("msg", "Invalid input")), "type": str(error.get("type", "value_error"))}
+                    for error in exc.errors()
+                ],
+            },
         )
 
     @app.exception_handler(Exception)

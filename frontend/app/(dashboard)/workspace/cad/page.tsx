@@ -66,7 +66,7 @@ export default function RoomCadPage() {
             }
             if (alive) {
                 setProjects(all);
-                setProjectId(all[0]?.id || "");
+                setProjectId(current => all.some(project => project.id === current) ? current : (all[0]?.id || ""));
             }
         }
         void load().catch((reason: unknown) => {

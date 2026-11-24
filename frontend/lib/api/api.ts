@@ -96,6 +96,15 @@ const WORKSPACE_URLS = {
 } as const;
 
 // Current user's workspace (use to get workspace_id on page load).
+export async function listWorkspaces(user: User | null) {
+    return apiClient("GET", "/api/v1/workspaces/", user);
+}
+export async function createWorkspace(user: User | null, name: string) {
+    return apiClient("POST", "/api/v1/workspaces/", user, {name});
+}
+export async function acceptWorkspaceInvite(user: User | null, token: string) {
+    return apiClient("POST", "/api/v1/workspaces/invites/accept", user, {token});
+}
 export async function getMyWorkspace(user: User | null) {
     return apiClient("GET", WORKSPACE_URLS.GET_MINE(), user);
 }

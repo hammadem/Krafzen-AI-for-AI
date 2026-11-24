@@ -37,7 +37,7 @@ function selectInvites(raw: ApiRes["data"]): WorkspaceInvite[] {
     return [];
 }
 
-export default function MemberManagement({ workspaceId }: { workspaceId: string }) {
+export default function MemberManagement({ workspaceId, canManage = true }: { workspaceId: string; canManage?: boolean }) {
     const { user } = useAuth();
 
     const {
@@ -54,20 +54,20 @@ export default function MemberManagement({ workspaceId }: { workspaceId: string 
         enabled: !!workspaceId,
     });
 
-    const { data: invites, setData: setInvites } = useApiResource<WorkspaceInvite[]>({
+    const { data: invites, setData: setInvites, isError: invitesError, error: inviteError, refetch: refetchInvites } = useApiResource<WorkspaceInvite[]>({
         fetcher: (u) => getWorkspaceInvites(u, workspaceId),
         select: selectInvites,
         fallback: [],
-        enabled: !!workspaceId,
+        enabled: !!workspaceId && canManage,
     });
 
-    const pendingInvites = invites.filter((i) => i.status === "pending");
+    const pendingInvites = invites.filter((i) => i.status === "pending" && new Date(i.expires_at).getTime() > Date.now());
 
     // --- Invite (with client + server duplicate handling) ---
     const handleInvite = useCallback(
         async (email: string, role: string): Promise<boolean> => {
             const dupe = invites.some(
-                (i) => i.status === "pending" && i.email.toLowerCase() === email.toLowerCase()
+                (i) => i.status === "pending" && new Date(i.expires_at).getTime() > Date.now() && i.email.toLowerCase() === email.toLowerCase()
             );
             if (dupe) {
                 toast.dark("An invite is already pending for that email.");
@@ -75,8 +75,9 @@ export default function MemberManagement({ workspaceId }: { workspaceId: string 
             }
             const { ok, data, error: apiError } = await createInvite(user, workspaceId, { email, role });
             if (ok && data) {
-                setInvites((prev) => [data as unknown as WorkspaceInvite, ...prev]);
-                toast.dark(`Invite sent to ${email}`);
+                const invite = data as unknown as WorkspaceInvite;
+                setInvites((prev) => [invite, ...prev.filter(i => i.id !== invite.id)]);
+                toast.dark("Invitation created. Copy the code and share it privately.");
                 return true;
             }
             toast.dark(apiError?.message || "Could not send the invite.");
@@ -158,9 +159,10 @@ export default function MemberManagement({ workspaceId }: { workspaceId: string 
 
     return (
         <div className="flex flex-col gap-5">
-            <InviteForm onInvite={handleInvite} />
-
-            <PendingInvites invites={pendingInvites} onRevoke={handleRevoke} />
+            {canManage && <><InviteForm onInvite={handleInvite} />
+            <p className="text-xs text-slate-400">Invitations are not emailed automatically. Share the code privately with the intended email account.</p>
+            {invitesError && <p role="alert">{inviteError?.message || "Could not load invitations."} <button onClick={refetchInvites} className="underline">Retry</button></p>}
+            <PendingInvites invites={pendingInvites} onRevoke={handleRevoke} /></>}
 
             {/* Members */}
             <div className="flex flex-col gap-2">
@@ -211,6 +213,7 @@ export default function MemberManagement({ workspaceId }: { workspaceId: string 
                     <MembersList
                         members={members}
                         currentUserId={user?.userId}
+                        canManage={canManage}
                         onRoleChange={handleRoleChange}
                         onRemove={handleRemove}
                     />
@@ -224,7 +227,7 @@ export default function MemberManagement({ workspaceId }: { workspaceId: string 
                         <div className="text-center">
                             <h3 className="text-white font-semibold">No members yet</h3>
                             <p className="text-[#94a3b8] text-sm mt-1">
-                                Invite teammates above to collaborate on your workspace.
+                                {canManage ? "Create an invitation to add a teammate." : "No additional members in this workspace."}
                             </p>
                         </div>
                     </div>

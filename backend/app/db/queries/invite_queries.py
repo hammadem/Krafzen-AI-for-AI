@@ -92,7 +92,7 @@ async def create_invite(workspace_id: str, email: str, role: str, user_id: str) 
                 "invite_id": invite["id"],
                 "role": role,
             },
-            message=f"Workspace invitation sent with {role.title()} role.",
+            message=f"Workspace invitation created with {role.title()} role.",
         )
         return invite
     

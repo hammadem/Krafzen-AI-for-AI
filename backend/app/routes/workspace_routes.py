@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, Query
 
 from app.db.queries.workspace_queries import (
     get_my_workspace,
+    create_workspace,
+    list_accessible_workspaces,
     get_workspace,
     get_workspace_members,
     remove_member,
@@ -13,9 +15,20 @@ from app.models.workspace_model import (
     PaginatedMembersResponse,
     WorkspaceMemberResponse,
     WorkspaceResponse,
+    WorkspaceCreate,
 )
 
 router = APIRouter(prefix="/workspaces", tags=["Workspaces"])
+
+@router.get("/", response_model=list[WorkspaceResponse])
+async def list_workspaces_route(user=Depends(require_auth)):
+    return await list_accessible_workspaces(user["user_id"])
+
+
+@router.post("/", response_model=WorkspaceResponse, status_code=201)
+async def create_workspace_route(body: WorkspaceCreate, user=Depends(require_auth)):
+    return await create_workspace(body.name, user["user_id"])
+
 
 #GET MY WORKSPACE
 @router.get("/me", response_model=WorkspaceResponse)
