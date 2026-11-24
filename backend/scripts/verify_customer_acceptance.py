@@ -147,12 +147,13 @@ def main():
         assert check(client.get(base+"/projects/",headers=other,params={"q":"Residential QA"})).json() == []
         check(client.delete(base+"/projects/"+p,headers=other),403)
         note("Projects","Reject blank/oversized inputs, search only owned rows and deny cross-account deletion")
-        # Workspace setup is explicitly a local-only prerequisite because
-        # the existing API does not expose organization creation.
+        check(client.post(base+"/workspaces/",headers=headers,json={"name":"   "}),422)
+        created = check(client.post(base+"/workspaces/",headers=headers,json={"name":"Isolated collaboration QA"}),201).json()
+        ws = created["id"]
+        assert created["owner_id"] == uid
+        assert any(row["id"] == ws for row in check(client.get(base+"/workspaces/",headers=headers)).json())
+        assert all(row["id"] != ws for row in check(client.get(base+"/workspaces/",headers=other)).json())
         with psycopg2.connect(dsn) as con, con.cursor() as cur:
-            cur.execute("INSERT INTO public.workspaces (name, owner_id) VALUES (%s, %s) RETURNING id",
-                        ("Isolated collaboration QA", uid))
-            ws = str(cur.fetchone()[0])
             cur.execute("SELECT email FROM auth.users WHERE id=%s", (other_uid,))
             invite_email = cur.fetchone()[0]
         workspace = base + "/workspaces/" + ws
@@ -172,6 +173,7 @@ def main():
         check(client.post(base+"/workspaces/invites/accept",headers=other,
             json={"token":reissued["token"]}))
         assert check(client.get(workspace,headers=other)).json()["id"] == ws
+        assert any(row["id"] == ws for row in check(client.get(base+"/workspaces/",headers=other)).json())
         members = check(client.get(workspace+"/members",headers=headers)).json()["members"]
         assert any(row["user_id"] == other_uid and row["role"] == "viewer" for row in members)
         member_path = workspace+"/members/"+other_uid
@@ -182,7 +184,7 @@ def main():
         workspace_events = check(client.get(base+"/activity/workspace/"+ws,headers=headers)).json()
         assert {"team.member_invited","team.member_joined","permissions.access_granted","permissions.access_revoked"} <= {e["action"] for e in workspace_events}
         assert check(client.get(base+"/activity/workspace/"+ws,headers=other)).json() == []
-        note("B/Members","Real invite, revoke, reissue, accept, role change, removal and scoped audit history; local workspace fixture only")
+        note("B/Members","Real API workspace creation, catalog, invite, revoke, reissue, accept, role change, removal and scoped audit history")
 
         inspection = check(client.post(base+"/field/inspections",headers=headers,json={
             "project_id":p,"title":"QA observation","description":"Recorded site observation",

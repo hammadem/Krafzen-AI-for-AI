@@ -1,10 +1,18 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 
 class WorkspaceCreate(BaseModel):
-    name:str
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def clean_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Workspace name cannot be blank")
+        return value
 
 
 class WorkspaceResponse(BaseModel):

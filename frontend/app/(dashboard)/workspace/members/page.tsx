@@ -1,136 +1,66 @@
 "use client";
-import { RefreshCw, AlertCircle, FolderKanban, Activity, AlertTriangle, Users } from "lucide-react";
-import { getMyWorkspace, getWorkspaceSummary } from "@/lib/api/api";
+import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { listWorkspaces, createWorkspace, acceptWorkspaceInvite } from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import MemberManagement from "@/components/members/MemberManagement";
 
-// Week 2 Step 3 — Invite + Member Management.
-// workspace_id comes from GET /api/v1/workspaces/me (Yehor). Members + invites
-// are loaded inside <MemberManagement> once the id is known.
-// Endpoints require Ava's migration to be live; until then the page degrades to
-// a clean error-with-retry.
-
-interface WorkspaceSummary {
-    total_projects: number;
-    total_jobs: number;
-    active_jobs: number;
-    requires_attention: number;
-}
-
 export default function MembersPage() {
-    const {
-        data: workspace,
-        isLoading: wsLoading,
-        isError: wsError,
-        error: wsErr,
-        refetch: wsRefetch,
-    } = useApiResource<WorkspaceInfo | null>({
-        fetcher: (u) => getMyWorkspace(u),
-        select: (raw) =>
-            raw && typeof raw === "object" && "id" in raw ? (raw as unknown as WorkspaceInfo) : null,
-        fallback: null,
+    const {user} = useAuth();
+    const {data: workspaces, isLoading, isError, error, refetch} = useApiResource<WorkspaceInfo[]>({
+        fetcher: u => listWorkspaces(u),
+        select: raw => Array.isArray(raw) ? raw as unknown as WorkspaceInfo[] : [],
+        fallback: [],
     });
-
-    // Summary is non-critical — show it if available, ignore quietly otherwise.
-    const { data: summary } = useApiResource<WorkspaceSummary | null>({
-        fetcher: (u) => getWorkspaceSummary(u),
-        select: (raw) =>
-            raw && typeof raw === "object" ? (raw as unknown as WorkspaceSummary) : null,
-        fallback: null,
-    });
-
-    const stats = summary
-        ? [
-              { label: "Projects", value: summary.total_projects, icon: FolderKanban },
-              { label: "Total jobs", value: summary.total_jobs, icon: Activity },
-              { label: "Active jobs", value: summary.active_jobs, icon: Activity },
-              { label: "Needs attention", value: summary.requires_attention, icon: AlertTriangle },
-          ]
-        : [];
-    const noWorkspaceYet = wsError && wsErr?.message?.toLowerCase().includes("no workspace");
-
-    return (
-        <div className="text-white flex p-4 flex-col items-stretch sm:items-end justify-start gap-6 w-full bg-[#191919] overflow-y-auto custom-scrollbar2 h-[86vh]">
-            <div className="w-full sm:w-[80%] p-2 sm:p-4 gap-4 flex flex-col">
-                <h1 className="text-white font-semibold text-2xl sm:text-[4vh]">Members</h1>
-                <p className="text-[#8F8F8F]">Manage who has access to your workspace.</p>
-
-                {/* Workspace summary stats */}
-                {summary && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                        {stats.map((s) => (
-                            <div key={s.label} className="bg-[#2F2F2F] rounded-[10px] p-4 flex flex-col gap-1">
-                                <div className="flex items-center gap-2 text-[#8F8F8F]">
-                                    <s.icon className="w-4 h-4" />
-                                    <span className="text-xs">{s.label}</span>
-                                </div>
-                                <span className="text-white text-2xl font-semibold">{s.value ?? 0}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Workspace loading */}
-                {wsLoading && (
-                    <div className="flex flex-col gap-3 mt-4">
-                        <div className="skeleton h-24 w-full rounded-[10px]" />
-                        {[1, 2, 3].map((i) => (
-                            <div key={i} className="bg-[#2F2F2F] rounded-[10px] p-4 flex items-center gap-4">
-                                <div className="skeleton h-11 w-11 rounded-full shrink-0" />
-                                <div className="flex flex-col gap-2 flex-1">
-                                    <div className="skeleton h-4 w-1/3 rounded-md" />
-                                    <div className="skeleton h-3 w-1/2 rounded-sm" />
-                                </div>
-                                <div className="skeleton h-9 w-24 rounded-lg" />
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* Workspace failed to resolve */}
-                {wsError && !wsLoading && noWorkspaceYet && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl">
-                        <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
-                            <Users className="w-7 h-7 text-[#54e3b5]/70" />
-                        </div>
-                        <div className="text-center">
-                            <h3 className="text-white font-semibold">No workspace members yet</h3>
-                            <p className="text-[#94a3b8] text-sm mt-1 max-w-md">
-                                Team workspace setup is not enabled for this account yet. Your project generation
-                                flow can still be tested from the workspace.
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-                {wsError && !wsLoading && !noWorkspaceYet && (
-                    <div className="flex flex-col items-center justify-center py-20 gap-4">
-                        <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center">
-                            <AlertCircle className="w-8 h-8 text-red-400" />
-                        </div>
-                        <div className="text-center">
-                            <h3 className="text-white font-medium">Couldn&apos;t load your workspace</h3>
-                            <p className="text-[#94a3b8] text-sm mt-1">
-                                {wsErr?.message || "Please try again."}
-                            </p>
-                        </div>
-                        <button
-                            onClick={wsRefetch}
-                            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white hover:bg-white/10 transition-all"
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                            Try again
-                        </button>
-                    </div>
-                )}
-
-                {/* Members + invites */}
-                {!wsLoading && !wsError && workspace?.id && (
-                    <div className="mt-4">
-                        <MemberManagement workspaceId={workspace.id} />
-                    </div>
-                )}
-            </div>
+    const [selectedId, setSelectedId] = useState("");
+    const [name, setName] = useState("");
+    const [inviteCode, setInviteCode] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [message, setMessage] = useState("");
+    const [actionError, setActionError] = useState("");
+    const workspace = workspaces.find(w => w.id === selectedId) || workspaces[0];
+    const canManage = !!workspace && workspace.owner_id === user?.userId;
+    const mutate = async (action: "create" | "accept") => {
+        if (busy || !user) return;
+        setBusy(true); setMessage(""); setActionError("");
+        try {
+            const result = action === "create" ? await createWorkspace(user, name.trim()) : await acceptWorkspaceInvite(user, inviteCode.trim());
+            if (!result.ok) { setActionError(result.error?.message || "Workspace action failed."); return; }
+            const raw = result.data as unknown as {id?:string;workspace_id?:string};
+            setSelectedId(raw?.id || raw?.workspace_id || "");
+            setName(""); setInviteCode("");
+            setMessage(action === "create" ? "Workspace created." : "Invitation accepted.");
+            refetch();
+        } catch { setActionError("Workspace service unavailable. Try again."); }
+        finally { setBusy(false); }
+    };
+    return <div className="flex flex-col gap-6 p-5 text-white overflow-y-auto">
+        <h1 className="text-2xl font-semibold">Members</h1>
+        <p className="text-sm text-slate-400">Create a team, accept an invitation, or manage a workspace you own. Project sharing is subject to its separate access controls.</p>
+        {message && <p role="status" className="text-emerald-300">{message}</p>}
+        {actionError && <p role="alert" className="text-red-300">{actionError}</p>}
+        <div className="grid gap-4 md:grid-cols-2">
+            <form className="flex flex-col gap-2 rounded-xl border border-white/10 p-4" onSubmit={e=>{e.preventDefault();void mutate("create");}}>
+                <label htmlFor="workspace-name">New workspace name</label>
+                <input id="workspace-name" className="bg-black border border-white/20 rounded p-2" required maxLength={120} value={name} onChange={e=>setName(e.target.value)}/>
+                <button className="bg-emerald-400 text-black rounded p-2 font-semibold" disabled={busy || !name.trim()}>Create workspace</button>
+            </form>
+            <form className="flex flex-col gap-2 rounded-xl border border-white/10 p-4" onSubmit={e=>{e.preventDefault();void mutate("accept");}}>
+                <label htmlFor="invite-code">Invitation code</label>
+                <input id="invite-code" className="bg-black border border-white/20 rounded p-2" required maxLength={36} value={inviteCode} onChange={e=>setInviteCode(e.target.value)}/>
+                <button className="bg-white/10 rounded p-2 font-semibold" disabled={busy || !inviteCode.trim()}>Accept invitation</button>
+            </form>
         </div>
-    );
+        {isLoading && <p role="status">Loading workspaces…</p>}
+        {isError && <div><p role="alert">{error?.message || "Could not load workspaces."}</p><button className="underline" onClick={refetch}>Retry</button></div>}
+        {!isLoading && !isError && workspace && <>
+            <label htmlFor="workspace-select">Current workspace</label>
+            <select id="workspace-select" value={workspace.id} onChange={e=>setSelectedId(e.target.value)} className="bg-black border border-white/20 rounded p-2">
+                {workspaces.map(w=><option key={w.id} value={w.id}>{w.name}{w.owner_id===user?.userId ? " (owner)" : ""}</option>)}
+            </select>
+            <p className="text-sm text-slate-400">{canManage ? "You own this workspace." : "Only the owner can invite, remove members, and modify roles."}</p>
+            <MemberManagement key={workspace.id} workspaceId={workspace.id} canManage={canManage}/>
+        </>}
+        {!isLoading && !isError && !workspace && <p className="text-slate-400">No team workspace yet. Create one or accept an invitation.</p>}
+    </div>;
 }
