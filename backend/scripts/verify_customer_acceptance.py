@@ -151,6 +151,12 @@ def main():
         assert file["id"]==fid
         signed=check(client.get(base+"/files/"+fid+"/signed-url",headers=headers)).json()
         assert signed.get("signed_url") or signed.get("signedUrl") or signed.get("url")
+        # Verify browser REST writes cannot replace trusted storage metadata.
+        browser = requests.patch(api + "/rest/v1/files?id=eq." + fid,
+            headers={"apikey": anon, **headers, "Prefer": "return=representation"},
+            json={"path": "untrusted/replacement.dxf"}, timeout=20)
+        assert browser.status_code in (401, 403), f"Browser metadata mutation HTTP {browser.status_code}"
+        note("A","Direct browser metadata modification rejected")
         note("A","Real dimensioned CAD generation persisted in private storage; signed link")
         # Check actual signed storage bytes and dimensional DXF entities.
         signed_path = signed.get("signed_url") or signed.get("signedUrl") or signed.get("url")
