@@ -168,11 +168,12 @@ export default function ModelsPage() {
     }
 
     useEffect(() => {
-        if (!user?.access_token || !projectId) {
-            setScreenHistory([]); setSelectedScreen(null); return;
-        }
+        setScreenHistory([]); setSelectedScreen(null);
+    }, [user?.access_token, projectId]);
+
+    useEffect(() => {
+        if (!user?.access_token || !projectId) return;
         let active = true;
-        setSelectedScreen(null);
         const read = async () => {
             const response = await getIfcSpatialScreens(user, projectId);
             if (!response.ok) throw new Error(
@@ -181,7 +182,7 @@ export default function ModelsPage() {
             const found = unwrap<SpatialScreen>(response.data);
             if (active) {
                 setScreenHistory(found);
-                setSelectedScreen(found[0] || null);
+                setSelectedScreen(previous => found.find(item => item.id === previous?.id) || found[0] || null);
                 setHistoryError(null);
             }
         };
@@ -236,7 +237,7 @@ export default function ModelsPage() {
                 </div>
                 <div className="flex gap-3 rounded-lg border border-amber-300/20 bg-amber-500/10 p-4 text-sm text-amber-100">
                     <Info className="h-5 w-5 shrink-0" />
-                    The viewer renders available IFC tessellation. Spatial screening below reports only possible 3D bounding-box overlaps across two models, never verified hard clashes, coordination sign-off, measured takeoff, or code approval. IFC quantities are declared, not independently measured.
+                    The viewer renders available IFC tessellation. Select a rapid bounding-box screen or native intersection and clearance analysis of two explicitly aligned models. Results require coordination review, not construction sign-off or code approval. IFC quantities are declared, not independently measured.
                 </div>
                 {error && <p role="alert" className="rounded-lg border border-red-500/30 p-3 text-red-300">{error}</p>}
                 {!user?.access_token ? (
