@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: ["fix/**"]
     paths: ["backend/**", "frontend/**", "supabase/**", ".github/workflows/customer-acceptance.yml"]
+  push:
+    branches: ["fix/integration-p0-20261117"]
+    paths: ["backend/**", "frontend/**", "supabase/**", ".github/workflows/customer-acceptance.yml"]
   workflow_dispatch:
 
 permissions:
