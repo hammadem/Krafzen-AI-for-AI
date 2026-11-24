@@ -260,7 +260,7 @@ export async function createAProject(
 };
 export async function saveProjectMetadata(user: User | null, data: ProjectMetadata, projectId?: string) {
     return projectId
-        ? apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, data)
+        ? apiClient("PATCH", PROJECT_URLS.UPDATE(projectId), user, {...data})
         : apiClient("POST", PROJECT_URLS.POST(), user, {...data, input_text: data.description.trim() || data.title});
 }
 
