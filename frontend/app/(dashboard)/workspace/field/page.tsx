@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ClipboardList, FileDown, RefreshCw } from "lucide-react";
 import FieldEvidencePanel from "@/components/field/FieldEvidencePanel";
+import FieldNotesPanel from "@/components/field/FieldNotesPanel";
 import { useAuth } from "@/context/AuthContext";
 import {
     getAllProjects, getFieldInspections, createFieldInspection,
@@ -255,6 +256,7 @@ export default function FieldPage() {
                                         ))}
                                     </div>
                                     <FieldEvidencePanel inspectionId={item.id} user={user}/>
+                                    <FieldNotesPanel inspectionId={item.id} user={user}/>
                                 </article>
                             ))}
                         </section>

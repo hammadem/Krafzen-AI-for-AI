@@ -15,6 +15,7 @@ def main():
         with conn.cursor() as cur:
             cur.execute(migration.read_text())
             cur.execute(migration.with_name("025_project_metadata.sql").read_text())
+            cur.execute(migration.with_name("026_field_observation_notes.sql").read_text())
             for table in TABLES:
                 for privilege in ("INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"):
                     for browser_role in ("anon", "authenticated"):

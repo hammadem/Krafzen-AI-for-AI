@@ -228,6 +228,14 @@ def main():
             "project_id":p,"title":"QA observation","description":"Recorded site observation",
             "discipline":"architecture","severity":"medium"}),201).json()
         inspection_id = inspection["id"]
+        notes_path = base+"/field/inspections/"+inspection_id+"/notes"
+        note_data = check(client.post(notes_path,headers=headers,json={"kind":"corrective_action","body":"Recheck measured clearance","due_date":"2027-01-15"}),201).json()
+        check(client.post(notes_path,headers=headers,json={"kind":"comment","body":"Awaiting site confirmation"}),201)
+        check(client.post(notes_path,headers=headers,json={"kind":"comment","body":"Invalid due date","due_date":"2027-01-15"}),422)
+        assert any(row["id"]==note_data["id"] and row["due_date"]=="2027-01-15" for row in check(client.get(notes_path,headers=headers)).json())
+        assert client.get(notes_path,headers=other).status_code in (403,404)
+        assert client.post(notes_path,headers=other,json={"kind":"comment","body":"Forbidden"}).status_code in (403,404)
+        note("Field","Persisted comments and due-dated corrective action, tenant isolation verified")
         status_path = base+"/field/inspections/"+inspection_id+"/status"
         check(client.patch(status_path,headers=headers,json={"status":"verified"}),409)
         denied = client.patch(status_path,headers=other,json={"status":"resolved"})
