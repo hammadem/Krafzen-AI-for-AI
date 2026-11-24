@@ -1,78 +1,76 @@
 import { NextRequest, NextResponse } from "next/server";
+import { formSchema } from "@/lib/validation";
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : undefined;
+const MAX_BODY_BYTES = 20 * 1024;
+function failure(error: string, status: number) {
+  return NextResponse.json({ success: false, error }, { status });
 }
 
-function getString(obj: Record<string, unknown> | undefined, key: string) {
-  const val = obj?.[key];
-  return typeof val === "string" ? val : undefined;
+async function readBoundedJson(req: NextRequest): Promise<unknown> {
+  const declared = Number(req.headers.get("content-length") || "0");
+  if (!Number.isFinite(declared) || declared < 0 || declared > MAX_BODY_BYTES) throw new RangeError("Request too large");
+  if (!req.body) throw new SyntaxError("Missing request body");
+  const reader = req.body.getReader();
+  const decoder = new TextDecoder("utf-8", {fatal: true});
+  let size = 0;
+  let text = "";
+  try {
+    while (true) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_BODY_BYTES) {
+        await reader.cancel();
+        throw new RangeError("Request too large");
+      }
+      text += decoder.decode(value, {stream: true});
+    }
+    return JSON.parse(text + decoder.decode());
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const supportEndpoint =
-    process.env.NEXT_PUBLIC_SUPABASE_RESEND_EMAIL_URL?.trim() || "";
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || "";
-
-  if (!supportEndpoint || !supabaseAnonKey) {
-    return NextResponse.json(
-      { success: false, error: "Support form is not configured." },
-      { status: 503 }
-    );
+  if (req.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
+    return failure("Expected application/json.", 415);
   }
-
   let payload: unknown;
   try {
-    payload = await req.json();
+    payload = await readBoundedJson(req);
+  } catch (error) {
+    return error instanceof RangeError ? failure("Request too large.", 413) : failure("Invalid request body.", 400);
+  }
+  const parsed = formSchema.strict().safeParse(payload);
+  if (!parsed.success) return failure("Invalid support form fields.", 422);
+
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  let endpoint: URL;
+  try {
+    endpoint = new URL(process.env.NEXT_PUBLIC_SUPABASE_RESEND_EMAIL_URL || "");
+    const project = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "");
+    if (!key || endpoint.protocol !== "https:" || endpoint.origin !== project.origin ||
+      endpoint.username || endpoint.password || endpoint.search || endpoint.hash ||
+      !/^\/functions\/v1\/[A-Za-z0-9_-]+\/?$/.test(endpoint.pathname)) {
+      return failure("Support form is not configured.", 503);
+    }
   } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid request body." },
-      { status: 400 }
-    );
+    return failure("Support form is not configured.", 503);
   }
 
   try {
-    const upstream = await fetch(supportEndpoint, {
+    const upstream = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${supabaseAnonKey}`,
-      },
-      body: JSON.stringify(payload),
+      redirect: "error",
+      signal: AbortSignal.timeout(15000),
+      headers: {"Content-Type":"application/json", apikey:key, Authorization:`Bearer ${key}`},
+      body: JSON.stringify(parsed.data),
     });
-
-    const text = await upstream.text();
-    let json: unknown = undefined;
-    try {
-      json = text ? JSON.parse(text) : undefined;
-    } catch {
-      json = undefined;
-    }
-    const jsonObj = asRecord(json);
-
-    if (!upstream.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            getString(jsonObj, "error") ||
-            getString(jsonObj, "message") ||
-            upstream.statusText ||
-            "Failed to send message.",
-        },
-        { status: upstream.status || 502 }
-      );
-    }
-
-    return NextResponse.json({ success: true, upstream: json ?? text ?? null });
+    if (!upstream.ok) return failure("Support service could not accept the message.", 502);
+    const result = await upstream.json() as {success?: unknown};
+    if (!result || result.success !== true) return failure("Support service did not confirm delivery.", 502);
+    return NextResponse.json({success:true});
   } catch {
-    return NextResponse.json(
-      { success: false, error: "Failed to reach support service." },
-      { status: 502 }
-    );
+    return failure("Failed to reach support service.", 502);
   }
 }
-
