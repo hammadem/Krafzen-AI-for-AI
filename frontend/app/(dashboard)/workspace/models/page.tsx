@@ -53,6 +53,8 @@ function unwrap<T>(data: unknown): T[] {
     return [];
 }
 
+import IFCValidationPanel from "@/components/bim/IFCValidationPanel";
+
 export default function ModelsPage() {
     const { user } = useAuth();
     const [projects, setProjects] = useState<Project[]>([]);
@@ -270,6 +272,7 @@ export default function ModelsPage() {
                             </button>
                         </section>
 
+                        {fileId && <IFCValidationPanel key={projectId + ":" + fileId} user={user} fileId={fileId}/>}
                         <section className="rounded-xl border border-white/10 p-5 space-y-4">
                             <div className="flex items-center gap-2">
                                 <GitCompareArrows className="h-5 w-5" />
