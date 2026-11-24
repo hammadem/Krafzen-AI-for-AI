@@ -1,6 +1,6 @@
 "use client";
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function AuthLayout({
@@ -10,12 +10,17 @@ export default function AuthLayout({
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const recovery = usePathname() === "/set-new-password";
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && !recovery) {
       router.replace("/auth/callback");
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, recovery]);
+
+  // Recovery links create a temporary authenticated session; do not redirect
+  // it into ordinary account access before password change is complete.
+  if (recovery) return <>{children}</>;
 
   if (loading) {
     return (
