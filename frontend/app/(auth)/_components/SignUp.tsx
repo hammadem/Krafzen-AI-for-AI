@@ -219,6 +219,7 @@ export default function SignUp() {
 
                     <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
                         <p>Continue with your work mail - SSO login</p>
+                        <Link href="/resend-verification" className="text-white underline">Resend verification email</Link>
                         <p>Already have an account? {" "}
                             <Link
                                 href="/login"

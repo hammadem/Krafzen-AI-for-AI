@@ -1,14 +1,16 @@
 import { createClient } from "@/lib/supabase/supabaseClient";
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import type { Session, AuthChangeEvent } from "@supabase/supabase-js";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { getApiBaseUrl } from "@/lib/api/utils";
 import { clearCache } from "@/lib/api/cache";
+import { authLinkError } from "@/lib/auth/emailLinks";
 
 interface AuthContextType {
   user: User | null; // ← from your global types
   session: Session | null;
   // this is for session managment you cannot manipulate this directly
   loading: boolean;
+  accessError?: string | null;
   logout: () => void;
   currentProject: ProjectDetails | false | null;
   setCurrentProject: (value: ProjectDetails | false | null) => void;
@@ -25,6 +27,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const principal = useRef<string | null>(null);
+  const authEpoch = useRef(0);
   const [currentProject, setCurrentProject] = useState<ProjectDetails | false | null>(null);
 
   const updateUserFromSubscriptionStatus = (data: {
@@ -71,122 +76,82 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // 1️⃣ Load session on mount
-    const loadSession = async () => {
-      // 0️⃣ Catch OAuth code in URL and redirect to callback if we are on the home page
-      // This happens if Supabase redirect whitelist defaults to Site URL instead of /auth/callback
-      if (typeof window !== "undefined") {
-        const url = new URL(window.location.href);
-        const code = url.searchParams.get("code");
-        if (code && url.pathname === "/") {
-          window.location.href = `/auth/callback?code=${code}`;
-          return;
-        }
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let request: AbortController | undefined;
+    const url = new URL(window.location.href);
+    // A Site URL fallback may land on the home page rather than the callback.
+    // Forward only known auth errors; never forward arbitrary redirect targets.
+    if (url.pathname === "/" && authLinkError(url)) {
+      window.location.replace("/auth/callback?error_code=" + encodeURIComponent(authLinkError(url)!));
+      return;
+    }
+    const adopt = (next: Session | null) => {
+      if (!active) return;
+      const epoch = ++authEpoch.current;
+      if (timer) clearTimeout(timer);
+      request?.abort();
+      const id = next?.user.id ?? null;
+      if (id !== principal.current) {
+        clearCache();
+        setCurrentProject(null);
+        principal.current = id;
       }
-
-      // Refresh session so we have a valid access_token (avoids 401 from expired token)
-      try {
-        await supabase.auth.refreshSession();
-      } catch {
-        // No session or refresh failed — getSession() below will still run
+      setSession(next);
+      setAccessError(null);
+      if (!next?.access_token || !id) {
+        setUser(null);
+        setLoading(false);
+        return;
       }
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session || null);
-
-      if (data.session?.user && data.session?.access_token) {
-        setUser({
-          userId: data.session.user.id,
-          email: data.session.user.email || undefined,
-          access_token: data.session.access_token,
-          firstname: data?.session?.user?.user_metadata?.firstname || data?.session?.user?.user_metadata?.full_name?.split(' ')[0],
-          lastname: data?.session?.user?.user_metadata?.lastname || data?.session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
-          avatar_url: data?.session?.user?.user_metadata?.avatar_url || data?.session?.user?.user_metadata?.picture,
-          subscription_plan: data?.session?.user?.user_metadata?.subscription_plan || "Free",
-          // No entitlement until the backend subscription check confirms payment.
-          can_access_workspace: false,
-          has_active_subscription: false,
-          remaining_minutes: 0,
-          total_minutes_purchased: 0
-        });
-        const apiUrl = getApiBaseUrl();
+      const token = next.access_token;
+      const metadata = next.user.user_metadata;
+      setUser({
+        userId: id, email: next.user.email,
+        access_token: token,
+        firstname: metadata?.firstname || metadata?.full_name?.split(" ")[0],
+        lastname: metadata?.lastname || metadata?.full_name?.split(" ").slice(1).join(" "),
+        avatar_url: metadata?.avatar_url || metadata?.picture,
+        subscription_plan: "Free", can_access_workspace: false, has_active_subscription: false,
+        remaining_minutes: 0, total_minutes_purchased: 0,
+      });
+      setLoading(true);
+      const controller = new AbortController();
+      request = controller;
+      // Leave Supabase's auth-event lock before doing async work.
+      timer = setTimeout(async () => {
         try {
-          const subRes = await fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
-            headers: { Authorization: `Bearer ${data.session.access_token}` },
+          const response = await fetch(`${getApiBaseUrl()}/api/v1/payments/subscription-status`, {
+            headers: { Authorization: `Bearer ${token}` }, cache: "no-store",
+            signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
           });
-          if (subRes.ok) {
-            const subJson = await subRes.json();
-            updateUserFromSubscriptionStatus(subJson, data.session.access_token);
-          }
-        } catch (err) {
-          console.error("Failed to fetch subscription status:", err);
+          if (!response.ok) throw new Error("Account access could not be verified.");
+          const data = await response.json();
+          if (typeof data?.balance?.can_access_workspace !== "boolean") throw new Error("Account access response incomplete.");
+          if (active && epoch === authEpoch.current) updateUserFromSubscriptionStatus(data, token);
+        } catch {
+          if (active && epoch === authEpoch.current) setAccessError("Account access could not be verified. Retry or sign in again.");
+        } finally {
+          if (active && epoch === authEpoch.current) setLoading(false);
         }
-      } else {
-        setUser(null);
-      }
-
-      setLoading(false);
+      }, 0);
     };
-
-    loadSession();
-
-    // 2️⃣ Listen to auth changes (login, logout, refresh)
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
-      // Defense-in-depth for other consumers of the shared cache module.
-      clearCache();
-      setSession(session || null);
-
-      if (session?.user && session?.access_token) {
-        setUser({
-          userId: session.user.id,
-          email: session.user.email || undefined,
-          access_token: session.access_token,
-          firstname: session?.user?.user_metadata?.firstname || session?.user?.user_metadata?.full_name?.split(' ')[0],
-          lastname: session?.user?.user_metadata?.lastname || session?.user?.user_metadata?.full_name?.split(' ').slice(1).join(' '),
-          avatar_url: session?.user?.user_metadata?.avatar_url || session?.user?.user_metadata?.picture,
-          subscription_plan: session?.user?.user_metadata?.subscription_plan || "Free",
-          can_access_workspace: false,
-          has_active_subscription: false,
-          remaining_minutes: 0,
-          total_minutes_purchased: 0
-        });
-
-        // 3️⃣ Fetch detailed profile and subscription status from Backend (only with valid token)
-        const apiUrl = getApiBaseUrl();
-        const token = session.access_token;
-
-        // Fetch user profile
-        fetch(`${apiUrl}/api/v1/users/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-          .then(res => (res.status === 401 ? null : res.json()))
-          .then(data => {
-            if (data && typeof data === "object")
-              setUser(prev => prev?.access_token === token ? {
-                ...prev,
-                remaining_minutes: data.remaining_minutes,
-                total_minutes_purchased: data.total_minutes_purchased,
-                subscription_plan: data.plan_tier || prev.subscription_plan
-              } : prev);
-          })
-          .catch(() => {});
-
-        // Fetch subscription status (backend returns { subscription, balance })
-        fetch(`${apiUrl}/api/v1/payments/subscription-status`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-          .then(res => (res.status === 401 ? null : res.json()))
-          .then(data => data && typeof data === "object" ? updateUserFromSubscriptionStatus(data, token) : undefined)
-          .catch(() => {});
-
-      } else {
-        setUser(null);
-      }
-
-      setLoading(false);
+    let receivedEvent = false;
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
+      receivedEvent = true;
+      adopt(next);
     });
-
-    return () => listener.subscription.unsubscribe();
-
+    // Also support clients that cannot deliver an initial auth event.
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!receivedEvent) adopt(data.session ?? null);
+    }).catch(() => { if (!receivedEvent) adopt(null); });
+    return () => {
+      active = false;
+      ++authEpoch.current;
+      if (timer) clearTimeout(timer);
+      request?.abort();
+      listener.subscription.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -212,6 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
       updateUserFromSubscriptionStatus(data, currentSession.access_token);
+      setAccessError(null);
       return data.balance.can_access_workspace === true;
     } catch (err) {
       console.error("Failed to verify subscription status:", err);
@@ -221,6 +187,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     clearCache();
+    ++authEpoch.current;
     setLoading(true);
 
     try {
@@ -242,6 +209,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         session,
         loading,
+        accessError,
         logout,
         currentProject,
         setCurrentProject,
