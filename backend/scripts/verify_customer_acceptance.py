@@ -321,6 +321,14 @@ def main():
             a=upload(bj,"a.ifc",first)
             b=upload(bj,"b.ifc",second)
             note("C","Real IFC scanned import and second model")
+            query_path = base+"/bim/files/"+a+"/query"
+            answer = check(client.post(query_path,headers=headers,json={"mode":"count","entity_class":"IfcWall"})).json()
+            assert answer["result"]["match_count"] == 1 and answer["source_sha256"]
+            elements = check(client.post(query_path,headers=headers,json={"mode":"elements","entity_class":"IfcWall"})).json()["result"]["elements"]
+            assert len(elements) == 1 and elements[0]["name"] == "Measured 2m wall"
+            assert check(client.post(query_path,headers=headers,json={"mode":"properties","element_guid":elements[0]["guid"]})).json()["result"]["element"]["guid"] == elements[0]["guid"]
+            assert client.post(query_path,headers=other,json={"mode":"count"}).status_code in (403,404)
+            note("C","Source-bound IFC count, element inventory and property lookup; cross-account access denied")
             mesh=check(client.get(base+"/bim/files/"+a+"/mesh",headers=headers)).json()
             assert mesh["mesh"]["elements"]
             note("C","Actual source-derived 3D geometry")

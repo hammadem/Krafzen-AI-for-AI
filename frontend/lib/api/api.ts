@@ -258,6 +258,10 @@ export async function createAProject(
 ) {
     return apiClient("POST", PROJECT_URLS.POST(), user, { user_id: user?.userId, input_text: body }, "application/json", controller);
 };
+export async function queryIfcSource(user: User | null, fileId: string, query: {mode:string;entity_class:string;storey_guid?:string;element_guid?:string;set_name?:string;property_name?:string}) {
+    return apiClient("POST", `/api/v1/bim/files/${encodeURIComponent(fileId)}/query`, user, query);
+}
+
 export async function getAProject(
     user: User | null,
     projectId: string

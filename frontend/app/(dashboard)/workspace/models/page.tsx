@@ -54,6 +54,7 @@ function unwrap<T>(data: unknown): T[] {
 }
 
 import IFCValidationPanel from "@/components/bim/IFCValidationPanel";
+import IFCQueryPanel from "@/components/bim/IFCQueryPanel";
 
 export default function ModelsPage() {
     const { user } = useAuth();
@@ -272,6 +273,7 @@ export default function ModelsPage() {
                             </button>
                         </section>
 
+                        {fileId && <IFCQueryPanel key={projectId + ":" + fileId} user={user} fileId={fileId}/>}
                         {fileId && <IFCValidationPanel key={projectId + ":" + fileId} user={user} fileId={fileId}/>}
                         <section className="rounded-xl border border-white/10 p-5 space-y-4">
                             <div className="flex items-center gap-2">
