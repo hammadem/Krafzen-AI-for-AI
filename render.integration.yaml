@@ -1,0 +1,14 @@
+# Adopt only the existing staging backend. Keep all existing secrets.
+# Do not adopt or deploy the production service.
+services:
+  - type: web
+    name: krafzen-integration-staging
+    runtime: python
+    repo: https://github.com/hammadem/Krafzen-AI-for-AI
+    branch: fix/integration-p0-20261117
+    region: virginia
+    plan: free
+    numInstances: 1
+    autoDeployTrigger: 'off'
+    buildCommand: bash backend/render_build_native.sh
+    startCommand: cd backend && export PATH="$PWD/bin/bin:$PATH" && potrace --version && exec uvicorn app.main:app --host 0.0.0.0 --port $PORT
