@@ -52,13 +52,13 @@ async def revoke_invite_route(
     invite_id: str,
     user=Depends(require_auth)
 ):
-    revoked = await revoke_invite(invite_id, user["user_id"])
+    revoked = await revoke_invite(workspace_id, invite_id, user["user_id"])
     if not revoked:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail={"error": "Failed to revoke invite"})
     return {"message": "Invite revoked successfully"}
 
-# VALIDATE INVITE (public - no auth required)
+# VALIDATE INVITE (router-level paid authentication currently applies)
 @router.get("/invites/validate", response_model=InviteValidateResponse)
 async def validate_invite_route(token: str):
     return await validate_invite(token)
