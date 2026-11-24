@@ -263,13 +263,41 @@ async def test_invite_revocation_records_inviter_as_actor():
     with patch.object(invite_queries, "db", database), \
          patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
          patch.object(invite_queries, "record_workspace_event", new=record_event):
-        revoked = await invite_queries.revoke_invite(INVITE_ID, ACTOR_ID)
+        revoked = await invite_queries.revoke_invite(WORKSPACE_ID, INVITE_ID, ACTOR_ID)
 
     assert revoked is True
     record_event.assert_awaited_once()
     assert record_event.await_args.kwargs["event_name"] == "permissions.access_revoked"
     assert record_event.await_args.kwargs["actor_user_id"] == ACTOR_ID
     assert record_event.await_args.kwargs["metadata"]["access_scope"] == "pending_invitation"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("workspace_id,actor_id,expected_status", [
+    ("00000000-0000-0000-0000-000000000099", ACTOR_ID, 404),
+    (WORKSPACE_ID, TARGET_ID, 403),
+    ("invalid", ACTOR_ID, 400),
+])
+async def test_invite_revocation_rejects_wrong_scope_or_actor(workspace_id, actor_id, expected_status):
+    database = FakeDatabase({"workspace_invites": [make_invite()]})
+    record_event = AsyncMock()
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(invite_queries, "record_workspace_event", new=record_event):
+        with pytest.raises(HTTPException) as error:
+            await invite_queries.revoke_invite(workspace_id, INVITE_ID, actor_id)
+    assert error.value.status_code == expected_status
+    assert database.tables["workspace_invites"][0]["status"] == "pending"
+    record_event.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_expired_invite_status_cannot_validate_even_with_future_expiry():
+    database = FakeDatabase({"workspace_invites": [make_invite(status="expired")]})
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)):
+        result = await invite_queries.validate_invite(INVITE_TOKEN)
+    assert result["valid"] is False
 
 
 @pytest.mark.asyncio
