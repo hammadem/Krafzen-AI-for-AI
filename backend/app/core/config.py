@@ -82,8 +82,9 @@ class Settings(BaseSettings):
 
     # Gemini Configuration
     GEMINI_API_KEY: str | None = None
-    GEMINI_MODEL: str = "gemini-2.0-flash-exp" # Keep the smart tex model
-    GEMINI_IMAGE_MODEL: str = "models/nano-banana-pro-preview" # Restoring the working image model
+    GEMINI_MODEL: str = "gemini-3.1-flash-lite"
+    GEMINI_IMAGE_MODEL: str = "gemini-3.1-flash-lite-image"
+    GEMINI_ALLOW_PAID_IMAGE_GENERATION: bool = False
 
     # A six-threshold IRC-style prototype is NOT adopted jurisdictional code
     # compliance and currently lacks verified code-edition/section provenance.
