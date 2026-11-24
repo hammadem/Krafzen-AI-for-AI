@@ -264,6 +264,10 @@ export async function saveProjectMetadata(user: User | null, data: ProjectMetada
         : apiClient("POST", PROJECT_URLS.POST(), user, {...data, input_text: data.description.trim() || data.title});
 }
 
+export async function queryIfcSource(user: User | null, fileId: string, query: {mode:string;entity_class:string;storey_guid?:string;element_guid?:string;set_name?:string;property_name?:string}) {
+    return apiClient("POST", `/api/v1/bim/files/${encodeURIComponent(fileId)}/query`, user, query);
+}
+
 export async function getAProject(
     user: User | null,
     projectId: string

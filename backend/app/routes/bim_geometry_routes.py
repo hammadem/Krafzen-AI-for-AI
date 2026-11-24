@@ -111,6 +111,55 @@ async def _read_verified_ifc(file_id: UUID, user: dict):
     return project_id, raw
 
 
+class ModelQuery(BaseModel):
+    mode: Literal["count", "elements", "properties", "missing_property", "quantity"]
+    entity_class: Literal["IfcElement", "IfcWall", "IfcSlab", "IfcDoor", "IfcWindow", "IfcSpace", "IfcColumn", "IfcBeam", "IfcStair", "IfcRoof", "IfcDistributionElement"] = "IfcElement"
+    storey_guid: str | None = Field(default=None, min_length=22, max_length=22)
+    element_guid: str | None = Field(default=None, min_length=22, max_length=22)
+    set_name: str | None = Field(default=None, min_length=1, max_length=120)
+    property_name: str | None = Field(default=None, min_length=1, max_length=120)
+
+
+def _run_source_query(raw: bytes, request: dict) -> dict:
+    if len(raw) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="IFC query exceeds the 20 MB source limit")
+    if importlib.util.find_spec("ifcopenshell") is None:
+        raise HTTPException(status_code=503, detail="IFC query engine unavailable")
+    with tempfile.TemporaryDirectory(prefix="krafzen-ifc-query-") as folder:
+        path = Path(folder) / "source.ifc"
+        path.write_bytes(raw)
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "app.services.ifc_source_query", str(path)],
+                input=json.dumps(request).encode(), capture_output=True, timeout=60, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise HTTPException(status_code=503, detail="IFC query engine unavailable or timed out") from exc
+    if result.returncode != 0 or len(result.stdout) > 1024 * 1024:
+        raise HTTPException(status_code=422, detail="IFC query could not be evaluated within supported limits")
+    try:
+        data = json.loads(result.stdout)
+    except (ValueError, UnicodeError) as exc:
+        raise HTTPException(status_code=503, detail="IFC query returned invalid data") from exc
+    if not isinstance(data, dict) or data.get("method") != "ifc_source_query_v1":
+        raise HTTPException(status_code=503, detail="IFC query evidence unavailable")
+    return data
+
+
+@router.post("/files/{file_id}/query")
+async def query_ifc_source(file_id: UUID, request: ModelQuery, user: dict = Depends(require_auth)):
+    if request.mode == "properties" and not request.element_guid:
+        raise HTTPException(status_code=422, detail="Select an element GlobalId")
+    if request.mode in {"quantity", "missing_property"} and (not (request.set_name or "").strip() or not (request.property_name or "").strip()):
+        raise HTTPException(status_code=422, detail="Specify the exact declared set and property or quantity name")
+    if _coordination_slot.locked():
+        raise HTTPException(status_code=429, detail="Another IFC calculation is running")
+    async with _coordination_slot:
+        project_id, raw = await _read_verified_ifc(file_id, user)
+        result = await run_in_threadpool(_run_source_query, raw, request.model_dump())
+    return {"file_id": str(file_id), "project_id": project_id, "source_sha256": sha256(raw).hexdigest(), "result": result}
+
+
 @router.get("/files/{file_id}/mesh")
 async def get_model_mesh(file_id: UUID, user: dict = Depends(require_auth)):
     project_id, raw = await _read_verified_ifc(file_id, user)
