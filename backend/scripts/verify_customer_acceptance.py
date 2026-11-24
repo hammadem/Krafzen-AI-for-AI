@@ -139,6 +139,62 @@ def main():
 
         p,j=project("Residential QA fixture")
         note("A","Create project and job")
+        # Workspace setup is explicitly a local-only prerequisite because
+        # the existing API does not expose organization creation.
+        with psycopg2.connect(dsn) as con, con.cursor() as cur:
+            cur.execute("INSERT INTO public.workspaces (name, owner_id) VALUES (%s, %s) RETURNING id",
+                        ("Isolated collaboration QA", uid))
+            ws = str(cur.fetchone()[0])
+            cur.execute("SELECT email FROM auth.users WHERE id=%s", (other_uid,))
+            invite_email = cur.fetchone()[0]
+        workspace = base + "/workspaces/" + ws
+        check(client.get(workspace, headers=other),403)
+        invite = check(client.post(workspace+"/invites",headers=headers,
+            json={"email":invite_email,"role":"viewer"}),201).json()
+        check(client.post(workspace+"/invites",headers=headers,
+            json={"email":invite_email,"role":"viewer"}),409)
+        revoke_path = workspace+"/invites/"+invite["id"]+"/revoke"
+        check(client.patch(revoke_path,headers=other),403)
+        check(client.patch(revoke_path,headers=headers))
+        reissued = check(client.post(workspace+"/invites",headers=headers,
+            json={"email":invite_email,"role":"viewer"}),201).json()
+        assert reissued["id"] == invite["id"] and reissued["token"] != invite["token"]
+        assert check(client.get(base+"/workspaces/invites/validate",headers=other,
+            params={"token":invite["token"]})).json()["valid"] is False
+        check(client.post(base+"/workspaces/invites/accept",headers=other,
+            json={"token":reissued["token"]}))
+        assert check(client.get(workspace,headers=other)).json()["id"] == ws
+        members = check(client.get(workspace+"/members",headers=headers)).json()["members"]
+        assert any(row["user_id"] == other_uid and row["role"] == "viewer" for row in members)
+        member_path = workspace+"/members/"+other_uid
+        check(client.patch(member_path,headers=other,json={"role":"admin"}),403)
+        assert check(client.patch(member_path,headers=headers,json={"role":"member"})).json()["role"] == "member"
+        check(client.delete(member_path,headers=headers))
+        check(client.get(workspace,headers=other),403)
+        workspace_events = check(client.get(base+"/activity/workspace/"+ws,headers=headers)).json()
+        assert {"team.member_invited","team.member_joined","permissions.access_granted","permissions.access_revoked"} <= {e["action"] for e in workspace_events}
+        assert check(client.get(base+"/activity/workspace/"+ws,headers=other)).json() == []
+        note("B/Members","Real invite, revoke, reissue, accept, role change, removal and scoped audit history; local workspace fixture only")
+
+        inspection = check(client.post(base+"/field/inspections",headers=headers,json={
+            "project_id":p,"title":"QA observation","description":"Recorded site observation",
+            "discipline":"architecture","severity":"medium"}),201).json()
+        inspection_id = inspection["id"]
+        status_path = base+"/field/inspections/"+inspection_id+"/status"
+        check(client.patch(status_path,headers=headers,json={"status":"verified"}),409)
+        denied = client.patch(status_path,headers=other,json={"status":"resolved"})
+        assert denied.status_code in (403,404)
+        check(client.patch(status_path,headers=headers,json={"status":"in_progress"}))
+        check(client.patch(status_path,headers=headers,json={"status":"resolved"}))
+        assert check(client.patch(status_path,headers=headers,json={"status":"verified"})).json()["status"] == "verified"
+        records = check(client.get(base+"/field/projects/"+p+"/inspections",headers=headers)).json()
+        assert any(row["id"] == inspection_id and row["status"] == "verified" for row in records)
+        denied = client.get(base+"/field/projects/"+p+"/report.pdf",headers=other)
+        assert denied.status_code in (403,404)
+        report = client.get(base+"/field/projects/"+p+"/report.pdf",headers=headers)
+        pdf(report)
+        assert "QA observation" in "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(report.content)).pages)
+        note("Field","Real observation persistence, status transitions, authorization and parsed PDF report")
         forbidden=client.get(base+"/projects/"+p,headers=other)
         assert forbidden.status_code in (403,404)
         note("A","Different paid account cannot open project")
@@ -273,7 +329,7 @@ def main():
             note("B","Commercial project; real saved IBC/NFPA numeric screening and report using declared QA measurements")
         else:
             note("B","IBC/NFPA assessment route not in tested revision","BLOCKED")
-        note("B","Full multidisciplinary assignment, adopted-code comprehensive review, member audit","NOT_RUN")
+        note("B","Full multidisciplinary project assignment and adopted-code comprehensive review","NOT_RUN")
         note("C","Browser interaction, full quantities and comprehensive model validity","NOT_RUN")
         note("D","Full review and export workflow","NOT_RUN")
 
