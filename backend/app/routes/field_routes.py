@@ -3,7 +3,7 @@
 This is a real persisted observation log, not fabricated sensor readings,
 AI field certification, photo evidence or automated issue assignment.
 """
-from datetime import UTC, datetime
+from datetime import UTC, datetime, date
 from uuid import uuid4
 
 from fastapi import File, Response, UploadFile
@@ -162,6 +162,50 @@ async def _owned_field_inspection(inspection_id: str, user: dict) -> dict:
         raise HTTPException(status_code=404, detail="Field inspection not found")
     await _owned_project(str(observation["project_id"]), user)
     return observation
+
+
+class FieldObservationNote(BaseModel):
+    kind: Literal["comment","corrective_action","progress_update"]
+    body: str = Field(min_length=1,max_length=4000)
+    due_date: date | None = None
+
+
+@router.post("/inspections/{inspection_id}/notes", status_code=201)
+async def create_field_observation_note(
+    inspection_id: UUID, payload: FieldObservationNote, user: dict = Depends(require_auth),
+):
+    inspection = await _owned_field_inspection(str(inspection_id), user)
+    project = await _owned_project(str(inspection["project_id"]), user)
+    if project.get("archived_at"):
+        raise HTTPException(status_code=409, detail="Restore project before adding observation notes")
+    if not payload.body.strip() or (payload.due_date and payload.kind != "corrective_action"):
+        raise HTTPException(status_code=422, detail="Enter a note; due dates apply only to corrective actions")
+    row = {**payload.model_dump(mode="json"), "body": payload.body.strip(),
+           "inspection_id":str(inspection_id), "created_by":user["user_id"]}
+    try:
+        response = await run_in_threadpool(lambda: db.table("field_observation_notes").insert(row).execute())
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Observation note could not be saved") from exc
+    if not response or not response.data:
+        raise HTTPException(status_code=503, detail="Observation note not saved")
+    return response.data[0]
+
+
+@router.get("/inspections/{inspection_id}/notes")
+async def list_field_observation_notes(
+    inspection_id: UUID, limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=10000), user: dict = Depends(require_auth),
+):
+    await _owned_field_inspection(str(inspection_id), user)
+    try:
+        response = await run_in_threadpool(lambda: db.table("field_observation_notes").select("*")
+            .eq("inspection_id",str(inspection_id)).eq("created_by",user["user_id"])
+            .order("created_at",desc=True).order("id",desc=True).range(offset,offset+limit-1).execute())
+    except Exception as exc:
+        raise HTTPException(status_code=503,detail="Observation notes unavailable") from exc
+    if response is None or response.data is None:
+        raise HTTPException(status_code=503, detail="Observation notes unavailable")
+    return response.data
 
 
 @router.post("/inspections/{inspection_id}/photos", status_code=201)
