@@ -785,7 +785,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
             "or a valid presigned DWG_ODA_DEB_URL."
         )
         logger.warning(_last_oda_error)
-        return bool(_read_bundle(root)[0])
+        return False
 
     if url and url != raw.strip():
         logger.warning("DWG_ODA_DEB_URL had extra whitespace or quotes; sanitized before download.")
@@ -800,8 +800,7 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
         if not force:
             exe, _, _ = _read_bundle(root)
             if exe:
-                ensure_headless_qt_plugins(root)
-                return True
+                return ensure_headless_qt_plugins(root)
 
         logger.info("Fetching ODA .deb into %s ...", bdir)
         _download_oda_deb(deb_local, url)
@@ -855,11 +854,11 @@ def _ensure_oda_bundle_locked(force: bool = False) -> bool:
             url,
         )
         logger.exception("Failed to ensure ODA bundle: %s", _last_oda_error)
-        return False if force else bool(_read_bundle(root)[0])
+        return False
     except Exception as e:
         _last_oda_error = str(e)
         logger.exception("Failed to ensure ODA bundle")
-        return False if force else bool(_read_bundle(root)[0])
+        return False
     finally:
         deb_local.unlink(missing_ok=True)
 
@@ -950,7 +949,7 @@ def run_oda_subprocess(
     if not _needs_virtual_display(root):
         platform = env.get("QT_QPA_PLATFORM", "unknown")
         logger.info("DWG: running ODA with Qt platform %s (no Xvfb)", platform)
-        return subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
+        return subprocess.run(cmd, capture_output=True, text=True, check=False, env=env, timeout=180)
 
     xvfb = _find_xvfb_binary(root)
     if not xvfb:
@@ -976,7 +975,7 @@ def run_oda_subprocess(
         run_env = {**env, "DISPLAY": display, "QT_QPA_PLATFORM": "xcb"}
         _prepend_ld_path(run_env, _bundle_extra_ld_dirs(bdir))
         logger.info("DWG: running ODA under Xvfb display %s (%s)", display, xvfb)
-        return subprocess.run(cmd, capture_output=True, text=True, check=False, env=run_env)
+        return subprocess.run(cmd, capture_output=True, text=True, check=False, env=run_env, timeout=180)
     finally:
         xvfb_proc.terminate()
         try:
@@ -991,11 +990,14 @@ def wrap_oda_command(cmd: list[str], root: Path | None = None) -> list[str]:
 
 
 def resolve_bundled_oda() -> tuple[str | None, str | None]:
-    """Return (converter_path, ld_library_path_prefix) from .oda_bundle if present."""
+    """Return a bundled converter only after its required Qt runtime is ready."""
     root = backend_root()
-    ensure_oda_bundle()
+    if not ensure_oda_bundle():
+        return None, None
     _repair_bundle_manifest(root)
     exe, ld, _qt = _read_bundle(root)
+    if not exe or not os.access(exe, os.X_OK) or not ensure_headless_qt_plugins(root):
+        return None, None
     return exe, ld
 
 
