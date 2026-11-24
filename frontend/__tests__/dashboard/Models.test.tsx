@@ -135,7 +135,7 @@ describe("Real IFC model inspector", () => {
         await waitFor(() => expect(createIfcNativeCoordination).toHaveBeenCalledWith(
             { userId: "user-1", access_token: "token-1" }, "project-1", "ifc-1", "ifc-2", 0.1
         ));
-        expect(await screen.findByText("Hard geometric intersections: 1")).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByText("Hard geometric intersections: 1")).toBeInTheDocument());
     });
 
     it("shows errors from unavailable IFC parsing", async () => {
