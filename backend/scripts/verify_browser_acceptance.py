@@ -106,11 +106,19 @@ def main():
                 def login(context,email,password):
                     page=context.new_page()
                     page.set_default_timeout(60000)
-                    page.goto(WEB+"/logincred",wait_until="domcontentloaded")
+                    page.goto(WEB+"/logincred",wait_until="load")
+                    expect(page.get_by_role("button",name="Submit",exact=True)).to_be_enabled()
+                    observations=[]
+                    page.on("response", lambda r: observations.append((urlsplit(r.url).path,r.status)) if "/auth/v1/token" in r.url or "/api/v1/payments/subscription-status" in r.url else None)
                     page.get_by_placeholder("Email",exact=True).fill(email)
                     page.get_by_placeholder("Password",exact=True).fill(password)
                     page.get_by_role("button",name="Submit",exact=True).click()
-                    page.wait_for_url("**/workspace",timeout=60000) if email != unpaid_email else page.wait_for_url("**/pricing",timeout=60000)
+                    try:
+                        page.wait_for_url("**/workspace" if email != unpaid_email else "**/pricing",timeout=60000,wait_until="domcontentloaded")
+                    except Exception:
+                        print("Login diagnostics: current path", urlsplit(page.url).path, "auth/subscription HTTP observations", observations, flush=True)
+                        print("Invalid form inputs:",page.locator("input[aria-invalid=true]").count(),flush=True)
+                        raise
                     return page
                 with browser.new_context() as context:
                     page=login(context,unpaid_email,unpaid_password)
