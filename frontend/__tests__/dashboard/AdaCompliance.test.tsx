@@ -70,7 +70,7 @@ describe("Evidence-backed ADA 2010 compliance screening UI", () => {
             { target: { value: "Commercial" } });
         fireEvent.change(screen.getByLabelText("Compliance edition"),
             { target: { value: "2010_ADA" } });
-        fireEvent.click(screen.getByRole("checkbox"));
+        fireEvent.click(screen.getByRole("checkbox", { name: /qualified project reviewer has confirmed ADA applicability/i }));
         fireEvent.change(screen.getByLabelText("Compliance source file"),
             { target: { value: "file-1" } });
         fireEvent.change(screen.getByLabelText("Door type"),
