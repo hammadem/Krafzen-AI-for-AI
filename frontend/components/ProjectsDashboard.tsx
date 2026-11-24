@@ -4,6 +4,7 @@ import { useFetchProjects } from '@/hooks/useFetchProjects';
 import { useAuth } from '@/context/AuthContext';
 import { archiveProject, saveProjectMetadata, deleteAProject } from '@/lib/api/api';
 import ProjectMetadataForm from '@/components/ProjectMetadataForm';
+import ProjectAssignmentsPanel from '@/components/ProjectAssignmentsPanel';
 import {
   Archive,
   Folder,
@@ -248,7 +249,7 @@ export default function ProjectsDashboard() {
                     <div className="flex items-start justify-between gap-3 pr-5">
                       <div className="min-w-0">
                         <div className="text-[15px] font-semibold text-white leading-snug line-clamp-2 group-hover:text-[#54e3b5] transition-colors">
-                          {project.input_text || 'Untitled Project'}
+                          {project.title || project.input_text || 'Untitled Project'}
                         </div>
                       </div>
                       <ReadyBadge ready={ready} />
@@ -283,6 +284,7 @@ export default function ProjectsDashboard() {
           <button type="button" disabled={!hasMore} onClick={nextPage} className="underline disabled:opacity-40">Next projects</button>
         </div>
       )}
+      <ProjectAssignmentsPanel key={user?.userId || 'signed-out'} user={user} projects={projects}/>
       {editing && <ProjectMetadataForm key={editing === 'new' ? 'new' : editing.id} project={editing === 'new' ? undefined : editing}
         onClose={()=>setEditing(null)}
         onSave={async (data)=>{

@@ -217,7 +217,22 @@ def main():
         member_path = workspace+"/members/"+other_uid
         check(client.patch(member_path,headers=other,json={"role":"admin"}),403)
         assert check(client.patch(member_path,headers=headers,json={"role":"member"})).json()["role"] == "member"
+        tasks=base+"/assignments/"
+        task=check(client.post(tasks,headers=headers,json={"project_id":p,"workspace_id":ws,"assignee_id":other_uid,"title":"Check structural coordination","discipline":"structural"}),201).json()
+        task_url=base+"/assignments/"+task["id"]
+        assert any(x["id"]==task["id"] for x in check(client.get(tasks,headers=other)).json())
+        check(client.post(tasks,headers=other,json={"project_id":p,"workspace_id":ws,"assignee_id":other_uid,"title":"Unauthorized task","discipline":"structural"}),403)
+        check(client.patch(task_url,headers=other,json={"expected_status":"assigned","status":"completed"}),409)
+        check(client.patch(task_url,headers=other,json={"expected_status":"assigned","status":"in_progress"}))
+        check(client.patch(task_url,headers=other,json={"expected_status":"in_progress","status":"submitted"}))
+        check(client.patch(task_url,headers=headers,json={"expected_status":"submitted","status":"completed"}))
+        check(client.patch(member_path,headers=headers,json={"role":"viewer"}))
+        check(client.patch(task_url,headers=headers,json={"expected_status":"completed","status":"in_progress"}))
+        check(client.patch(task_url,headers=other,json={"expected_status":"in_progress","status":"submitted"}),409)
+        check(client.get(base+"/projects/"+p,headers=other),403)
         check(client.delete(member_path,headers=headers))
+        assert not any(x["id"]==task["id"] for x in check(client.get(tasks,headers=other)).json())
+        note("Assignments","Real member assignment, role downgrade, owner approval, membership revocation and no implicit file access")
         check(client.get(workspace,headers=other),403)
         workspace_events = check(client.get(base+"/activity/workspace/"+ws,headers=headers)).json()
         assert {"team.member_invited","team.member_joined","permissions.access_granted","permissions.access_revoked"} <= {e["action"] for e in workspace_events}
