@@ -87,6 +87,29 @@ class SubscriptionService:
         if plan not in PLAN_CONFIG or state != "active" or not provider_id:
             return False
 
+        # An active row alone is not proof of continuing payment. New verified
+        # webhook fulfillment sets a renewal boundary. If that known boundary
+        # has passed without another paid event, deny access even when an
+        # outdated provider notification left the status marked active.
+        # Legacy paid rows without a recorded boundary are preserved pending
+        # controlled provider reconciliation; their absence remains a release
+        # migration/acceptance blocker rather than silently inventing dates.
+        paid_until = sub.get("plan_requests_reset_date")
+        if paid_until is not None:
+            try:
+                if isinstance(paid_until, datetime):
+                    end = paid_until
+                elif isinstance(paid_until, str):
+                    end = datetime.fromisoformat(
+                        paid_until.strip().replace("Z", "+00:00")
+                    )
+                else:
+                    return False
+                if end.tzinfo is None or end <= datetime.now(UTC):
+                    return False
+            except (ValueError, TypeError, OverflowError):
+                return False
+
         # Dev mock subscriptions must never authorize production users.
         if provider_id.startswith("mock_") and settings.ENVIRONMENT.lower() != "development":
             return False

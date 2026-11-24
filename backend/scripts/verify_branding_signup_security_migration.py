@@ -11,6 +11,7 @@ import psycopg2
 ROOT = Path(__file__).resolve().parents[2]
 MIGRATION = ROOT / "supabase/migrations/20261121000000_branding_rls_and_signup_hardening.sql"
 SECURITY_PROBE = ROOT / "supabase/migrations/20261124030000_release_security_probe.sql"
+SUBSCRIPTION_ACL = ROOT / "supabase/migrations/20261124040000_subscription_browser_acl.sql"
 NEW_USER = "00000000-0000-0000-0000-000000000222"
 OLD_USER = "00000000-0000-0000-0000-000000000223"
 BRANDING = (
@@ -74,6 +75,34 @@ def run():
             script = MIGRATION.read_text(encoding="utf-8")
             cur.execute(script)
             cur.execute(script)  # Repeat-safe migration.
+            # Reproduce the live unnecessary direct grants, then prove both
+            # RLS and SQL-level privileges deny browser role writes.
+            cur.execute(
+                "GRANT INSERT, UPDATE, DELETE ON public.user_subscriptions "
+                "TO PUBLIC, anon, authenticated"
+            )
+            subscription_acl = SUBSCRIPTION_ACL.read_text(encoding="utf-8")
+            cur.execute(subscription_acl)
+            cur.execute(subscription_acl)  # repeat-safe
+            for role in ("anon", "authenticated"):
+                for privilege in ("INSERT", "UPDATE", "DELETE"):
+                    cur.execute(
+                        "SELECT has_table_privilege(%s,'public.user_subscriptions',%s)",
+                        (role, privilege),
+                    )
+                    assert cur.fetchone() == (False,), (role, privilege)
+            cur.execute(
+                "SELECT has_table_privilege('authenticated',"
+                "'public.user_subscriptions','SELECT'),"
+                "has_table_privilege('service_role',"
+                "'public.user_subscriptions','UPDATE')"
+            )
+            assert cur.fetchone() == (True, True)
+            cur.execute(
+                "SELECT relrowsecurity FROM pg_class "
+                "WHERE oid='public.user_subscriptions'::regclass"
+            )
+            assert cur.fetchone() == (True,)
             probe = SECURITY_PROBE.read_text(encoding="utf-8")
             cur.execute(probe)
             cur.execute(probe)  # Service-role-only RPC must be repeat-safe too.

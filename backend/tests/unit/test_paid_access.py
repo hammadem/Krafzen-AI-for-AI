@@ -1,5 +1,6 @@
 """Paid-only entitlement and route-boundary regression tests."""
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -141,3 +142,39 @@ async def test_paid_active_account_may_create_project_over_http(client):
     finally:
         if original is not None:
             app.dependency_overrides[require_paid_subscription] = original
+
+
+@pytest.mark.parametrize("expiry", [
+    (datetime.now(UTC) - timedelta(days=1)).isoformat(),
+    (datetime.now(UTC) - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    "not-a-timestamp",
+    "2026-11-01T00:00:00",
+    123,
+])
+def test_expired_or_invalid_paid_renewal_never_authorizes_access(expiry):
+    sub = {**ACTIVE, "plan_requests_reset_date": expiry}
+    assert not SubscriptionService()._is_paid_subscriber(sub)
+
+
+def test_future_verified_billing_period_remains_entitled():
+    sub = {
+        **ACTIVE,
+        "plan_requests_reset_date":
+            (datetime.now(UTC) + timedelta(days=10)).isoformat(),
+    }
+    assert SubscriptionService()._is_paid_subscriber(sub)
+
+
+@pytest.mark.asyncio
+async def test_expired_active_subscription_denied_over_paid_dependency():
+    sub = {
+        **ACTIVE,
+        "plan_requests_reset_date":
+            (datetime.now(UTC) - timedelta(days=5)).isoformat(),
+    }
+    with patch.object(subscription_service, "get_subscription", AsyncMock(return_value=sub)):
+        with pytest.raises(HTTPException) as exc:
+            await require_paid_subscription(USER)
+        with pytest.raises(ValueError, match="active paid subscription"):
+            await subscription_service.deduct_request(USER["user_id"])
+    assert exc.value.status_code == 402
