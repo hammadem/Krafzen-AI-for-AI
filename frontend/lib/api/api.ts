@@ -588,6 +588,23 @@ export async function createIfcSpatialScreen(
     );
 }
 
+/** Native IFC hard-intersection and clearance analysis, saved by the API. */
+export async function createIfcNativeCoordination(
+    user: User | null, projectId: string, primaryFileId: string,
+    secondaryFileId: string, clearanceM: number
+) {
+    return apiClient(
+        "POST", `/api/v1/bim/projects/${encodeURIComponent(projectId)}/spatial-screens`,
+        user, {
+            primary_file_id: primaryFileId,
+            secondary_file_id: secondaryFileId,
+            same_origin_axes_and_scale_confirmed: true,
+            mode: "native_coordination",
+            clearance_m: clearanceM,
+        }
+    );
+}
+
 export async function getIfcSpatialScreens(user: User | null, projectId: string) {
     return apiClient(
         "GET", `/api/v1/bim/projects/${encodeURIComponent(projectId)}/spatial-screens`,
