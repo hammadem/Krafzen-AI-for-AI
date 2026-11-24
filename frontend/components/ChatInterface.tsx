@@ -1,5 +1,6 @@
 "use client"
 
+import { downloadRasterImage } from "@/lib/downloadRasterImage";
 import { useState, useRef, useEffect } from "react"
 import { Send, Loader2, Download, Maximize2, FileCode, FileText, Mic, ChevronsLeft, ThumbsUp, ThumbsDown } from "lucide-react"
 import { downloadDesignFile, downloadDxf, transcribeAudio, type ChatJurisdiction, type CompliancePayload } from "@/lib/api/chat"
@@ -236,48 +237,9 @@ export function ChatInterface({
     }
 
     const handleDownload = async (imageUrl: string) => {
-        try {
-            let blob: Blob;
-
-            // Try fetching directly first (if same origin or CORS allows)
-            try {
-                const response = await fetch(imageUrl);
-                if (response.ok) {
-                    blob = await response.blob();
-                } else {
-                    throw new Error("Direct fetch failed");
-                }
-            } catch (e) {
-                // If direct fetch fails (CORS), use our proxy
-                const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error("Proxy fetch failed");
-                blob = await response.blob();
-            }
-
-            const blobUrl = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = blobUrl;
-            link.download = `generated-image-${new Date().getTime()}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            // Short delay to ensure download starts before revoking
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-
-        } catch (error) {
-            console.error("Download failed:", error);
-            // Last resort fallback (this will result in UUID filename but better than nothing)
-            const link = document.createElement('a');
-            link.href = imageUrl;
-            link.target = '_blank'; // Open in new tab if download fails
-            // download attribute usually ignored for cross-origin
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-    }
+        try { await downloadRasterImage(imageUrl); }
+        catch (error) { alert(error instanceof Error ? error.message : "Image download failed."); }
+    };
 
     return (
         <div className="flex flex-col h-full w-full mx-auto overflow-hidden relative">

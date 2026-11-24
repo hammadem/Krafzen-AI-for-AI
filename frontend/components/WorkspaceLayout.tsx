@@ -1,4 +1,5 @@
 "use client";
+import { downloadRasterImage } from "@/lib/downloadRasterImage";
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/context/ChatContext';
 import { useAuth } from '@/context/AuthContext';
@@ -219,39 +220,8 @@ export default function WorkspaceLayout() {
   }, [messages.length, currentSessionId]);
 
   const handleDownloadMessageImage = async (imageUrl: string) => {
-    try {
-        let blob: Blob;
-        try {
-            const response = await fetch(imageUrl);
-            if (response.ok) {
-                blob = await response.blob();
-            } else {
-                throw new Error("Direct fetch failed");
-            }
-        } catch (e) {
-            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Proxy fetch failed");
-            blob = await response.blob();
-        }
-
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `design-${new Date().getTime()}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-    } catch (error) {
-        console.error("Download failed:", error);
-        const link = document.createElement('a');
-        link.href = imageUrl;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
+      try { await downloadRasterImage(imageUrl); }
+      catch (error) { alert(error instanceof Error ? error.message : "Image download failed."); }
   };
 
   // Compliance & Generation toggles

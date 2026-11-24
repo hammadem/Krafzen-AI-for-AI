@@ -10,7 +10,9 @@ export function getApiBaseUrl(): string {
     const h = window.location.hostname;
     if (h === "krafzen.com" || h === "www.krafzen.com") return "https://backend.krafzen.com";
     if (h === "staging.krafzen.com" || h === "www.staging.krafzen.com") return "https://backend.staging.krafzen.com";
-    return "http://localhost:8000";
+    if (h === "krafzen-integration-ui.onrender.com") return "https://krafzen-integration-staging.onrender.com";
+    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]") return "http://localhost:8000";
+    throw new Error("API URL is not configured for this deployment.");
 }
 
 export async function apiClient(
@@ -38,9 +40,8 @@ export async function apiClient(
         "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     };
 
-    const baseUrl = getApiBaseUrl();
-
     try {
+        const baseUrl = getApiBaseUrl();
         const response = await fetch(`${baseUrl}${url}`, {
             method,
             headers,
@@ -50,10 +51,13 @@ export async function apiClient(
                     body: body instanceof FormData ? body : JSON.stringify(body)
                 }
                 : {}),
-            ...(controller ? { signal: controller.signal } : {}),
+            cache: "no-store",
+            ...(controller ? { signal: controller.signal } : {signal: AbortSignal.timeout(120000)}),
         });
 
-        const data = await response.json();
+        let data;
+        try { data = await response.json(); }
+        catch { return {ok:false,data:null,error:{type:"APIERROR",message:"The service returned an invalid response ("+response.status+")."}}; }
 
         let result: ApiRes;
         if (response.ok) {
