@@ -141,9 +141,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 };
                 useChatStore.getState().setSessions(sessions);
                 const id = records[0]?.id;
-                if (!id || !paid || !storeSessions[id]) return;
-        const generation = epoch.current;
-        loadingSession.current = id;
+                if (!id) return;
                 const res = await fetchSessionMessages(id, token, 30);
                 if (generation !== epoch.current || currentIdentity.current !== identity) return;
                 useChatStore.getState().setSessionMessages(id, res.messages.map(m => ({
@@ -164,7 +162,9 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
     }, [identity]);
 
     const handleSwitchSession = async (id: string | null) => {
-        if (!id) return;
+        if (!id || !paid || !storeSessions[id]) return;
+        const generation = epoch.current;
+        loadingSession.current = id;
         
         // Switch to the session immediately (Instant cache display)
         switchSession(id);
@@ -201,6 +201,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
 
     const loadMoreMessages = async () => {
         if (!activeSessionId || !activeSession?.hasMore || !user?.access_token) return;
+        const generation = epoch.current;
         const cursor = activeSession.nextCursor || activeSession.messages[0]?.id;
         if (!cursor) return;
 
@@ -215,7 +216,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 feedback: m.feedback,
                 compliance: m.compliance ?? undefined,
             }));
-            useChatStore.getState().prependMessages(activeSessionId, storeMessages, res.has_more, res.next_cursor);
+            if (generation === epoch.current && currentIdentity.current === identity) useChatStore.getState().prependMessages(activeSessionId, storeMessages, res.has_more, res.next_cursor);
         } catch (err) {
             console.error("Failed to load older messages:", err);
         }
