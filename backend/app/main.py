@@ -75,10 +75,17 @@ async def lifespan(app: FastAPI):
 
     # 2. Check Supabase JWT environment
     if not (getattr(settings, "SUPABASE_JWT_SECRET", None) or "").strip():
-        logger.warning(
-            "SUPABASE_JWT_SECRET is not set. Authenticated API calls will return 401. "
-            "Set SUPABASE_JWT_SECRET (and SUPABASE_PROJECT_ID) on Render to match your Supabase project."
-        )
+        if (getattr(settings, "SUPABASE_ANON_KEY", None) or "").strip():
+            logger.info(
+                "Legacy user tokens will be verified by Supabase Auth over HTTPS; "
+                "asymmetric sessions use the project's public JWKS."
+            )
+        else:
+            logger.warning(
+                "Supabase authentication has neither a legacy JWT secret nor "
+                "a public key for HTTPS Auth-server verification. Private API "
+                "access will fail closed."
+            )
     if not (getattr(settings, "SUPABASE_PROJECT_ID", None) or "").strip():
         logger.warning(
             "SUPABASE_PROJECT_ID is not set. JWT issuer check will fail; authenticated calls may return 401. "
