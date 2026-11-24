@@ -147,6 +147,7 @@ export default function LoginWithCred() {
                             </Link>
                         </p>
 
+                        <Link href="/resend-verification" className="text-white underline">Resend verification email</Link>
                         <p>Forgot Password? {" "}
                             <Link
                                 href="/forgot"
