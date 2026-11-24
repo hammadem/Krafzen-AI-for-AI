@@ -1,44 +1,102 @@
-"""JWT and password security utilities."""
+"""Supabase access-token verification and password security utilities.
+
+User-controlled JWT claims must never authorize paid plans or private project
+files until verified against the configured Supabase issuer and signing key.
+"""
+import logging
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
+from urllib.parse import urlsplit
 
 import jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_ASYMMETRIC_ALGORITHMS = frozenset({"RS256", "ES256", "EdDSA"})
+_TOKEN_AUDIENCE = "authenticated"
+_REQUIRED_CLAIMS = ["exp", "iat", "iss", "sub", "aud"]
+
+
+def _trusted_issuer() -> str | None:
+    """Only operator-configured Supabase hosts may be used as JWT issuers/JWKS."""
+    raw = str(settings.SUPABASE_URL or "").rstrip("/")
+    try:
+        parsed = urlsplit(raw)
+        if (not parsed.hostname or not parsed.netloc or parsed.username
+                or parsed.password or parsed.query or parsed.fragment
+                or parsed.path not in ("", "/")):
+            return None
+        local = (parsed.hostname in {"127.0.0.1", "localhost"}
+                 and (settings.ENVIRONMENT or "").lower() in {"development", "test"})
+        if parsed.scheme != "https" and not (local and parsed.scheme == "http"):
+            return None
+    except (ValueError, TypeError):
+        return None
+    return raw + "/auth/v1"
+
+
+@lru_cache(maxsize=8)
+def _jwks_client(issuer: str) -> jwt.PyJWKClient:
+    # The URL originates exclusively from _trusted_issuer(), never token claims.
+    # Cache the JWKS for 5 minutes; support timely signing-key revocation.
+    return jwt.PyJWKClient(
+        issuer + "/.well-known/jwks.json",
+        cache_jwk_set=True,
+        lifespan=300,
+        timeout=5,
+    )
 
 
 def decode_supabase_token(token: str):
-    import logging
-    logger = logging.getLogger(__name__)
+    """Return only verified Supabase authenticated-user claims, or None.
+
+    Legacy HS256 requires the operator's actual JWT signing secret; asymmetric
+    Supabase signing keys are discovered from the trusted project's JWKS. Never
+    allow 'none' or algorithm confusion, an unsigned decode, missing expiry,
+    wrong issuer/audience, or a service-role token.
+    """
+    issuer = _trusted_issuer()
+    if not issuer or not isinstance(token, str) or not 1 <= len(token) <= 8192:
+        return None
     try:
-        # PyJWT decode
-        payload = jwt.decode(
+        header = jwt.get_unverified_header(token)
+        algorithm = header.get("alg")
+        if algorithm == "HS256":
+            signing_key = settings.SUPABASE_JWT_SECRET
+            if not signing_key:
+                return None
+        elif algorithm in _ASYMMETRIC_ALGORITHMS:
+            signing_key = _jwks_client(issuer).get_signing_key_from_jwt(token).key
+        else:
+            return None
+
+        claims = jwt.decode(
             token,
-            settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False, "verify_signature": False}
+            signing_key,
+            algorithms=[algorithm],
+            audience=_TOKEN_AUDIENCE,
+            issuer=issuer,
+            leeway=30,
+            options={
+                "verify_signature": True,
+                "verify_exp": True,
+                "verify_iat": True,
+                "verify_aud": True,
+                "verify_iss": True,
+                "require": _REQUIRED_CLAIMS,
+            },
         )
-        return payload
-    except (jwt.PyJWTError, TypeError, ValueError) as e:
-        logger.exception("JWT decode error")
-        # Hint when signature verification fails: secret must match the Supabase project that issued the token
-        if "Signature verification failed" in str(e) or "signature" in str(e).lower():
-            try:
-                unverified = jwt.decode(token, options={"verify_signature": False})
-                iss = unverified.get("iss", "")
-                logger.warning(
-                    "JWT signature verification failed. Ensure SUPABASE_JWT_SECRET on this service "
-                    "matches the JWT Secret of the Supabase project that issued the token (same project "
-                    "as the frontend's NEXT_PUBLIC_SUPABASE_URL). Token iss=%s",
-                    iss,
-                )
-            except (jwt.PyJWTError, TypeError, ValueError):
-                logger.warning(
-                    "JWT signature verification failed. Set SUPABASE_JWT_SECRET on this service "
-                    "to the JWT Secret from Supabase Dashboard → Project Settings → API.",
-                )
+        if (not isinstance(claims, dict) or claims.get("role") != "authenticated"
+                or not isinstance(claims.get("sub"), str)
+                or not claims["sub"].strip()):
+            return None
+        return claims
+    except (jwt.PyJWTError, jwt.PyJWKClientError, TypeError, ValueError, OSError):
+        # No token contents, secret, unverified issuer or provider exception in logs.
+        logger.warning("Supabase access token verification failed")
         return None
 
 
@@ -46,13 +104,7 @@ def create_access_token(data: dict, expires_minutes: int = 30):
     to_encode = data.copy()
     expire = datetime.now(UTC) + timedelta(minutes=expires_minutes)
     to_encode.update({"exp": expire})
-
-    encoded_jwt = jwt.encode(
-        to_encode,
-        settings.SECRET_KEY,   
-        algorithm="HS256"
-    )
-    return encoded_jwt
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm="HS256")
 
 
 def verify_password(plain_password, hashed_password):
