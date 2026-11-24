@@ -151,7 +151,17 @@ export default function RoomCadPage() {
             if (!response.ok) throw new Error(response.error?.message || "Private drawing unavailable");
             const info = response.data as unknown as { signed_url?: string };
             const uri = new URL(info.signed_url || "");
-            if (uri.protocol !== "https:") throw new Error("Unsafe download URL");
+            // HTTPS remains mandatory on hosted deployments. The disposable
+            // local Supabase stack uses HTTP; allow only its exact configured
+            // origin when this browser is also running on loopback.
+            const loopback = (host: string) => host === "localhost" || host === "127.0.0.1";
+            const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
+            const localStorage = configured ? new URL(configured) : null;
+            const localQA = uri.protocol === "http:" && loopback(window.location.hostname) &&
+                loopback(uri.hostname) && localStorage?.origin === uri.origin;
+            if (uri.username || uri.password || (uri.protocol !== "https:" && !localQA)) {
+                throw new Error("Unsafe download URL");
+            }
             setDownload(uri.toString());
         } catch (reason) {
             setError(reason instanceof Error ? reason.message : "Private drawing unavailable");
