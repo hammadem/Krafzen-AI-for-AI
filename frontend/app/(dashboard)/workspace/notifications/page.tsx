@@ -3,6 +3,7 @@ import { Bell, RefreshCw, AlertCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getDashboardNotifications, markNotificationRead } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
+import NotificationPreferences from "@/components/NotificationPreferences";
 import { useApiResource } from "@/hooks/useApiResource";
 
 // Wired to Tazwar's endpoint (dashboard_routes.py)
@@ -78,6 +79,7 @@ function NotificationInbox() {
                     <label className="flex items-center gap-2"><input type="checkbox" checked={unreadOnly} disabled={isLoading || !!pending} onChange={(e) => { setUnreadOnly(e.target.checked); changePage(0); }} /> Unread only</label>
                     <button type="button" disabled={isLoading || !!pending} onClick={refetch} className="underline">Refresh notifications</button>
                 </div>
+                <NotificationPreferences user={user} onReadAll={()=>{setOffset(0);refetch();}}/>
                 {markError && <p role="alert" className="text-red-300 text-sm">{markError}</p>}
 
                 {/* Error state */}

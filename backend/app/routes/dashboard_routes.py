@@ -456,6 +456,11 @@ _NOTIFICATION_TYPES = {
     "import_completed": ("Import completed", "success"),
     "project_invitation": ("Project invitation", "info"),
     "member_joined": ("Member joined", "info"),
+    "project_assignment": ("Project assignment", "info"),
+    "field_update": ("Field observation", "info"),
+    "review_update": ("Drawing review", "info"),
+    "compliance_update": ("Compliance screening saved", "warning"),
+    "bim_validation": ("IFC validation saved", "info"),
 }
 
 
