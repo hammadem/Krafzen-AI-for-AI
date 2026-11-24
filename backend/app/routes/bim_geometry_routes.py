@@ -299,3 +299,70 @@ async def list_project_ifc_spatial_screens(
     except Exception as exc:
         raise HTTPException(status_code=503, detail="BIM screening history unavailable") from exc
     return rows.data if rows and rows.data else []
+
+
+def _run_model_validation(raw: bytes) -> dict:
+    if len(raw) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="IFC model exceeds the 20 MB validation budget")
+    if not raw.lstrip().startswith(b"ISO-10303-21;") or b"END-ISO-10303-21;" not in raw[-256:]:
+        raise HTTPException(status_code=422, detail="Invalid IFC STEP document")
+    if importlib.util.find_spec("ifcopenshell") is None:
+        raise HTTPException(status_code=503, detail="IFC validation engine unavailable")
+    with tempfile.TemporaryDirectory(prefix="krafzen-ifc-validation-") as folder:
+        source = Path(folder) / "source.ifc"
+        source.write_bytes(raw)
+        try:
+            process = subprocess.run(
+                [sys.executable, "-m", "app.services.ifc_model_validation", str(source)],
+                capture_output=True, check=False, timeout=90,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise HTTPException(status_code=503, detail="IFC model validation timed out") from exc
+    if process.returncode != 0 or len(process.stdout) > MAX_MESH_JSON_BYTES:
+        raise HTTPException(status_code=422, detail="IFC validation could not finish within supported limits")
+    try:
+        result = json.loads(process.stdout)
+    except (ValueError, UnicodeError) as exc:
+        raise HTTPException(status_code=503, detail="IFC validation evidence unreadable") from exc
+    if not isinstance(result,dict) or result.get("method") != "ifcopenshell_source_validation_v1":
+        raise HTTPException(status_code=503, detail="IFC validation evidence missing")
+    return result
+
+
+@router.post("/files/{file_id}/validations", status_code=201)
+async def create_model_validation(file_id: UUID, user: dict = Depends(require_auth)):
+    if _coordination_slot.locked():
+        raise HTTPException(status_code=429, detail="Another IFC calculation is running")
+    async with _coordination_slot:
+        project_id, raw = await _read_verified_ifc(file_id, user)
+        result = await run_in_threadpool(_run_model_validation, raw)
+    row = {
+        "project_id": project_id, "file_id": str(file_id),
+        "created_by": user["user_id"], "source_sha256": sha256(raw).hexdigest(),
+        "result": result,
+    }
+    try:
+        saved = await run_in_threadpool(lambda: db.table("bim_model_validations").insert(row).execute())
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Model validation could not be saved") from exc
+    if not saved or not saved.data:
+        raise HTTPException(status_code=503, detail="Model validation was not persisted")
+    return saved.data[0]
+
+
+@router.get("/files/{file_id}/validations")
+async def list_model_validations(file_id: UUID, user: dict = Depends(require_auth)):
+    record = await get_file(str(file_id), user)
+    if not record or str(record.get("file_type","")).lower() != "ifc":
+        raise HTTPException(status_code=404, detail="IFC model not found")
+    pid = str(record.get("project_id") or "")
+    project = await get_project(pid,user)
+    if not project or project.get("workspace_id"):
+        raise HTTPException(status_code=404, detail="Verified project not found")
+    try:
+        rows = await run_in_threadpool(lambda: db.table("bim_model_validations")
+            .select("*").eq("file_id",str(file_id)).eq("project_id",pid)
+            .eq("created_by",user["user_id"]).order("created_at",desc=True).limit(5).execute())
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Model validation history unavailable") from exc
+    return rows.data if rows and rows.data else []

@@ -612,6 +612,13 @@ export async function createIfcRevisionComparison(user: User | null, projectId: 
     });
 }
 
+export async function runIfcModelValidation(user: User | null, fileId: string) {
+    return apiClient("POST", `/api/v1/bim/files/${encodeURIComponent(fileId)}/validations`, user, {});
+}
+export async function getIfcModelValidations(user: User | null, fileId: string) {
+    return apiClient("GET", `/api/v1/bim/files/${encodeURIComponent(fileId)}/validations`, user);
+}
+
 export async function getIfcSpatialScreens(user: User | null, projectId: string) {
     return apiClient(
         "GET", `/api/v1/bim/projects/${encodeURIComponent(projectId)}/spatial-screens`,
