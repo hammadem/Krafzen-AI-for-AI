@@ -114,11 +114,9 @@ export default function SetNewPassword() {
           <p>Your Password must include:</p>
           <ul className="list-disc list-inside">
             <li>At least 8 characters</li>
-            <li>At least 1 uppercase letter (A - Z)</li>
-            <li>At least 1 lowercase letter (A - Z)</li>
-            <li>At least 1 number (0 - 9)</li>
-            <li>At least 1 special character (e.g. ! @ # $ % ^ &)</li>
-            <li>No spaces</li>
+            <li>At most 72 UTF-8 bytes</li>
+            <li>Confirmation must match</li>
+            <li>Any additional password policy enforced by the authentication server</li>
           </ul>
         </span>
 
