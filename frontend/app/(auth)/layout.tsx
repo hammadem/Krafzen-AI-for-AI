@@ -13,7 +13,7 @@ export default function AuthLayout({
 
   useEffect(() => {
     if (!loading && user) {
-      router.push("/");
+      router.replace("/auth/callback");
     }
   }, [user, loading, router]);
 
@@ -26,7 +26,7 @@ export default function AuthLayout({
   }
 
   if (user) {
-    return null; // Or a loading spinner while redirecting
+    return <div role="status" className="flex h-screen items-center justify-center">Verifying account access…</div>;
   }
 
   return <>
