@@ -79,7 +79,10 @@ async def readiness_check():
     from app.services.dwg_converter_service import dwg_converter_service
     dwg_ready = bool(dwg_converter_service.is_configured())
     # A working web server does not imply imports can scan customer files.
-    scanner = await run_in_threadpool(scanner_status)
+    try:
+        scanner = await run_in_threadpool(scanner_status)
+    except Exception:
+        scanner = {"scanner_binary_detected": False, "scanner_signature_metadata_current": False}
     scanner_detected = scanner["scanner_binary_detected"]
     ifc_parser_installed = importlib.util.find_spec("ifcopenshell") is not None
     potrace_detected = bool(shutil.which("potrace"))
@@ -94,7 +97,8 @@ async def readiness_check():
         "activity_audit_schema": ("activity_events", "event_id,action,entity_type,entity_id,file_id,organization_id,workspace_id,timestamp"),
         "paid_webhook_ledger_schema": ("payment_webhook_events", "event_id"),
         "paid_subscription_schema": ("user_subscriptions", "last_paid_at"),
-        "project_archive_schema": ("projects", "archived_at,title,description,project_type,lifecycle_stage"),
+        "project_archive_schema": ("projects", "archived_at"),
+        "project_metadata_schema": ("projects", "title,description,project_type,lifecycle_stage"),
         "field_notes_schema": ("field_observation_notes", "id,inspection_id,kind,body"),
         "asbuilt_comparison_schema": ("asbuilt_comparisons", "id"),
         "drawing_redline_schema": ("drawing_redlines", "id"),

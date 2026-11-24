@@ -24,6 +24,8 @@ REQUIRED = {
     "paid_webhook_ledger_schema": ("payment_webhook_events", "event_id"),
     "paid_subscription_schema": ("user_subscriptions", "last_paid_at"),
     "project_archive_schema": ("projects", "archived_at"),
+    "project_metadata_schema": ("projects", "title,description,project_type,lifecycle_stage"),
+    "field_notes_schema": ("field_observation_notes", "id,inspection_id,kind,body"),
     "asbuilt_comparison_schema": ("asbuilt_comparisons", "id"),
     "drawing_redline_schema": ("drawing_redlines", "id"),
     "field_inspection_schema": ("field_inspections", "id"),
