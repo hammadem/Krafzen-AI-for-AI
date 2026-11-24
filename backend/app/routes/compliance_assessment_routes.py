@@ -2,7 +2,7 @@
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
@@ -12,6 +12,7 @@ from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.services.ada_measurement_rules import evaluate_ada_measurements
 from app.services.building_code_measurement_rules import evaluate_building_code_measurements
+from app.services.compliance_pdf_service import build_compliance_pdf
 
 router = APIRouter(prefix="/compliance", tags=["Measured Compliance"])
 
@@ -223,3 +224,19 @@ async def create_building_code_measurement_assessment(
     if not response or not response.data:
         raise HTTPException(status_code=503, detail="Code assessment was not persisted")
     return response.data[0]
+
+
+@router.get("/assessments/{assessment_id}/report.pdf")
+async def download_compliance_report(
+    assessment_id: UUID, user: dict = Depends(require_auth),
+):
+    record = await get_ada_measurement_assessment(assessment_id, user=user)
+    try:
+        pdf = await run_in_threadpool(build_compliance_pdf, record)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="Assessment evidence is incomplete or inconsistent") from exc
+    return Response(content=pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="compliance-{assessment_id}.pdf"',
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
