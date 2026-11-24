@@ -768,3 +768,33 @@ export async function getFieldReportPdf(user: User | null, projectId: string): P
     }
     return bytes;
 }
+
+
+export async function getComplianceReportPdf(
+    user: User | null,
+    assessmentId: string
+): Promise<Blob> {
+    if (!user?.access_token) throw new Error("Authentication required");
+    const response = await fetch(
+        `${getApiBaseUrl().replace(/\/$/, "")}/api/v1/compliance/assessments/${encodeURIComponent(assessmentId)}/report.pdf`,
+        {
+            headers: {
+                Authorization: `Bearer ${user.access_token}`,
+                apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+                Accept: "application/pdf",
+            },
+            cache: "no-store",
+        }
+    );
+    if (!response.ok) {
+        throw new Error("Saved compliance PDF is unavailable or access was denied");
+    }
+    if (!response.headers.get("content-type")?.includes("application/pdf")) {
+        throw new Error("Server did not return a PDF");
+    }
+    const blob = await response.blob();
+    if (!blob.size || blob.size > 5 * 1024 * 1024) {
+        throw new Error("Compliance PDF has an invalid size");
+    }
+    return blob;
+}
