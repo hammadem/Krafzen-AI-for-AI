@@ -55,8 +55,9 @@ def main():
         output.write_text(json.dumps({"scope": "isolated real Chromium frontend acceptance; local QA entitlement", "checks": evidence}, indent=2))
         print("BROWSER PASS: " + step, flush=True)
     def account(paid=False):
-        email = "browser-qa-" + secrets.token_hex(8) + "@example.com"
-        password = "Qa!" + secrets.token_urlsafe(25) + "9a"
+        email = "bqa-" + secrets.token_hex(5) + "@example.com"
+        password = "Qa!" + secrets.token_urlsafe(16) + "9a"
+        assert len(email) <= 32 and 8 <= len(password) <= 32, "QA credentials must satisfy the existing form schema"
         r = requests.post(supabase+"/auth/v1/admin/users",
           headers={"apikey":role,"Authorization":"Bearer "+role},
           json={"email":email,"password":password,"email_confirm":True},timeout=20)
