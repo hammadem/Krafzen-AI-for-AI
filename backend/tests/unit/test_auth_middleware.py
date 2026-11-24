@@ -86,6 +86,7 @@ async def test_rejects_missing_expiry_and_missing_audience():
 @pytest.mark.asyncio
 async def test_missing_signing_secret_fails_closed(monkeypatch):
     monkeypatch.setattr(settings, "SUPABASE_JWT_SECRET", "")
+    monkeypatch.setattr(settings, "SUPABASE_ANON_KEY", "")
     with pytest.raises(HTTPException) as error:
         await require_auth(f"Bearer {_jwt()}")
     assert error.value.status_code == 401
@@ -134,3 +135,80 @@ async def test_asymmetric_token_forged_by_other_key_is_denied(monkeypatch):
 def test_unsigned_claims_are_never_returned_as_verified_claims():
     forged = jwt.encode(_claims(), "attacker-secret", algorithm="HS256")
     assert decode_supabase_token(forged) is None
+
+
+@pytest.mark.asyncio
+async def test_auth_server_verifies_legacy_hs256_without_shared_secret(monkeypatch):
+    monkeypatch.setattr(settings, "SUPABASE_JWT_SECRET", "")
+    monkeypatch.setattr(settings, "SUPABASE_ANON_KEY", "public-ci-anon-key")
+    token = _jwt()
+    response = SimpleNamespace(status_code=200, json=lambda: {
+        "id": "provider-verified-user", "aud": "authenticated",
+        "role": "authenticated",
+    })
+    with patch("app.core.security.httpx.get", return_value=response) as auth:
+        assert await require_auth(f"Bearer {token}") == {
+            "user_id": "provider-verified-user"
+        }
+    auth.assert_called_once_with(
+        ISSUER + "/user",
+        headers={
+            "apikey": "public-ci-anon-key",
+            "Authorization": "Bearer " + token,
+            "Accept": "application/json",
+        },
+        timeout=5.0,
+        follow_redirects=False,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("response", [
+    SimpleNamespace(status_code=401),
+    SimpleNamespace(status_code=200, json=lambda: {"id": ""}),
+    SimpleNamespace(status_code=200, json=lambda: {
+        "id": "some-user", "role": "service_role",
+    }),
+    SimpleNamespace(status_code=200, json=lambda: {
+        "id": "some-user", "aud": "anon",
+    }),
+])
+async def test_remote_auth_denial_or_invalid_user_fails_closed(monkeypatch, response):
+    monkeypatch.setattr(settings, "SUPABASE_JWT_SECRET", "")
+    monkeypatch.setattr(settings, "SUPABASE_ANON_KEY", "public-ci-anon-key")
+    with patch("app.core.security.httpx.get", return_value=response):
+        with pytest.raises(HTTPException) as error:
+            await require_auth(f"Bearer {_jwt()}")
+    assert error.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_remote_auth_network_failure_never_allows_unverified_token(monkeypatch):
+    monkeypatch.setattr(settings, "SUPABASE_JWT_SECRET", "")
+    monkeypatch.setattr(settings, "SUPABASE_ANON_KEY", "public-ci-anon-key")
+    import httpx
+    with patch("app.core.security.httpx.get",
+               side_effect=httpx.ConnectError("provider unavailable")):
+        with pytest.raises(HTTPException) as error:
+            await require_auth(f"Bearer {_jwt()}")
+    assert error.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_signed_hs256_with_configured_secret_never_uses_remote_provider(monkeypatch):
+    monkeypatch.setattr(settings, "SUPABASE_ANON_KEY", "public-ci-anon-key")
+    with patch("app.core.security.httpx.get") as provider:
+        assert await require_auth(f"Bearer {_jwt()}") == {"user_id": "user-123"}
+    provider.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bad_project_url_never_sends_token_to_external_provider(monkeypatch):
+    monkeypatch.setattr(settings, "SUPABASE_JWT_SECRET", "")
+    monkeypatch.setattr(settings, "SUPABASE_ANON_KEY", "public-ci-anon-key")
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://example.test.evil/?redirect=1")
+    with patch("app.core.security.httpx.get") as provider:
+        with pytest.raises(HTTPException) as error:
+            await require_auth(f"Bearer {_jwt()}")
+    assert error.value.status_code == 401
+    provider.assert_not_called()

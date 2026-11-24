@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from urllib.parse import urlsplit
 
+import httpx
 import jwt
 from passlib.context import CryptContext
 
@@ -50,11 +51,58 @@ def _jwks_client(issuer: str) -> jwt.PyJWKClient:
     )
 
 
+
+def _verify_hs256_with_auth_server(token: str, issuer: str):
+    """Ask the original Supabase Auth service to validate legacy user tokens.
+
+    Supabase recommends this method over distributing shared JWT secrets.
+    The returned identity comes from the Auth server's verified response,
+    *not* from untrusted token claims or headers. No redirects allowed.
+    """
+    public_key = str(settings.SUPABASE_ANON_KEY or "").strip()
+    if not public_key:
+        return None
+    try:
+        response = httpx.get(
+            issuer + "/user",
+            headers={
+                "apikey": public_key,
+                "Authorization": "Bearer " + token,
+                "Accept": "application/json",
+            },
+            timeout=5.0,
+            follow_redirects=False,
+        )
+        if response.status_code != 200:
+            return None
+        user = response.json()
+        if not isinstance(user, dict):
+            return None
+        uid = user.get("id")
+        if not isinstance(uid, str) or not uid.strip():
+            return None
+        if user.get("aud", "authenticated") != "authenticated":
+            return None
+        if user.get("role", "authenticated") != "authenticated":
+            return None
+        return {
+            "sub": uid,
+            "role": "authenticated",
+            "aud": "authenticated",
+            "iss": issuer,
+            "verified_by": "supabase_auth_server",
+        }
+    except (httpx.HTTPError, ValueError, TypeError):
+        logger.warning("Supabase Auth server unavailable for JWT verification")
+        return None
+
+
 def decode_supabase_token(token: str):
     """Return only verified Supabase authenticated-user claims, or None.
 
-    Legacy HS256 requires the operator's actual JWT signing secret; asymmetric
-    Supabase signing keys are discovered from the trusted project's JWKS. Never
+    Legacy HS256 is verified either with the operator's signing secret or
+    directly by the trusted Supabase Auth server; asymmetric signing keys
+    are discovered from the configured project's public JWKS. Never
     allow 'none' or algorithm confusion, an unsigned decode, missing expiry,
     wrong issuer/audience, or a service-role token.
     """
@@ -67,7 +115,9 @@ def decode_supabase_token(token: str):
         if algorithm == "HS256":
             signing_key = settings.SUPABASE_JWT_SECRET
             if not signing_key:
-                return None
+                # Verification still occurs at Supabase Auth. Never accept
+                # unsigned claims as a workaround for missing legacy secret.
+                return _verify_hs256_with_auth_server(token, issuer)
         elif algorithm in _ASYMMETRIC_ALGORITHMS:
             signing_key = _jwks_client(issuer).get_signing_key_from_jwt(token).key
         else:

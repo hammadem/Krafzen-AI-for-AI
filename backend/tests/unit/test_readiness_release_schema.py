@@ -172,3 +172,32 @@ def test_missing_security_rpc_never_passes_release(client, monkeypatch):
     assert all(response.json()["dependencies"][check] == "unavailable"
                for check in SECURITY)
     assert "internal database secret" not in response.text
+
+
+
+def test_readiness_recognizes_legacy_public_key_remote_auth(client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "SUPABASE_PROJECT_ID", "trusted-project")
+    monkeypatch.setattr(settings, "SUPABASE_URL", "https://trusted-project.supabase.co")
+    monkeypatch.setattr(settings, "SUPABASE_JWT_SECRET", "")
+    monkeypatch.setattr(settings, "SUPABASE_ANON_KEY", "public-ci-anon-key")
+    with patch("app.api.health.supabase_service.test_connection",
+               return_value={"connected": False}):
+        response = client.get("/health/ready")
+    assert response.status_code == 503  # No DB/provider readiness is asserted.
+    assert response.json()["dependencies"]["authentication"] == "ready"
+
+
+def test_readiness_rejects_unsafe_issuer_even_with_public_key(client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "SUPABASE_PROJECT_ID", "trusted-project")
+    monkeypatch.setattr(settings, "SUPABASE_URL", "http://remote-untrusted.example")
+    monkeypatch.setattr(settings, "SUPABASE_JWT_SECRET", "")
+    monkeypatch.setattr(settings, "SUPABASE_ANON_KEY", "public-ci-anon-key")
+    with patch("app.api.health.supabase_service.test_connection",
+               return_value={"connected": False}):
+        response = client.get("/health/ready")
+    assert response.status_code == 503
+    assert response.json()["dependencies"]["authentication"] == "unavailable"

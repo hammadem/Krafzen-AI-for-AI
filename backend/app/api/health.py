@@ -15,6 +15,7 @@ from httpx import HTTPError
 from postgrest.exceptions import APIError
 
 from app.core.config import settings
+from app.core.security import _trusted_issuer
 from app.db.supabase_client import db
 from app.services.supabase_service import supabase_service
 
@@ -46,10 +47,15 @@ async def readiness_check():
     Unlike /health, which is a liveness probe, /health/ready indicates
     deployment readiness. Never include credentials or connection errors.
     """
-    auth_ready = all((
-        settings.SUPABASE_PROJECT_ID,
-        settings.SUPABASE_JWT_SECRET,
-    ))
+    # The backend accepts either a securely configured legacy JWT secret or
+    # the project's PUBLIC anon key for server-side /auth/v1/user verification.
+    # Asymmetric JWTs are verified against the project's trusted JWKS.
+    # This checks identity configuration, not successful customer sign-in.
+    auth_ready = bool(
+        settings.SUPABASE_PROJECT_ID
+        and _trusted_issuer()
+        and (settings.SUPABASE_JWT_SECRET or settings.SUPABASE_ANON_KEY)
+    )
     database_configured = bool(settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY)
     database_ready = False
     if database_configured:
