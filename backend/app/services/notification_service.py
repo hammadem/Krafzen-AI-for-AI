@@ -23,6 +23,7 @@ VALID_NOTIFICATION_TYPES = {
     "export_failed",
     "export_requires_review",
     "validation_update",
+    "import_completed",
 }
 
 
