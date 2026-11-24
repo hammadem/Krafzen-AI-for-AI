@@ -39,6 +39,7 @@ from app.routes import (
     review_routes,
     user_routes,
     workspace_routes,
+    assignment_routes,
 )
 from app.middlewares.paid_access import require_paid_subscription
 from app.services.worker_service import _poll_export_jobs
@@ -233,6 +234,7 @@ app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"], dependencies=paid_access)
 app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"], dependencies=paid_access)
 app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"], dependencies=paid_access)
+app.include_router(assignment_routes.router, prefix="/api/v1", tags=["Project assignments"], dependencies=paid_access)
 app.include_router(activity_routes.router, prefix="/api/v1", tags=["Activity"], dependencies=paid_access)
 app.include_router(notification_routes.router, prefix="/api/v1", tags=["Notifications"], dependencies=paid_access)
 app.include_router(export_validation_routes.router, prefix="/api/v1", tags=["Export Validation"], dependencies=paid_access)
