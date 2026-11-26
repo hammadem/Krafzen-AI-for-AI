@@ -15,6 +15,7 @@ import {
     removeWorkspaceMember,
     createInvite,
     revokeInvite,
+    resendWorkspaceInviteEmail,
 } from "@/lib/api/api";
 import InviteForm from "@/components/members/InviteForm";
 import PendingInvites from "@/components/members/PendingInvites";
@@ -82,7 +83,7 @@ export default function MemberManagement({ workspaceId, canManage = true }: { wo
             if (ok && data) {
                 const invite = data as unknown as WorkspaceInvite;
                 setInvites((prev) => [invite, ...prev.filter(i => i.id !== invite.id)]);
-                toast.dark("Invitation created. Copy the code and share it privately.");
+                toast.dark(invite.email_delivery === "provider_accepted" ? "Invitation email accepted by the mail provider." : "Invitation saved. Email not confirmed; retry or share the code privately.");
                 return true;
             }
             toast.dark(apiError?.message || "Could not send the invite.");
@@ -108,6 +109,14 @@ export default function MemberManagement({ workspaceId, canManage = true }: { wo
         }
     }, []);
 
+    const handleEmail = (id: string) => change(async () => {
+        const response = await resendWorkspaceInviteEmail(user, workspaceId, id);
+        if (response.ok) {
+            const state = (response.data as unknown as {email_delivery?: string})?.email_delivery;
+            toast.dark(state === "provider_accepted" ? "Email accepted by provider (inbox delivery not confirmed)." : `Email not sent or not confirmed: ${state || "unknown"}.`);
+        }
+        return response;
+    }, refetchInvites, "Could not send invitation email.");
     const handleRevoke = (id: string) => change(() => revokeInvite(user, workspaceId, id), refetchInvites, "Could not revoke invitation.");
     const handleRoleChange = (id: string, role: string) => change(() => updateMemberRole(user, workspaceId, id, role), refetch, "Could not update role.");
     const handleRemove = (id: string) => change(() => removeWorkspaceMember(user, workspaceId, id), refetch, "Could not remove member.");
@@ -115,9 +124,9 @@ export default function MemberManagement({ workspaceId, canManage = true }: { wo
     return (
         <div className="flex flex-col gap-5">
             {canManage && <><InviteForm onInvite={handleInvite} />
-            <p className="text-xs text-slate-400">Invitations are not emailed automatically. Share the code privately with the intended email account.</p>
+            <p className="text-xs text-slate-400">Email is submitted when configured. Provider acceptance is not proof of inbox delivery; use the retry action or share the code privately if needed.</p>
             {invitesError && <p role="alert">{inviteError?.message || "Could not load invitations."} <button onClick={refetchInvites} className="underline">Retry</button></p>}
-            <fieldset disabled={changing}><PendingInvites invites={pendingInvites} onRevoke={handleRevoke} /></fieldset>
+            <fieldset disabled={changing}><PendingInvites invites={pendingInvites} onRevoke={handleRevoke} onEmail={handleEmail} /></fieldset>
             {!!invites.filter(i=>!pendingInvites.includes(i)).length && <details className="rounded-lg border border-white/10 p-3"><summary className="cursor-pointer text-sm">Invitation history</summary>{invites.filter(i=>!pendingInvites.includes(i)).map(i=><div key={i.id} className="flex flex-wrap justify-between gap-2 py-2 text-xs border-b border-white/10"><span>{i.email} · {i.role}</span><span>{i.status === "revoked" ? "Invalidated — revoked or declined" : i.status === "pending" ? "Expired" : i.status}</span></div>)}<p className="text-xs text-slate-400">The activity timeline records who revoked or declined an invitation.</p></details>}</>}
 
             {/* Members */}
