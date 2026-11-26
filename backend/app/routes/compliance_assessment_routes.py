@@ -315,3 +315,41 @@ async def save_multidiscipline_assessment(body: MultidisciplineAssessment,user: 
     if not response or not response.data:
         raise HTTPException(status_code=503,detail="Assessment was not persisted")
     return response.data[0]
+
+
+class ReviewDeclaration(BaseModel):
+    disposition: Literal["reviewed","rejected"]
+    reviewer_name: str = Field(min_length=2,max_length=150)
+    reviewer_credential: str = Field(min_length=2,max_length=250)
+    review_reference: str = Field(min_length=3,max_length=300)
+    notes: str = Field(min_length=10,max_length=2000)
+    record_is_reviewer_supplied: bool = False
+
+@router.post("/assessments/{assessment_id}/review")
+async def record_review_declaration(assessment_id: UUID, body: ReviewDeclaration,user: dict=Depends(require_auth)):
+    """Append a single review declaration; never certify a professional license."""
+    from datetime import UTC,datetime
+    record=await get_ada_measurement_assessment(assessment_id,user=user)
+    project=await _owned_nonsovereign_project(str(record["project_id"]),user)
+    if project.get("archived_at"):
+        raise HTTPException(status_code=409,detail="Project archived")
+    if not body.record_is_reviewer_supplied or not all(value.strip() for value in (body.reviewer_name,body.reviewer_credential,body.review_reference,body.notes)):
+        raise HTTPException(status_code=422,detail="Explicit reviewer-supplied declaration required")
+    result=record.get("result")
+    if not isinstance(result,dict) or result.get("complete_code_compliance_determined") is not False:
+        raise HTTPException(status_code=409,detail="Invalid assessment evidence")
+    if record.get("review_status")!="pending_qualified_review" or result.get("review_attestation"):
+        raise HTTPException(status_code=409,detail="Review declaration already recorded")
+    declaration={**body.model_dump(),"recorded_by":user["user_id"],"recorded_at":datetime.now(UTC).isoformat(),
+                 "credential_independently_verified":False,"authority_approval":False,"complete_compliance_certified":False}
+    # Preserve all original numerical evidence; append the declaration atomically.
+    try:
+        response=await run_in_threadpool(lambda: db.table("compliance_assessments")
+            .update({"result":{**result,"review_attestation":declaration},"review_status":body.disposition})
+            .eq("id",str(assessment_id)).eq("created_by",user["user_id"])
+            .eq("review_status","pending_qualified_review").execute())
+    except Exception as exc:
+        raise HTTPException(status_code=503,detail="Review declaration could not be recorded") from exc
+    if not response or not response.data:
+        raise HTTPException(status_code=409,detail="Assessment state changed; reload")
+    return response.data[0]
