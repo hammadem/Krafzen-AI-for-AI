@@ -108,214 +108,37 @@ class OrganizationResidencyService:
             import logging
             logging.getLogger(__name__).error(f"Audit log write failed: {str(e)}")
 
-    def _execute_controlled_migration(
-        self,
-        organization_id: UUID,
-        current_region: str,
-        target_region_entry: RegionEntry,
-        payload: AssignRegionRequest,
-        current_user_id: UUID,
-    ) -> Dict[str, Any]:
-        """
-        Executes controlled migration workflow rather than changing the region field
-        and immediately routing requests elsewhere.
-        """
-        now_iso = datetime.now(timezone.utc).isoformat()
-
-        # Audit migration initiation
-        self._record_audit_log(
-            organization_id=organization_id,
-            user_id=current_user_id,
-            action="organization_residency.migration_initiated",
-            region_code=target_region_entry.region_code,
-            status_val=ResidencyStatus.PROVISIONING.value,
-            details={
-                "source_region": current_region,
-                "target_region": target_region_entry.region_code,
-                "policy_version": payload.policy_version,
-            },
-        )
-
-        try:
-            # Mark status provisioning while retaining current region for active queries
-            self.supabase.table("organization_residency").update({
-                "status": ResidencyStatus.PROVISIONING.value,
-                "updated_at": now_iso,
-            }).eq("organization_id", str(organization_id)).execute()
-
-            # Pre-flight validate target region connectivity and residency
-            self._validate_connectivity_and_residency(target_region_entry)
-
-            # Atomic cutover to target region upon verification
-            cutover_record = (
-                self.supabase.table("organization_residency")
-                .update({
-                    "region_code": target_region_entry.region_code,
-                    "status": ResidencyStatus.ACTIVE.value,
-                    "last_verified_at": now_iso,
-                    "policy_version": payload.policy_version,
-                    "updated_at": now_iso,
-                })
-                .eq("organization_id", str(organization_id))
-                .execute()
-            )
-
-            # Audit migration completion
-            self._record_audit_log(
-                organization_id=organization_id,
-                user_id=current_user_id,
-                action="organization_residency.migration_completed",
-                region_code=target_region_entry.region_code,
-                status_val=ResidencyStatus.ACTIVE.value,
-                details={
-                    "previous_region": current_region,
-                    "new_region": target_region_entry.region_code,
-                },
-            )
-
-            return cutover_record.data[0]
-
-        except Exception as err:
-            # Roll back to active in source region if target checks fail
-            self.supabase.table("organization_residency").update({
-                "status": ResidencyStatus.ACTIVE.value,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("organization_id", str(organization_id)).execute()
-
-            self._record_audit_log(
-                organization_id=organization_id,
-                user_id=current_user_id,
-                action="organization_residency.migration_failed",
-                region_code=target_region_entry.region_code,
-                status_val=ResidencyStatus.FAILED.value,
-                details={
-                    "error": str(err),
-                    "rolled_back_to": current_region,
-                },
-            )
-
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Migration pre-flight failed: {str(err)}. Rolled back to active source region.",
-            )
-
     def request_region_assignment_or_migration(
-        self,
-        organization_id: UUID,
-        payload: AssignRegionRequest,
-        current_user_id: UUID,
+        self, organization_id: UUID, payload: AssignRegionRequest, current_user_id: UUID,
     ) -> Dict[str, Any]:
+        """Persist a request, never mark an unverified infrastructure active.
+
+        Moving existing data needs an operator-approved migration and cutover,
+        not an update to a region label. There is no verified regional worker
+        heartbeat, backup policy, or inference path in the current deployment.
         """
-            Main (Entrypoint): Handles both initial assignment and controlled migration.
-        """
-        # Step 2: Verify enterprise entitlement and admin permissions
         self._verify_enterprise_entitlement_and_admin(organization_id, current_user_id)
-
-        # Steps 3 & 4: Validate target region and verify infrastructure readiness
-        target_region_entry = RegionRegistryService.validate_region_for_assignment(payload.region_code)
-
-        # Check existing residency mapping
-        existing_res = (
-            self.supabase.table("organization_residency")
-            .select("*")
-            .eq("organization_id", str(organization_id))
-            .execute()
-        )
-        existing_record = existing_res.data[0] if existing_res.data else None
-
-        # Case 1: Idempotent request (already active in requested region)
-        if (
-            existing_record
-            and existing_record.get("region_code") == payload.region_code
-            and existing_record.get("status") == ResidencyStatus.ACTIVE.value
-        ):
-            return existing_record
-
-        # Case 2: Controlled Migration (active in another region, changing to new one)
-        if (
-            existing_record
-            and existing_record.get("region_code") != payload.region_code
-            and existing_record.get("status") == ResidencyStatus.ACTIVE.value
-        ):
-            return self._execute_controlled_migration(
-                organization_id=organization_id,
-                current_region=existing_record.get("region_code"),
-                target_region_entry=target_region_entry,
-                payload=payload,
-                current_user_id=current_user_id,
-            )
-
-        # Case 3: Initial Assignment or retrying failed provisioning
-        now_iso = datetime.now(timezone.utc).isoformat()
-        initial_record = {
-            "organization_id": str(organization_id),
-            "region_code": payload.region_code,
-            "status": ResidencyStatus.PROVISIONING.value,
-            "assigned_by": str(current_user_id),
-            "assigned_at": now_iso,
-            "policy_version": payload.policy_version,
-            "updated_at": now_iso,
-        }
-
-        upsert_res = (
-            self.supabase.table("organization_residency")
-            .upsert(initial_record)
-            .execute()
-        )
-        if not upsert_res.data:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to initiate organization residency record.",
-            )
-
-        try:
-            # Steps 6, 7 & 8: Validate connectivity and mandatory residency checks
-            self._validate_connectivity_and_residency(target_region_entry)
-
-            # Step 9: Transition to active once all mandatory checks pass
-            final_record = (
-                self.supabase.table("organization_residency")
-                .update({
-                    "status": ResidencyStatus.ACTIVE.value,
-                    "last_verified_at": datetime.now(timezone.utc).isoformat(),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                })
-                .eq("organization_id", str(organization_id))
-                .execute()
-            )
-
-            # Step 10: Log successful assignment
-            self._record_audit_log(
-                organization_id=organization_id,
-                user_id=current_user_id,
-                action="organization_residency.activated",
-                region_code=payload.region_code,
-                status_val=ResidencyStatus.ACTIVE.value,
-                details={"policy_version": payload.policy_version},
-            )
-
-            return final_record.data[0]
-
-        except Exception as err:
-            self.supabase.table("organization_residency").update({
-                "status": ResidencyStatus.FAILED.value,
-                "region_code": payload.region_code,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("organization_id", str(organization_id)).execute()
-
-            self._record_audit_log(
-                organization_id=organization_id,
-                user_id=current_user_id,
-                action="organization_residency.assignment_failed",
-                region_code=payload.region_code,
-                status_val=ResidencyStatus.FAILED.value,
-                details={"error": str(err)},
-            )
-
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Residency activation failed: {str(err)}",
-            )
+        if payload.region_code != "us":
+            raise HTTPException(status_code=400, detail="Only the United States is supported")
+        existing = self.supabase.table("organization_residency").select("*").eq(
+            "organization_id", str(organization_id)).execute()
+        if existing is None or existing.data is None:
+            raise HTTPException(status_code=503, detail="Residency assignment unavailable")
+        if existing.data:
+            record = existing.data[0]
+            if record.get("region_code") != "us":
+                raise HTTPException(status_code=409, detail="A controlled data migration is required")
+            return {**record, "residency_verified": False, "activation_available": False}
+        now = datetime.now(timezone.utc).isoformat()
+        record = {"organization_id": str(organization_id), "region_code": "us",
+                  "status": ResidencyStatus.PROVISIONING.value, "assigned_by": str(current_user_id),
+                  "assigned_at": now, "policy_version": "us-evidence-v1", "updated_at": now}
+        response = self.supabase.table("organization_residency").insert(record).execute()
+        if not response or not response.data:
+            raise HTTPException(status_code=503, detail="Unable to persist residency request")
+        self._record_audit_log(organization_id, current_user_id, "organization_residency.requested",
+                               "us", ResidencyStatus.PROVISIONING.value, {"policy_version": "us-evidence-v1"})
+        return {**response.data[0], "residency_verified": False, "activation_available": False}
 
     def get_organization_residency(self, organization_id: UUID) -> Dict[str, Any]:
         res = (
@@ -329,7 +152,7 @@ class OrganizationResidencyService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No residency mapping configured for organization '{organization_id}'.",
             )
-        return res.data[0]
+        return {**res.data[0], "residency_verified": False, "activation_available": False}
 
     def get_residency_audit_trail(
         self,
@@ -412,7 +235,8 @@ class OrganizationResidencyService:
         worker_pool = "unassigned"
         if region_entry:
             worker_pool = region_entry.processing_config.get("worker_pool", "default")
-            worker_healthy = True
+            # A configured pool name is not evidence of a live worker.
+            worker_healthy = False
 
         overall_healthy = (
             storage_healthy
@@ -428,6 +252,9 @@ class OrganizationResidencyService:
             "last_verified_at": record.get("last_verified_at"),
             "policy_version": record.get("policy_version"),
             "overall_healthy": overall_healthy,
+            "residency_verified": False,
+            "activation_available": False,
+            "verification_scope": "Connectivity is not an end-to-end residency guarantee.",
             "services": {
                 "database": {
                     "healthy": db_healthy,
