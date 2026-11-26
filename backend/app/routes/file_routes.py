@@ -18,7 +18,7 @@ from app.db.queries.file_queries import (
 )
 from app.middlewares.auth import require_auth
 from app.models.file_model import FileCreate, FileResponse, FileUpdate
-from app.services.import_service import import_document_for_job, import_dwg_for_job, import_dxf_for_job, import_ifc_for_job
+from app.services.import_service import import_document_for_job, import_dwg_for_job, import_dxf_for_job, import_ifc_for_job, import_revit_bridge_for_job
 from app.services.notification_service import create_notification
 
 router = APIRouter(prefix="/files", tags=["Files"])
@@ -88,6 +88,22 @@ async def import_ifc_route(
         )
         return record
     finally:
+        await upload.close()
+
+
+@router.post("/import-revit-bridge", response_model=FileResponse, status_code=201)
+async def import_revit_bridge_route(job_id: str = Form(...), source: UploadFile = File(...),
+    upload: UploadFile = File(...), confirmed: bool = Form(...), user=Depends(require_auth)):
+    try:
+        if not confirmed:
+            raise HTTPException(status_code=422, detail="Confirm the RVT and IFC source relationship")
+        record = await import_revit_bridge_for_job(job_id=job_id,source=source,upload=upload,user=user)
+        await create_notification(user_id=user["user_id"],notification_type="import_completed",
+            message="Revit-exported IFC imported: "+record["name"],project_id=record["project_id"],
+            metadata={"file_id":record["id"]})
+        return record
+    finally:
+        await source.close()
         await upload.close()
 
 
