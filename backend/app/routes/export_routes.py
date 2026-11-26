@@ -68,7 +68,9 @@ async def _resolve_project_residency_context(project_id: str) -> dict[str, Any]:
         .eq("id", str(project_id))
         .execute()
     )
-    if not proj_res.data or not proj_res.data[0].get("workspace_id"):
+    if not proj_res or not proj_res.data:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not proj_res.data[0].get("workspace_id"):
         return {
             "organization_id": None,
             "region_code": "global",
@@ -121,7 +123,8 @@ async def create_export_route(
         "region_code": residency_ctx["region_code"],
         "worker_pool": residency_ctx["worker_pool"],
         "target_bucket": residency_ctx["bucket_name"],
-        "sovereign_boundary_enforced": True,
+        "sovereign_boundary_enforced": False,
+        "residency_verified": False,
     })
 
     return await create_export(
