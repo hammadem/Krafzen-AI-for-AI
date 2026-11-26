@@ -59,7 +59,7 @@ describe("Real IFC model inspector", () => {
             { userId: "user-1", access_token: "token-1" }, "ifc-1"
         ));
         expect(await screen.findByText("IfcWall")).toBeInTheDocument();
-        expect(screen.getByText(/5.25 raw model units/i)).toBeInTheDocument();
+        expect(screen.getByText(/5.25 · project_declared/i)).toBeInTheDocument();
         expect(screen.getByText(/viewer renders available IFC tessellation/i)).toBeInTheDocument();
         expect(screen.getByText("Pset_WallCommon: 2")).toBeInTheDocument();
     });
