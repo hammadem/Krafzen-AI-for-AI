@@ -142,18 +142,21 @@ def main():
         # Disposable local QA data only: exercise real PostgREST join and
         # customer queue scoping with two distinct paid fixture accounts.
         other_project = check(client.post(base+"/projects/",headers=other,json={"input_text":"Other account queue fixture"}),201).json()["id"]
-        other_job = check(client.post(base+"/jobs/",headers=other,json={"project_id":other_project}),201).json()["id"]
+        # Queue monitoring is for export_jobs, not ordinary import/source jobs.
+        # Use isolated SQL fixtures so no export worker or paid provider is invoked.
         with psycopg2.connect(dsn) as con, con.cursor() as cur:
-            cur.execute("UPDATE public.jobs SET status='queued', updated_at=now()-interval '1 hour' WHERE id IN (%s,%s)", (j,other_job))
-            assert cur.rowcount == 2
+            cur.execute("INSERT INTO public.export_jobs(project_id,requested_by,format,status,updated_at) VALUES (%s,%s,'dxf','queued',now()-interval '1 hour') RETURNING id", (p,uid))
+            own_export = str(cur.fetchone()[0])
+            cur.execute("INSERT INTO public.export_jobs(project_id,requested_by,format,status,updated_at) VALUES (%s,%s,'dxf','queued',now()-interval '1 hour') RETURNING id", (other_project,other_uid))
+            other_export = str(cur.fetchone()[0])
         own_queue = check(client.get(base+"/dashboard/queue-health",headers=headers)).json()
         other_queue = check(client.get(base+"/dashboard/queue-health",headers=other)).json()
-        assert j in own_queue["stuck_job_ids"] and other_job not in own_queue["stuck_job_ids"]
-        assert other_job in other_queue["stuck_job_ids"] and j not in other_queue["stuck_job_ids"]
+        assert own_export in own_queue["stuck_job_ids"] and other_export not in own_queue["stuck_job_ids"]
+        assert other_export in other_queue["stuck_job_ids"] and own_export not in other_queue["stuck_job_ids"]
         assert own_queue["counts_by_status"]["queued"] == other_queue["counts_by_status"]["queued"] == 1
         with psycopg2.connect(dsn) as con, con.cursor() as cur:
-            cur.execute("UPDATE public.jobs SET updated_at=now() WHERE id IN (%s,%s)", (j,other_job))
-        note("Security","Real two-account queue monitoring isolates job IDs and counts through PostgREST")
+            cur.execute("DELETE FROM public.export_jobs WHERE id IN (%s,%s)", (own_export,other_export))
+        note("Security","Real two-account export queue monitoring isolates job IDs and counts through PostgREST")
         session_path = base + "/chat/session"
         linked = check(client.post(session_path,headers=headers,json={"project_id":p})).json()
         assert linked["project_id"] == p
