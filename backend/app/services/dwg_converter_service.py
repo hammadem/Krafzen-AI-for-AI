@@ -53,7 +53,13 @@ class DwgConverterService:
         return self._converter_type
 
     def _libredwg_tools(self) -> tuple[str | None, str | None]:
-        return (shutil.which(settings.DWG_LIBREDWG_DWG2DXF), shutil.which(settings.DWG_LIBREDWG_DXF2DWG))
+        def resolve(command: str, name: str) -> str | None:
+            found = shutil.which(command)
+            if found:
+                return found
+            bundled = backend_root() / "bin" / "libredwg" / "bin" / name
+            return str(bundled) if command == name and os.access(bundled, os.X_OK) else None
+        return (resolve(settings.DWG_LIBREDWG_DWG2DXF, "dwg2dxf"), resolve(settings.DWG_LIBREDWG_DXF2DWG, "dxf2dwg"))
 
     def _resolve_converter_cmd_and_ld(self) -> tuple[str | None, str | None]:
         """
