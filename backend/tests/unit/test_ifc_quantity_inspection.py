@@ -67,3 +67,23 @@ def test_unassigned_quantity_sets_are_not_falsely_counted(tmp_path: Path):
     summary = inspect_ifc_file(str(path))
     assert summary["declared_quantities"] == []
     assert summary["quantity_relation_count"] == 0
+
+
+def test_duplicate_relationships_and_conflicts_do_not_inflate_takeoff(tmp_path):
+    model=ifcopenshell.file(schema="IFC4")
+    guid=ifcopenshell.guid.new
+    model.create_entity("IfcProject",GlobalId=guid())
+    a=model.create_entity("IfcWall",GlobalId=guid())
+    b=model.create_entity("IfcWall",GlobalId=guid())
+    q=model.create_entity("IfcQuantityLength",Name="Length",LengthValue=3.0)
+    qset=model.create_entity("IfcElementQuantity",GlobalId=guid(),Name="Qto",Quantities=[q])
+    for objects in ([a,b],[a]):
+        model.create_entity("IfcRelDefinesByProperties",GlobalId=guid(),RelatedObjects=objects,RelatingPropertyDefinition=qset)
+    q2=model.create_entity("IfcQuantityLength",Name="Length",LengthValue=4.0)
+    qset2=model.create_entity("IfcElementQuantity",GlobalId=guid(),Name="Qto",Quantities=[q2])
+    model.create_entity("IfcRelDefinesByProperties",GlobalId=guid(),RelatedObjects=[b],RelatingPropertyDefinition=qset2)
+    path=tmp_path/"duplicate.ifc";model.write(str(path))
+    result=inspect_ifc_file(str(path))
+    assert result["ambiguous_quantity_declarations"]==1
+    assert result["declared_quantities"][0]["sum_raw"]==3.0
+    assert result["declared_quantities"][0]["item_count"]==1
