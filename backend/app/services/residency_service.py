@@ -15,73 +15,22 @@ class OrganizationResidencyService:
         self.supabase = supabase
 
     def _verify_enterprise_entitlement_and_admin(self, organization_id: UUID, user_id: UUID) -> None:
-        # Step 2: Verify user is an owner or admin of this workspace
-        member_res = (
-            self.supabase.table("workspace_members")
-            .select("role")
-            .eq("workspace_id", str(organization_id))
-            .eq("user_id", str(user_id))
-            .execute()
-        )
-        user_role = member_res.data[0].get("role") if member_res.data else None
-        if not user_role or user_role not in ["owner", "admin"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only workspace owners or administrators can configure data residency.",
-            )
-
-        # Step 2: Resolve workspace owner to verify active Enterprise subscription
-        # Workspaces table stores canonical ownership in owner_id (003_workspace_tables.sql)
-        owner_res = (
-            self.supabase.table("workspaces")
-            .select("owner_id")
-            .eq("id", str(organization_id))
-            .execute()
-        )
-        owner_id = owner_res.data[0].get("owner_id") if owner_res.data else str(user_id)
-
-        # Select subscription_status and plan tier matching user_subscriptions schema
-        sub_res = (
-            self.supabase.table("user_subscriptions")
-            .select("plan_tier, plan_name, subscription_status")
-            .eq("user_id", str(owner_id))
-            .execute()
-        )
-        if not sub_res.data:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No active subscription found for workspace billing owner.",
-            )
-
-        sub_info = sub_res.data[0]
-        plan_tier = str(sub_info.get("plan_tier") or sub_info.get("plan_name") or "").lower()
-        sub_status = str(sub_info.get("subscription_status") or "").lower()
-
-        if plan_tier != "enterprise" or sub_status not in ["active", "trial", "trialing"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Regional sovereign residency requires an active Enterprise subscription plan.",
-            )
-
-    def _validate_connectivity_and_residency(self, region_entry: RegionEntry) -> None:
-        """
-        Steps 6, 7 & 8: Validate queue readiness, processing configuration,
-        and mandatory sovereign backup replication rules.
-        """
-        # Validate queue configuration
-        queue_name = region_entry.queue_config.get("queue_name")
-        if not queue_name:
-            raise ValueError(f"Regional queue configuration missing for {region_entry.region_code}")
-
-        # Validate regional processing worker pool
-        worker_pool = region_entry.processing_config.get("worker_pool")
-        if not worker_pool:
-            raise ValueError(f"Regional worker configuration missing for {region_entry.region_code}")
-
-        # Step 8: Mandatory sovereignty check - cross-region replication must be False
-        backup_policy = region_entry.backup_policy or {}
-        if backup_policy.get("cross_region_replication") is not False:
-            raise ValueError("Residency check failed: regional backups violate sovereign isolation policy.")
+        from app.services.subscription_service import subscription_service
+        workspace = self.supabase.table("workspaces").select("owner_id").eq(
+            "id", str(organization_id)).execute()
+        if not workspace or not workspace.data:
+            raise HTTPException(status_code=404, detail="Organization not found")
+        owner_id = str(workspace.data[0]["owner_id"])
+        if str(user_id) != owner_id:
+            membership = self.supabase.table("workspace_members").select("role").eq(
+                "workspace_id", str(organization_id)).eq("user_id", str(user_id)).execute()
+            if not membership or not membership.data or membership.data[0].get("role") not in ("owner", "admin"):
+                raise HTTPException(status_code=403, detail="Workspace owner or administrator required")
+        sub = self.supabase.table("user_subscriptions").select("*").eq("user_id", owner_id).execute()
+        row = sub.data[0] if sub and sub.data else {}
+        tier = str(row.get("plan_name") or row.get("plan_tier") or "").lower()
+        if tier not in ("enterprise", "enterprise_plus") or not subscription_service._is_paid_subscriber(row):
+            raise HTTPException(status_code=403, detail="Active paid Enterprise subscription required")
 
     def _record_audit_log(
         self,
