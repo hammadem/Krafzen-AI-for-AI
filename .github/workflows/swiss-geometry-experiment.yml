@@ -1,0 +1,29 @@
+name: Swiss Dwellings geometry experiment
+on:
+  pull_request:
+    branches: ['fix/**']
+    paths: ['backend/scripts/train_swiss_geometry.py', '.github/workflows/swiss-geometry-experiment.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Download pinned public source archive
+        run: curl --fail --location --proto '=https' --max-time 360 --max-filesize 1000000000 -o /tmp/swiss-dwellings.zip 'https://zenodo.org/records/7788422/files/swiss-dwellings-v3.0.0.zip?download=1'
+      - name: Install CPU-only geometry dependencies
+        run: pip install shapely==2.1.2 scikit-learn==1.6.1 numpy==2.2.5
+      - name: Validate source archive and train building-disjoint model
+        run: python backend/scripts/train_swiss_geometry.py --archive /tmp/swiss-dwellings.zip --output-dir /tmp/swiss-geometry
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swiss-geometry-training-evidence
+          path: /tmp/swiss-geometry/
+          retention-days: 7
+          if-no-files-found: error
