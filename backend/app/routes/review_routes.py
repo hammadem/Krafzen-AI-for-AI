@@ -13,6 +13,7 @@ from app.middlewares.auth import require_auth
 from app.routes.asbuilt_routes import _owned_project, _read_dxf
 from app.services.dxf_preview_service import render_dxf_preview
 from app.services.review_pdf_service import build_review_pdf
+from app.services.dxf_review_findings import inspect_dxf_review
 
 router = APIRouter(prefix="/reviews", tags=["Reviews and Redlines"])
 
@@ -62,6 +63,19 @@ async def drawing_preview(file_id: UUID, user: dict = Depends(require_auth)):
             "Content-Security-Policy": "sandbox",
         },
     )
+
+
+@router.get("/files/{file_id}/findings")
+async def drawing_findings(file_id: UUID, user: dict = Depends(require_auth)):
+    record = await _owned_dxf_record(str(file_id), user)
+    raw = await _read_dxf(str(file_id), str(record["project_id"]), user)
+    try:
+        report = await asyncio.wait_for(run_in_threadpool(inspect_dxf_review, raw), timeout=30)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="Drawing review timed out") from exc
+    return {**report, "file_id": str(file_id), "file_version": int(record.get("version") or 1)}
 
 
 @router.get("/files/{file_id}/redlines")
