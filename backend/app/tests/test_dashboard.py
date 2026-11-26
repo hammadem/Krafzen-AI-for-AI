@@ -310,9 +310,10 @@ async def test_members_returns_at_least_owner():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("updated,expected_status", [(True, 200), (False, 404)])
-async def test_notification_unread_uses_authenticated_recipient(updated, expected_status):
-    with patch("app.routes.dashboard_routes.set_read_state", new=AsyncMock(return_value=updated)) as update, \
-         patch("app.middlewares.auth.require_auth", return_value=MOCK_USER):
+async def test_notification_unread_uses_authenticated_recipient(updated, expected_status, monkeypatch):
+    from app.middlewares.auth import require_auth
+    monkeypatch.setitem(app.dependency_overrides, require_auth, lambda: MOCK_USER)
+    with patch("app.routes.dashboard_routes.set_read_state", new=AsyncMock(return_value=updated)) as update:
         async with AsyncClient(app=app, base_url="http://test") as ac:
             resp = await ac.patch(BASE + "/notifications/" + NOTIFICATION_ID + "/unread")
     assert resp.status_code == expected_status
