@@ -34,7 +34,7 @@ export default function IFCQueryPanel({user,fileId}:{user:User|null;fileId:strin
         }}>
             <label className="block text-sm">Model question<select className="block w-full bg-slate-900 border rounded p-2" value={mode} onChange={e=>setMode(e.target.value)}>{modes.map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></label>
             {mode!=="properties"&&<><label className="block text-sm">IFC element class<select className="block w-full bg-slate-900 border rounded p-2" value={kind} onChange={e=>setKind(e.target.value)}>{classes.map(v=><option key={v} value={v}>{v.replace(/^Ifc/,"")} ({v})</option>)}</select></label>
-            <label className="block text-sm">Storey GlobalId (optional, direct containment)<input maxLength={22} value={storey} onChange={e=>setStorey(e.target.value)} className="block w-full bg-slate-900 border rounded p-2"/></label>
+            <label className="block text-sm">Storey GlobalId (optional, declared spatial hierarchy)<input maxLength={22} value={storey} onChange={e=>setStorey(e.target.value)} className="block w-full bg-slate-900 border rounded p-2"/></label>
             {!!storeys.length&&<div className="flex gap-2 flex-wrap">{storeys.map(f=><button key={f.guid} type="button" className="text-xs underline" onClick={()=>setStorey(f.guid)}>{f.name||f.guid}</button>)}</div>}</>}
             {mode==="properties"&&<label className="block text-sm">Element GlobalId<input required minLength={22} maxLength={22} value={guid} onChange={e=>setGuid(e.target.value)} className="block w-full bg-slate-900 border rounded p-2"/></label>}
             {(mode==="quantity"||mode==="missing_property")&&<><label className="block text-sm">Exact property or quantity set name<input required maxLength={120} value={setName} onChange={e=>setSetName(e.target.value)} className="block w-full bg-slate-900 border rounded p-2"/></label><label className="block text-sm">Exact property or quantity name<input required maxLength={120} value={property} onChange={e=>setProperty(e.target.value)} className="block w-full bg-slate-900 border rounded p-2"/></label></>}
@@ -45,6 +45,9 @@ export default function IFCQueryPanel({user,fileId}:{user:User|null;fileId:strin
             <p className="font-medium">Source result: {String(r.status)}</p>
             {typeof r.match_count==="number"&&<p>Matching entities: {r.match_count}</p>}
             {typeof r.missing_count==="number"&&<p>Missing declarations: {r.missing_count}</p>}
+            {typeof r.ambiguous_storey_count==="number"&&r.ambiguous_storey_count>0&&<p className="text-amber-200">Excluded conflicting storey assignments: {r.ambiguous_storey_count}</p>}
+            {Array.isArray(r.totals)&&<div className="space-y-1 text-sm"><h3 className="font-medium">Declared quantity totals (source units)</h3>{(r.totals as {type:string;unit:string;sum_raw:number;item_count:number}[]).map((q,i)=><p key={i}>{q.type.replace("IfcQuantity","")}: {q.sum_raw.toLocaleString()} · {q.unit} · {q.item_count} elements</p>)}</div>}
+            {typeof r.ambiguous_count==="number"&&r.ambiguous_count>0&&<p className="text-amber-200">Excluded ambiguous declarations: {r.ambiguous_count}</p>}
             {elements.map(e=><button key={e.guid} type="button" onClick={()=>{setGuid(e.guid);setMode("properties");}} className="block text-left text-xs underline">{e.name||e.guid} · {e.ifc_type}</button>)}
             <details><summary className="cursor-pointer text-sm">Full source evidence</summary><pre className="text-xs whitespace-pre-wrap break-all max-h-72 overflow-auto">{JSON.stringify(r,null,2)}</pre></details>
             <p className="text-xs break-all text-slate-400">Source SHA-256: {evidence.source_sha256}</p>
