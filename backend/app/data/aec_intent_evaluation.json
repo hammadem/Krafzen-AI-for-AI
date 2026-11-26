@@ -1,0 +1,330 @@
+{
+  "model": "aec_multinomial_nb_v1",
+  "training_count": 512,
+  "evaluation_count": 32,
+  "correct": 32,
+  "accuracy": 1,
+  "results": [
+    {
+      "text": "suggest a residential floor plan",
+      "label": "architecture",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "architecture",
+        "confidence": 0.9982783328273016
+      }
+    },
+    {
+      "text": "arrange kitchen and living room",
+      "label": "architecture",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "architecture",
+        "confidence": 0.9994766105516535
+      }
+    },
+    {
+      "text": "review bedroom layout",
+      "label": "architecture",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "architecture",
+        "confidence": 0.8238291452255524
+      }
+    },
+    {
+      "text": "plan office circulation",
+      "label": "architecture",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "architecture",
+        "confidence": 0.996752931226428
+      }
+    },
+    {
+      "text": "resize the door opening in DXF",
+      "label": "cad",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "cad",
+        "confidence": 0.9980105881023487
+      }
+    },
+    {
+      "text": "inspect CAD layers and polylines",
+      "label": "cad",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "cad",
+        "confidence": 0.948292975145074
+      }
+    },
+    {
+      "text": "change drawing units",
+      "label": "cad",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "cad",
+        "confidence": 0.7866320348503544
+      }
+    },
+    {
+      "text": "extract wall coordinates",
+      "label": "cad",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "cad",
+        "confidence": 0.981063054557019
+      }
+    },
+    {
+      "text": "count IfcWall entities",
+      "label": "bim",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "bim",
+        "confidence": 0.7975880157935507
+      }
+    },
+    {
+      "text": "inspect IFC quantities",
+      "label": "bim",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "bim",
+        "confidence": 0.9772238547212246
+      }
+    },
+    {
+      "text": "query BIM element properties",
+      "label": "bim",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "bim",
+        "confidence": 0.9991156434721102
+      }
+    },
+    {
+      "text": "detect clashes in IFC model",
+      "label": "bim",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "bim",
+        "confidence": 0.9681451435417747
+      }
+    },
+    {
+      "text": "screen ADA accessibility",
+      "label": "compliance",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "compliance",
+        "confidence": 0.9878617899092682
+      }
+    },
+    {
+      "text": "check NFPA fire safety",
+      "label": "compliance",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "compliance",
+        "confidence": 0.9967761827334433
+      }
+    },
+    {
+      "text": "verify NEC clearance",
+      "label": "compliance",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "compliance",
+        "confidence": 0.9878617899092682
+      }
+    },
+    {
+      "text": "assess ASCE load rules",
+      "label": "compliance",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "compliance",
+        "confidence": 0.9985170671575169
+      }
+    },
+    {
+      "text": "flag duplicate drawing lines",
+      "label": "review",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "review",
+        "confidence": 0.9974760450805169
+      }
+    },
+    {
+      "text": "resolve the redline comment",
+      "label": "review",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "review",
+        "confidence": 0.9944220328538211
+      }
+    },
+    {
+      "text": "record review markup",
+      "label": "review",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "review",
+        "confidence": 0.946665997653416
+      }
+    },
+    {
+      "text": "identify zero length entities",
+      "label": "review",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "review",
+        "confidence": 0.9960664705263307
+      }
+    },
+    {
+      "text": "align as built comparison",
+      "label": "asbuilt",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "asbuilt",
+        "confidence": 0.9986534215832473
+      }
+    },
+    {
+      "text": "summarize added removed elements",
+      "label": "asbuilt",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "asbuilt",
+        "confidence": 0.9970572390947626
+      }
+    },
+    {
+      "text": "inspect revision overlay",
+      "label": "asbuilt",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "asbuilt",
+        "confidence": 0.9613910254413984
+      }
+    },
+    {
+      "text": "compare original versus revised",
+      "label": "asbuilt",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "asbuilt",
+        "confidence": 0.9968975215588192
+      }
+    },
+    {
+      "text": "record a field inspection",
+      "label": "field",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "field",
+        "confidence": 0.9964666298942109
+      }
+    },
+    {
+      "text": "assign corrective action",
+      "label": "field",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "field",
+        "confidence": 0.9910321321333491
+      }
+    },
+    {
+      "text": "document site photo",
+      "label": "field",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "field",
+        "confidence": 0.996752931226428
+      }
+    },
+    {
+      "text": "summarize inspection notes",
+      "label": "field",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "field",
+        "confidence": 0.9426297622210559
+      }
+    },
+    {
+      "text": "retry DWG conversion",
+      "label": "exports",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "exports",
+        "confidence": 0.9910321321333491
+      }
+    },
+    {
+      "text": "download DXF drawing",
+      "label": "exports",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "exports",
+        "confidence": 0.8746737854296577
+      }
+    },
+    {
+      "text": "retrieve export history",
+      "label": "exports",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "exports",
+        "confidence": 0.996752931226428
+      }
+    },
+    {
+      "text": "prepare CSV report",
+      "label": "exports",
+      "split": "test",
+      "origin": "internally_authored_synthetic",
+      "prediction": {
+        "label": "exports",
+        "confidence": 0.9803700935697257
+      }
+    }
+  ],
+  "limitations": "Authored phrase holdout, not independent real customer validation. No foundation model fine-tuning, visual recognition or engineering approval."
+}
