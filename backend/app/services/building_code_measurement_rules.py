@@ -119,6 +119,27 @@ def evaluate_building_code_measurements(*, context, measurements, source_file_id
              [load_key, width_key, "egress_factor_basis", "other_egress_exceptions_excluded"],
              applicable and load is not None)
 
+    if measurements.get("extended_stair_checks") is True:
+        ordinary = measurements.get("ordinary_straight_stair_no_exceptions_confirmed") is True
+        smallest = _number(measurements.get("stair_min_riser_in"))
+        largest = _number(measurements.get("stair_max_riser_in"))
+        consistent = smallest is not None and largest is not None and smallest <= largest
+        for field, section, actual, threshold, direction in (
+            ("stair_min_riser_in", "1011.5.2", smallest if consistent else None, "4", "min"),
+            ("stair_max_riser_in", "1011.5.2", largest if consistent else None, "7", "max"),
+            ("stair_min_tread_in", "1011.5.2", _number(measurements.get("stair_min_tread_in")), "11", "min"),
+            ("stair_min_headroom_in", "1011.3", _number(measurements.get("stair_min_headroom_in")), "80", "min"),
+        ):
+            emit("IBC", "means_of_egress", f"IBC-2024-{section}-{field}", section,
+                 Decimal(threshold), actual, "in",
+                 f"Declared extreme measurement over the reviewed ordinary straight flight; {direction} {threshold} in",
+                 [field, "ordinary_straight_stair_no_exceptions_confirmed"], ordinary, direction)
+        spread = largest-smallest if consistent else None
+        emit("IBC", "means_of_egress", "IBC-2024-1011.5.4-riser-uniformity", "1011.5.4",
+             Decimal("0.375"), spread, "in", "Largest minus smallest riser in one flight <= 3/8 in",
+             ["stair_min_riser_in","stair_max_riser_in","ordinary_straight_stair_no_exceptions_confirmed"],
+             ordinary, "max")
+
     # NFPA 101-2024, Chapter 7. Emergency illumination requirements are
     # conditional on the occupancy and applicable code sections. These checks
     # intentionally cover only duration and floor-level photometry.
@@ -173,11 +194,12 @@ def evaluate_building_code_measurements(*, context, measurements, source_file_id
             missing.append(f"{family} 2024 applicability and edition not confirmed")
     return {
         "assessment_kind": "ibc_nfpa_measurements_v1",
+        "rule_version": "ibc_nfpa_measurements_v2" if measurements.get("extended_stair_checks") is True else "ibc_nfpa_measurements_v1",
         "generated_at": datetime.now(UTC).isoformat(),
         "overall_status": "pending_qualified_review",
         "complete_code_compliance_determined": False,
         "rule_results": findings, "counts": counts,
         "missing_information": sorted(set(missing)),
         "coverage": coverage,
-        "disclaimer": "Selected 2024 IBC capacity and NFPA 101 emergency-lighting measurements only. No automatic jurisdiction determination, full rule coverage, authority approval or field verification. A pass applies only to its isolated numerical comparison. All unimplemented categories require qualified review.",
+        "disclaimer": "Selected 2024 IBC capacity, optional ordinary straight stair measurements, and NFPA 101 emergency-lighting measurements only. No automatic jurisdiction determination, full rule coverage, authority approval or field verification. A pass applies only to its isolated numerical comparison. All unimplemented categories require qualified review.",
     }
