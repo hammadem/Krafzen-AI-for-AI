@@ -11,7 +11,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
     FolderKanban, Archive, Activity, FileDown, Users, Bell, CreditCard, ClipboardList,
-    Upload, ClipboardCheck, Box, Ruler, DraftingCompass, Settings, Plus,
+    Upload, ClipboardCheck, Box, Ruler, DraftingCompass, Settings, Plus, Globe,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -26,6 +26,7 @@ const MAIN: NavItem[] = [
     { label: "Members", href: "/workspace/members", icon: Users },
     { label: "Notifications", href: "/workspace/notifications", icon: Bell },
     { label: "Billing", href: "/workspace/billings", icon: CreditCard },
+    { label: "USA Data Residency", href: "/workspace/residency", icon: Globe },
 ];
 
 // Reviews support manual markups; IFC Models support inspected metadata, not 3D.
