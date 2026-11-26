@@ -198,6 +198,8 @@ def inspect_document_bytes(raw: bytes, kind: str) -> dict:
             "image_width_px": width, "image_height_px": height,
             "optical_character_recognition_performed": False,
         })
+        from app.services.drawing_ocr import recognize_drawing_image
+        result.update(recognize_drawing_image(raw))
     return result
 
 

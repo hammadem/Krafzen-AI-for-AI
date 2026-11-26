@@ -48,7 +48,7 @@ jobs:
     - name: Install native DXF tracer for real conversion smoke test
       run: |
         sudo apt-get update -qq
-        sudo apt-get install -y potrace
+        sudo apt-get install -y potrace tesseract-ocr tesseract-ocr-eng fonts-dejavu-core
 
     - name: Lint code
       run: |

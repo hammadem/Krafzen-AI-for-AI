@@ -9,7 +9,7 @@
       "format": "IFC",
       "category": "BIM architecture structural MEP",
       "version": "5030f652e85d3e679b392fcb38bfa3328d6d9f79",
-      "processing": "10 files committed; verify hash and parse in reference index",
+      "processing": "13 original IFC files; verify and parse in reference index",
       "training_use": "not used for intent weights"
     },
     {
@@ -121,6 +121,28 @@
       "version": "per rule edition",
       "processing": "not downloaded",
       "training_use": "excluded"
+    },
+    {
+      "name": "ResPlan",
+      "url": "https://github.com/m-agour/ResPlan",
+      "license": "CC BY 4.0 for authors' contributions; MIT code",
+      "commercial_use": "candidate, underlying rights and takedown policy review required",
+      "format": "ZIP containing Python pickle",
+      "category": "architectural vector geometry",
+      "version": "e2b78fe069aee1ab1e1828a612743f308e3c32a7",
+      "processing": "not downloaded or unpickled; safe export required",
+      "training_use": "pending"
+    },
+    {
+      "name": "Tesseract English",
+      "url": "https://github.com/tesseract-ocr/tessdata",
+      "license": "Apache 2.0",
+      "commercial_use": "permitted subject to license notices",
+      "format": "pretrained OCR",
+      "category": "drawing text extraction",
+      "version": "installed distribution",
+      "processing": "native engine integration; synthetic QA",
+      "training_use": "pretrained inference only"
     }
   ]
 }

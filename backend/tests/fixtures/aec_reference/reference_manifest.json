@@ -132,6 +132,39 @@
         "IfcTriangulatedFaceSet": 1
       },
       "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/tessellation-with-individual-colors.ifc"
+    },
+    {
+      "name": "ifc2x3_hvac.ifc",
+      "schema": "IFC2X3",
+      "classification": "MEP HVAC legacy scene",
+      "source": "IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Building-Hvac.ifc",
+      "blob": "4ff261b087e62cf38cbc438c75280387986bc83f",
+      "expected_min": {
+        "IfcProject": 1
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%202.3.0.1%20(IFC%202x3%20TC1)/Simple-Scene/Building-Hvac.ifc"
+    },
+    {
+      "name": "ifc2x3_electrical.ifc",
+      "schema": "IFC2X3",
+      "classification": "MEP electrical infrastructure legacy scene",
+      "source": "IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Infra-Electrical.ifc",
+      "blob": "ed0510607c1d0c5cb6d95c77dbe3cf2a6438ec78",
+      "expected_min": {
+        "IfcProject": 1
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%202.3.0.1%20(IFC%202x3%20TC1)/Simple-Scene/Infra-Electrical.ifc"
+    },
+    {
+      "name": "ifc2x3_structural.ifc",
+      "schema": "IFC2X3",
+      "classification": "structural legacy scene",
+      "source": "IFC 2.3.0.1 (IFC 2x3 TC1)/Simple-Scene/Building-Structural.ifc",
+      "blob": "fad27d36546343908439ea0b295db1c82db797b2",
+      "expected_min": {
+        "IfcProject": 1
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%202.3.0.1%20(IFC%202x3%20TC1)/Simple-Scene/Building-Structural.ifc"
     }
   ],
   "generated_dxf": "Run python backend/scripts/generate_aec_reference_dxf.py --output-dir /tmp/krafzen-aec-dxf for independent known-coordinate DXF regression drawings. NOT surveyed architecture.",

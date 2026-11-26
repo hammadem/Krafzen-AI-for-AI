@@ -10,7 +10,7 @@ from app.services.reference_retrieval import _index
 # not proof that the upstream models have no common geometric components.
 def group(row):
     name=row["dataset_id"]
-    if any(x in name for x in ("architecture","structural","hvac")):return "simple_scene"
+    if any(x in name for x in ("architecture","structural","hvac","electrical")):return "simple_scene"
     if "basin" in name:return "basin"
     if "column" in name:return "column"
     return name.removesuffix(".ifc")
