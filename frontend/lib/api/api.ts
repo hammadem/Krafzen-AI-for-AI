@@ -882,3 +882,9 @@ export async function importDwgFile(user: User | null, jobId: string, file: File
     const body = new FormData(); body.append("job_id",jobId); body.append("upload",file,file.name);
     return apiClient("POST","/api/v1/files/import-dwg",user,body);
 }
+
+export async function importRevitBridge(user: User | null, jobId: string, source: File, ifc: File) {
+    const body=new FormData();
+    body.append("job_id",jobId);body.append("confirmed","true");body.append("source",source,source.name);body.append("upload",ifc,ifc.name);
+    return apiClient("POST","/api/v1/files/import-revit-bridge",user,body);
+}
