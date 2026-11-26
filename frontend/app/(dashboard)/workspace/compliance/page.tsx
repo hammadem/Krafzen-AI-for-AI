@@ -73,6 +73,10 @@ export default function CompliancePage() {
     const [rampRun, setRampRun] = useState("");
     const [rampException, setRampException] = useState("unknown");
     const [newConstruction, setNewConstruction] = useState("unknown");
+    const [extendedRamp, setExtendedRamp] = useState(false);
+    const [rampApplicability, setRampApplicability] = useState("unknown");
+    const [crossSlope, setCrossSlope] = useState("");
+    const [rampWidth, setRampWidth] = useState("");
     const [saving, setSaving] = useState(false);
     const [buildingCodeOpen, setBuildingCodeOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -163,6 +167,10 @@ export default function CompliancePage() {
                     ramp_horizontal_run_in: optionalValue(rampRun),
                     new_construction: tri(newConstruction),
                     ramp_alteration_exception_applies: tri(rampException),
+                    extended_ramp_checks: extendedRamp,
+                    ramp_run_405_applies_no_exception_confirmed: extendedRamp ? tri(rampApplicability) : null,
+                    ramp_cross_slope_percent: extendedRamp && crossSlope.trim() && Number.isFinite(Number(crossSlope)) && Number(crossSlope) >= 0 ? Number(crossSlope) : null,
+                    ramp_clear_width_in: extendedRamp ? optionalValue(rampWidth) : null,
                 },
             });
             if (!response.ok) throw new Error(response.error?.message || "Assessment could not be saved");
@@ -210,9 +218,9 @@ export default function CompliancePage() {
                 </div>
                 <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
                     <AlertTriangle className="inline h-4 w-4 mr-1"/>
-                    Only three numerical checks from the official 2010 ADA Standards are supported here:
+                    The baseline numerical checks from the official 2010 ADA Standards are:
                     manual door clear width (§404.2.3), nominal walking surface width (§403.5.1)
-                    and new-construction ramp running slope (§405.2). No AI-derived measurements,
+                    and new-construction ramp running slope (§405.2). Optional expanded ramp checks cover §405.3, §405.5 and §405.6. No AI-derived measurements,
                     complete IBC/NFPA conclusions or code approval. Expand the IBC/NFPA section for additional bounded numeric rules. A qualified reviewer must determine
                     jurisdictional adoption, exceptions and all remaining requirements.
                 </p>
@@ -276,11 +284,18 @@ export default function CompliancePage() {
                                 {yesNo("Door clear width measured at 90 degrees", at90, setAt90)}
                                 {number("Walking route clear width (in)", routeWidth, setRouteWidth)}
                                 {yesNo("Walking route exception applies", routeException, setRouteException)}
-                                {number("Ramp rise (in)", rampRise, setRampRise)}
+                                {number("Single ramp run rise (in)", rampRise, setRampRise)}
                                 {number("Ramp horizontal run (in)", rampRun, setRampRun)}
                                 {yesNo("New construction ramp", newConstruction, setNewConstruction)}
                                 {yesNo("Ramp alteration exception applies", rampException, setRampException)}
                             </div>
+                            <label className="flex gap-2 items-center text-sm"><input type="checkbox" checked={extendedRamp} onChange={e=>setExtendedRamp(e.target.checked)}/>Include cross slope, clear width and maximum rise checks</label>
+                            {extendedRamp && <div className="grid gap-4 sm:grid-cols-2">
+                                {yesNo("Reviewer confirmed section 405 applies to this ramp run and no relevant exceptions apply", rampApplicability, setRampApplicability)}
+                                {number("Ramp run cross slope (%)", crossSlope, setCrossSlope)}
+                                {number("Ramp clear width between handrails where present (in)", rampWidth, setRampWidth)}
+                                <p className="text-xs text-slate-400">Use measurements of one accessible ramp run, not a curb ramp or a gangway. Landings, handrails, edge protection and other conditions are not assessed.</p>
+                            </div>}
                             <button type="button" onClick={() => void submit()} disabled={!projectId || saving}
                                 className="rounded-lg bg-emerald-300 px-5 py-2 text-slate-950 font-semibold disabled:opacity-40">
                                 {saving ? "Evaluating and saving…" : "Run checks and save evidence"}
