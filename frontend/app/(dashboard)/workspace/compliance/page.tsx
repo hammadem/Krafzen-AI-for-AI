@@ -5,6 +5,7 @@ import { AlertTriangle, ClipboardCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import BuildingCodePanel from "@/components/compliance/BuildingCodePanel";
 import MultidisciplinePanel from "@/components/compliance/MultidisciplinePanel";
+import ReviewDeclarationPanel from "@/components/compliance/ReviewDeclarationPanel";
 import {
     createAdaAssessment, getAllFiles, getAllJobs, getAllProjects,
     getProjectAdaAssessments, getComplianceReportPdf,
@@ -17,6 +18,7 @@ type Finding = {
     rule_id: string; section_reference: string; result: "pass" | "fail" | "unknown";
     threshold?: number | null; measured?: number | null; unit: string;
     explanation: string; source_url: string;
+    evidence?: {element_reference?: string; source_file_version?: number};
 };
 type Assessment = {
     id: string; created_at?: string; review_status: string; result: {
@@ -24,6 +26,7 @@ type Assessment = {
         rule_results: Finding[]; missing_information: string[];
         complete_code_compliance_determined: boolean;
         assessment_kind?: string;
+        review_attestation?: {disposition?:string;reviewer_name?:string;reviewer_credential?:string;review_reference?:string;notes?:string;recorded_at?:string};
         coverage?: Array<{code_family: string; category: string; coverage: string; full_category_compliance: string}>;
     };
 };
@@ -329,7 +332,7 @@ export default function CompliancePage() {
                         </section>
                         {selected && (
                             <section className="rounded-xl border border-white/10 p-5 space-y-4">
-                                <h2 className="font-semibold">Traceable rule findings (pending review)</h2>
+                                <h2 className="font-semibold">Traceable rule findings</h2>
                                 <button type="button" className="rounded border border-white/20 px-3 py-2 text-sm" onClick={async () => {
                                     try {
                                         const blob = await getComplianceReportPdf(user, selected.id);
@@ -340,12 +343,13 @@ export default function CompliancePage() {
                                     } catch (cause) { setError(cause instanceof Error ? cause.message : "PDF unavailable"); }
                                 }}>Download compliance PDF</button>
                                 <p className="text-sm text-amber-200">{selected.result.disclaimer}</p>
-                                {selected.result.rule_results.map(finding => (
-                                    <div key={finding.rule_id} className="rounded-lg border border-white/10 p-4 space-y-2 text-sm">
+                                {selected.result.rule_results.map((finding,index) => (
+                                    <div key={finding.rule_id+":"+index} className="rounded-lg border border-white/10 p-4 space-y-2 text-sm">
                                         <div className="flex justify-between gap-2">
                                             <h3 className="font-semibold">{finding.rule_id} (§{finding.section_reference})</h3>
                                             <span className="font-semibold uppercase">{finding.result}</span>
                                         </div>
+                                        {finding.evidence?.element_reference && <p className="text-xs text-slate-400">Element: {finding.evidence.element_reference} · Source version: {finding.evidence.source_file_version ?? "unknown"}</p>}
                                         <p>{finding.explanation}</p>
                                         <p className="text-xs text-slate-400">
                                             User-declared measurement: {finding.measured ?? "unknown"} {finding.unit} ·
@@ -374,6 +378,7 @@ export default function CompliancePage() {
                                 }} className="rounded border border-white/20 px-3 py-2 text-xs">
                                     Download saved compliance report (JSON)
                                 </button>
+                                <ReviewDeclarationPanel key={selected.id} user={user} id={selected.id} status={selected.review_status} declaration={selected.result.review_attestation} onSaved={value=>{const record=value as Assessment;if(!record?.id||!record.result)throw Error("Review not saved");setHistory(previous=>previous.map(r=>r.id===record.id?record:r));setSelected(current=>current?.id===record.id?record:current);}}/>
                                 <h3 className="font-semibold text-sm">Unresolved information</h3>
                                 {selected.result.missing_information.length === 0 ?
                                     <p className="text-xs text-slate-400">All fields for these narrow checks were supplied; other code requirements remain unassessed.</p> :
