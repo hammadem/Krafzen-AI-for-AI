@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import FileManager from "@/components/FileManager";
 import { useAuth } from "@/context/AuthContext";
-import { importDocumentFile, importDxfFile, importIfcFile } from "@/lib/api/api";
+import { importDocumentFile, importDwgFile, importDxfFile, importIfcFile } from "@/lib/api/api";
 
 /** Authenticated multi-format upload. The backend scans, validates and persists. */
 export default function FilesPanel({ jobId }: { jobId: string }) {
@@ -22,8 +22,8 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
         const documentTypes = new Set([
             "pdf", "docx", "xlsx", "csv", "png", "jpg", "jpeg", "webp", "zip",
         ]);
-        if (!["dxf", "ifc"].includes(format) && !documentTypes.has(format)) {
-            setError("Supported files: DXF, IFC, PDF, DOCX, XLSX, CSV, PNG, JPEG, WebP and ZIP.");
+        if (!["dxf", "dwg", "ifc"].includes(format) && !documentTypes.has(format)) {
+            setError("Supported files: DWG, DXF, IFC, PDF, DOCX, XLSX, CSV, PNG, JPEG, WebP and ZIP.");
             return;
         }
         const limit = format === "ifc" ? 40 : 25;
@@ -35,6 +35,7 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
         try {
             const result = format === "ifc"
                 ? await importIfcFile(user, jobId, file)
+                : format === "dwg" ? await importDwgFile(user, jobId, file)
                 : format === "dxf"
                     ? await importDxfFile(user, jobId, file)
                     : await importDocumentFile(user, jobId, file);
@@ -45,6 +46,7 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
             setRevision((count) => count + 1);
             setMessage(format === "ifc"
                 ? "IFC model imported with parsed project and element metadata."
+                : format === "dwg" ? "DWG converted to validated DXF and saved with source hash."
                 : format === "dxf"
                     ? "DXF drawing imported and linked to this job."
                     : "Document scanned, parsed and saved to this project job.");
@@ -63,7 +65,7 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
                 <input
                     ref={fileInput}
                     type="file"
-                    accept=".dxf,.ifc,.pdf,.docx,.xlsx,.csv,.png,.jpg,.jpeg,.webp,.zip"
+                    accept=".dwg,.dxf,.ifc,.pdf,.docx,.xlsx,.csv,.png,.jpg,.jpeg,.webp,.zip"
                     aria-label="Choose a CAD, BIM or document file"
                     className="sr-only"
                     onChange={(event) => void submitFile(event.currentTarget.files?.[0])}
