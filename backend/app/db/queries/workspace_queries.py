@@ -220,11 +220,12 @@ async def update_role_member(workspace_id: str, target_user_id: str, new_role: s
                 .update({"role": new_role})
                 .eq("workspace_id", workspace_id)
                 .eq("user_id", target_user_id)
+                .eq("role", previous_role)
                 .execute()
         )
 
         if not res or not res.data:
-            raise HTTPException(status_code=404, detail={"error": "Member not found"})
+            raise HTTPException(status_code=409, detail={"error": "Member changed; reload and try again"})
 
         metadata = {
             "target_user_id": target_user_id,
