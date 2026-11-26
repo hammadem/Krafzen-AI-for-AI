@@ -330,10 +330,18 @@ async def import_dwg_for_job(*, job_id: str, upload: UploadFile, user: dict) -> 
             source.write_bytes(raw)
             _scan_file(source)
             try:
-                return dwg_converter_service.convert_dwg_bytes_to_dxf(raw)
+                output=dwg_converter_service.convert_dwg_bytes_to_dxf(raw)
+                if dwg_converter_service.converter_type != "LIBREDWG":
+                    return output,0
+                from app.services.dwg_dxf_validation import validate_converted_dxf
+                raw_dxf=Path(folder)/"native.dxf"; canonical=Path(folder)/"canonical.dxf"
+                raw_dxf.write_bytes(output)
+                _scan_file(raw_dxf)
+                fixed=validate_converted_dxf(raw_dxf,canonical)
+                return canonical.read_bytes(),fixed
             except Exception as exc:
                 raise HTTPException(status_code=503, detail="Local DWG converter unavailable or conversion failed") from exc
-    converted = await run_in_threadpool(convert)
+    converted, zero_handle_normalizations = await run_in_threadpool(convert)
     wrapped = UploadFile(file=BytesIO(converted), filename=name[:-4]+".dxf")
     try:
         return await import_dxf_for_job(job_id=job_id,upload=wrapped,user=user,
@@ -341,6 +349,7 @@ async def import_dwg_for_job(*, job_id: str, upload: UploadFile, user: dict) -> 
                 "source_sha256":hashlib.sha256(raw).hexdigest(),
                 "converted_sha256":hashlib.sha256(converted).hexdigest(),
                 "conversion_method":dwg_converter_service.converter_type.lower()+"_local_dwg_to_dxf","original_binary_retained":False,
+                "zero_handle_normalizations":zero_handle_normalizations,
                 "fidelity_independently_verified":False})
     finally:
         await wrapped.close()

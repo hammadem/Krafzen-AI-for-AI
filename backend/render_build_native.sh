@@ -195,8 +195,13 @@ if [ "${DWG_CONVERTER_TYPE:-LIBREDWG}" = "ODA" ] && [ "${DWG_ODA_USE_AUTHORIZED:
 fi
 
 if [ "${DWG_BUILD_LIBREDWG:-false}" = "true" ]; then
-    bash "$SCRIPT_DIR/scripts/install_libredwg.sh"
-    python "$SCRIPT_DIR/scripts/verify_libredwg_roundtrip.py"
+    rm -f "$SCRIPT_DIR/bin/libredwg/bin/roundtrip_verified"
+    if bash "$SCRIPT_DIR/scripts/install_libredwg.sh" && python "$SCRIPT_DIR/scripts/verify_libredwg_roundtrip.py"; then
+        echo "Native DWG sample round trip verified"
+    else
+        echo "Native DWG disabled: installation or round trip verification failed" >&2
+        rm -f "$SCRIPT_DIR/bin/libredwg/bin/roundtrip_verified"
+    fi
 fi
 
 # Summary

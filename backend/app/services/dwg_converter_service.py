@@ -58,7 +58,8 @@ class DwgConverterService:
             if found:
                 return found
             bundled = backend_root() / "bin" / "libredwg" / "bin" / name
-            return str(bundled) if command == name and os.access(bundled, os.X_OK) else None
+            verified=bundled.parent/"roundtrip_verified"
+            return str(bundled) if command == name and os.access(bundled, os.X_OK) and verified.is_file() else None
         return (resolve(settings.DWG_LIBREDWG_DWG2DXF, "dwg2dxf"), resolve(settings.DWG_LIBREDWG_DXF2DWG, "dxf2dwg"))
 
     def _resolve_converter_cmd_and_ld(self) -> tuple[str | None, str | None]:
