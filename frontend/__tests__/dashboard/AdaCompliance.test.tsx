@@ -14,6 +14,8 @@ vi.mock("@/lib/api/api", () => ({
     getAllFiles: files,
     getProjectAdaAssessments: saved,
     createAdaAssessment: create,
+    getMultidisciplineCatalog: vi.fn().mockResolvedValue({ok:true,data:{rules:[]}}),
+    saveMultidisciplineAssessment: vi.fn(),
 }));
 
 describe("Evidence-backed ADA 2010 compliance screening UI", () => {

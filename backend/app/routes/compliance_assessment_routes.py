@@ -250,3 +250,106 @@ async def download_compliance_report(
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
     })
+
+
+from app.services.multidiscipline_rules import RULES, CATALOG, evaluate_multidiscipline
+
+class MultidisciplineContext(BaseModel):
+    state: str = Field(min_length=2,max_length=100)
+    municipality: str = Field(min_length=2,max_length=100)
+    project_address: str = Field(min_length=5,max_length=250)
+    occupancy: str = Field(min_length=1,max_length=100)
+    building_type: str = Field(min_length=2,max_length=100)
+    adoption_reference: str = Field(default="",max_length=1000)
+    reviewer_name: str = Field(default="",max_length=150)
+    reviewer_credential: str = Field(default="",max_length=250)
+    local_amendments_reviewed_no_conflict: bool = False
+
+class MultidisciplineEntry(BaseModel):
+    rule_id: str = Field(min_length=1,max_length=100)
+    adopted_edition: str = Field(default="",max_length=30)
+    element_reference: str = Field(default="",max_length=300)
+    applicability_confirmed: bool = False
+    measured: float | None = Field(default=None,ge=0,le=1e9,allow_inf_nan=False)
+    extra_value: float | None = Field(default=None,ge=0,le=1e9,allow_inf_nan=False)
+
+class MultidisciplineAssessment(BaseModel):
+    project_id: UUID
+    source_file_id: UUID | None = None
+    jurisdiction: MultidisciplineContext
+    entries: list[MultidisciplineEntry] = Field(min_length=1,max_length=50)
+
+@router.get("/multidiscipline/catalog")
+async def multidisciplinary_catalog(user: dict = Depends(require_auth)):
+    return {"version":"multidiscipline_v1","rules":RULES}
+
+@router.post("/multidiscipline/assessments",status_code=201)
+async def save_multidiscipline_assessment(body: MultidisciplineAssessment,user: dict=Depends(require_auth)):
+    pid=str(body.project_id)
+    project=await _owned_nonsovereign_project(pid,user)
+    if project.get("archived_at"):
+        raise HTTPException(status_code=409,detail="Project archived")
+    source_id=str(body.source_file_id) if body.source_file_id else None
+    source_version=None
+    if source_id:
+        evidence=await get_file(source_id,user)
+        if not evidence or str(evidence.get("project_id"))!=pid:
+            raise HTTPException(status_code=404,detail="Evidence file not found in project")
+        if evidence.get("archived_at"):
+            raise HTTPException(status_code=409,detail="Evidence file archived")
+        source_version=int(evidence.get("version") or 1)
+    entries=[entry.model_dump() for entry in body.entries]
+    if any(entry["rule_id"] not in CATALOG for entry in entries):
+        raise HTTPException(status_code=422,detail="Unknown catalog rule")
+    if len({(e["rule_id"],e["element_reference"].strip().casefold()) for e in entries})!=len(entries):
+        raise HTTPException(status_code=422,detail="Duplicate rule and element reference")
+    context=body.jurisdiction.model_dump()
+    result=evaluate_multidiscipline(context=context,entries=entries,source_file_id=source_id,source_version=source_version)
+    payload={"project_id":pid,"source_file_id":source_id,"created_by":user["user_id"],"jurisdiction":context,
+             "measurements":{"entries":entries,"source_file_version":source_version},"result":result,
+             "review_status":"pending_qualified_review"}
+    try:
+        response=await run_in_threadpool(lambda:db.table("compliance_assessments").insert(payload).execute())
+    except Exception as exc:
+        raise HTTPException(status_code=503,detail="Assessment could not be saved") from exc
+    if not response or not response.data:
+        raise HTTPException(status_code=503,detail="Assessment was not persisted")
+    return response.data[0]
+
+
+class ReviewDeclaration(BaseModel):
+    disposition: Literal["reviewed","rejected"]
+    reviewer_name: str = Field(min_length=2,max_length=150)
+    reviewer_credential: str = Field(min_length=2,max_length=250)
+    review_reference: str = Field(min_length=3,max_length=300)
+    notes: str = Field(min_length=10,max_length=2000)
+    record_is_reviewer_supplied: bool = False
+
+@router.post("/assessments/{assessment_id}/review")
+async def record_review_declaration(assessment_id: UUID, body: ReviewDeclaration,user: dict=Depends(require_auth)):
+    """Append a single review declaration; never certify a professional license."""
+    from datetime import UTC,datetime
+    record=await get_ada_measurement_assessment(assessment_id,user=user)
+    project=await _owned_nonsovereign_project(str(record["project_id"]),user)
+    if project.get("archived_at"):
+        raise HTTPException(status_code=409,detail="Project archived")
+    if not body.record_is_reviewer_supplied or not all(value.strip() for value in (body.reviewer_name,body.reviewer_credential,body.review_reference,body.notes)):
+        raise HTTPException(status_code=422,detail="Explicit reviewer-supplied declaration required")
+    result=record.get("result")
+    if not isinstance(result,dict) or result.get("complete_code_compliance_determined") is not False:
+        raise HTTPException(status_code=409,detail="Invalid assessment evidence")
+    if record.get("review_status")!="pending_qualified_review" or result.get("review_attestation"):
+        raise HTTPException(status_code=409,detail="Review declaration already recorded")
+    declaration={**body.model_dump(),"recorded_by":user["user_id"],"recorded_at":datetime.now(UTC).isoformat(),
+                 "credential_independently_verified":False,"authority_approval":False,"complete_compliance_certified":False}
+    # Preserve all original numerical evidence; append the declaration atomically.
+    try:
+        response=await run_in_threadpool(lambda: db.table("compliance_assessments")
+            .update({"result":{**result,"review_attestation":declaration},"review_status":body.disposition})
+            .eq("id",str(assessment_id)).eq("created_by",user["user_id"])
+            .eq("review_status","pending_qualified_review").execute())
+    except Exception as exc:
+        raise HTTPException(status_code=503,detail="Review declaration could not be recorded") from exc
+    if not response or not response.data:
+        raise HTTPException(status_code=409,detail="Assessment state changed; reload")
+    return response.data[0]
