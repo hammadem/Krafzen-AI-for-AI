@@ -98,7 +98,10 @@ class Settings(BaseSettings):
 
     # DWG export (DXF → DWG conversion)
     # Recommended local converter: ODA File Converter (command often: ODAFileConverter)
-    DWG_CONVERTER_TYPE: str = "ODA"
+    DWG_CONVERTER_TYPE: str = "LIBREDWG"
+    DWG_ODA_USE_AUTHORIZED: bool = False  # operator confirms appropriate usage rights
+    DWG_LIBREDWG_DWG2DXF: str = "dwg2dxf"
+    DWG_LIBREDWG_DXF2DWG: str = "dxf2dwg"
     DWG_CONVERTER_CMD: str = ""  # e.g. "ODAFileConverter"
     DWG_ODA_DEB_URL: str | None = None  # HTTPS presigned URL to Linux x64 .deb (fallback)
     # Preferred on Render: direct R2 API download (avoids presign 400 issues)

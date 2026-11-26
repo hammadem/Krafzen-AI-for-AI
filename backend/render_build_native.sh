@@ -57,7 +57,7 @@ fi
 #
 # Set DWG_ODA_DEB_URL to a direct HTTPS URL of the official Linux x64 .deb
 # (https://www.opendesign.com/guestfiles/oda_file_converter — do not commit the .deb).
-if [ -n "${DWG_ODA_DEB_URL:-}" ]; then
+if [ "${DWG_CONVERTER_TYPE:-LIBREDWG}" = "ODA" ] && [ "${DWG_ODA_USE_AUTHORIZED:-false}" = "true" ] && [ -n "${DWG_ODA_DEB_URL:-}" ]; then
     if ! command -v wget >/dev/null 2>&1; then
         echo "ERROR: wget is required to download DWG_ODA_DEB_URL" >&2
         exit 1
@@ -192,6 +192,11 @@ if [ -n "${DWG_ODA_DEB_URL:-}" ]; then
     fi
 
     echo "DWG: bundled ODA converter OK (relative: $REL)"
+fi
+
+if [ "${DWG_BUILD_LIBREDWG:-false}" = "true" ]; then
+    bash "$SCRIPT_DIR/scripts/install_libredwg.sh"
+    python "$SCRIPT_DIR/scripts/verify_libredwg_roundtrip.py"
 fi
 
 # Summary

@@ -331,7 +331,7 @@ async def import_dwg_for_job(*, job_id: str, upload: UploadFile, user: dict) -> 
             conversion_metadata={"type":"cad","source_format":"dwg","source_name":name,
                 "source_sha256":hashlib.sha256(raw).hexdigest(),
                 "converted_sha256":hashlib.sha256(converted).hexdigest(),
-                "conversion_method":"oda_local_dwg_to_dxf","original_binary_retained":False,
+                "conversion_method":dwg_converter_service.converter_type.lower()+"_local_dwg_to_dxf","original_binary_retained":False,
                 "fidelity_independently_verified":False})
     finally:
         await wrapped.close()
