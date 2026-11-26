@@ -445,3 +445,36 @@ async def test_concurrent_role_change_rejects_stale_update_without_audit():
     assert error.value.status_code == 409
     assert database.tables["workspace_members"][0]["role"] == "viewer"
     record_event.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_recipient_decline_invalidates_code_and_never_grants_membership():
+    database = FakeDatabase({"workspace_invites": [make_invite()]})
+    audit = AsyncMock()
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(invite_queries, "record_workspace_event", audit):
+        result = await invite_queries.decline_invite(INVITE_TOKEN, TARGET_ID)
+        assert result["message"] == "Invitation declined"
+        assert not (await invite_queries.validate_invite(INVITE_TOKEN))["valid"]
+        with pytest.raises(HTTPException) as error:
+            await invite_queries.accept_invite(INVITE_TOKEN, TARGET_ID)
+        assert error.value.status_code == 409
+    assert database.tables["workspace_invites"][0]["status"] == "revoked"
+    assert not database.tables.get("workspace_members")
+    assert audit.await_args.kwargs["event_name"] == "team.invitation_declined"
+    assert audit.await_args.kwargs["actor_user_id"] == TARGET_ID
+
+
+@pytest.mark.asyncio
+async def test_other_email_cannot_decline_invitation():
+    database = FakeDatabase({"workspace_invites": [make_invite()]}, user_email="other@example.com")
+    audit = AsyncMock()
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(invite_queries, "record_workspace_event", audit):
+        with pytest.raises(HTTPException) as error:
+            await invite_queries.decline_invite(INVITE_TOKEN, TARGET_ID)
+    assert error.value.status_code == 403
+    assert database.tables["workspace_invites"][0]["status"] == "pending"
+    audit.assert_not_awaited()

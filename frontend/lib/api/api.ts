@@ -105,6 +105,9 @@ export async function createWorkspace(user: User | null, name: string) {
 export async function acceptWorkspaceInvite(user: User | null, token: string) {
     return apiClient("POST", "/api/v1/workspaces/invites/accept", user, {token});
 }
+export async function declineWorkspaceInvite(user: User | null, token: string) {
+    return apiClient("POST", "/api/v1/workspaces/invites/decline", user, {token});
+}
 export async function getMyWorkspace(user: User | null) {
     return apiClient("GET", WORKSPACE_URLS.GET_MINE(), user);
 }
