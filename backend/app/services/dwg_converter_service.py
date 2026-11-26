@@ -1,4 +1,7 @@
 import logging
+import re
+from pathlib import Path
+from threading import Lock
 import os
 import shutil
 import tempfile
@@ -16,6 +19,12 @@ from app.services.oda_bundle import (
 )
 
 logger = logging.getLogger(__name__)
+_conversion_slot = Lock()
+
+def validate_dwg_header(raw: bytes) -> None:
+    if len(raw) < 64 or not re.fullmatch(rb'AC10[0-9]{2}', raw[:6]):
+        raise ValueError('Not a supported DWG binary header')
+
 
 
 @dataclass(frozen=True)
@@ -141,6 +150,8 @@ class DwgConverterService:
 
         # Pick largest DWG (safest when multiple candidates appear).
         dwg_path = max(candidates, key=lambda p: os.path.getsize(p))
+        with open(dwg_path, "rb") as converted:
+            validate_dwg_header(converted.read(64))
 
         # Normalize output name if desired.
         final_dwg_path = os.path.join(work_dir, dwg_name)
@@ -152,6 +163,34 @@ class DwgConverterService:
             logger.warning("Unable to normalize DWG output filename: %s", exc)
 
         return DwgConvertResult(dwg_path=dwg_path, input_dxf_path=input_dxf_path, work_dir=work_dir)
+
+    def convert_dwg_bytes_to_dxf(self, raw: bytes) -> bytes:
+        """Convert a scanned DWG using the existing ODA runtime, never rename."""
+        validate_dwg_header(raw)
+        if len(raw) > 25 * 1024 * 1024:
+            raise ValueError("DWG exceeds 25 MB")
+        if self._converter_type != "ODA":
+            raise RuntimeError("Unsupported DWG converter")
+        executable, _ = self._resolve_converter_cmd_and_ld()
+        if not executable:
+            raise RuntimeError("ODA converter runtime unavailable")
+        if not _conversion_slot.acquire(blocking=False):
+            raise RuntimeError("DWG converter busy")
+        try:
+            with tempfile.TemporaryDirectory(prefix="krafzen-dwg-import-") as folder:
+                input_dir, output_dir = Path(folder)/"in", Path(folder)/"out"
+                input_dir.mkdir(); output_dir.mkdir()
+                (input_dir/"source.dwg").write_bytes(raw)
+                result = run_oda_subprocess([executable,str(input_dir),str(output_dir),
+                    "ACAD2018","DXF","0","0"],os.environ.copy(),backend_root())
+                output = output_dir/"source.dxf"
+                if result.returncode or not output.is_file() or output.is_symlink():
+                    raise RuntimeError("ODA did not produce the expected DXF")
+                if not 0 < output.stat().st_size <= 25*1024*1024:
+                    raise RuntimeError("Converted DXF exceeds supported size")
+                return output.read_bytes()
+        finally:
+            _conversion_slot.release()
 
     def _normalize_dxf_visibility(self, dxf_path: str) -> None:
         """
