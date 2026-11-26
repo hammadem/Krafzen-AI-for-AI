@@ -38,6 +38,10 @@ class MeasurementsInput(BaseModel):
     ramp_horizontal_run_in: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
     new_construction: bool | None = None
     ramp_alteration_exception_applies: bool | None = None
+    extended_ramp_checks: bool = False
+    ramp_run_405_applies_no_exception_confirmed: bool | None = None
+    ramp_cross_slope_percent: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
+    ramp_clear_width_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
 
 
 class NewAssessment(BaseModel):
