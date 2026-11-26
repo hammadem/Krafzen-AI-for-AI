@@ -1,6 +1,6 @@
 {
   "title": "KRAFZEN AEC objective QA reference set",
-  "as_of": "2026-11-24",
+  "as_of": "2026-11-27",
   "source_repo": "buildingSMART/Certification-datasets",
   "source_repository_url": "https://github.com/buildingSMART/Certification-datasets",
   "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
@@ -80,7 +80,52 @@
         "IfcSlab": 3
       },
       "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.3.2.0%20(IFC%204.3%20ADD2)/Simple-Scene/Building-Architecture.ifc"
+    },
+    {
+      "name": "ifc4_basin_tessellation.ifc",
+      "schema": "IFC4",
+      "classification": "MEP plumbing basin tessellation",
+      "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/basin-tessellation.ifc",
+      "blob": "6598b39f682850f1af7a80df0fec32d3137fad89",
+      "expected_min": {
+        "IfcProject": 1
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/basin-tessellation.ifc"
+    },
+    {
+      "name": "ifc4_column_rectangle.ifc",
+      "schema": "IFC4",
+      "classification": "structural rectangular column tessellation",
+      "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/column-straight-rectangle-tessellation.ifc",
+      "blob": "749e17c510f98d2daaa87d428c946efd7a014dbd",
+      "expected_min": {
+        "IfcProject": 1
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/column-straight-rectangle-tessellation.ifc"
+    },
+    {
+      "name": "ifc4_tessellated_item.ifc",
+      "schema": "IFC4",
+      "classification": "architectural tessellated geometry",
+      "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/tessellated-item.ifc",
+      "blob": "c4a6a764fa7bd32d11988c943158a6b0c75e7e7e",
+      "expected_min": {
+        "IfcProject": 1
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/tessellated-item.ifc"
+    },
+    {
+      "name": "ifc4_tessellation_colors.ifc",
+      "schema": "IFC4",
+      "classification": "architectural tessellation individual colors",
+      "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/tessellation-with-individual-colors.ifc",
+      "blob": "cf5b3e7fde22213b2d69319a2c8c8e260775dcd8",
+      "expected_min": {
+        "IfcProject": 1
+      },
+      "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/tessellation-with-individual-colors.ifc"
     }
   ],
-  "generated_dxf": "Run python backend/scripts/generate_aec_reference_dxf.py --output-dir /tmp/krafzen-aec-dxf for independent known-coordinate DXF regression drawings. NOT surveyed architecture."
+  "generated_dxf": "Run python backend/scripts/generate_aec_reference_dxf.py --output-dir /tmp/krafzen-aec-dxf for independent known-coordinate DXF regression drawings. NOT surveyed architecture.",
+  "source_revision": "5030f652e85d3e679b392fcb38bfa3328d6d9f79"
 }
