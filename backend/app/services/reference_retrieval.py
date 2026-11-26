@@ -39,7 +39,7 @@ def _load_index(root):
         if not item["source_url"].startswith("https://github.com/buildingSMART/Certification-datasets/blob/main/"):
             raise ValueError("Reference source not approved")
         model=ifcopenshell.open(str(path))
-        if str(model.schema) != item["schema"]:
+        if str(model.schema_identifier) != item["schema"]:
             raise ValueError("Reference schema mismatch")
         counts=Counter(str(e.is_a()) for e in model.by_type("IfcProduct"))
         if len(counts)>200: raise ValueError("Reference class budget exceeded")
@@ -48,12 +48,12 @@ def _load_index(root):
         classification=item["classification"]
         discipline="structural" if "structural" in classification.lower() else "mep" if "mep" in classification.lower() else "architecture"
         classes=dict(sorted(counts.items()))
-        content=(f"Certification sample: {classification}. IFC schema {model.schema}. "
+        content=(f"Certification sample: {classification}. IFC schema {model.schema_identifier}. "
                  +"Source product classes: "+", ".join(f"{key}: {count}" for key,count in classes.items())+". "
                  +"Counts describe this reference model only, not a customer's project or verified construction.")
         terms=" ".join(re.sub(r"([a-z])([A-Z])",r"\1 \2",k).lower() for k in classes)
         docs.append({"dataset_id":item["name"],"title":classification,"discipline":discipline,
-                     "schema":str(model.schema),"format":"IFC","version":item["blob"],
+                     "schema":str(model.schema_identifier),"format":"IFC","version":item["blob"],
                      "sha256":digest,"source_url":item["source_url"],"license":LICENSE,
                      "license_url":manifest["license_url"],"attribution":manifest["attribution"],
                      "commercial_use":"CC BY 4.0 permits commercial reuse with attribution",
