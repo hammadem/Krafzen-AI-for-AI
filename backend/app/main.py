@@ -54,9 +54,10 @@ def _bootstrap_oda_bundle() -> None:
         from app.services.dwg_converter_service import dwg_converter_service
         from app.services.oda_bundle import warm_dwg_runtime
 
-        warm_dwg_runtime()
+        if dwg_converter_service.converter_type == "ODA" and settings.DWG_ODA_USE_AUTHORIZED:
+            warm_dwg_runtime()
         if dwg_converter_service.is_configured():
-            logger.info("DWG: ODA converter ready after bundle bootstrap")
+            logger.info("DWG: selected converter executable available")
         else:
             logger.warning(
                 "DWG: converter not configured after bootstrap "
