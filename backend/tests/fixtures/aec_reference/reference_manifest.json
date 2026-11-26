@@ -88,7 +88,9 @@
       "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/basin-tessellation.ifc",
       "blob": "6598b39f682850f1af7a80df0fec32d3137fad89",
       "expected_min": {
-        "IfcProject": 1
+        "IfcProject": 1,
+        "IfcSanitaryTerminal": 1,
+        "IfcTriangulatedFaceSet": 1
       },
       "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/basin-tessellation.ifc"
     },
@@ -99,7 +101,9 @@
       "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/column-straight-rectangle-tessellation.ifc",
       "blob": "749e17c510f98d2daaa87d428c946efd7a014dbd",
       "expected_min": {
-        "IfcProject": 1
+        "IfcProject": 1,
+        "IfcColumn": 1,
+        "IfcTriangulatedFaceSet": 1
       },
       "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/column-straight-rectangle-tessellation.ifc"
     },
@@ -110,7 +114,9 @@
       "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/tessellated-item.ifc",
       "blob": "c4a6a764fa7bd32d11988c943158a6b0c75e7e7e",
       "expected_min": {
-        "IfcProject": 1
+        "IfcProject": 1,
+        "IfcBuildingElementProxy": 1,
+        "IfcTriangulatedFaceSet": 1
       },
       "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/tessellated-item.ifc"
     },
@@ -121,7 +127,9 @@
       "source": "IFC 4.0.2.1 (IFC 4 ADD2 TC1)/ISO Spec - ReferenceView_V1.2/tessellation-with-individual-colors.ifc",
       "blob": "cf5b3e7fde22213b2d69319a2c8c8e260775dcd8",
       "expected_min": {
-        "IfcProject": 1
+        "IfcProject": 1,
+        "IfcBuildingElementProxy": 1,
+        "IfcTriangulatedFaceSet": 1
       },
       "source_url": "https://github.com/buildingSMART/Certification-datasets/blob/main/IFC%204.0.2.1%20(IFC%204%20ADD2%20TC1)/ISO%20Spec%20-%20ReferenceView_V1.2/tessellation-with-individual-colors.ifc"
     }
