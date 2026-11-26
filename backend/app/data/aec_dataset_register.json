@@ -1,0 +1,126 @@
+{
+  "version": "2026-11-27",
+  "sources": [
+    {
+      "name": "buildingSMART Certification-datasets",
+      "url": "https://github.com/buildingSMART/Certification-datasets",
+      "license": "CC BY 4.0",
+      "commercial_use": "approved under attribution",
+      "format": "IFC",
+      "category": "BIM architecture structural MEP",
+      "version": "5030f652e85d3e679b392fcb38bfa3328d6d9f79",
+      "processing": "10 files committed; verify hash and parse in reference index",
+      "training_use": "not used for intent weights"
+    },
+    {
+      "name": "KRAFZEN synthetic CAD QA",
+      "url": "backend/scripts/generate_aec_reference_dxf.py",
+      "license": "original project authored",
+      "commercial_use": "internal original",
+      "format": "DXF",
+      "category": "architecture CAD structural MEP",
+      "version": "generator v1",
+      "processing": "existing generator, separate QA",
+      "training_use": "not used for intent weights"
+    },
+    {
+      "name": "KRAFZEN synthetic intent",
+      "url": "backend/app/data/aec_intent_dataset.jsonl",
+      "license": "original project authored",
+      "commercial_use": "internal original",
+      "format": "JSONL",
+      "category": "AEC query routing",
+      "version": "v1",
+      "processing": "512 train and 32 non-identical synthetic evaluation",
+      "training_use": "fitted Naive Bayes parameters"
+    },
+    {
+      "name": "CubiCasa5K",
+      "url": "https://github.com/CubiCasa/CubiCasa5k/blob/master/LICENSE",
+      "license": "CC BY-NC 4.0",
+      "commercial_use": "blocked",
+      "format": "raster SVG",
+      "category": "architectural floorplans",
+      "version": "publisher release",
+      "processing": "not downloaded",
+      "training_use": "excluded"
+    },
+    {
+      "name": "FloorPlanCAD",
+      "url": "https://floorplancad.github.io/",
+      "license": "CC BY-NC 4.0 annotations",
+      "commercial_use": "blocked",
+      "format": "SVG raster",
+      "category": "CAD symbols",
+      "version": "publisher release",
+      "processing": "not downloaded",
+      "training_use": "excluded"
+    },
+    {
+      "name": "CVC-FP",
+      "url": "https://dag.cvc.uab.es/resources/floorplans/",
+      "license": "exact dataset terms pending",
+      "commercial_use": "not approved",
+      "format": "raster XML",
+      "category": "floorplans",
+      "version": "unverified",
+      "processing": "not downloaded",
+      "training_use": "excluded"
+    },
+    {
+      "name": "HouseExpo",
+      "url": "https://github.com/TeaganLi/HouseExpo",
+      "license": "repository MIT; underlying layout provenance pending",
+      "commercial_use": "not approved until dataset-specific rights reviewed",
+      "format": "JSON",
+      "category": "floorplans",
+      "version": "unverified",
+      "processing": "not downloaded",
+      "training_use": "excluded"
+    },
+    {
+      "name": "Swiss Dwellings",
+      "url": "https://zenodo.org/records/7788422",
+      "license": "CC BY 4.0",
+      "commercial_use": "candidate; review privacy/geolocation and selected fields before ingestion",
+      "format": "CSV geometry",
+      "category": "architecture",
+      "version": "3.0.0",
+      "processing": "not downloaded",
+      "training_use": "pending"
+    },
+    {
+      "name": "BIM Open Data",
+      "url": "https://github.com/ara3d/bim-open-data/blob/main/samples/public/NOTICE.md",
+      "license": "individual model licenses CC BY 4.0 or MIT; review per file",
+      "commercial_use": "candidate only",
+      "format": "BOS DuckDB IFC",
+      "category": "BIM",
+      "version": "unverified",
+      "processing": "not downloaded",
+      "training_use": "pending"
+    },
+    {
+      "name": "buildingSMART IFC4.x specification models",
+      "url": "https://github.com/buildingSMART/IFC4.x-specification-models",
+      "license": "CC BY-ND 4.0 final IFC; exact sample terms pending",
+      "commercial_use": "not approved for training",
+      "format": "IFC",
+      "category": "BIM",
+      "version": "unverified",
+      "processing": "not downloaded",
+      "training_use": "excluded until review"
+    },
+    {
+      "name": "ICC NFPA ASCE standards",
+      "url": "https://codes.iccsafe.org/",
+      "license": "copyrighted; no training permission established",
+      "commercial_use": "link and verified factual rule calculations only",
+      "format": "reference links",
+      "category": "engineering compliance",
+      "version": "per rule edition",
+      "processing": "not downloaded",
+      "training_use": "excluded"
+    }
+  ]
+}
