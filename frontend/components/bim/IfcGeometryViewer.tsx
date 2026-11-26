@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { Box, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { getIfcModelMesh } from "@/lib/api/api";
+import { clipIfcTriangle, type Vec3 } from "@/lib/ifcSection";
 
 type MeshElement = {
     guid: string; name: string; ifc_type: string;
@@ -63,11 +64,19 @@ export default function IfcGeometryViewer({
     const [category, setCategory] = useState("all");
     const [selected, setSelected] = useState<string | null>(null);
     const [isolated, setIsolated] = useState(false);
+    const [sectionAxis, setSectionAxis] = useState("off");
+    const [sectionPosition, setSectionPosition] = useState(50);
+    const scope = fileId + ":" + (user?.userId || "") + ":" + (user?.access_token || "");
+    const scopeRef = useRef(scope);
+    scopeRef.current = scope;
+    const [loadedScope, setLoadedScope] = useState("");
+    const visibleMesh = loadedScope === scope ? mesh : null;
 
     useEffect(() => {
         setMesh(null); setSelected(null); setError(null);
-        setIsolated(false); setCategory("all");
-    }, [fileId]);
+        setIsolated(false); setCategory("all"); setSectionAxis("off"); setSectionPosition(50); setLoading(false);
+        setLoadedScope(""); hitRef.current = [];
+    }, [scope]);
 
     const categories = useMemo(() =>
         [...new Set((mesh?.elements || []).map(item => item.ifc_type))].sort(),
@@ -77,6 +86,7 @@ export default function IfcGeometryViewer({
 
     const load = async () => {
         if (!user?.access_token || !fileId || loading) return;
+        const requestScope = scope;
         setLoading(true); setError(null);
         try {
             const response = await getIfcModelMesh(user, fileId);
@@ -92,17 +102,19 @@ export default function IfcGeometryViewer({
                 !candidate.bounds?.min || !candidate.bounds?.max) {
                 throw new Error("Server did not provide verified triangulated IFC geometry");
             }
-            setMesh(candidate); setSelected(null);
+            if (scopeRef.current !== requestScope) return;
+            setMesh(candidate); setLoadedScope(requestScope); setSelected(null);
         } catch (cause) {
-            setError(cause instanceof Error ? cause.message : "Model geometry unavailable");
+            if (scopeRef.current === requestScope) setError(cause instanceof Error ? cause.message : "Model geometry unavailable");
         } finally {
-            setLoading(false);
+            if (scopeRef.current === requestScope) setLoading(false);
         }
     };
 
     useEffect(() => {
         const canvas = canvasRef.current;
-        if (!canvas || !mesh) return;
+        if (!canvas || !visibleMesh) return;
+        const mesh = visibleMesh;
         const context = canvas.getContext("2d");
         if (!context) return;
         context.clearRect(0, 0, WIDTH, HEIGHT);
@@ -125,34 +137,34 @@ export default function IfcGeometryViewer({
             if (!Array.isArray(element.vertices) ||
                 !Array.isArray(element.triangles) ||
                 element.vertices.length % 3 || element.triangles.length % 3) continue;
-            const projected: Array<Point2 & { depth: number }> = [];
-            for (let i = 0; i < element.vertices.length; i += 3) {
-                const x = (element.vertices[i] - center[0]) / span;
-                const y = (element.vertices[i+1] - center[1]) / span;
-                const z = (element.vertices[i+2] - center[2]) / span;
+            const project = (p: Vec3) => {
+                const x = (p[0] - center[0]) / span;
+                const y = (p[1] - center[1]) / span;
+                const z = (p[2] - center[2]) / span;
                 // Camera rotates around the source model's true 3-D bounding centre.
                 const rx = x*cosY - y*sinY;
                 const dy = x*sinY + y*cosY;
                 const rz = z*cosP - dy*sinP;
                 const depth = z*sinP + dy*cosP;
                 const perspective = 2.8 / Math.max(0.8, 3.5-depth);
-                projected.push({
+                return {
                     x: WIDTH/2 + rx*HEIGHT*perspective*zoom + pan.x,
                     y: HEIGHT/2 - rz*HEIGHT*perspective*zoom + pan.y,
                     depth,
-                });
-            }
+                };
+            };
             for (let i = 0; i < element.triangles.length; i += 3) {
-                const a = projected[element.triangles[i]];
-                const b = projected[element.triangles[i+1]];
-                const c = projected[element.triangles[i+2]];
-                if (!a || !b || !c ||
-                    ![a.x,a.y,b.x,b.y,c.x,c.y].every(Number.isFinite)) continue;
-                triangles.push({
-                    guid: element.guid, p1: a, p2: b, p3: c,
-                    depth: (a.depth+b.depth+c.depth)/3,
-                    type: element.ifc_type, active: selected === element.guid,
-                });
+                const ids = element.triangles.slice(i,i+3);
+                if (ids.some(index=>!Number.isInteger(index)||index<0||index*3+2>=element.vertices.length)) continue;
+                const points = ids.map(index=>element.vertices.slice(index*3,index*3+3) as Vec3) as [Vec3,Vec3,Vec3];
+                const axis = ["x","y","z"].indexOf(sectionAxis);
+                const plane = axis>=0 ? mesh.bounds.min[axis]+(mesh.bounds.max[axis]-mesh.bounds.min[axis])*sectionPosition/100 : 0;
+                for (const part of axis>=0 ? clipIfcTriangle(points,axis,plane) : [points]) {
+                    const [a,b,c] = part.map(project);
+                    if (![a.x,a.y,b.x,b.y,c.x,c.y].every(Number.isFinite)) continue;
+                    triangles.push({guid:element.guid,p1:a,p2:b,p3:c,depth:(a.depth+b.depth+c.depth)/3,
+                        type:element.ifc_type,active:selected===element.guid});
+                }
             }
         }
         triangles.sort((a,b) => a.depth - b.depth);
@@ -172,7 +184,7 @@ export default function IfcGeometryViewer({
         }
         context.globalAlpha = 1;
         hitRef.current = triangles;
-    }, [mesh, yaw, pitch, zoom, pan, category, selected, isolated]);
+    }, [visibleMesh, yaw, pitch, zoom, pan, category, selected, isolated, sectionAxis, sectionPosition]);
 
     const xy = (event: ReactPointerEvent<HTMLCanvasElement>): Point2 => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -244,7 +256,7 @@ export default function IfcGeometryViewer({
                 surface to select its source element. No fabricated model geometry.
             </p>
             {error && <p role="alert" className="text-amber-300 text-sm">{error}</p>}
-            {mesh && (
+            {visibleMesh && mesh && (
                 <>
                     <div className="flex gap-3 flex-wrap items-center text-xs">
                         <span>{mesh.rendered_element_count} displayed objects · {mesh.triangle_count} triangles</span>
@@ -271,6 +283,11 @@ export default function IfcGeometryViewer({
                                 disabled={!selected}/>
                             Isolate selected
                         </label>
+                    </div>
+                    <div className="flex flex-wrap gap-3 items-center text-xs">
+                        <label>Section plane <select aria-label="IFC section axis" value={sectionAxis} onChange={e=>setSectionAxis(e.target.value)} className="bg-slate-900 p-1 rounded"><option value="off">Off</option><option value="x">X</option><option value="y">Y</option><option value="z">Z (height)</option></select></label>
+                        {sectionAxis!=="off" && <label>Plane position <input aria-label="IFC section position" type="range" min={0} max={100} value={sectionPosition} onChange={e=>setSectionPosition(Number(e.target.value))}/> {sectionPosition}%</label>}
+                        <span className="text-slate-400">Visual clipping of source triangles only; no section caps or measured areas.</span>
                     </div>
                     <canvas
                         ref={canvasRef} width={WIDTH} height={HEIGHT}
