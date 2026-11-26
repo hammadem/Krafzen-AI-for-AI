@@ -25,6 +25,22 @@ def scanner_status():
     with _lock:
         now=monotonic()
         if _cache and now-_cache[0]<60: return dict(_cache[1])
+        from app.services.private_scanner_client import remote_requested, _config
+        if remote_requested():
+            result={"scanner_binary_detected":False,"scanner_signature_metadata_current":False,"private_scanner_verified":False}
+            try:
+                import httpx
+                url,token=_config()
+                with httpx.Client(timeout=90,follow_redirects=False,trust_env=False) as client:
+                    response=client.get(url+"/health",headers={"Authorization":"Bearer "+token})
+                    response.raise_for_status()
+                    evidence=response.json()
+                valid=(evidence.get("status")=="verified" and evidence.get("benign")=="clean" and evidence.get("eicar")=="rejected" and signature_metadata_current(evidence.get("signature_version")))
+                result.update(scanner_binary_detected=valid,scanner_signature_metadata_current=valid,private_scanner_verified=valid)
+            except Exception:
+                pass
+            _cache=(now,result)
+            return dict(result)
         binary=shutil.which(os.getenv("CLAMSCAN_CMD","clamscan"))
         result={"scanner_binary_detected":bool(binary),"scanner_signature_metadata_current":False}
         if binary:
