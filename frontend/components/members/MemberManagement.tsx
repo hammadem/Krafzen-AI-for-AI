@@ -63,6 +63,7 @@ export default function MemberManagement({ workspaceId, canManage = true }: { wo
         select: selectInvites,
         fallback: [],
         enabled: !!workspaceId && canManage,
+        resourceKey: workspaceId,
     });
 
     const pendingInvites = invites.filter((i) => i.status === "pending" && new Date(i.expires_at).getTime() > Date.now());
@@ -116,7 +117,8 @@ export default function MemberManagement({ workspaceId, canManage = true }: { wo
             {canManage && <><InviteForm onInvite={handleInvite} />
             <p className="text-xs text-slate-400">Invitations are not emailed automatically. Share the code privately with the intended email account.</p>
             {invitesError && <p role="alert">{inviteError?.message || "Could not load invitations."} <button onClick={refetchInvites} className="underline">Retry</button></p>}
-            <fieldset disabled={changing}><PendingInvites invites={pendingInvites} onRevoke={handleRevoke} /></fieldset></>}
+            <fieldset disabled={changing}><PendingInvites invites={pendingInvites} onRevoke={handleRevoke} /></fieldset>
+            {!!invites.filter(i=>!pendingInvites.includes(i)).length && <details className="rounded-lg border border-white/10 p-3"><summary className="cursor-pointer text-sm">Invitation history</summary>{invites.filter(i=>!pendingInvites.includes(i)).map(i=><div key={i.id} className="flex flex-wrap justify-between gap-2 py-2 text-xs border-b border-white/10"><span>{i.email} · {i.role}</span><span>{i.status === "revoked" ? "Invalidated — revoked or declined" : i.status === "pending" ? "Expired" : i.status}</span></div>)}<p className="text-xs text-slate-400">The activity timeline records who revoked or declined an invitation.</p></details>}</>}
 
             {/* Members */}
             <div className="flex flex-col gap-2">
