@@ -210,3 +210,25 @@ async def test_failed_persistence_must_not_report_succeeded_rule_assessment():
         with pytest.raises(HTTPException) as error:
             await routes.create_ada_measurement_assessment(request(), user=USER)
     assert error.value.status_code == 503
+
+
+@pytest.mark.parametrize("cross,width,rise,expected", [
+    (100 / 48, 36, 30, ("pass", "pass", "pass")),
+    (2.1, 35.99, 30.01, ("fail", "fail", "fail")),
+    (0, 42, 6, ("pass", "pass", "pass")),
+])
+def test_extended_ada_ramp_boundaries(cross, width, rise, expected):
+    report = evaluate_ada_measurements(context=CONTEXT, measurements=checks(
+        extended_ramp_checks=True, ramp_run_405_applies_no_exception_confirmed=True,
+        ramp_cross_slope_percent=cross, ramp_clear_width_in=width, ramp_rise_in=rise,
+    ))
+    assert report["rule_version"] == "ada_measurements_v2"
+    assert tuple(result_by_section(report, section)["result"] for section in ("405.3", "405.5", "405.6")) == expected
+    assert report["complete_code_compliance_determined"] is False
+
+
+def test_extended_ada_ramp_without_confirmed_applicability_is_unknown():
+    report = evaluate_ada_measurements(context=CONTEXT, measurements=checks(
+        extended_ramp_checks=True, ramp_cross_slope_percent=1.0, ramp_clear_width_in=40,
+    ))
+    assert all(result_by_section(report, section)["result"] == "unknown" for section in ("405.3", "405.5", "405.6"))
