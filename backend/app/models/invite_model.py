@@ -22,6 +22,7 @@ class InviteResponse(BaseModel):
     status: str
     expires_at: datetime
     created_at: datetime | None = None
+    email_delivery: str | None = None
 
     class Config:
         from_attributes = True
