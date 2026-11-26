@@ -185,3 +185,33 @@ async def test_queue_filter_is_applied_before_limit(region):
             "metadata->>region_code.eq.global,metadata->>region_code.is.null"
         )
     query.limit.assert_called_once_with(50)
+
+
+@pytest.mark.parametrize("value,expected", [("0", 1), ("1", 1), ("2", 2), ("50", 4), ("invalid", 1)])
+def test_worker_concurrency_is_bounded(monkeypatch, value, expected):
+    monkeypatch.setenv("KRAFZEN_EXPORT_WORKER_CONCURRENCY", value)
+    assert worker_service._worker_concurrency() == expected
+
+
+@pytest.mark.asyncio
+async def test_worker_does_not_launch_multiple_native_jobs_on_single_slot():
+    jobs = [{**GLOBAL_JOB, "id": str(index)} for index in range(10)]
+    task = MagicMock()
+    task.done.return_value = False
+
+    def schedule(coro):
+        coro.close()
+        return task
+
+    with (
+        patch.object(worker_service, "CURRENT_REGION_CODE", ""),
+        patch.object(worker_service, "CURRENT_WORKER_POOL", ""),
+        patch.object(worker_service, "MAX_CONCURRENT_EXPORTS", 1),
+        patch.object(worker_service, "run_in_threadpool", AsyncMock(return_value=SimpleNamespace(data=jobs))),
+        patch.object(worker_service, "process_export_job", new_callable=AsyncMock) as process,
+        patch.object(worker_service.asyncio, "create_task", side_effect=schedule),
+        patch.object(worker_service.asyncio, "sleep", AsyncMock(side_effect=asyncio.CancelledError)),
+    ):
+        with pytest.raises(asyncio.CancelledError):
+            await worker_service._poll_export_jobs()
+    assert process.call_count == 1
