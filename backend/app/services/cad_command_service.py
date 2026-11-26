@@ -21,6 +21,14 @@ def propose_room_edit(metadata, command):
     if match:
         field={"width":"exterior_width_m","length":"exterior_length_m","wall thickness":"wall_thickness_m"}[match[1].lower()]
         data[field]=metre(match[2],match[3])
+    elif match := re.fullmatch(r"move opening (\d{1,2}) to (north|south|east|west)(?: wall)? at "+VALUE,value,re.I):
+        index=int(match[1])-1
+        if not 0<=index<len(data["openings"]): raise ValueError("Opening number does not exist")
+        data["openings"][index].update(side=match[2].lower(),offset_m=metre(match[3],match[4]))
+    elif match := re.fullmatch(r"(?:resize|set width of) opening (\d{1,2}) to "+VALUE,value,re.I):
+        index=int(match[1])-1
+        if not 0<=index<len(data["openings"]): raise ValueError("Opening number does not exist")
+        data["openings"][index]["clear_width_m"]=metre(match[2],match[3])
     else:
         match=re.fullmatch(r"add (door|window) on (north|south|east|west)(?: wall)? at "+VALUE+r" (?:with )?(?:clear )?width "+VALUE,value,re.I)
         if match:
@@ -35,7 +43,7 @@ def propose_room_edit(metadata, command):
             else:
                 match=re.fullmatch(r"rename room to (.{1,80})",value,re.I)
                 if not match:
-                    raise ValueError("Supported commands: set width/length/wall thickness to 6 m; add door on south at 1 m width 0.9 m; remove opening 1; rename room to Office. Explicit units required.")
+                    raise ValueError("Supported commands: set width/length/wall thickness to 6 m; add door on south at 1 m width 0.9 m; move opening 1 to east at 1 m; resize opening 1 to 900 mm; remove opening 1; rename room to Office. Explicit units required.")
                 data["room_name"]=match[1].strip()
     _, geometry=build_room_dxf(name=data["room_name"],width_m=data["exterior_width_m"],
         length_m=data["exterior_length_m"],wall_thickness_m=data["wall_thickness_m"],openings=data["openings"])
