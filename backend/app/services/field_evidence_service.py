@@ -48,6 +48,7 @@ def sanitized_photo_bytes(raw: bytes, extension: str) -> tuple[bytes, dict]:
             decoded = ImageOps.exif_transpose(source)
             decoded.load()
             sanitized = decoded.convert("RGB")
+            width, height = sanitized.size
             buf = BytesIO()
             sanitized.save(buf, format="JPEG", quality=88, optimize=True)
             result = buf.getvalue()
@@ -132,6 +133,20 @@ def generate_field_report_pdf(project_id: str, rows: list[dict]) -> bytes:
         line("Observed: " + str(record.get("observed_at") or record.get("created_at") or "unknown"))
         line("Location (user-declared): " + str(record.get("location_label") or "not supplied"))
         line("Description: " + str(record.get("description") or ""))
+        if record.get("resolved_at"):
+            line("Resolved: " + str(record["resolved_at"]))
+        for note in record.get("report_notes", []):
+            line("Note: " + str(note.get("kind") or "comment").replace("_", " ") +
+                 " | " + str(note.get("created_at") or "unknown"), 10, True)
+            if note.get("due_date"):
+                line("Corrective action due: " + str(note["due_date"]))
+            line(note.get("body") or "")
+        for photo in record.get("report_photos", []):
+            line("Stored photo evidence reference: " + str(photo.get("id") or ""))
+            line("Recorded: " + str(photo.get("created_at") or "unknown"))
+            metadata = photo.get("source_metadata") or {}
+            if metadata.get("stored_sha256"):
+                line("Stored SHA-256: " + str(metadata["stored_sha256"]))
         y -= 10
 
     line("NOT A CONFIRMED ENGINEERING DEFECT OR CODE APPROVAL.", 10, True)

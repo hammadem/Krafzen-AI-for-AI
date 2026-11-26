@@ -358,14 +358,47 @@ async def get_field_project_report_pdf(
         )
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Cannot load report observations") from exc
-    rows = response.data if response and response.data else []
+    if response is None or response.data is None:
+        raise HTTPException(status_code=503, detail="Cannot load report observations")
+    rows = response.data
     if len(rows) > 200:
         raise HTTPException(
             status_code=409,
             detail="Report exceeds 200 observations; use scoped reporting",
         )
+    # Attach saved comments, corrective actions and photo evidence metadata.
+    # Never retrieve private image bytes or signed URLs for this report.
+    inspection_ids = [str(row["id"]) for row in rows]
+    notes_by_id = {key: [] for key in inspection_ids}
+    photos_by_id = {key: [] for key in inspection_ids}
+    if inspection_ids:
+        try:
+            for start in range(0, len(inspection_ids), 50):
+                batch = inspection_ids[start:start + 50]
+                notes = await run_in_threadpool(lambda: db.table("field_observation_notes")
+                    .select("id,inspection_id,kind,body,due_date,created_at")
+                    .eq("created_by", user["user_id"]).in_("inspection_id", batch)
+                    .order("created_at").order("id").limit(501).execute())
+                photos = await run_in_threadpool(lambda: db.table("field_photos")
+                    .select("id,inspection_id,created_at,source_metadata")
+                    .eq("created_by", user["user_id"]).eq("project_id", project_id_str)
+                    .in_("inspection_id", batch).order("created_at").order("id").limit(501).execute())
+                if notes is None or notes.data is None or photos is None or photos.data is None:
+                    raise RuntimeError("Report evidence unavailable")
+                for item in notes.data:
+                    notes_by_id[str(item["inspection_id"])].append(item)
+                for item in photos.data:
+                    photos_by_id[str(item["inspection_id"])].append(item)
+                if sum(map(len, notes_by_id.values())) > 500 or sum(map(len, photos_by_id.values())) > 500:
+                    raise HTTPException(status_code=409, detail="Report exceeds 500 notes or photo references")
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="Cannot load report evidence") from exc
+    enriched = [{**row, "report_notes": notes_by_id[str(row["id"])],
+                 "report_photos": photos_by_id[str(row["id"])]} for row in rows]
     try:
-        pdf = await run_in_threadpool(generate_field_report_pdf, project_id_str, rows)
+        pdf = await run_in_threadpool(generate_field_report_pdf, project_id_str, enriched)
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Field PDF generation failed") from exc
     return Response(
