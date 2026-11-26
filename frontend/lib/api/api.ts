@@ -895,3 +895,7 @@ export async function getMultidisciplineCatalog(user:User|null){
 export async function saveMultidisciplineAssessment(user:User|null,payload:{project_id:string;source_file_id:string|null;jurisdiction:Record<string,unknown>;entries:Record<string,unknown>[]}){
     return apiClient("POST","/api/v1/compliance/multidiscipline/assessments",user,payload);
 }
+
+export async function recordComplianceReview(user:User|null,assessmentId:string,payload:Record<string,unknown>){
+    return apiClient("POST",`/api/v1/compliance/assessments/${encodeURIComponent(assessmentId)}/review`,user,payload);
+}
