@@ -1,5 +1,6 @@
 import logging
 import re
+import subprocess
 from pathlib import Path
 from threading import Lock
 import os
@@ -45,12 +46,21 @@ class DwgConverterService:
 
     def __init__(self) -> None:
         self._converter_cmd = (getattr(settings, "DWG_CONVERTER_CMD", None) or "").strip()
-        self._converter_type = (getattr(settings, "DWG_CONVERTER_TYPE", None) or "ODA").strip().upper()
+        self._converter_type = (getattr(settings, "DWG_CONVERTER_TYPE", None) or "LIBREDWG").strip().upper()
+
+    @property
+    def converter_type(self) -> str:
+        return self._converter_type
+
+    def _libredwg_tools(self) -> tuple[str | None, str | None]:
+        return (shutil.which(settings.DWG_LIBREDWG_DWG2DXF), shutil.which(settings.DWG_LIBREDWG_DXF2DWG))
 
     def _resolve_converter_cmd_and_ld(self) -> tuple[str | None, str | None]:
         """
         Resolve ODA executable and optional LD_LIBRARY_PATH prefix (bundled .deb on Render).
         """
+        if self._converter_type != "ODA" or not settings.DWG_ODA_USE_AUTHORIZED:
+            return None, None
         if self._converter_cmd:
             raw = self._converter_cmd
             if os.path.basename(raw) != raw:
@@ -75,9 +85,13 @@ class DwgConverterService:
         return None, None
 
     def is_configured(self) -> bool:
+        if self._converter_type == "LIBREDWG":
+            return all(self._libredwg_tools())
         return bool(self._resolve_converter_cmd_and_ld()[0])
 
     def convert_dxf_path_to_dwg(self, dxf_path: str, *, output_filename: str | None = None) -> DwgConvertResult:
+        if self._converter_type == "LIBREDWG":
+            return self._libredwg_export(dxf_path, output_filename=output_filename)
         if not self.is_configured():
             detail = get_last_oda_error()
             msg = (
@@ -105,7 +119,7 @@ class DwgConverterService:
         shutil.copyfile(dxf_path, input_dxf_path)
         self._normalize_dxf_visibility(input_dxf_path)
 
-        dwg_name = output_filename or os.path.splitext(os.path.basename(dxf_path))[0] + ".dwg"
+        dwg_name = os.path.basename(output_filename) if output_filename else os.path.splitext(os.path.basename(dxf_path))[0] + ".dwg"
         if not dwg_name.lower().endswith(".dwg"):
             dwg_name += ".dwg"
 
@@ -164,16 +178,50 @@ class DwgConverterService:
 
         return DwgConvertResult(dwg_path=dwg_path, input_dxf_path=input_dxf_path, work_dir=work_dir)
 
+    def _libredwg_export(self, dxf_path: str, *, output_filename: str | None = None) -> DwgConvertResult:
+        reader, writer = self._libredwg_tools()
+        if not reader or not writer:
+            raise RuntimeError("LibreDWG CLI tools are not installed")
+        if not os.path.isfile(dxf_path) or not 0 < os.path.getsize(dxf_path) <= 25*1024*1024:
+            raise ValueError("DXF input missing or oversized")
+        if not _conversion_slot.acquire(blocking=False):
+            raise RuntimeError("DWG converter busy")
+        work_dir = tempfile.mkdtemp(prefix="krafzen-libredwg-")
+        try:
+            original = Path(work_dir)/"source.dxf"
+            shutil.copyfile(dxf_path, original)
+            name = os.path.basename(output_filename or "drawing.dwg")
+            if not name.lower().endswith(".dwg"):
+                name += ".dwg"
+            output = Path(work_dir)/name
+            # Stable documented write target; do not promise DWG 2018 output.
+            result = subprocess.run([writer, "--as=r2000", "-o", str(output), str(original)],
+                                    capture_output=True, check=False, timeout=180)
+            if result.returncode or not output.is_file() or output.is_symlink() or not 64<=output.stat().st_size<=25*1024*1024:
+                raise RuntimeError("LibreDWG did not produce a bounded DWG")
+            with output.open("rb") as f:
+                header=f.read(64)
+                validate_dwg_header(header)
+                if header[:6]!=b"AC1015":
+                    raise RuntimeError("LibreDWG output is not the requested R2000 format")
+            return DwgConvertResult(str(output), str(original), work_dir)
+        except Exception:
+            shutil.rmtree(work_dir, ignore_errors=True)
+            raise
+        finally:
+            _conversion_slot.release()
+
     def convert_dwg_bytes_to_dxf(self, raw: bytes) -> bytes:
         """Convert a scanned DWG using the existing ODA runtime, never rename."""
         validate_dwg_header(raw)
         if len(raw) > 25 * 1024 * 1024:
             raise ValueError("DWG exceeds 25 MB")
-        if self._converter_type != "ODA":
-            raise RuntimeError("Unsupported DWG converter")
-        executable, _ = self._resolve_converter_cmd_and_ld()
+        if self._converter_type == "LIBREDWG":
+            executable, _ = self._libredwg_tools()
+        else:
+            executable, _ = self._resolve_converter_cmd_and_ld()
         if not executable:
-            raise RuntimeError("ODA converter runtime unavailable")
+            raise RuntimeError("Selected DWG converter runtime unavailable")
         if not _conversion_slot.acquire(blocking=False):
             raise RuntimeError("DWG converter busy")
         try:
@@ -181,11 +229,15 @@ class DwgConverterService:
                 input_dir, output_dir = Path(folder)/"in", Path(folder)/"out"
                 input_dir.mkdir(); output_dir.mkdir()
                 (input_dir/"source.dwg").write_bytes(raw)
-                result = run_oda_subprocess([executable,str(input_dir),str(output_dir),
-                    "ACAD2018","DXF","0","0"],os.environ.copy(),backend_root())
                 output = output_dir/"source.dxf"
+                if self._converter_type == "LIBREDWG":
+                    result = subprocess.run([executable,"-o",str(output),str(input_dir/"source.dwg")],
+                                            capture_output=True,check=False,timeout=180)
+                else:
+                    result = run_oda_subprocess([executable,str(input_dir),str(output_dir),
+                        "ACAD2018","DXF","0","0"],os.environ.copy(),backend_root())
                 if result.returncode or not output.is_file() or output.is_symlink():
-                    raise RuntimeError("ODA did not produce the expected DXF")
+                    raise RuntimeError("Converter did not produce the expected DXF")
                 if not 0 < output.stat().st_size <= 25*1024*1024:
                     raise RuntimeError("Converted DXF exceeds supported size")
                 return output.read_bytes()
