@@ -6,6 +6,7 @@ and ezdxf parsing are NOT substitutes for malware scanning.
 """
 
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -203,7 +204,7 @@ async def import_dxf_for_job(
 
 
 async def import_ifc_for_job(
-    *, job_id: str, upload: UploadFile, user: dict
+    *, job_id: str, upload: UploadFile, user: dict, revit_provenance: dict | None = None
 ) -> dict:
     """Import a genuine IFC model and persist parsed model metadata."""
     if not user or not user.get("user_id"):
@@ -238,6 +239,8 @@ async def import_ifc_for_job(
         raise HTTPException(status_code=413, detail="IFC file exceeds 40 MB")
 
     summary = await run_in_threadpool(_scan_ifc_and_extract_metadata, data)
+    if revit_provenance:
+        summary["revit_source"] = {**revit_provenance, "ifc_sha256": hashlib.sha256(data).hexdigest()}
     user_id = str(user["user_id"])
     filename = f"import_{uuid.uuid4().hex}.ifc"
     storage_path = f"{user_id}/{project_id}/imports/{job_id}/{filename}"
@@ -282,6 +285,47 @@ async def import_ifc_for_job(
         except Exception:
             pass
         raise HTTPException(status_code=503, detail="IFC import could not be finalized") from exc
+
+
+async def import_revit_bridge_for_job(*, job_id: str, source: UploadFile, upload: UploadFile, user: dict) -> dict:
+    """Accept a local Revit-exported IFC and hash/scan its declared RVT source.
+
+    Neither file is sent to a third party. The relationship is user-declared;
+    only Revit can perform native export. We do not claim native RVT parsing.
+    """
+    if not user or not user.get("user_id"):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        uuid.UUID(str(job_id))
+    except (ValueError,TypeError) as exc:
+        raise HTTPException(status_code=422,detail="Invalid job ID") from exc
+    job = await get_job(job_id,user)
+    project = await get_project(str(job["project_id"]),user) if job else None
+    if not project:
+        raise HTTPException(status_code=404,detail="Project job not found")
+    if project.get("workspace_id") or project.get("archived_at"):
+        raise HTTPException(status_code=409,detail="Project is archived or requires regional processing")
+    filename = source.filename or ""
+    if (not filename.lower().endswith(".rvt") or len(filename)>250 or "/" in filename or chr(92) in filename):
+        raise HTTPException(status_code=415,detail="Select the original RVT and exported IFC")
+    if not (upload.filename or "").lower().endswith(".ifc"):
+        raise HTTPException(status_code=415,detail="Export an actual IFC using Autodesk Revit")
+    original = await source.read(MAX_IFC_BYTES+1)
+    if len(original)>MAX_IFC_BYTES:
+        raise HTTPException(status_code=413,detail="RVT source exceeds 40 MB")
+    if len(original)<512 or original[:8] != bytes.fromhex("D0CF11E0A1B11AE1"):
+        raise HTTPException(status_code=422,detail="Unsupported RVT container signature; native file not verified")
+    def scan_source():
+        with tempfile.TemporaryDirectory(prefix="krafzen-revit-source-") as folder:
+            path = Path(folder)/"source.rvt"
+            path.write_bytes(original)
+            _scan_file(path)
+    await run_in_threadpool(scan_source)
+    return await import_ifc_for_job(job_id=job_id,upload=upload,user=user,
+        revit_provenance={"source_name":filename,"source_sha256":hashlib.sha256(original).hexdigest(),
+            "source_container":"compound_file_signature","conversion_method":"user_declared_local_revit_ifc_export",
+            "native_rvt_parsed":False,"source_relationship_independently_verified":False,
+            "original_binary_retained":False})
 
 
 # Document/file classes use the SAME authenticated job/project, malware scanner,
