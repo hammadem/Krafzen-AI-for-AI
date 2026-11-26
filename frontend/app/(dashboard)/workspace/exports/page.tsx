@@ -2,7 +2,8 @@
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileDown, SearchIcon, RefreshCw, AlertCircle, Download, RotateCcw, Loader2 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import { exportHistoryCsv, isSafeExportDownload } from "@/lib/exportHistory";
 import { getUserExports, retryExport, getExportArtifactSignedUrl } from "@/lib/api/api";
 import { useApiResource } from "@/hooks/useApiResource";
 import { useAuth } from "@/context/AuthContext";
@@ -67,6 +68,8 @@ export default function Exports() {
     const [status, setStatus] = useState("all");
     const [retrying, setRetrying] = useState<Set<string>>(new Set());
     const [downloading, setDownloading] = useState<Set<string>>(new Set());
+    const retryLock = useRef(new Set<string>());
+    const downloadLock = useRef(new Set<string>());
 
     const {
         data: exports,
@@ -74,7 +77,6 @@ export default function Exports() {
         isError,
         error,
         refetch,
-        setData,
     } = useApiResource<ExportItem[]>({
         fetcher: (u) => getUserExports(u),
         select: (raw) => {
@@ -102,44 +104,53 @@ export default function Exports() {
     }, [exports, search, format, status]);
 
     const handleRetry = async (item: ExportItem) => {
-        if (retrying.has(item.id)) return;
-        setRetrying((prev) => new Set(prev).add(item.id));
-
-        // Optimistic: move it to "queued" immediately.
-        const prevStatus = item.status;
-        setData((prev) => prev.map((e) => (e.id === item.id ? { ...e, status: "queued", progress_percent: 0 } : e)));
-
-        const { ok } = await retryExport(user, item.id);
-        if (ok) {
-            toast.dark("Export retry started");
-        } else {
-            setData((prev) => prev.map((e) => (e.id === item.id ? { ...e, status: prevStatus } : e)));
-            toast.dark("Couldn't retry — please try again");
+        if (retryLock.current.has(item.id)) return;
+        retryLock.current.add(item.id);
+        setRetrying(prev => new Set(prev).add(item.id));
+        try {
+            const result = await retryExport(user, item.id);
+            if (!result.ok) throw new Error(result.error?.message || "Could not retry export");
+            toast.dark("Export retry queued");
+        } catch (cause) {
+            toast.dark(cause instanceof Error ? cause.message : "Could not retry export");
+        } finally {
+            retryLock.current.delete(item.id);
+            setRetrying(prev => { const next = new Set(prev); next.delete(item.id); return next; });
+            refetch();
         }
-        setRetrying((prev) => {
-            const next = new Set(prev);
-            next.delete(item.id);
-            return next;
-        });
     };
 
-    // Private bucket → fetch a short-lived signed URL for the artifact, then open it.
     const handleDownload = async (item: ExportItem) => {
-        if (!item.artifact_file_id || downloading.has(item.id)) return;
-        setDownloading((prev) => new Set(prev).add(item.id));
-
-        const { ok, data } = await getExportArtifactSignedUrl(user, item.id);
-        const url = (data as unknown as SignedUrlResponse | null)?.signed_url;
-        if (ok && url) {
-            window.open(url, "_blank", "noopener,noreferrer");
-        } else {
-            toast.dark("Couldn't get the download link");
+        if (!item.artifact_file_id || downloadLock.current.has(item.id)) return;
+        downloadLock.current.add(item.id);
+        setDownloading(prev => new Set(prev).add(item.id));
+        try {
+            const result = await getExportArtifactSignedUrl(user, item.id);
+            const url = (result.data as unknown as SignedUrlResponse | null)?.signed_url;
+            if (!result.ok || !url || !isSafeExportDownload(url, window.location.hostname)) {
+                throw new Error(result.error?.message || "A valid secure download URL is unavailable");
+            }
+            const link = document.createElement("a");
+            link.href = url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.click();
+        } catch (cause) {
+            toast.dark(cause instanceof Error ? cause.message : "Could not download export");
+        } finally {
+            downloadLock.current.delete(item.id);
+            setDownloading(prev => { const next = new Set(prev); next.delete(item.id); return next; });
         }
-        setDownloading((prev) => {
-            const next = new Set(prev);
-            next.delete(item.id);
-            return next;
-        });
+    };
+
+    const downloadHistory = () => {
+        const blob = new Blob([exportHistoryCsv(visible)], {type: "text/csv;charset=utf-8"});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "krafzen-export-history.csv";
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
 
     return (
@@ -152,7 +163,11 @@ export default function Exports() {
                         <p className="text-[#8F8F8F] text-sm mt-1">Track your CAD export jobs, statuses, and downloads.</p>
                     </div>
 
-                    <NewExportForm onCreated={() => { void refetch(); }} />
+                    <NewExportForm key={user?.userId || "signed-out"} onCreated={() => { void refetch(); }} />
+                    <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={refetch} disabled={isLoading} className="rounded-lg border border-white/20 px-3 py-2 text-sm disabled:opacity-50">Refresh export statuses</button>
+                        <button type="button" onClick={downloadHistory} disabled={isLoading || isError || visible.length === 0} className="rounded-lg border border-white/20 px-3 py-2 text-sm disabled:opacity-50">Download filtered history (CSV)</button>
+                    </div>
 
                     {/* Search + filters */}
                     <div className="flex flex-col sm:flex-row gap-3 text-[#8F8F8F]">
