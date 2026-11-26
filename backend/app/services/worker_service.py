@@ -43,6 +43,15 @@ from app.utils.logger import logger
 WORKER_POLL_INTERVAL_SECONDS = 5
 JOB_TIMEOUT_SECONDS = 120
 MAX_RETRY_COUNT = 3
+# CAD conversion is memory intensive. Keep one job per worker unless a
+# separately sized runtime is explicitly configured, with a hard ceiling.
+def _worker_concurrency() -> int:
+    try:
+        return max(1, min(4, int(os.getenv("KRAFZEN_EXPORT_WORKER_CONCURRENCY", "1"))))
+    except ValueError:
+        return 1
+
+MAX_CONCURRENT_EXPORTS = _worker_concurrency()
 
 # Local worker process configuration
 # Do not assume a worker is in the US without explicit deployment configuration.
@@ -469,6 +478,9 @@ async def _poll_export_jobs() -> None:
     while True:
         try:
             running = {job_id: task for job_id, task in running.items() if not task.done()}
+            if len(running) >= MAX_CONCURRENT_EXPORTS:
+                await asyncio.sleep(WORKER_POLL_INTERVAL_SECONDS)
+                continue
             def _fetch_affinity_candidates():
                 query = (
                     db.table("export_jobs")
@@ -489,6 +501,8 @@ async def _poll_export_jobs() -> None:
             response = await run_in_threadpool(_fetch_affinity_candidates)
             jobs = response.data if response and response.data else []
             for job in jobs:
+                if len(running) >= MAX_CONCURRENT_EXPORTS:
+                    break
                 job_id = str(job.get("id") or "")
                 if not job_id or job_id in running or not _eligible_for_worker(job):
                     continue
