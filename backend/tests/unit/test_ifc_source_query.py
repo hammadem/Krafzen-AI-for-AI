@@ -26,3 +26,35 @@ def test_ifc_count_floor_properties_and_quantity(tmp_path):
     quantities=run(mode="quantity",set_name="Qto_WallBaseQuantities",property_name="Length")
     assert quantities["totals"]==[{"type":"IfcQuantityLength","unit":"project_declared","sum_raw":5.0,"item_count":2}]
     assert quantities["quantities_are_declared_not_measured"] is True
+
+
+def test_ifc_floor_query_includes_aggregated_spaces_and_contained_elements(tmp_path):
+    model = ifcopenshell.file(schema="IFC4")
+    def guid(): return ifcopenshell.guid.new()
+    floor = model.create_entity("IfcBuildingStorey", GlobalId=guid(), Name="Level 1")
+    space = model.create_entity("IfcSpace", GlobalId=guid(), Name="Room 101")
+    wall = model.create_entity("IfcWall", GlobalId=guid())
+    model.create_entity("IfcRelAggregates", GlobalId=guid(), RelatingObject=floor, RelatedObjects=[space])
+    model.create_entity("IfcRelContainedInSpatialStructure", GlobalId=guid(), RelatingStructure=space, RelatedElements=[wall])
+    path = tmp_path / "hierarchy.ifc"
+    model.write(str(path))
+    for kind, obj in (("IfcSpace", space), ("IfcWall", wall)):
+        result = query_file(str(path), {"mode": "elements", "entity_class": kind, "storey_guid": floor.GlobalId})
+        assert result["match_count"] == 1
+        assert result["elements"][0]["guid"] == obj.GlobalId
+        assert result["ambiguous_storey_count"] == 0
+
+
+def test_ifc_floor_query_excludes_conflicting_declared_storeys(tmp_path):
+    model = ifcopenshell.file(schema="IFC4")
+    def guid(): return ifcopenshell.guid.new()
+    first = model.create_entity("IfcBuildingStorey", GlobalId=guid())
+    second = model.create_entity("IfcBuildingStorey", GlobalId=guid())
+    wall = model.create_entity("IfcWall", GlobalId=guid())
+    model.create_entity("IfcRelContainedInSpatialStructure", GlobalId=guid(), RelatingStructure=first, RelatedElements=[wall])
+    model.create_entity("IfcRelAggregates", GlobalId=guid(), RelatingObject=second, RelatedObjects=[wall])
+    path = tmp_path / "conflict.ifc"
+    model.write(str(path))
+    result = query_file(str(path), {"mode": "count", "entity_class": "IfcWall", "storey_guid": first.GlobalId})
+    assert result["match_count"] == 0
+    assert result["ambiguous_storey_count"] == 1
