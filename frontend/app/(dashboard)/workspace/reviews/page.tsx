@@ -10,6 +10,7 @@ import {
     createDrawingRedline, updateDrawingRedline,
 } from "@/lib/api/api";
 import { getApiBaseUrl } from "@/lib/api/utils";
+import DrawingFindingsPanel from "@/components/cad/DrawingFindingsPanel";
 
 type Project = { id: string; input_text?: string | null };
 type Job = { id: string };
@@ -261,6 +262,7 @@ export default function ReviewsPage() {
                                 <p className="text-sm text-slate-400">Import a scanned DXF file through <Link className="underline" href="/workspace/imports">Imports</Link>.</p>
                             )}
                         </section>
+                        <DrawingFindingsPanel user={user} fileId={fileId} onSaved={()=>setReload(v=>v+1)}/>
                         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
