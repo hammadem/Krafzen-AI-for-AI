@@ -41,6 +41,12 @@ def build_compliance_pdf(record):
     add("Source file/version reference: " + str(record.get("source_file_id") or "No source linked"))
     add("Generated: " + str(result.get("generated_at") or record.get("created_at")))
     add("Review status: " + str(record.get("review_status") or "pending_qualified_review"))
+    declaration=result.get("review_attestation")
+    if isinstance(declaration,dict):
+        add("Recorded reviewer-supplied declaration (credential not independently verified)", "Heading2")
+        for field in ("disposition","reviewer_name","reviewer_credential","review_reference","notes","recorded_by","recorded_at"):
+            add(field.replace("_"," ")+": "+str(declaration.get(field) or ""))
+        add("This declaration does not establish authority approval or full code compliance.")
     add("Jurisdiction, applicable editions and declared reviewer", "Heading2")
     context = record.get("jurisdiction") or {}
     if not isinstance(context, dict):
