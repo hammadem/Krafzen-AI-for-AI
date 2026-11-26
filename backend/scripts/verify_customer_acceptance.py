@@ -139,6 +139,21 @@ def main():
 
         p,j=project("Residential QA fixture")
         note("A","Create project and job")
+        # Disposable local QA data only: exercise real PostgREST join and
+        # customer queue scoping with two distinct paid fixture accounts.
+        other_project = check(client.post(base+"/projects/",headers=other,json={"input_text":"Other account queue fixture"}),201).json()["id"]
+        other_job = check(client.post(base+"/jobs/",headers=other,json={"project_id":other_project}),201).json()["id"]
+        with psycopg2.connect(dsn) as con, con.cursor() as cur:
+            cur.execute("UPDATE public.jobs SET status='queued', updated_at=now()-interval '1 hour' WHERE id IN (%s,%s)", (j,other_job))
+            assert cur.rowcount == 2
+        own_queue = check(client.get(base+"/dashboard/queue-health",headers=headers)).json()
+        other_queue = check(client.get(base+"/dashboard/queue-health",headers=other)).json()
+        assert j in own_queue["stuck_job_ids"] and other_job not in own_queue["stuck_job_ids"]
+        assert other_job in other_queue["stuck_job_ids"] and j not in other_queue["stuck_job_ids"]
+        assert own_queue["counts_by_status"]["queued"] == other_queue["counts_by_status"]["queued"] == 1
+        with psycopg2.connect(dsn) as con, con.cursor() as cur:
+            cur.execute("UPDATE public.jobs SET updated_at=now() WHERE id IN (%s,%s)", (j,other_job))
+        note("Security","Real two-account queue monitoring isolates job IDs and counts through PostgREST")
         session_path = base + "/chat/session"
         linked = check(client.post(session_path,headers=headers,json={"project_id":p})).json()
         assert linked["project_id"] == p
@@ -157,7 +172,9 @@ def main():
         check(client.post(base+"/chat/reference",headers=other,json={"session_id":linked["id"],"question":"IFC walls"}),404)
         saved = check(client.get(base+"/chat/history/"+linked["id"],headers=headers)).json()["messages"]
         assert any(row["id"] == ref_answer["message_id"] and "buildingSMART" in row["content"] for row in saved)
-        note("Knowledge","Approved IFC source index, licensed references, saved chat response and tenant isolation verified without paid AI")
+        unknown = check(client.post(base+"/chat/reference",headers=headers,json={"session_id":linked["id"],"question":"IFC model qzxvunknownmaterial"})).json()
+        assert unknown["references"] == [] and "No matching approved reference" in unknown["validated_response"]
+        note("Knowledge","Approved IFC source index, licensed references, saved chat response, abstention and tenant isolation verified without paid AI")
         check(client.post(base+"/projects/",headers=headers,json={"input_text":"   "}),422)
         check(client.post(base+"/projects/",headers=headers,json={"input_text":""}),422)
         check(client.post(base+"/projects/",headers=headers,json={"input_text":"x"*20001}),422)
@@ -269,7 +286,9 @@ def main():
         assert denied.status_code in (403,404)
         report = client.get(base+"/field/projects/"+p+"/report.pdf",headers=headers)
         pdf(report)
-        assert "QA observation" in "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(report.content)).pages)
+        extracted = "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(report.content)).pages)
+        for expected in ("QA observation", "Recheck measured clearance", "2027-01-15", "Awaiting site confirmation"):
+            assert expected in extracted, "Field report omitted saved observation evidence"
         note("Field","Real observation persistence, status transitions, authorization and parsed PDF report")
         assert not any(row["type"]=="field_update" for row in check(client.get(base+"/notifications/",headers=headers)).json())
         check(client.put(prefs_path,headers=headers,json=defaults))
@@ -277,7 +296,14 @@ def main():
         assert any(row["type"]=="field_update" and row["metadata"]["source_id"]==inspection_id for row in check(client.get(base+"/notifications/",headers=headers)).json())
         check(client.post(base+"/notifications/read-all",headers=headers))
         assert check(client.get(base+"/notifications/",headers=headers,params={"unread_only":True})).json()==[]
-        note("Notifications","Persistent category preference suppresses real field events, reenable restores delivery, mark all read scoped to owner")
+        own_inbox = check(client.get(base+"/notifications/",headers=headers)).json()
+        n_id = next(row["id"] for row in own_inbox if row["type"]=="field_update" and row["metadata"]["source_id"]==inspection_id)
+        unread_path = base+"/dashboard/notifications/"+n_id+"/unread"
+        check(client.patch(unread_path,headers=other),404)
+        assert check(client.patch(unread_path,headers=headers)).json()["read"] is False
+        assert any(row["id"]==n_id and not row["is_read"] for row in check(client.get(base+"/notifications/",headers=headers,params={"unread_only":True})).json())
+        check(client.patch(base+"/dashboard/notifications/"+n_id+"/read",headers=headers))
+        note("Notifications","Persistent preferences, real field events, read/unread transitions and tenant isolation verified")
         forbidden=client.get(base+"/projects/"+p,headers=other)
         assert forbidden.status_code in (403,404)
         note("A","Different paid account cannot open project")
