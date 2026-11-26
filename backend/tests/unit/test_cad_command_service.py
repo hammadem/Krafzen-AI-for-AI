@@ -17,3 +17,18 @@ def test_edit_explicit_dimensions_and_openings():
     assert not removed["openings"]
     for command in ["make bigger","set width to 6","add door on south at 4.9 m width 0.9 m","remove opening 1"]:
         with pytest.raises(ValueError): propose_room_edit(original,command)
+
+
+def test_move_and_resize_preserve_source_and_validate_geometry():
+    _, original = propose_room_edit(fixture(), "add door on south at 1 m width 900 mm")
+    _, moved = propose_room_edit(original, "move opening 1 to east at 1500 mm")
+    assert moved["openings"][0]["side"] == "east"
+    assert moved["openings"][0]["offset_m"] == 1.5
+    assert original["openings"][0]["side"] == "south"
+    _, resized = propose_room_edit(moved, "resize opening 1 to 1.2 m")
+    assert resized["openings"][0]["clear_width_m"] == 1.2
+    assert moved["openings"][0]["clear_width_m"] == .9
+    for command in ("move opening 2 to east at 1 m", "move opening 1 to east at 3.9 m",
+                    "resize opening 1 to 10 m", "resize opening 1 to 1"):
+        with pytest.raises(ValueError):
+            propose_room_edit(moved, command)
