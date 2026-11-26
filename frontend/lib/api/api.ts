@@ -400,6 +400,10 @@ export async function markNotificationRead(
     return apiClient("PATCH", DASHBOARD_URLS.MARK_NOTIFICATION_READ(notificationId), user);
 }
 
+export async function markNotificationUnread(user: User | null, notificationId: string) {
+    return apiClient("PATCH", `/api/v1/dashboard/notifications/${encodeURIComponent(notificationId)}/unread`, user);
+}
+
 // Workspace summary counts
 export async function getWorkspaceSummary(
     user: User | null
