@@ -1,7 +1,7 @@
 "use client";
 import { Bell, RefreshCw, AlertCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { getDashboardNotifications, markNotificationRead } from "@/lib/api/api";
+import { getDashboardNotifications, markNotificationRead, markNotificationUnread } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
 import NotificationPreferences from "@/components/NotificationPreferences";
 import { useApiResource } from "@/hooks/useApiResource";
@@ -41,23 +41,24 @@ function NotificationInbox() {
         fetcher: (u) => getDashboardNotifications(u, { limit: PAGE_SIZE, offset, unreadOnly }),
         select: (raw) => raw as unknown as NotificationPage,
         fallback: { notifications: [], total: 0 },
+        resourceKey: `${unreadOnly}:${offset}`,
     });
     const notifications = data.notifications;
 
     const handleMarkRead = async (id: string) => {
         const target = notifications.find((n) => n.id === id);
-        if (!target || target.read || pending) return;
+        if (!target || pending) return;
         setPending(id);
         setMarkError(null);
         try {
-            const result = await markNotificationRead(user, id);
-            if (!result.ok) throw new Error(result.error?.message || "Could not mark notification as read.");
+            const result = target.read ? await markNotificationUnread(user, id) : await markNotificationRead(user, id);
+            if (!result.ok) throw new Error(result.error?.message || "Could not update notification read status.");
             if (active.current) {
                 if (unreadOnly && notifications.length === 1 && offset > 0) setOffset(Math.max(0, offset - PAGE_SIZE));
                 refetch();
             }
         } catch (cause) {
-            if (active.current) setMarkError(cause instanceof Error ? cause.message : "Could not mark notification as read.");
+            if (active.current) setMarkError(cause instanceof Error ? cause.message : "Could not update notification read status.");
         } finally {
             if (active.current) setPending(null);
         }
@@ -125,8 +126,8 @@ function NotificationInbox() {
                             <button
                                 key={n.id}
                                 onClick={() => void handleMarkRead(n.id)}
-                                disabled={!!pending || n.read}
-                                aria-label={`${n.title}${n.read ? ", read" : ", unread"}`}
+                                disabled={!!pending}
+                                aria-label={`${n.title}${n.read ? ", read, mark as unread" : ", unread, mark as read"}`}
                                 className={`text-left rounded-[10px] p-4 flex items-start gap-4 transition-all border ${
                                     n.read
                                         ? "bg-[#2F2F2F] border-transparent"
@@ -143,6 +144,7 @@ function NotificationInbox() {
                                     <p className={`text-sm ${n.read ? "text-[#cfcfcf] font-normal" : "text-white font-semibold"}`}>
                                         {n.title}
                                     </p>
+                                    <span className="text-xs text-[#54e3b5]">{n.read ? "Mark as unread" : "Mark as read"}</span>
                                     <p className="text-[#94a3b8] text-sm">{n.message}</p>
                                     <span className="text-[#8F8F8F] text-xs capitalize">
                                         {n.type}
@@ -154,10 +156,10 @@ function NotificationInbox() {
                     </div>
                 )}
 
-                {!isLoading && !isError && data.total > 0 && (
+                {!isLoading && !isError && (data.total > 0 || offset > 0) && (
                     <div className="flex items-center justify-between gap-2 text-sm">
                         <button type="button" disabled={offset === 0 || !!pending} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))} className="underline disabled:opacity-40">Previous</button>
-                        <span>{Math.min(offset + 1, data.total)}–{Math.min(offset + notifications.length, data.total)} of {data.total}</span>
+                        <span>{notifications.length ? `${offset + 1}–${Math.min(offset + notifications.length, data.total)} of ${data.total}` : `${data.total} notifications`}</span>
                         <button type="button" disabled={offset + PAGE_SIZE >= data.total || !!pending} onClick={() => changePage(offset + PAGE_SIZE)} className="underline disabled:opacity-40">Next</button>
                     </div>
                 )}

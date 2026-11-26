@@ -18,7 +18,7 @@ from app.db.queries.project_queries import get_projects
 from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.schemas.export_contracts import ExportStatus
-from app.services.notification_service import get_notification_page, mark_as_read
+from app.services.notification_service import get_notification_page, mark_as_read, set_read_state
 from app.utils.logger import logger
 from app.utils.queue_monitor import get_queue_health
 
@@ -129,6 +129,8 @@ async def get_activity_feed(
         for row in activity_rows:
             event_name = row.get("event_name") or row.get("action") or "activity.updated"
             row_project_id = row.get("project_id")
+            if row_project_id and str(row_project_id) not in project_by_id:
+                continue  # workspace membership alone is not project authorization
             if project_id and str(row_project_id or "") != project_id:
                 continue
             project = project_by_id.get(str(row_project_id)) if row_project_id else None
@@ -502,6 +504,13 @@ async def mark_notification_read(notification_id: UUID, user=Depends(require_aut
     if not await mark_as_read(str(notification_id), user["user_id"]):
         raise HTTPException(status_code=404, detail="Notification not found")
     return {"id": str(notification_id), "read": True}
+
+
+@router.patch("/notifications/{notification_id}/unread")
+async def mark_notification_unread(notification_id: UUID, user=Depends(require_auth)):
+    if not await set_read_state(str(notification_id), user["user_id"], False):
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"id": str(notification_id), "read": False}
 
 
 # ── Members list ─────────────────────────────────────────────────────────────
