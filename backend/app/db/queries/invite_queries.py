@@ -280,6 +280,47 @@ async def accept_invite(token: str, user_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail={"error": "Server error"})
     
 
+async def decline_invite(token: str, user_id: str) -> dict[str, Any]:
+    """Invalidate a pending invitation only for its intended authenticated recipient.
+
+    The existing revoked state means the token is unusable. The persisted
+    team.invitation_declined event distinguishes recipient decline from
+    inviter revocation, without changing database constraints.
+    """
+    if not _valid_uuid(token):
+        raise HTTPException(status_code=400, detail="Invalid token format")
+    try:
+        result = await run_in_threadpool(lambda: db.table("workspace_invites")
+            .select("*").eq("token", token).maybe_single().execute())
+        invite = result.data if result else None
+        if not invite:
+            raise HTTPException(status_code=404, detail="Invite not found")
+        auth_result = await run_in_threadpool(lambda: db.auth.admin.get_user_by_id(user_id))
+        email = getattr(auth_result.user, "email", None) if auth_result else None
+        if not email or email.casefold() != invite["email"].casefold():
+            raise HTTPException(status_code=403, detail="Invite email does not match authenticated user")
+        if invite["status"] != "pending":
+            raise HTTPException(status_code=409, detail="Invite is not pending")
+        if datetime.fromisoformat(invite["expires_at"]) <= datetime.now(UTC):
+            raise HTTPException(status_code=410, detail="Invite has expired")
+        changed = await run_in_threadpool(lambda: db.table("workspace_invites")
+            .update({"status": "revoked"}).eq("id", invite["id"])
+            .eq("token", token).eq("status", "pending").execute())
+        if not changed or not changed.data:
+            raise HTTPException(status_code=409, detail="Invite is no longer pending")
+        await record_workspace_event(
+            event_name="team.invitation_declined", workspace_id=invite["workspace_id"],
+            actor_user_id=user_id, metadata={"invite_id": invite["id"], "role": invite["role"]},
+            message="The invited recipient declined the workspace invitation.",
+        )
+        return {"message": "Invitation declined", "workspace_id": invite["workspace_id"]}
+    except HTTPException:
+        raise
+    except (APIError, HTTPError, KeyError, TypeError, ValueError, RuntimeError) as exc:
+        logger.error("[decline_invite] Error", error=str(exc))
+        raise HTTPException(status_code=503, detail="Invitation service unavailable") from exc
+
+
 #VALIDATE INVITE
 async def validate_invite(token: str) -> dict[str, Any]:
     if not _valid_uuid(token):
