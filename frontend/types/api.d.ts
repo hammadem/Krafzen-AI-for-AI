@@ -181,6 +181,7 @@ interface WorkspaceInvite {
     role: string;
     token: string;
     status: "pending" | "accepted" | "revoked" | "expired";
+    email_delivery?: string | null;
     expires_at: string;
     created_at: string | null;
 }
