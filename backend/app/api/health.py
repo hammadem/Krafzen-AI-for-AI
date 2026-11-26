@@ -239,11 +239,13 @@ async def dwg_health_check():
     from app.services.dwg_converter_service import dwg_converter_service
     from app.services.oda_bundle import ensure_oda_bundle, get_last_oda_error
 
-    ready = ensure_oda_bundle() and dwg_converter_service.is_configured()
+    ready = dwg_converter_service.is_configured()
     payload = {
         "status": "healthy" if ready else "unavailable",
         "service": "DWG converter",
-        "detail": None if ready else get_last_oda_error(),
+        "engine": dwg_converter_service.converter_type,
+        "roundtrip_verified": False,
+        "detail": None if ready else "Selected native converter unavailable or not authorized",
     }
     if ready:
         return payload
