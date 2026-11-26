@@ -10,7 +10,7 @@ from app.db.queries.invite_queries import (
     validate_invite,
 )
 from app.middlewares.auth import require_auth
-from app.services.invitation_email_service import send_invitation_email
+from app.services.invitation_email_service import attach_email_history, send_invitation_email
 from app.models.invite_model import (
     InviteAccept,
     InviteCreate,
@@ -65,7 +65,8 @@ async def list_invites_route(
     workspace_id: str,
     user=Depends(require_auth)
 ):
-    return await get_workspace_invites(workspace_id, user["user_id"])
+    invites = await get_workspace_invites(workspace_id, user["user_id"])
+    return await attach_email_history(workspace_id, invites)
 
 
 # REVOKE INVITE
