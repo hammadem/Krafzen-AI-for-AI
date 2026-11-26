@@ -145,6 +145,9 @@ export async function createInvite(
 export async function getWorkspaceInvites(user: User | null, wsId: string) {
     return apiClient("GET", WORKSPACE_URLS.GET_INVITES(wsId), user);
 }
+export async function resendWorkspaceInviteEmail(user: User | null, wsId: string, inviteId: string) {
+    return apiClient("POST", `/api/v1/workspaces/${encodeURIComponent(wsId)}/invites/${encodeURIComponent(inviteId)}/email`, user);
+}
 // Revoke a pending invite.
 export async function revokeInvite(user: User | null, wsId: string, inviteId: string) {
     return apiClient("PATCH", WORKSPACE_URLS.REVOKE_INVITE(wsId, inviteId), user);
