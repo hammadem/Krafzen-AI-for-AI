@@ -39,6 +39,8 @@ def _load_index(root):
         if not item["source_url"].startswith("https://github.com/buildingSMART/Certification-datasets/blob/main/"):
             raise ValueError("Reference source not approved")
         model=ifcopenshell.open(str(path))
+        if str(model.schema) != item["schema"]:
+            raise ValueError("Reference schema mismatch")
         counts=Counter(str(e.is_a()) for e in model.by_type("IfcProduct"))
         if len(counts)>200: raise ValueError("Reference class budget exceeded")
         for entity,min_count in item.get("expected_min",{}).items():
@@ -67,7 +69,7 @@ def reference_register():
     rows=_index()
     return {"dataset_count":len(rows),"retrieval_method":"local_lexical_reference_v1",
             "datasets":[{k:v for k,v in row.items() if k not in {"search_text","content","entity_counts"}} for row in rows],
-            "scope":"Reference IFC certification fixtures only. No codebook ingestion, customer data, or model weight training."}
+            "scope":"Reference IFC certification fixtures only. Separate intent model is trained on original synthetic text, not these files. No customer data or codebook ingestion."}
 
 def retrieve_reference(question):
     # Generic query words and boilerplate caveats are not technical evidence.
