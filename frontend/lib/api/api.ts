@@ -877,3 +877,8 @@ export async function getOrganizationResidency(user: User | null, organizationId
 export async function requestOrganizationUsResidency(user: User | null, organizationId: string) {
     return apiClient("POST", `/api/v1/enterprise/region/request?organization_id=${encodeURIComponent(organizationId)}`, user, {region_code: "us"});
 }
+
+export async function importDwgFile(user: User | null, jobId: string, file: File) {
+    const body = new FormData(); body.append("job_id",jobId); body.append("upload",file,file.name);
+    return apiClient("POST","/api/v1/files/import-dwg",user,body);
+}
