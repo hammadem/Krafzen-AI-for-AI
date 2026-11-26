@@ -220,6 +220,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             linked_project = await get_project(session_project_id, user_data)
             if not linked_project or linked_project.get("archived_at"):
                 raise HTTPException(status_code=409, detail="Restore the linked project before generating a design")
+            if linked_project.get("workspace_id"):
+                raise HTTPException(status_code=503, detail="Organization AI processing requires verified regional inference and storage")
 
         # 2. Persist User Message
         await chat_history_service.add_message(session_id, "user", request.message)
@@ -578,6 +580,8 @@ async def answer_reference_question(request: ReferenceRequest, user_data: dict =
             project = await get_project(session["project_id"], user_data)
             if not project or project.get("archived_at"):
                 raise HTTPException(status_code=409, detail="Restore project before writing chat messages")
+            if project.get("workspace_id"):
+                raise HTTPException(status_code=503, detail="Organization chat persistence requires verified regional storage")
         hits = await run_in_threadpool(retrieve_reference, question)
         answer = format_reference_answer(hits)
         user_message = await chat_history_service.add_message(session_id, "user", "/reference " + question)
@@ -610,6 +614,8 @@ async def create_chat_session(request: CreateSessionRequest, user_data: dict = D
                 raise HTTPException(status_code=404, detail="Project not found")
             if project.get("archived_at"):
                 raise HTTPException(status_code=409, detail="Restore project before editing")
+            if project.get("workspace_id"):
+                raise HTTPException(status_code=503, detail="Organization chat requires verified regional storage")
             sessions = await chat_history_service.get_user_sessions(user_id)
             existing = next((s for s in sessions if s.get("project_id") == project_id), None)
             if existing:
