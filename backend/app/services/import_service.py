@@ -37,6 +37,15 @@ IFC_PARSE_TIMEOUT_SECONDS = 90
 
 def _scan_file(path: Path) -> None:
     """Scan uploaded bytes. No parser is allowed to run before a clean scan."""
+    from app.services.private_scanner_client import remote_requested, scan_remote
+    if remote_requested():
+        if not _scan_slot.acquire(blocking=False):
+            raise HTTPException(status_code=429, detail="Scanner is busy; retry later.")
+        try:
+            scan_remote(path)
+        finally:
+            _scan_slot.release()
+        return
     scanner = shutil.which(os.getenv("CLAMSCAN_CMD", "clamscan"))
     if not scanner:
         raise HTTPException(
