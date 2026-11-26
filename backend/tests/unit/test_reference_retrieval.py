@@ -23,3 +23,18 @@ def test_tampered_reference_rejected(tmp_path:Path):
     path.write_bytes(path.read_bytes()+b"\n")
     with pytest.raises(ValueError,match="integrity"):
         _load_index(root)
+
+
+@pytest.mark.parametrize("question", [
+    "IFC model qzxvunknownmaterial",
+    "customer project verified construction",
+    "IFC quantum entanglement",
+])
+def test_generic_or_boilerplate_terms_do_not_return_unrelated_reference(question):
+    assert retrieve_reference(question) == []
+
+
+def test_technical_schema_and_discipline_terms_remain_searchable():
+    hits = retrieve_reference("IFC4 structural beams")
+    assert hits
+    assert hits[0]["discipline"] == "structural"

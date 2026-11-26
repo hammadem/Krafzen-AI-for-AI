@@ -10,10 +10,11 @@ import re
 ROOT = Path(__file__).resolve().parents[2] / "tests/fixtures/aec_reference"
 LICENSE = "Creative Commons Attribution 4.0 International (CC BY 4.0)"
 STOP = {"what","how","where","which","the","a","an","are","is","do","does","in","of","for","to","and","me","show","tell","reference","many","can","i","example"}
+GENERIC = {"ifc", "model", "file", "source", "project", "customer", "sample", "certification", "count", "data", "evidence", "construction", "verified", "describe", "result"}
 
 def tokens(value):
     words = {w for w in re.findall(r"[a-z0-9]+", value.casefold()) if w not in STOP and len(w)>1}
-    return {w[:-1] if w.endswith("s") and len(w)>3 else w for w in words}
+    return {w[:-1] if w.endswith("s") and not w.endswith(("ss", "us", "is")) and len(w)>3 else w for w in words}
 
 def _load_index(root):
     import ifcopenshell
@@ -55,7 +56,7 @@ def _load_index(root):
                      "license_url":manifest["license_url"],"attribution":manifest["attribution"],
                      "commercial_use":"CC BY 4.0 permits commercial reuse with attribution",
                      "processing_status":"parsed_hash_verified","entity_counts":classes,
-                     "content":content,"search_text":f"{item['name']} {classification} {discipline} {model.schema} {terms} {content}"})
+                     "content":content,"search_text":f"{item['name']} {classification} {discipline} {model.schema} {terms}"})
     return docs
 
 @lru_cache(maxsize=1)
@@ -69,10 +70,13 @@ def reference_register():
             "scope":"Reference IFC certification fixtures only. No codebook ingestion, customer data, or model weight training."}
 
 def retrieve_reference(question):
-    words=tokens(question)
+    # Generic query words and boilerplate caveats are not technical evidence.
+    # A specific unsupported question must not retrieve a random IFC example
+    # merely because it contains the word IFC, model, or project.
+    words=tokens(question) - GENERIC
     if not words: return []
     docs=_index()
-    terms=[tokens(row["search_text"]) for row in docs]
+    terms=[tokens(row["search_text"]) - GENERIC for row in docs]
     scored=[]
     for row,term_set in zip(docs,terms):
         common=words&term_set
