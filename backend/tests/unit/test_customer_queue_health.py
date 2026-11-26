@@ -14,15 +14,17 @@ async def test_queue_health_reads_only_owned_jobs_and_reports_stuck_ids():
     for name in ("select", "eq", "order", "range"):
         getattr(query, name).return_value = query
     query.execute.return_value = SimpleNamespace(data=[
-        {"id": "old-job", "status": "queued", "updated_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat(), "projects": {"user_id": actor}},
-        {"id": "done-job", "status": "completed", "updated_at": datetime.now(UTC).isoformat(), "projects": {"user_id": actor}},
+        {"id": "old-job", "status": "queued", "updated_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat(), "requested_by": actor, "projects": {"user_id": actor}},
+        {"id": "done-job", "status": "completed", "updated_at": datetime.now(UTC).isoformat(), "requested_by": actor, "projects": {"user_id": actor}},
     ])
     db = MagicMock()
     db.table.return_value = query
     with patch.object(queue_monitor, "db", db):
         result = await queue_monitor.get_customer_queue_health(actor)
-    query.eq.assert_called_once_with("projects.user_id", actor)
-    query.select.assert_called_once_with("id,status,updated_at,projects!inner(user_id)")
+    query.eq.assert_any_call("projects.user_id", actor)
+    query.eq.assert_any_call("requested_by", actor)
+    db.table.assert_called_once_with("export_jobs")
+    query.select.assert_called_once_with("id,status,updated_at,requested_by,projects!inner(user_id)")
     assert result["counts_by_status"]["queued"] == 1
     assert result["counts_by_status"]["completed"] == 1
     assert result["stuck_job_ids"] == ["old-job"]
