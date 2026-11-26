@@ -93,10 +93,15 @@ async def get_notifications(user_id: str, unread_only: bool = False) -> list:
 
 
 async def mark_as_read(notification_id: str, user_id: str) -> bool:
+    return await set_read_state(notification_id, user_id, True)
+
+
+async def set_read_state(notification_id: str, user_id: str, is_read: bool) -> bool:
+    """Change only the authenticated recipient's persisted notification."""
     try:
         response = await run_in_threadpool(
             lambda: db.table("notifications")
-                .update({"is_read": True})
+                .update({"is_read": is_read})
                 .eq("id", notification_id)
                 .eq("user_id", user_id)
                 .execute()
