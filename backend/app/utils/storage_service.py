@@ -91,47 +91,16 @@ class StorageService:
         if not organization_id:
             return central_client, cls.DEFAULT_BUCKET_NAME, "global"
 
-        # Delegate client resolution to RegionalDatabaseRouter
+        # Use the same assignment snapshot for client and bucket selection.
         router = RegionalDatabaseRouter(central_client=central_client)
-        regional_client = router.resolve_for_organization(organization_id)
-
-        try:
-            res = (
-                central_client.table("organization_residency")
-                .select("region_code, status")
-                .eq("organization_id", str(organization_id))
-                .execute()
-            )
-            record = res.data[0] if (res and res.data) else None
-
-            if not record:
-                return regional_client, cls.DEFAULT_BUCKET_NAME, "global"
-            if record.get("status") != ResidencyStatus.ACTIVE.value:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail="Regional storage unavailable: residency assignment is not active.",
-                )
-
-            region_code = record.get("region_code", "us")
-            region_entry = CENTRAL_REGION_REGISTRY.get(region_code)
-
-            # Resolve configured bucket name
-            bucket_name = (
-                (region_entry.storage_config.get("bucket_name") if region_entry else None)
-                or getattr(settings, f"SUPABASE_STORAGE_BUCKET_{region_code.upper()}", None)
-                or f"krafzen-{region_code}-files"
-            )
-
-            return regional_client, bucket_name, region_code
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            logger.exception("Failed resolving regional bucket for org %s", organization_id)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Regional storage resolution failed; central storage fallback is prohibited.",
-            ) from e
+        regional_client, region_code = router.resolve_context(organization_id)
+        if region_code == "global":
+            return regional_client, cls.DEFAULT_BUCKET_NAME, region_code
+        region_entry = CENTRAL_REGION_REGISTRY.get(region_code)
+        bucket_name = region_entry.storage_config.get("bucket_name") if region_entry else None
+        if not bucket_name:
+            raise HTTPException(status_code=503, detail="Regional storage bucket unavailable")
+        return regional_client, bucket_name, region_code
 
     @classmethod
     def validate_file_metadata(cls, content_type: str, file_size_bytes: int, category: str) -> None:
