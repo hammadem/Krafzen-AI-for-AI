@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from app.db.queries.invite_queries import (
     accept_invite,
     create_invite,
+    decline_invite,
     get_workspace_invites,
     revoke_invite,
     validate_invite,
@@ -25,6 +26,11 @@ async def accept_invite_route(
     user=Depends(require_auth)
 ):
     return await accept_invite(body.token, user["user_id"])
+
+
+@router.post("/invites/decline")
+async def decline_invite_route(body: InviteAccept, user=Depends(require_auth)):
+    return await decline_invite(body.token, user["user_id"])
 
 
 #CREATE INVITE
