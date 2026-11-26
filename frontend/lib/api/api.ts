@@ -888,3 +888,10 @@ export async function importRevitBridge(user: User | null, jobId: string, source
     body.append("job_id",jobId);body.append("confirmed","true");body.append("source",source,source.name);body.append("upload",ifc,ifc.name);
     return apiClient("POST","/api/v1/files/import-revit-bridge",user,body);
 }
+
+export async function getMultidisciplineCatalog(user:User|null){
+    return apiClient("GET","/api/v1/compliance/multidiscipline/catalog",user);
+}
+export async function saveMultidisciplineAssessment(user:User|null,payload:{project_id:string;source_file_id:string|null;jurisdiction:Record<string,unknown>;entries:Record<string,unknown>[]}){
+    return apiClient("POST","/api/v1/compliance/multidiscipline/assessments",user,payload);
+}
