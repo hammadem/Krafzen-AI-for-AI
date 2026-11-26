@@ -20,7 +20,7 @@ from app.middlewares.auth import require_auth
 from app.schemas.export_contracts import ExportStatus
 from app.services.notification_service import get_notification_page, mark_as_read
 from app.utils.logger import logger
-from app.utils.queue_monitor import get_queue_health
+from app.utils.queue_monitor import get_customer_queue_health
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -563,7 +563,8 @@ async def queue_health_endpoint(user=Depends(require_auth)):
     Week 3 will expand with avg processing time, failure rate, retry frequency.
     Owner: Tazwar — monitoring foundation per Week 1 Step 6.
     """
-    result = await get_queue_health()
-    if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    try:
+        return await get_customer_queue_health(user["user_id"])
+    except (APIError, HTTPError, KeyError, TypeError, ValueError, RuntimeError) as exc:
+        logger.error("Customer queue snapshot unavailable")
+        raise HTTPException(status_code=503, detail="Queue health temporarily unavailable") from exc
