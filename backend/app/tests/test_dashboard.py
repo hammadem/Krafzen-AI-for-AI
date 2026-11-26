@@ -307,3 +307,37 @@ async def test_members_returns_at_least_owner():
         assert "user_id" in owner
         assert "role" in owner
         assert owner["role"] == "owner"
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("updated,expected_status", [(True, 200), (False, 404)])
+async def test_notification_unread_uses_authenticated_recipient(updated, expected_status):
+    with patch("app.routes.dashboard_routes.set_read_state", new=AsyncMock(return_value=updated)) as update, \
+         patch("app.middlewares.auth.require_auth", return_value=MOCK_USER):
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            resp = await ac.patch(BASE + "/notifications/" + NOTIFICATION_ID + "/unread")
+    assert resp.status_code == expected_status
+    update.assert_awaited_once_with(NOTIFICATION_ID, MOCK_USER["user_id"], False)
+    if updated:
+        assert resp.json() == {"id": NOTIFICATION_ID, "read": False}
+
+
+@pytest.mark.asyncio
+async def test_activity_feed_does_not_expose_other_project_events_from_workspace():
+    private_project = "00000000-0000-0000-0000-000000000999"
+    rows = [
+        {"id": "private-event", "event_name": "file.uploaded", "project_id": private_project,
+         "workspace_id": "workspace-1", "message": "Private drawing", "created_at": "2026-10-01T00:00:00Z"},
+        {"id": "shared-event", "event_name": "team.member_joined", "project_id": None,
+         "workspace_id": "workspace-1", "message": "Team member joined", "created_at": "2026-10-01T00:01:00Z"},
+    ]
+    with patch("app.routes.dashboard_routes.get_projects", new=AsyncMock(return_value=MOCK_PROJECTS)), \
+         patch("app.routes.dashboard_routes.get_jobs", new=AsyncMock(return_value=[])), \
+         patch("app.routes.dashboard_routes._get_user_workspace_ids", new=AsyncMock(return_value=["workspace-1"])), \
+         patch("app.routes.dashboard_routes._get_activity_rows", new=AsyncMock(return_value=rows)), \
+         patch("app.routes.dashboard_routes._get_actor_names", new=AsyncMock(return_value={})), \
+         patch("app.middlewares.auth.require_auth", return_value=MOCK_USER):
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            resp = await ac.get(BASE + "/activity")
+    assert resp.status_code == 200
+    assert [row["id"] for row in resp.json()["events"]] == ["shared-event"]
+    assert "Private drawing" not in resp.text
