@@ -1,0 +1,33 @@
+name: AEC language model experiment
+on:
+  pull_request:
+    branches: ['fix/**']
+    paths: ['backend/scripts/finetune_aec_llm.py', '.github/workflows/aec-llm-experiment.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+      OMP_NUM_THREADS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install bounded CPU experiment dependencies
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0
+          pip install transformers==4.51.3 peft==0.15.2 accelerate==1.6.0 ifcopenshell==0.9.0.post1
+      - name: Fit adapter and compare held-out reference answers
+        run: python backend/scripts/finetune_aec_llm.py --output-dir /tmp/krafzen-llm-experiment --steps 24
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aec-llm-experimental-adapter
+          path: /tmp/krafzen-llm-experiment
+          retention-days: 7
+          if-no-files-found: error
