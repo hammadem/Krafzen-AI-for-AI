@@ -1,6 +1,6 @@
 """Evidence-based, narrowly scoped ADA 2010 numerical measurement checks.
 
-Only official 2010 ADA Standards sections 404.2.3, 403.5.1 and 405.2.
+Only official 2010 ADA Standards sections 404.2.3, 403.5.1 and 405.2, with optional 405.3, 405.5 and 405.6.
 This module does NOT determine which standards apply to a project, nor does
 passing a threshold establish code compliance, approval or professional review.
 Unknown edition/applicability/exception/measurement -> UNKNOWN, never PASS.
@@ -181,6 +181,39 @@ def evaluate_ada_measurements(
                    "landings, clear width, handrails, cross slope and total rise are unassessed.",
         )
 
+    # Optional expanded screening preserves the legacy three-rule contract
+    # for existing clients. Section 405 applicability and exceptions must be
+    # established for this particular run (not a curb ramp or a gangway).
+    if measurements.get("extended_ramp_checks") is True:
+        confirmed = measurements.get("ramp_run_405_applies_no_exception_confirmed") is True
+        ramp_ready = base_ready and confirmed and new_construction and ramp_exception is False
+        cross_raw = measurements.get("ramp_cross_slope_percent")
+        cross = (float(cross_raw) if isinstance(cross_raw, (int, float))
+                 and not isinstance(cross_raw, bool) and isfinite(cross_raw)
+                 and 0 <= cross_raw <= 100 else None)
+        width = _measurement(measurements.get("ramp_clear_width_in"))
+        shared = ["ramp_run_405_applies_no_exception_confirmed", "new_construction",
+                  "ramp_alteration_exception_applies", "ada_applicability_confirmed"]
+        for section, suffix, label, key, value, threshold, unit, minimum in (
+            ("405.3", "cross-slope", "Ramp run transverse cross slope", "ramp_cross_slope_percent", cross, 100 / 48, "%", False),
+            ("405.5", "clear-width", "Ramp run clear width, between handrails where present", "ramp_clear_width_in", width, 36.0, "in", True),
+            ("405.6", "rise", "Vertical rise of a single ramp run", "ramp_rise_in", rise, 30.0, "in", False),
+        ):
+            if not ramp_ready or value is None:
+                status = "unknown"
+                reason = "Section 405 applicability, absence of relevant exceptions, new construction or measured value has not been established."
+            else:
+                passed = value >= threshold if minimum else value <= threshold
+                status = "pass" if passed else "fail"
+                reason = (f"Declared {label.lower()} {value:.4f} {unit} "
+                          f"{'meets' if passed else 'does not meet'} the narrow numerical threshold "
+                          f"of {threshold:.6g} {unit}. Other ramp requirements remain unassessed.")
+            append(rule_id=f"ADA-{section}-{suffix}", section=section,
+                   description=label + " only", expected=threshold, measured=value,
+                   basis="minimum measured value" if minimum else
+                         ("cross slope percent = 100 × transverse rise/run; maximum 100/48" if section == "405.3" else "maximum measured value"),
+                   unit=unit, prerequisites=[key, *shared], status=status, reason=reason)
+
     counts = {
         state: sum(1 for row in findings if row["result"] == state)
         for state in ("pass", "fail", "unknown")
@@ -199,6 +232,7 @@ def evaluate_ada_measurements(
 
     return {
         "standard": "2010 ADA Standards for Accessible Design",
+        "rule_version": "ada_measurements_v2" if measurements.get("extended_ramp_checks") is True else "ada_measurements_v1",
         "standard_source_url": OFFICIAL_SOURCE,
         "jurisdiction": jurisdiction,
         "source_kind": "user_declared_measurements",

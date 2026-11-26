@@ -70,7 +70,11 @@ describe("Evidence-backed ADA 2010 compliance screening UI", () => {
             { target: { value: "Commercial" } });
         fireEvent.change(screen.getByLabelText("Compliance edition"),
             { target: { value: "2010_ADA" } });
-        fireEvent.click(screen.getByRole("checkbox"));
+        fireEvent.click(screen.getByRole("checkbox", { name: /Qualified project reviewer has confirmed ADA applicability/ }));
+        fireEvent.click(screen.getByRole("checkbox", { name: /Include cross slope/ }));
+        fireEvent.change(screen.getByLabelText(/Reviewer confirmed section 405/), { target: { value: "yes" } });
+        fireEvent.change(screen.getByLabelText("Ramp run cross slope (%)"), { target: { value: "0" } });
+        fireEvent.change(screen.getByLabelText("Ramp clear width between handrails where present (in)"), { target: { value: "36" } });
         fireEvent.change(screen.getByLabelText("Compliance source file"),
             { target: { value: "file-1" } });
         fireEvent.change(screen.getByLabelText("Door type"),
@@ -94,6 +98,10 @@ describe("Evidence-backed ADA 2010 compliance screening UI", () => {
                     door_clear_width_in: 31,
                     door_measured_at_90_degrees: true,
                     ramp_rise_in: null,
+                    extended_ramp_checks: true,
+                    ramp_run_405_applies_no_exception_confirmed: true,
+                    ramp_cross_slope_percent: 0,
+                    ramp_clear_width_in: 36,
                 }),
             })
         );
