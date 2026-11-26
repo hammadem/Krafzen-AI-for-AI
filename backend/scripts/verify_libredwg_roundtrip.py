@@ -3,6 +3,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import subprocess
 import ezdxf
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from app.services.dwg_dxf_validation import validate_converted_dxf
 
 tools=Path(__file__).resolve().parents[1]/"bin"/"libredwg"/"bin"
 with TemporaryDirectory(prefix="krafzen-dwg-smoke-") as work:
@@ -17,7 +20,10 @@ with TemporaryDirectory(prefix="krafzen-dwg-smoke-") as work:
     subprocess.run([str(tools/"dxf2dwg"),"--as=r2000","-o",str(dwg),str(source)],check=True,timeout=180)
     assert dwg.read_bytes()[:6]==b"AC1015"
     subprocess.run([str(tools/"dwg2dxf"),"-o",str(recovered),str(dwg)],check=True,timeout=180)
-    result=ezdxf.readfile(recovered)
+    canonical=root/"canonical.dxf"
+    repairs=validate_converted_dxf(recovered,canonical)
+    result=ezdxf.readfile(canonical)
+    print(f"Native converter DXF zero-handle normalizations: {repairs}")
     assert result.header["$INSUNITS"]==4
     lines=list(result.modelspace().query("LINE"))
     circles=list(result.modelspace().query("CIRCLE"))
@@ -27,3 +33,4 @@ with TemporaryDirectory(prefix="krafzen-dwg-smoke-") as work:
     assert circles[0].dxf.radius==50
     assert lines[0].dxf.layer==circles[0].dxf.layer=="QA_GEOMETRY"
 print("Actual LibreDWG R2000 native round trip passed for synthetic LINE/CIRCLE, units and layers")
+(tools/"roundtrip_verified").write_text("R2000 synthetic LINE/CIRCLE units layers verified\n")
