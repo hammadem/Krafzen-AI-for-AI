@@ -6,7 +6,7 @@ from app.services.reference_retrieval import ROOT, _load_index, reference_regist
 
 def test_license_gate_hash_verified_index_and_retrieval():
     result=reference_register()
-    assert result["dataset_count"]>=6
+    assert result["dataset_count"]>=10
     assert all(row["license"].endswith("(CC BY 4.0)") for row in result["datasets"])
     hits=retrieve_reference("IFC wall opening window")
     assert hits and hits[0]["dataset_id"]=="ifc4_wall_opening_window.ifc"

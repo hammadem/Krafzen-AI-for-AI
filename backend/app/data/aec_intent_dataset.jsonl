@@ -1,0 +1,544 @@
+{"text":"design room layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"plan room layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"arrange room layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate room layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"sketch room layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"describe room layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"propose room layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"revise room layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"design floor plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"plan floor plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"arrange floor plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate floor plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"sketch floor plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"describe floor plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"propose floor plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"revise floor plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"design bedroom arrangement","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"plan bedroom arrangement","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"arrange bedroom arrangement","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate bedroom arrangement","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"sketch bedroom arrangement","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"describe bedroom arrangement","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"propose bedroom arrangement","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"revise bedroom arrangement","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"design kitchen layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"plan kitchen layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"arrange kitchen layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate kitchen layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"sketch kitchen layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"describe kitchen layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"propose kitchen layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"revise kitchen layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"design residential plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"plan residential plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"arrange residential plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate residential plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"sketch residential plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"describe residential plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"propose residential plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"revise residential plan","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"design office layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"plan office layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"arrange office layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate office layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"sketch office layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"describe office layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"propose office layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"revise office layout","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"design living room","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"plan living room","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"arrange living room","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate living room","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"sketch living room","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"describe living room","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"propose living room","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"revise living room","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"design floor circulation","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"plan floor circulation","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"arrange floor circulation","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate floor circulation","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"sketch floor circulation","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"describe floor circulation","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"propose floor circulation","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"revise floor circulation","label":"architecture","split":"train","origin":"internally_authored_synthetic"}
+{"text":"edit DXF drawing","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"measure DXF drawing","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"draw DXF drawing","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect DXF drawing","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resize DXF drawing","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract DXF drawing","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"modify DXF drawing","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"generate DXF drawing","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"edit CAD layers","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"measure CAD layers","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"draw CAD layers","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect CAD layers","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resize CAD layers","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract CAD layers","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"modify CAD layers","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"generate CAD layers","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"edit door opening","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"measure door opening","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"draw door opening","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect door opening","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resize door opening","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract door opening","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"modify door opening","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"generate door opening","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"edit dimensioned geometry","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"measure dimensioned geometry","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"draw dimensioned geometry","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect dimensioned geometry","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resize dimensioned geometry","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract dimensioned geometry","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"modify dimensioned geometry","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"generate dimensioned geometry","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"edit polyline","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"measure polyline","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"draw polyline","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect polyline","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resize polyline","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract polyline","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"modify polyline","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"generate polyline","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"edit wall coordinates","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"measure wall coordinates","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"draw wall coordinates","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect wall coordinates","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resize wall coordinates","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract wall coordinates","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"modify wall coordinates","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"generate wall coordinates","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"edit drawing units","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"measure drawing units","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"draw drawing units","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect drawing units","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resize drawing units","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract drawing units","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"modify drawing units","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"generate drawing units","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"edit line entities","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"measure line entities","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"draw line entities","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect line entities","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resize line entities","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract line entities","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"modify line entities","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"generate line entities","label":"cad","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect IFC model","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"count IFC model","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"query IFC model","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"list IFC model","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare IFC model","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract IFC model","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"analyze IFC model","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"validate IFC model","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect BIM element","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"count BIM element","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"query BIM element","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"list BIM element","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare BIM element","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract BIM element","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"analyze BIM element","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"validate BIM element","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect IfcWall","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"count IfcWall","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"query IfcWall","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"list IfcWall","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare IfcWall","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract IfcWall","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"analyze IfcWall","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"validate IfcWall","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect IfcSpace","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"count IfcSpace","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"query IfcSpace","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"list IfcSpace","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare IfcSpace","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract IfcSpace","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"analyze IfcSpace","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"validate IfcSpace","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect IFC quantities","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"count IFC quantities","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"query IFC quantities","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"list IFC quantities","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare IFC quantities","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract IFC quantities","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"analyze IFC quantities","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"validate IFC quantities","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect model properties","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"count model properties","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"query model properties","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"list model properties","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare model properties","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract model properties","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"analyze model properties","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"validate model properties","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect clash detection","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"count clash detection","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"query clash detection","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"list clash detection","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare clash detection","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract clash detection","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"analyze clash detection","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"validate clash detection","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect IFC spatial hierarchy","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"count IFC spatial hierarchy","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"query IFC spatial hierarchy","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"list IFC spatial hierarchy","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare IFC spatial hierarchy","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"extract IFC spatial hierarchy","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"analyze IFC spatial hierarchy","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"validate IFC spatial hierarchy","label":"bim","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check ADA accessibility","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"screen ADA accessibility","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review ADA accessibility","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assess ADA accessibility","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"verify ADA accessibility","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate ADA accessibility","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect ADA accessibility","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"calculate ADA accessibility","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check IBC egress","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"screen IBC egress","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review IBC egress","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assess IBC egress","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"verify IBC egress","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate IBC egress","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect IBC egress","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"calculate IBC egress","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check NFPA fire safety","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"screen NFPA fire safety","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review NFPA fire safety","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assess NFPA fire safety","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"verify NFPA fire safety","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate NFPA fire safety","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect NFPA fire safety","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"calculate NFPA fire safety","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check IRC provisions","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"screen IRC provisions","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review IRC provisions","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assess IRC provisions","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"verify IRC provisions","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate IRC provisions","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect IRC provisions","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"calculate IRC provisions","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check NEC clearance","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"screen NEC clearance","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review NEC clearance","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assess NEC clearance","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"verify NEC clearance","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate NEC clearance","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect NEC clearance","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"calculate NEC clearance","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check IPC plumbing code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"screen IPC plumbing code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review IPC plumbing code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assess IPC plumbing code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"verify IPC plumbing code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate IPC plumbing code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect IPC plumbing code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"calculate IPC plumbing code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check IMC mechanical code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"screen IMC mechanical code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review IMC mechanical code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assess IMC mechanical code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"verify IMC mechanical code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate IMC mechanical code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect IMC mechanical code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"calculate IMC mechanical code","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check ASCE load rules","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"screen ASCE load rules","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review ASCE load rules","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assess ASCE load rules","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"verify ASCE load rules","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate ASCE load rules","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect ASCE load rules","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"calculate ASCE load rules","label":"compliance","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify drawing redline","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review drawing redline","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"flag drawing redline","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record drawing redline","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resolve drawing redline","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect drawing redline","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"add drawing redline","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate drawing redline","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify review comment","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review review comment","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"flag review comment","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record review comment","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resolve review comment","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect review comment","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"add review comment","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate review comment","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify duplicate drawing lines","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review duplicate drawing lines","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"flag duplicate drawing lines","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record duplicate drawing lines","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resolve duplicate drawing lines","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect duplicate drawing lines","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"add duplicate drawing lines","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate duplicate drawing lines","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify zero length entities","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review zero length entities","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"flag zero length entities","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record zero length entities","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resolve zero length entities","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect zero length entities","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"add zero length entities","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate zero length entities","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify annotation issue","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review annotation issue","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"flag annotation issue","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record annotation issue","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resolve annotation issue","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect annotation issue","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"add annotation issue","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate annotation issue","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify redline resolution","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review redline resolution","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"flag redline resolution","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record redline resolution","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resolve redline resolution","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect redline resolution","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"add redline resolution","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate redline resolution","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify drawing finding","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review drawing finding","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"flag drawing finding","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record drawing finding","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resolve drawing finding","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect drawing finding","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"add drawing finding","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate drawing finding","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify review markup","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review review markup","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"flag review markup","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record review markup","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"resolve review markup","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect review markup","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"add review markup","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate review markup","label":"review","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare as built comparison","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect as built comparison","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"align as built comparison","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify as built comparison","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate as built comparison","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize as built comparison","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review as built comparison","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"examine as built comparison","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare revision overlay","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect revision overlay","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"align revision overlay","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify revision overlay","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate revision overlay","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize revision overlay","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review revision overlay","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"examine revision overlay","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare geometry differences","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect geometry differences","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"align geometry differences","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify geometry differences","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate geometry differences","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize geometry differences","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review geometry differences","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"examine geometry differences","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare added removed elements","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect added removed elements","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"align added removed elements","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify added removed elements","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate added removed elements","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize added removed elements","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review added removed elements","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"examine added removed elements","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare survey discrepancy","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect survey discrepancy","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"align survey discrepancy","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify survey discrepancy","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate survey discrepancy","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize survey discrepancy","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review survey discrepancy","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"examine survey discrepancy","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare updated drawing","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect updated drawing","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"align updated drawing","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify updated drawing","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate updated drawing","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize updated drawing","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review updated drawing","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"examine updated drawing","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare original versus revised","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect original versus revised","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"align original versus revised","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify original versus revised","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate original versus revised","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize original versus revised","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review original versus revised","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"examine original versus revised","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"compare revision alignment","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect revision alignment","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"align revision alignment","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"identify revision alignment","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"evaluate revision alignment","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize revision alignment","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review revision alignment","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"examine revision alignment","label":"asbuilt","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record site observation","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create site observation","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review site observation","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"document site observation","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assign site observation","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect site observation","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize site observation","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"update site observation","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record field inspection","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create field inspection","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review field inspection","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"document field inspection","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assign field inspection","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect field inspection","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize field inspection","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"update field inspection","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record site photo","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create site photo","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review site photo","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"document site photo","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assign site photo","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect site photo","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize site photo","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"update site photo","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record corrective action","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create corrective action","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review corrective action","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"document corrective action","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assign corrective action","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect corrective action","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize corrective action","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"update corrective action","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record inspection note","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create inspection note","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review inspection note","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"document inspection note","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assign inspection note","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect inspection note","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize inspection note","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"update inspection note","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record site issue","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create site issue","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review site issue","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"document site issue","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assign site issue","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect site issue","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize site issue","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"update site issue","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record field report","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create field report","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review field report","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"document field report","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assign field report","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect field report","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize field report","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"update field report","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"record inspection checklist","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create inspection checklist","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"review inspection checklist","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"document inspection checklist","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"assign inspection checklist","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"inspect inspection checklist","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"summarize inspection checklist","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"update inspection checklist","label":"field","split":"train","origin":"internally_authored_synthetic"}
+{"text":"request export PDF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create export PDF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retry export PDF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retrieve export PDF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"open export PDF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"produce export PDF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"prepare export PDF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check export PDF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"request download DXF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create download DXF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retry download DXF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retrieve download DXF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"open download DXF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"produce download DXF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"prepare download DXF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check download DXF","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"request DWG conversion","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create DWG conversion","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retry DWG conversion","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retrieve DWG conversion","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"open DWG conversion","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"produce DWG conversion","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"prepare DWG conversion","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check DWG conversion","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"request IFC export","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create IFC export","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retry IFC export","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retrieve IFC export","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"open IFC export","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"produce IFC export","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"prepare IFC export","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check IFC export","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"request CSV report","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create CSV report","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retry CSV report","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retrieve CSV report","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"open CSV report","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"produce CSV report","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"prepare CSV report","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check CSV report","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"request ZIP package","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create ZIP package","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retry ZIP package","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retrieve ZIP package","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"open ZIP package","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"produce ZIP package","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"prepare ZIP package","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check ZIP package","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"request export history","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create export history","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retry export history","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retrieve export history","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"open export history","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"produce export history","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"prepare export history","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check export history","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"request download drawing","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"create download drawing","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retry download drawing","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"retrieve download drawing","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"open download drawing","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"produce download drawing","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"prepare download drawing","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"check download drawing","label":"exports","split":"train","origin":"internally_authored_synthetic"}
+{"text":"could you propose a kitchen layout with living room circulation","label":"architecture","split":"test","origin":"internally_authored_synthetic"}
+{"text":"bedroom arrangement for a residential plan please","label":"architecture","split":"test","origin":"internally_authored_synthetic"}
+{"text":"describe the office layout and room arrangement","label":"architecture","split":"test","origin":"internally_authored_synthetic"}
+{"text":"how should i arrange this floor plan","label":"architecture","split":"test","origin":"internally_authored_synthetic"}
+{"text":"could you resize a door opening in the DXF drawing","label":"cad","split":"test","origin":"internally_authored_synthetic"}
+{"text":"please inspect CAD layers and polyline entities","label":"cad","split":"test","origin":"internally_authored_synthetic"}
+{"text":"modify the drawing units before measuring","label":"cad","split":"test","origin":"internally_authored_synthetic"}
+{"text":"extract wall coordinates from the dimensioned geometry","label":"cad","split":"test","origin":"internally_authored_synthetic"}
+{"text":"how many IfcWall entities are in this IFC model","label":"bim","split":"test","origin":"internally_authored_synthetic"}
+{"text":"can i list IFC quantities and model properties","label":"bim","split":"test","origin":"internally_authored_synthetic"}
+{"text":"please query the BIM element spatial hierarchy","label":"bim","split":"test","origin":"internally_authored_synthetic"}
+{"text":"analyze clash detection results in this model","label":"bim","split":"test","origin":"internally_authored_synthetic"}
+{"text":"what does the ADA accessibility screen require","label":"compliance","split":"test","origin":"internally_authored_synthetic"}
+{"text":"assess NFPA fire safety and egress under the applicable edition","label":"compliance","split":"test","origin":"internally_authored_synthetic"}
+{"text":"verify the NEC clearance requirement","label":"compliance","split":"test","origin":"internally_authored_synthetic"}
+{"text":"review the ASCE load rules for this case","label":"compliance","split":"test","origin":"internally_authored_synthetic"}
+{"text":"please flag duplicate drawing lines in the drawing","label":"review","split":"test","origin":"internally_authored_synthetic"}
+{"text":"where can i resolve the redline comment","label":"review","split":"test","origin":"internally_authored_synthetic"}
+{"text":"record this review markup and its annotation issue","label":"review","split":"test","origin":"internally_authored_synthetic"}
+{"text":"could you identify zero length entities","label":"review","split":"test","origin":"internally_authored_synthetic"}
+{"text":"compare the updated drawing against the original versus revised files","label":"asbuilt","split":"test","origin":"internally_authored_synthetic"}
+{"text":"summarize the geometry differences and added removed elements","label":"asbuilt","split":"test","origin":"internally_authored_synthetic"}
+{"text":"inspect the revision overlay after alignment","label":"asbuilt","split":"test","origin":"internally_authored_synthetic"}
+{"text":"examine this survey discrepancy in the as built comparison","label":"asbuilt","split":"test","origin":"internally_authored_synthetic"}
+{"text":"please record a field inspection and site observation","label":"field","split":"test","origin":"internally_authored_synthetic"}
+{"text":"assign the corrective action for this site issue","label":"field","split":"test","origin":"internally_authored_synthetic"}
+{"text":"document the site photo in the field report","label":"field","split":"test","origin":"internally_authored_synthetic"}
+{"text":"summarize the inspection note and checklist","label":"field","split":"test","origin":"internally_authored_synthetic"}
+{"text":"can i retry the DWG conversion job","label":"exports","split":"test","origin":"internally_authored_synthetic"}
+{"text":"please retrieve the export PDF and download drawing","label":"exports","split":"test","origin":"internally_authored_synthetic"}
+{"text":"where is the export history for this project","label":"exports","split":"test","origin":"internally_authored_synthetic"}
+{"text":"prepare a CSV report and ZIP package for download","label":"exports","split":"test","origin":"internally_authored_synthetic"}

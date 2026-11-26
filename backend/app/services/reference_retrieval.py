@@ -39,6 +39,8 @@ def _load_index(root):
         if not item["source_url"].startswith("https://github.com/buildingSMART/Certification-datasets/blob/main/"):
             raise ValueError("Reference source not approved")
         model=ifcopenshell.open(str(path))
+        if str(model.schema_identifier) != item["schema"]:
+            raise ValueError("Reference schema mismatch")
         counts=Counter(str(e.is_a()) for e in model.by_type("IfcProduct"))
         if len(counts)>200: raise ValueError("Reference class budget exceeded")
         for entity,min_count in item.get("expected_min",{}).items():
@@ -46,12 +48,12 @@ def _load_index(root):
         classification=item["classification"]
         discipline="structural" if "structural" in classification.lower() else "mep" if "mep" in classification.lower() else "architecture"
         classes=dict(sorted(counts.items()))
-        content=(f"Certification sample: {classification}. IFC schema {model.schema}. "
+        content=(f"Certification sample: {classification}. IFC schema {model.schema_identifier}. "
                  +"Source product classes: "+", ".join(f"{key}: {count}" for key,count in classes.items())+". "
                  +"Counts describe this reference model only, not a customer's project or verified construction.")
         terms=" ".join(re.sub(r"([a-z])([A-Z])",r"\1 \2",k).lower() for k in classes)
         docs.append({"dataset_id":item["name"],"title":classification,"discipline":discipline,
-                     "schema":str(model.schema),"format":"IFC","version":item["blob"],
+                     "schema":str(model.schema_identifier),"format":"IFC","version":item["blob"],
                      "sha256":digest,"source_url":item["source_url"],"license":LICENSE,
                      "license_url":manifest["license_url"],"attribution":manifest["attribution"],
                      "commercial_use":"CC BY 4.0 permits commercial reuse with attribution",
@@ -67,7 +69,7 @@ def reference_register():
     rows=_index()
     return {"dataset_count":len(rows),"retrieval_method":"local_lexical_reference_v1",
             "datasets":[{k:v for k,v in row.items() if k not in {"search_text","content","entity_counts"}} for row in rows],
-            "scope":"Reference IFC certification fixtures only. No codebook ingestion, customer data, or model weight training."}
+            "scope":"Reference IFC certification fixtures only. Separate intent model is trained on original synthetic text, not these files. No customer data or codebook ingestion."}
 
 def retrieve_reference(question):
     # Generic query words and boilerplate caveats are not technical evidence.

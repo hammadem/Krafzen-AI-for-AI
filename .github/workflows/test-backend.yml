@@ -123,6 +123,15 @@ jobs:
         print("Jobs, files, and projects routes registered successfully")
         PY
 
+    - name: Refit AEC model from approved synthetic corpus
+      run: python backend/scripts/train_aec_intent.py --output-dir /tmp/krafzen-aec-training
+    - name: Generate source-grounded BIM QA corpus from approved IFC models
+      run: python backend/scripts/build_ifc_qa_corpus.py --output-dir /tmp/krafzen-aec-training
+    - name: Upload training evidence
+      uses: actions/upload-artifact@v4
+      with:
+        name: aec-intent-training
+        path: /tmp/krafzen-aec-training/
     - name: Run backend tests
       run: |
         cd backend

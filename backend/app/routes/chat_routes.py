@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from uuid import UUID
 from fastapi.concurrency import run_in_threadpool
 from app.services.reference_retrieval import retrieve_reference, format_reference_answer, reference_register
+from app.services.aec_intent_model import predict_intent
 
 from app.compliance.extraction_fallback import merge_heuristic_layout
 from app.compliance.models import LayoutExtract
@@ -555,6 +556,17 @@ class ReferenceRequest(BaseModel):
     session_id: UUID
     question: str = Field(min_length=1, max_length=500)
 
+
+class IntentPreviewRequest(BaseModel):
+    text: str = Field(min_length=1,max_length=2000)
+
+@router.post("/chat/intent-preview")
+async def preview_aec_intent(request: IntentPreviewRequest,user_data:dict=Depends(require_auth)):
+    """Local trained model advisory; cannot trigger generation or calculations."""
+    try:
+        return await run_in_threadpool(predict_intent,request.text)
+    except Exception as exc:
+        raise HTTPException(status_code=503,detail="AEC intent model unavailable") from exc
 
 @router.get("/chat/reference-register")
 async def get_reference_register(user_data: dict = Depends(require_auth)):
