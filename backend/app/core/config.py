@@ -159,6 +159,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     FRONTEND_URL: str = "http://localhost:3000"
+    # Optional HTTPS transactional email; never put sending credentials in frontend.
+    INVITE_EMAIL_ENABLED: bool = False
+    RESEND_API_KEY: str = ""
+    INVITE_EMAIL_FROM: str = ""
     
     # Render
     PORT: int = 8000
