@@ -415,3 +415,33 @@ async def test_workspace_event_requires_actor_and_persists_scope():
             workspace_id=WORKSPACE_ID,
             actor_user_id="",
         )
+
+
+@pytest.mark.asyncio
+async def test_concurrent_role_change_rejects_stale_update_without_audit():
+    database = FakeDatabase(
+        {"workspace_members": [{
+            "workspace_id": WORKSPACE_ID,
+            "user_id": TARGET_ID,
+            "role": "member",
+        }]}
+    )
+    record_event = AsyncMock()
+    original_execute = FakeQuery.execute
+
+    def concurrent_execute(query):
+        if query.table_name == "workspace_members" and query.operation == "update":
+            database.tables["workspace_members"][0]["role"] = "viewer"
+        return original_execute(query)
+
+    with patch.object(workspace_queries, "db", database), \
+         patch.object(workspace_queries, "get_workspace", new=AsyncMock(return_value={"owner_id": ACTOR_ID})), \
+         patch.object(workspace_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(workspace_queries, "record_workspace_event", new=record_event), \
+         patch.object(FakeQuery, "execute", concurrent_execute):
+        with pytest.raises(HTTPException) as error:
+            await workspace_queries.update_role_member(WORKSPACE_ID, TARGET_ID, "admin", ACTOR_ID)
+
+    assert error.value.status_code == 409
+    assert database.tables["workspace_members"][0]["role"] == "viewer"
+    record_event.assert_not_awaited()

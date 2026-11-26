@@ -1,9 +1,9 @@
 "use client";
 
 // Orchestrates Step 3: members + invites for one workspace.
-// Owns the optimistic update logic; the child components are presentational.
+// Reloads authoritative server state after member mutations.
 
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Users, RefreshCw, AlertCircle } from "lucide-react";
 import { toast } from "react-toastify";
 import { useAuth } from "@/context/AuthContext";
@@ -39,20 +39,24 @@ function selectInvites(raw: ApiRes["data"]): WorkspaceInvite[] {
 
 export default function MemberManagement({ workspaceId, canManage = true }: { workspaceId: string; canManage?: boolean }) {
     const { user } = useAuth();
+    const [page, setPage] = useState(1);
+    const [changing, setChanging] = useState(false);
+    const mutationLock = useRef(false);
 
     const {
-        data: members,
-        setData: setMembers,
+        data: memberPage,
         isLoading,
         isError,
         error,
         refetch,
-    } = useApiResource<WorkspaceMember[]>({
-        fetcher: (u) => getWorkspaceMembers(u, workspaceId),
-        select: selectMembers,
-        fallback: [],
+    } = useApiResource<{ members: WorkspaceMember[]; total: number }>({
+        fetcher: (u) => getWorkspaceMembers(u, workspaceId, page, 50),
+        select: raw => ({ members: selectMembers(raw), total: Number((raw as { total?: number })?.total ?? selectMembers(raw).length) }),
+        fallback: { members: [], total: 0 },
         enabled: !!workspaceId,
+        resourceKey: `${workspaceId}:${page}`,
     });
+    const members = memberPage.members;
 
     const { data: invites, setData: setInvites, isError: invitesError, error: inviteError, refetch: refetchInvites } = useApiResource<WorkspaceInvite[]>({
         fetcher: (u) => getWorkspaceInvites(u, workspaceId),
@@ -86,88 +90,38 @@ export default function MemberManagement({ workspaceId, canManage = true }: { wo
         [invites, user, workspaceId, setInvites]
     );
 
-    // --- Revoke invite (optimistic) ---
-    const handleRevoke = useCallback(
-        async (inviteId: string) => {
-            let prevStatus: WorkspaceInvite["status"] | undefined;
-            setInvites((prev) =>
-                prev.map((i) => {
-                    if (i.id === inviteId) {
-                        prevStatus = i.status;
-                        return { ...i, status: "revoked" };
-                    }
-                    return i;
-                })
-            );
-            const { ok } = await revokeInvite(user, workspaceId, inviteId);
-            if (!ok && prevStatus) {
-                setInvites((prev) =>
-                    prev.map((i) => (i.id === inviteId ? { ...i, status: prevStatus! } : i))
-                );
-                toast.dark("Couldn't revoke the invite. Please try again.");
-            }
-        },
-        [user, workspaceId, setInvites]
-    );
+    // Serialize mutations; re-read authoritative data after success or failure.
+    const change = useCallback(async (operation: () => Promise<ApiRes>, refresh: () => void, fallback: string) => {
+        if (mutationLock.current) return;
+        mutationLock.current = true;
+        setChanging(true);
+        try {
+            const result = await operation();
+            if (!result.ok) toast.dark(result.error?.message || fallback);
+        } catch {
+            toast.dark(fallback);
+        } finally {
+            refresh();
+            mutationLock.current = false;
+            setChanging(false);
+        }
+    }, []);
 
-    // --- Change role (optimistic) ---
-    const handleRoleChange = useCallback(
-        async (userId: string, role: string) => {
-            let prevRole: string | undefined;
-            setMembers((prev) =>
-                prev.map((m) => {
-                    if (m.user_id === userId) {
-                        prevRole = m.role;
-                        return { ...m, role };
-                    }
-                    return m;
-                })
-            );
-            const { ok } = await updateMemberRole(user, workspaceId, userId, role);
-            if (!ok && prevRole !== undefined) {
-                setMembers((prev) =>
-                    prev.map((m) => (m.user_id === userId ? { ...m, role: prevRole! } : m))
-                );
-                toast.dark("Couldn't update the role. Please try again.");
-            }
-        },
-        [user, workspaceId, setMembers]
-    );
-
-    // --- Remove member (optimistic, with re-insert rollback) ---
-    const handleRemove = useCallback(
-        async (userId: string) => {
-            let removed: WorkspaceMember | undefined;
-            let index = -1;
-            setMembers((prev) => {
-                index = prev.findIndex((m) => m.user_id === userId);
-                removed = prev[index];
-                return prev.filter((m) => m.user_id !== userId);
-            });
-            const { ok } = await removeWorkspaceMember(user, workspaceId, userId);
-            if (!ok && removed) {
-                setMembers((prev) => {
-                    const copy = [...prev];
-                    copy.splice(index < 0 ? copy.length : index, 0, removed!);
-                    return copy;
-                });
-                toast.dark("Couldn't remove the member. Please try again.");
-            }
-        },
-        [user, workspaceId, setMembers]
-    );
+    const handleRevoke = (id: string) => change(() => revokeInvite(user, workspaceId, id), refetchInvites, "Could not revoke invitation.");
+    const handleRoleChange = (id: string, role: string) => change(() => updateMemberRole(user, workspaceId, id, role), refetch, "Could not update role.");
+    const handleRemove = (id: string) => change(() => removeWorkspaceMember(user, workspaceId, id), refetch, "Could not remove member.");
 
     return (
         <div className="flex flex-col gap-5">
             {canManage && <><InviteForm onInvite={handleInvite} />
             <p className="text-xs text-slate-400">Invitations are not emailed automatically. Share the code privately with the intended email account.</p>
             {invitesError && <p role="alert">{inviteError?.message || "Could not load invitations."} <button onClick={refetchInvites} className="underline">Retry</button></p>}
-            <PendingInvites invites={pendingInvites} onRevoke={handleRevoke} /></>}
+            <fieldset disabled={changing}><PendingInvites invites={pendingInvites} onRevoke={handleRevoke} /></fieldset></>}
 
             {/* Members */}
             <div className="flex flex-col gap-2">
                 <h3 className="text-[#8F8F8F] text-xs uppercase tracking-wide">
-                    Members{!isLoading && !isError ? ` (${members.length})` : ""}
+                    Members{!isLoading && !isError ? ` (${memberPage.total})` : ""}
                 </h3>
 
                 {isError && (
@@ -213,12 +167,17 @@ export default function MemberManagement({ workspaceId, canManage = true }: { wo
                     <MembersList
                         members={members}
                         currentUserId={user?.userId}
-                        canManage={canManage}
+                        canManage={canManage && !changing}
                         onRoleChange={handleRoleChange}
                         onRemove={handleRemove}
                     />
                 )}
 
+                {!isLoading && !isError && (page > 1 || memberPage.total > 50) && <nav aria-label="Member pagination" className="flex items-center gap-3">
+                    <button disabled={page === 1 || changing} onClick={() => setPage(p => p - 1)} className="rounded border border-white/20 px-3 py-1 disabled:opacity-40">Previous</button>
+                    <span>Page {page} of {Math.max(1, Math.ceil(memberPage.total / 50))}</span>
+                    <button disabled={page * 50 >= memberPage.total || changing} onClick={() => setPage(p => p + 1)} className="rounded border border-white/20 px-3 py-1 disabled:opacity-40">Next</button>
+                </nav>}
                 {!isLoading && !isError && members.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-12 gap-4 border-2 border-dashed border-white/5 rounded-3xl">
                         <div className="w-14 h-14 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
