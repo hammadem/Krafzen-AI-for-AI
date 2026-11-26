@@ -94,6 +94,19 @@ def test_invalid_image_extension_or_payload_rejected():
     assert rejected.value.status_code == 422
 
 
+def test_rotated_photo_reports_stored_pixel_dimensions():
+    original = BytesIO()
+    image = Image.new("RGB", (160, 120))
+    exif = Image.Exif()
+    exif[274] = 6
+    image.save(original, format="JPEG", exif=exif)
+    with patch("app.services.field_evidence_service._scan_file"):
+        result, metadata = sanitized_photo_bytes(original.getvalue(), "jpg")
+    with Image.open(BytesIO(result)) as restored:
+        assert restored.size == (120, 160)
+    assert (metadata["image_width_px"], metadata["image_height_px"]) == (120, 160)
+
+
 def test_genuine_factual_report_pdf_contains_only_stored_observations():
     records = [
         {
@@ -104,6 +117,8 @@ def test_genuine_factual_report_pdf_contains_only_stored_observations():
             "description": "North entrance approach blocked by materials",
             "location_label": "North lobby",
             "observed_at": "2026-11-23T11:00:00Z",
+            "report_notes": [{"kind": "corrective_action", "body": "Clear accessible approach", "due_date": "2026-12-01"}],
+            "report_photos": [{"id": PHOTO, "source_metadata": {"stored_sha256": "a" * 64}}],
         }
     ]
     pdf_bytes = generate_field_report_pdf(PROJECT, records)
@@ -115,6 +130,10 @@ def test_genuine_factual_report_pdf_contains_only_stored_observations():
     assert "NOT A CONFIRMED ENGINEERING DEFECT" in content
     assert "Verified persisted inspection records included: 1" in content
     assert "Example fixture" not in content
+    assert "Clear accessible approach" in content
+    assert "2026-12-01" in content
+    assert PHOTO in content
+    assert "a" * 64 in content
 
 
 def test_field_report_paginate_long_notes_without_truncating_real_data():
@@ -262,11 +281,18 @@ async def test_report_route_reads_real_owner_rows_and_returns_pdf():
     query.order.return_value = query
     query.limit.return_value = query
     query.execute.return_value = SimpleNamespace(data=[
-        {"title": "Actual field observation", "description": "Concrete damaged",
+        {"id": INSPECTION, "title": "Actual field observation", "description": "Concrete damaged",
          "severity": "medium", "discipline": "site", "status": "open"},
     ])
     db = MagicMock()
-    db.table.return_value = query
+    evidence = MagicMock()
+    for method in ("select", "eq", "in_", "order", "limit"):
+        getattr(evidence, method).return_value = evidence
+    evidence.execute.side_effect = [
+        SimpleNamespace(data=[{"inspection_id": INSPECTION, "kind": "corrective_action", "body": "Repair recorded surface", "due_date": "2026-12-02"}]),
+        SimpleNamespace(data=[{"inspection_id": INSPECTION, "id": PHOTO, "source_metadata": {"stored_sha256": "b" * 64}}]),
+    ]
+    db.table.side_effect = lambda name: query if name == "field_inspections" else evidence
     with (
         patch.object(field_routes, "_owned_project", AsyncMock(return_value={"id": PROJECT})),
         patch.object(field_routes, "run_in_threadpool", inline),
@@ -279,7 +305,10 @@ async def test_report_route_reads_real_owner_rows_and_returns_pdf():
     assert response.body.startswith(b"%PDF-")
     assert "private, no-store" == response.headers["cache-control"]
     assert any(call.args == ("created_by", USER["user_id"]) for call in query.eq.call_args_list)
-    assert b"Actual" in response.body or PdfReader(BytesIO(response.body))
+    content = "\n".join(page.extract_text() for page in PdfReader(BytesIO(response.body)).pages)
+    assert "Repair recorded surface" in content
+    assert PHOTO in content
+    assert any(call.args == ("created_by", USER["user_id"]) for call in evidence.eq.call_args_list)
 
 
 @pytest.mark.asyncio
