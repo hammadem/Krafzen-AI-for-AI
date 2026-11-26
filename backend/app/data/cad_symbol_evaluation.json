@@ -1,0 +1,67 @@
+{
+  "training_count": 960,
+  "test_count": 240,
+  "correct": 206,
+  "accuracy": 0.8583333333333333,
+  "accepted": 182,
+  "accepted_correct": 182,
+  "confusion": [
+    [
+      40,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      39,
+      0,
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      39,
+      0,
+      1,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      40,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      40,
+      0
+    ],
+    [
+      0,
+      0,
+      12,
+      7,
+      13,
+      8
+    ]
+  ],
+  "labels": [
+    "column",
+    "door_swing",
+    "duct",
+    "pipe_circle",
+    "window",
+    "annotation_arrow"
+  ],
+  "scope": "Procedurally generated crop holdout; no real drawing evaluation."
+}

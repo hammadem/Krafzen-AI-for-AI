@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/api";
 import { getApiBaseUrl } from "@/lib/api/utils";
 import DrawingFindingsPanel from "@/components/cad/DrawingFindingsPanel";
+import SymbolCropPreview from "@/components/cad/SymbolCropPreview";
 
 type Project = { id: string; input_text?: string | null };
 type Job = { id: string };
@@ -263,6 +264,7 @@ export default function ReviewsPage() {
                             )}
                         </section>
                         <DrawingFindingsPanel user={user} fileId={fileId} onSaved={()=>setReload(v=>v+1)}/>
+                        <SymbolCropPreview key={fileId}/>
                         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
