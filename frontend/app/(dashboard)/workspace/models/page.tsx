@@ -18,6 +18,9 @@ type ModelSummary = {
     storeys: { global_id: string; name: string; elevation?: number | null; contained_element_count: number }[];
     length_unit?: { name: string; prefix?: string | null } | null;
     declared_quantities?: Quantity[];
+    ambiguous_quantity_declarations?: number;
+    invalid_quantity_declarations?: number;
+    quantity_groups_truncated?: boolean;
     property_set_assignment_counts?: Record<string, number>;
     quantities_are_declared_not_measured?: boolean;
     geometry_validated: boolean; clash_detection_performed: boolean;
@@ -441,11 +444,14 @@ export default function ModelsPage() {
                                 </section>
                                 <section className="rounded-xl border border-white/10 p-5 space-y-3">
                                     <h2 className="font-semibold">Declared IFC quantities ({quantities.length})</h2>
+                                    {!!model.ambiguous_quantity_declarations && <p className="text-amber-200 text-sm">Excluded conflicting quantity declarations: {model.ambiguous_quantity_declarations}</p>}
+                                    {!!model.invalid_quantity_declarations && <p className="text-amber-200 text-sm">Excluded invalid quantity declarations: {model.invalid_quantity_declarations}</p>}
+                                    {model.quantity_groups_truncated && <p className="text-amber-200 text-sm">Quantity groups truncated at 300.</p>}
                                     {quantities.length === 0 && <p className="text-sm text-slate-400">No linked quantity sets were found in this IFC model.</p>}
                                     {quantities.map((q, i) => (
                                         <div className="border-b border-white/5 py-2 text-sm" key={i}>
                                             <p>{q.set} / {q.name}</p>
-                                            <p className="text-slate-400">{q.sum_raw} raw model units · {q.item_count} assigned element(s) · {q.type}</p>
+                                            <p className="text-slate-400">{q.sum_raw} · {q.unit} · {q.item_count} assigned element(s) · {q.type}</p>
                                         </div>
                                     ))}
                                     <h3 className="text-sm font-semibold mt-4">Property set assignments</h3>

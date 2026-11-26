@@ -66,58 +66,69 @@ def inspect_ifc_file(path: str) -> dict:
     # Read *declared* IFC quantities and property sets actually assigned to
     # model products. Never estimate dimensions from counts or claim a geometric
     # takeoff without evaluating representations.
-    quantity_totals: dict[str, dict] = {}
-    property_set_counts: Counter = Counter()
+    quantity_totals: dict[tuple, dict] = {}
+    property_assignments = set()
+    candidates: dict[tuple, dict] = {}
     quantity_relations = 0
-    for rel in model.by_type("IfcRelDefinesByProperties")[:50000]:
+    assignment_steps = 0
+    relationships = model.by_type("IfcRelDefinesByProperties")
+    if len(relationships) > 50000:
+        raise ValueError("IFC property relationship budget exceeded")
+    for rel in relationships:
         definition = getattr(rel, "RelatingPropertyDefinition", None)
         if not definition:
             continue
-        assigned = sum(
-            1 for obj in (getattr(rel, "RelatedObjects", ()) or ())
-            if obj.is_a("IfcProduct")
-        )
+        assigned = {obj.id() for obj in (getattr(rel, "RelatedObjects", ()) or ()) if obj.is_a("IfcProduct")}
         if not assigned:
             continue
         if definition.is_a("IfcPropertySet"):
-            property_set_counts[str(definition.Name or "Unnamed")[:120]] += assigned
+            assignment_steps += len(assigned)
+            if assignment_steps > 100000:
+                raise ValueError("IFC property assignment budget exceeded")
+            property_assignments.update((obj, definition.id(), str(definition.Name or "Unnamed")[:120]) for obj in assigned)
             continue
         if not definition.is_a("IfcElementQuantity"):
             continue
         quantity_relations += 1
-        set_name = str(definition.Name or "Unnamed")[:100]
+        set_name = str(definition.Name or "Unnamed")
         for qty in (getattr(definition, "Quantities", ()) or ()):
             kind = str(qty.is_a())
-            value_attr = {
-                "IfcQuantityLength": "LengthValue",
-                "IfcQuantityArea": "AreaValue",
-                "IfcQuantityVolume": "VolumeValue",
-                "IfcQuantityCount": "CountValue",
-                "IfcQuantityWeight": "WeightValue",
-                "IfcQuantityTime": "TimeValue",
-            }.get(kind)
-            if not value_attr:
+            attr = {"IfcQuantityLength":"LengthValue","IfcQuantityArea":"AreaValue",
+                    "IfcQuantityVolume":"VolumeValue","IfcQuantityCount":"CountValue",
+                    "IfcQuantityWeight":"WeightValue","IfcQuantityTime":"TimeValue"}.get(kind)
+            if not attr:
                 continue
-            try:
-                value = float(getattr(qty, value_attr))
-            except (TypeError, ValueError, AttributeError):
-                continue
-            if not (-1e15 <= value <= 1e15):
-                continue
-            name = str(qty.Name or kind)[:100]
-            unit = getattr(qty, "Unit", None)
-            # Unit overrides are not silently combined with project defaults.
-            unit_key = f"{unit.is_a()}:{unit.id()}" if unit else "project_declared"
-            key = f"{set_name}/{name}/{kind}/{unit_key}"
-            if key not in quantity_totals and len(quantity_totals) >= 300:
-                continue
-            item = quantity_totals.setdefault(key, {
-                "set": set_name, "name": name, "type": kind,
-                "unit": unit_key,
-                "sum_raw": 0.0, "item_count": 0,
-            })
-            item["sum_raw"] += value * assigned
-            item["item_count"] += assigned
+            assignment_steps += len(assigned)
+            if assignment_steps > 100000:
+                raise ValueError("IFC quantity assignment budget exceeded")
+            name = str(qty.Name or kind)
+            for obj in assigned:
+                key = (obj, set_name.casefold(), name.casefold())
+                # Repeated links to the same actual quantity count once.
+                candidates.setdefault(key, {})[qty.id()] = (set_name, name, qty, attr)
+    ambiguous = invalid = 0
+    for declarations in candidates.values():
+        if len(declarations) != 1:
+            ambiguous += 1
+            continue
+        set_name, name, qty, attr = next(iter(declarations.values()))
+        try:
+            value = float(getattr(qty, attr))
+        except (TypeError, ValueError, AttributeError):
+            invalid += 1
+            continue
+        if not 0 <= value <= 1e15:
+            invalid += 1
+            continue
+        kind = str(qty.is_a())
+        unit = getattr(qty, "Unit", None)
+        unit_key = f"{unit.is_a()}:{unit.id()}" if unit else "project_declared"
+        key = (set_name, name, kind, unit_key)
+        item = quantity_totals.setdefault(key, {"set":set_name[:100],"name":name[:100],"type":kind,
+                                                "unit":unit_key,"sum_raw":0.0,"item_count":0})
+        item["sum_raw"] += value
+        item["item_count"] += 1
+    property_set_counts = Counter(name for _, _, name in property_assignments)
 
     return {
         "type": "ifc",
@@ -135,7 +146,10 @@ def inspect_ifc_file(path: str) -> dict:
         "storey_count": len(storeys),
         "length_unit": length_unit,
         "represented_product_count": represented,
-        "declared_quantities": list(quantity_totals.values()),
+        "declared_quantities": list(quantity_totals.values())[:300],
+        "quantity_groups_truncated": len(quantity_totals) > 300,
+        "ambiguous_quantity_declarations": ambiguous,
+        "invalid_quantity_declarations": invalid,
         "quantity_relation_count": quantity_relations,
         "property_set_assignment_counts": dict(sorted(property_set_counts.items())[:200]),
         "quantities_are_declared_not_measured": True,
