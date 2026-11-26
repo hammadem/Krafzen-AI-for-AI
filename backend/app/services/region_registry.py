@@ -30,7 +30,7 @@ CENTRAL_REGION_REGISTRY: Dict[str, RegionEntry] = {
     "us": RegionEntry(
         region_code="us",
         display_name="United States",
-        status=RegionStatus.ACTIVE,
+        status=RegionStatus.PROVISIONING,
         database_config={
             "secret_env_ref": "SUPABASE_URL_US",
             "service_key_env_ref": "SUPABASE_SERVICE_ROLE_KEY_US",
@@ -42,7 +42,7 @@ CENTRAL_REGION_REGISTRY: Dict[str, RegionEntry] = {
             "bucket_name": settings.SUPABASE_STORAGE_BUCKET_US,
             "secret_env_ref": "SUPABASE_STORAGE_KEY_US",
             "configured": bool(settings.SUPABASE_STORAGE_KEY_US),
-            "provider": "supabase_s3",
+            "provider": "supabase_storage",
             "region": settings.SUPABASE_STORAGE_REGION_US,
         },
         queue_config={
