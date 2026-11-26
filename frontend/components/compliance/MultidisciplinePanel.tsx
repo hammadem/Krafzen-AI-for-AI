@@ -8,7 +8,7 @@ export default function MultidisciplinePanel({user,projectId,sourceFile,context,
  const [rules,setRules]=useState<Rule[]>([]),[id,setId]=useState(""),[entries,setEntries]=useState<Entry[]>([]);
  const [edition,setEdition]=useState(""),[element,setElement]=useState(""),[measured,setMeasured]=useState(""),[extra,setExtra]=useState(""),[applies,setApplies]=useState(false);
  const [adoption,setAdoption]=useState(""),[reviewer,setReviewer]=useState(""),[credential,setCredential]=useState(""),[amendments,setAmendments]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
- useEffect(()=>{let active=true;if(!user?.access_token)return;void getMultidisciplineCatalog(user).then(r=>{if(!active)return;const data=r.data as unknown as {rules?:Rule[]};if(r.ok&&Array.isArray(data?.rules))setRules(data.rules);else setError(r.error?.message||"Rule catalog unavailable");}).catch(()=>{if(active)setError("Rule catalog unavailable");});return()=>{active=false};},[user]);
+ useEffect(()=>{let active=true;if(!user?.access_token)return;void getMultidisciplineCatalog(user).then(r=>{if(!active)return;const data=r.data as unknown as {rules?:Rule[]};if(r.ok&&Array.isArray(data?.rules))setRules(data.rules);else setError(r.error?.message||"Rule catalog unavailable");}).catch(()=>{if(active)setError("Rule catalog unavailable");});return()=>{active=false};},[user?.access_token,user?.userId]);
  const rule=rules.find(r=>r.rule_id===id);
  const reset=()=>{setEdition("");setElement("");setMeasured("");setExtra("");setApplies(false);};
  function add(){
