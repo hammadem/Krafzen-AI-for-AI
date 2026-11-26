@@ -67,11 +67,23 @@ export async function apiClient(
             // FastAPI returns 401/4xx with { detail: string | { error: string } }
             const detail = data?.detail;
             const serverMessage =
-                typeof detail === "string"
+                typeof detail === "string" && detail.trim()
                     ? detail
-                    : detail && typeof detail === "object" && "error" in detail
-                        ? (detail as { error?: string }).error
-                        : data?.message;
+                    : Array.isArray(detail)
+                        ? detail.map((issue: unknown) => {
+                            if (!issue || typeof issue !== "object") return "";
+                            const { loc, msg } = issue as { loc?: unknown; msg?: unknown };
+                            if (typeof msg !== "string") return "";
+                            const field = Array.isArray(loc)
+                                ? loc.filter((part) => typeof part === "string" || typeof part === "number").slice(1).join(".")
+                                : "";
+                            return field ? field + ": " + msg : msg;
+                        }).filter(Boolean).join("; ") || "Please check the submitted fields."
+                        : detail && typeof detail === "object" && typeof detail.error === "string"
+                            ? detail.error
+                            : detail && typeof detail === "object" && typeof detail.message === "string"
+                                ? detail.message
+                                : typeof data?.message === "string" ? data.message : undefined;
 
             // SU5 — centralized error handling. Normalize auth/forbidden failures
             // in one place so pages get a consistent AppError + the right UX.
