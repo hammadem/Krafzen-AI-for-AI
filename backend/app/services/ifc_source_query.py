@@ -33,10 +33,28 @@ def definitions(e, kind):
 def same(a,b):
     return str(a or "").strip().casefold() == str(b or "").strip().casefold()
 
-def directly_in_storey(e, guid):
-    # Explicit containment only; not a geometric floor attribution.
-    return any(str(getattr(rel.RelatingStructure,"GlobalId","")) == guid
-               for rel in (getattr(e,"ContainedInStructure",()) or ()))
+def declared_storeys(e):
+    """Resolve explicit containment and aggregation, not geometric attribution."""
+    pending = [e]
+    visited = set()
+    floors = set()
+    while pending:
+        obj = pending.pop()
+        if obj is None or obj.id() in visited:
+            continue
+        visited.add(obj.id())
+        if len(visited) > 64:
+            raise ValueError("Spatial relationship exceeds traversal budget")
+        if obj.is_a("IfcBuildingStorey"):
+            floors.add(obj.id())
+            continue
+        for relation in getattr(obj, "ContainedInStructure", ()) or ():
+            pending.append(getattr(relation, "RelatingStructure", None))
+        for relation in getattr(obj, "Decomposes", ()) or ():
+            if relation.is_a("IfcRelAggregates"):
+                pending.append(getattr(relation, "RelatingObject", None))
+    return floors
+
 
 def primitive(value):
     value = getattr(value, "wrappedValue", value)
@@ -60,13 +78,16 @@ def query_file(path, req):
     if entity_class not in CLASSES or mode not in {"count","elements","properties","missing_property","quantity"}:
         raise ValueError("Unsupported query")
     result = {"method":"ifc_source_query_v1","schema":str(model.schema),"mode":mode,
-              "entity_class":entity_class,"limits":"Explicit occurrence-level IFC declarations only; floor filter uses direct containment. No type inheritance, physical measurements or compliance conclusions."}
+              "entity_class":entity_class,"limits":"Explicit occurrence-level IFC declarations only; floor filter follows declared containment and aggregation; conflicting storeys are excluded and counted. No type inheritance, physical measurements or compliance conclusions."}
     storeys = model.by_type("IfcBuildingStorey")
     result["storeys"] = [brief(e) for e in storeys[:MAX_ROWS]]
     result["storeys_truncated"] = len(storeys)>MAX_ROWS
     if mode == "properties":
         guid = req.get("element_guid")
-        matches = [e for e in model.by_type("IfcProduct") if str(getattr(e,"GlobalId","")) == guid]
+        products = model.by_type("IfcProduct")
+        if len(products) > MAX_SCAN:
+            raise ValueError("Product class exceeds query budget")
+        matches = [e for e in products if str(getattr(e,"GlobalId","")) == guid]
         if len(matches) != 1:
             return {**result,"status":"not_found_or_ambiguous","element":None}
         e = matches[0]
@@ -87,9 +108,22 @@ def query_file(path, req):
         raise ValueError("Model class exceeds query budget")
     storey_guid = req.get("storey_guid")
     if storey_guid:
-        if sum(1 for e in storeys if str(e.GlobalId)==storey_guid)!=1:
+        matches = [e for e in storeys if str(e.GlobalId) == storey_guid]
+        if len(matches) != 1:
             return {**result,"status":"not_found_or_ambiguous","match_count":None}
-        elements = [e for e in elements if directly_in_storey(e,storey_guid)]
+        target = matches[0].id()
+        selected = []
+        ambiguous = 0
+        for e in elements:
+            floors = declared_storeys(e)
+            if target in floors:
+                if len(floors) == 1:
+                    selected.append(e)
+                else:
+                    ambiguous += 1
+        elements = selected
+        result["ambiguous_storey_count"] = ambiguous
+        result["storey_relationship_method"] = "explicit_containment_and_aggregation"
     result["match_count"] = len(elements)
     result["status"] = "answered"
     if mode in {"count","elements"}:
