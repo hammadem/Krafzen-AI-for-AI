@@ -140,6 +140,24 @@ def _read_dxf(raw: bytes, *, translation: tuple[float, float] = (0.0, 0.0)) -> t
             unsupported[kind] += 1
             continue
         try:
+            # These entity types store coordinates in an object coordinate
+            # system. The current XY registration/preview cannot compare a
+            # rotated or flipped OCS without a world-space transformation.
+            if kind in {"CIRCLE", "ARC", "LWPOLYLINE"}:
+                extrusion = tuple(float(v) for v in entity.dxf.get("extrusion", (0, 0, 1)))
+                if len(extrusion) != 3 or not all(isfinite(v) for v in extrusion):
+                    raise ValueError("Invalid DXF extrusion direction")
+                if extrusion != (0.0, 0.0, 1.0):
+                    unsupported[f"{kind}:nonstandard_ocs"] += 1
+                    continue
+            # Thickness represents additional geometry not included in a 2D
+            # entity signature, including for otherwise supported LINEs.
+            thickness = float(entity.dxf.get("thickness", 0))
+            if not isfinite(thickness):
+                raise ValueError("Invalid DXF thickness")
+            if thickness != 0:
+                unsupported[f"{kind}:nonzero_thickness"] += 1
+                continue
             geometry[_translated_signature(_signature(entity), *translation)] += 1
         except (AttributeError, TypeError, ValueError, OverflowError) as exc:
             raise ValueError("Malformed supported DXF entity") from exc
@@ -197,7 +215,7 @@ def compare_dxf_bytes(original: bytes, revised: bytes, *, alignment: dict | None
             "Only exact modelspace coordinates after an explicitly entered 2D "
             "translation (if provided). Anchor points are asserted by the user, "
             "NOT independently verified; no rotation, scaling, automatic model "
-            "registration, survey alignment, complex solids/blocks, or physical "
+            "registration, survey alignment, complex solids/blocks, rotated object coordinate systems, extruded thickness, or physical "
             "construction confirmation. Moved/edited entities appear as "
             "additions and removals. The visual preview omits unsupported curves."
 
