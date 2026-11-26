@@ -899,3 +899,7 @@ export async function saveMultidisciplineAssessment(user:User|null,payload:{proj
 export async function recordComplianceReview(user:User|null,assessmentId:string,payload:Record<string,unknown>){
     return apiClient("POST",`/api/v1/compliance/assessments/${encodeURIComponent(assessmentId)}/review`,user,payload);
 }
+
+export async function previewAecIntent(user: User | null, text: string) {
+    return apiClient("POST", "/api/v1/chat/intent-preview", user, {text});
+}
