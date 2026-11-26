@@ -176,3 +176,42 @@ async def test_persistence_failure_is_not_reported_as_success():
                 user=USER,
             )
     assert err.value.status_code == 503
+
+
+def _drawing_with_extrusion(kind, extrusion=(0, 0, 1), thickness=0):
+    doc = ezdxf.new("R2010")
+    doc.header["$INSUNITS"] = 4
+    model = doc.modelspace()
+    attribs = {"extrusion": extrusion, "thickness": thickness}
+    if kind == "CIRCLE":
+        model.add_circle((2, 3, 0), 1, dxfattribs=attribs)
+    elif kind == "ARC":
+        model.add_arc((2, 3, 0), 1, 0, 90, dxfattribs=attribs)
+    elif kind == "LWPOLYLINE":
+        model.add_lwpolyline([(0, 0), (1, 1)], dxfattribs=attribs)
+    else:
+        model.add_line((0, 0), (1, 1), dxfattribs=attribs)
+    stream = StringIO()
+    doc.write(stream)
+    return stream.getvalue().encode()
+
+
+@pytest.mark.parametrize("kind", ["CIRCLE", "ARC", "LWPOLYLINE"])
+def test_nonstandard_object_coordinates_are_not_claimed_as_equivalent(kind):
+    original = _drawing_with_extrusion(kind)
+    revised = _drawing_with_extrusion(kind, extrusion=(0, 1, 0))
+    report = compare_dxf_bytes(original, revised)
+    assert report["comparison_complete"] is False
+    assert report["unchanged_count"] == 0
+    assert report["unsupported_revised"][kind + ":nonstandard_ocs"] == 1
+    assert report["revised_supported_count"] == 0
+
+
+def test_thickness_geometry_is_explicitly_unassessed():
+    report = compare_dxf_bytes(
+        _drawing_with_extrusion("LINE"),
+        _drawing_with_extrusion("LINE", thickness=2),
+    )
+    assert report["comparison_complete"] is False
+    assert report["unsupported_revised"]["LINE:nonzero_thickness"] == 1
+    assert report["unchanged_count"] == 0
