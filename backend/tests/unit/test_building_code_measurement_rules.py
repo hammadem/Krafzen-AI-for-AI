@@ -112,3 +112,20 @@ def test_pdf_uses_persisted_evidence_and_rejects_inconsistent_counts():
     report["counts"]["pass"] = 99
     with pytest.raises(ValueError, match="count mismatch"):
         build_compliance_pdf(row)
+
+
+def test_optional_straight_stair_rule_boundaries():
+    measures={**MEASURES,"extended_stair_checks":True,"ordinary_straight_stair_no_exceptions_confirmed":True,
+        "stair_min_riser_in":6.625,"stair_max_riser_in":7,"stair_min_tread_in":11,"stair_min_headroom_in":80}
+    report=evaluate(measures=measures)
+    assert report["rule_version"]=="ibc_nfpa_measurements_v2"
+    assert finding(report,"IBC-2024-1011.5.4")["result"]=="pass"
+    assert finding(report,"IBC-2024-1011.3")["result"]=="pass"
+    bad=evaluate(measures={**measures,"stair_max_riser_in":7.01,"stair_min_tread_in":10.99,"stair_min_headroom_in":79.99})
+    assert finding(bad,"IBC-2024-1011.5.2-stair_max")["result"]=="fail"
+    assert finding(bad,"IBC-2024-1011.5.2-stair_min_tread")["result"]=="fail"
+    assert finding(bad,"IBC-2024-1011.5.4")["result"]=="fail"
+    assert finding(bad,"IBC-2024-1011.3")["result"]=="fail"
+    unknown=evaluate(measures={**measures,"ordinary_straight_stair_no_exceptions_confirmed":False})
+    assert all(f["result"]=="unknown" for f in unknown["rule_results"] if f["rule_id"].startswith("IBC-2024-1011"))
+    assert bad["complete_code_compliance_determined"] is False

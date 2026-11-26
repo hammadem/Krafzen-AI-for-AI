@@ -48,6 +48,8 @@ export default function BuildingCodePanel({ user, projectId, sourceFile, context
     const [nfpa, setNfpa] = useState("unknown");
     const [basis, setBasis] = useState("unknown_or_other");
     const [saving, setSaving] = useState(false);
+    const [extendedStair, setExtendedStair] = useState(false);
+    const stairFields = [["stair_min_riser_in","Smallest riser in flight (in)"],["stair_max_riser_in","Largest riser in flight (in)"],["stair_min_tread_in","Minimum rectangular tread depth (in)"],["stair_min_headroom_in","Minimum vertical headroom (in)"]] as const;
     const [error, setError] = useState("");
     const numeric = (key: string) => {
         const raw = values[key]?.trim();
@@ -76,6 +78,9 @@ export default function BuildingCodePanel({ user, projectId, sourceFile, context
                 measurements: {
                     ...Object.fromEntries(measurementFields.map(([key]) => [key, numeric(key)])),
                     egress_factor_basis: basis,
+                    extended_stair_checks: extendedStair,
+                    ordinary_straight_stair_no_exceptions_confirmed: extendedStair && !!flags.ordinary_straight_stair_no_exceptions_confirmed,
+                    ...(extendedStair ? Object.fromEntries(stairFields.map(([key])=>[key,numeric(key)])) : {}),
                     ...Object.fromEntries(boolFields.slice(3).map(([key]) => [key, !!flags[key]])),
                 },
             });
@@ -93,7 +98,7 @@ export default function BuildingCodePanel({ user, projectId, sourceFile, context
             <p className="text-sm text-amber-200">
                 Uses the project jurisdiction and optional evidence file selected above. Without applicable
                 edition, reviewer, source evidence and local-amendment confirmation, numerical checks remain
-                unknown. Only 2024 IBC egress capacity and 2024 NFPA 101 emergency lighting provisions are
+                unknown. Selected 2024 IBC egress capacity, ordinary stair measurements and 2024 NFPA 101 emergency lighting provisions are
                 encoded here. The full category coverage register identifies every unimplemented area.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -143,6 +148,12 @@ export default function BuildingCodePanel({ user, projectId, sourceFile, context
                     </label>
                 ))}
             </div>
+            <label className="flex gap-2 text-sm"><input type="checkbox" checked={extendedStair} onChange={e=>setExtendedStair(e.target.checked)}/>Include ordinary straight stair geometry checks</label>
+            {extendedStair && <div className="space-y-3">
+                <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={!!flags.ordinary_straight_stair_no_exceptions_confirmed} onChange={e=>setFlags(old=>({...old,ordinary_straight_stair_no_exceptions_confirmed:e.target.checked}))}/>Qualified reviewer confirms these provisions apply to one ordinary straight flight, with no exceptions, winders or special stair type.</label>
+                <p className="text-xs text-slate-400">Use extrema over the entire flight; headroom measured vertically from nosing line and required extent. Verify all remaining stair provisions separately.</p>
+                <div className="grid gap-3 sm:grid-cols-2">{stairFields.map(([key,label])=><label key={key} className="block text-sm">{label}<input type="number" min="0" step="any" value={values[key]||""} onChange={e=>setValues(old=>({...old,[key]:e.target.value}))} className="mt-1 w-full rounded-lg border border-white/20 bg-slate-900 p-2"/></label>)}</div>
+            </div>}
             {error && <p role="alert" className="text-red-300 text-sm">{error}</p>}
             <button type="button" disabled={saving || !projectId} onClick={() => void submit()}
                 className="rounded-lg bg-sky-300 px-5 py-2 text-slate-950 font-semibold disabled:opacity-40">

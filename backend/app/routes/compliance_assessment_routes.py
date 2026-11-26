@@ -168,6 +168,12 @@ class BuildingCodeJurisdiction(BaseModel):
 
 
 class BuildingCodeMeasurements(BaseModel):
+    extended_stair_checks: bool = False
+    ordinary_straight_stair_no_exceptions_confirmed: bool | None = None
+    stair_min_riser_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    stair_max_riser_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    stair_min_tread_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    stair_min_headroom_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
     egress_factor_basis: Literal["standard_confirmed", "sprinkler_voice_exception_confirmed", "unknown_or_other"] = "unknown_or_other"
     qualifying_sprinkler_system_confirmed: bool | None = None
     qualifying_voice_alarm_confirmed: bool | None = None
