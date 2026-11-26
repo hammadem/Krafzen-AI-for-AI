@@ -150,8 +150,7 @@ export default function ImportsPage() {
                     scans, validates, extracts source metadata and stores every file
                     in the selected project job. Document text/metadata extraction
                     does not constitute engineering interpretation or OCR.
-                    DWG/RVT and sovereign-tenant imports remain unavailable until
-                    their verified conversion and regional pipelines exist.
+                    DWG imports require the local ODA converter and malware scanner; output is a genuine DXF with source provenance. Native RVT and sovereign-tenant imports remain unavailable.
                 </div>
 
                 {error && <div role="alert" className="flex gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
