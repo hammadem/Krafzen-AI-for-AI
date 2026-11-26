@@ -18,7 +18,7 @@ from app.db.queries.file_queries import (
 )
 from app.middlewares.auth import require_auth
 from app.models.file_model import FileCreate, FileResponse, FileUpdate
-from app.services.import_service import import_document_for_job, import_dxf_for_job, import_ifc_for_job
+from app.services.import_service import import_document_for_job, import_dwg_for_job, import_dxf_for_job, import_ifc_for_job
 from app.services.notification_service import create_notification
 
 router = APIRouter(prefix="/files", tags=["Files"])
@@ -55,6 +55,18 @@ async def import_dxf_route(
             message="Imported and validated " + record["name"],
             project_id=record["project_id"], metadata={"file_id": record["id"]},
         )
+        return record
+    finally:
+        await upload.close()
+
+
+@router.post("/import-dwg", response_model=FileResponse, status_code=201)
+async def import_dwg_route(job_id: str = Form(...), upload: UploadFile = File(...), user=Depends(require_auth)):
+    try:
+        record = await import_dwg_for_job(job_id=job_id, upload=upload, user=user)
+        await create_notification(user_id=user["user_id"], notification_type="import_completed",
+            message="DWG converted and validated as DXF: " + record["name"],
+            project_id=record["project_id"], metadata={"file_id":record["id"]})
         return record
     finally:
         await upload.close()

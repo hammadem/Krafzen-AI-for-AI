@@ -6,6 +6,8 @@ and ezdxf parsing are NOT substitutes for malware scanning.
 """
 
 import asyncio
+import hashlib
+from io import BytesIO
 import json
 import os
 import sys
@@ -113,7 +115,7 @@ def _scan_ifc_and_extract_metadata(data: bytes) -> dict:
 
 
 async def import_dxf_for_job(
-    *, job_id: str, upload: UploadFile, user: dict
+    *, job_id: str, upload: UploadFile, user: dict, conversion_metadata: dict | None = None
 ) -> dict:
     """Upload a validated drawing to a unique, job-scoped storage path."""
     if not user or not user.get("user_id"):
@@ -185,6 +187,7 @@ async def import_dxf_for_job(
                 "mime_type": "application/dxf",
                 "size_bytes": len(data),
                 "name": original,
+                **({"import_metadata": conversion_metadata} if conversion_metadata else {}),
             },
             user,
         )
@@ -282,6 +285,54 @@ async def import_ifc_for_job(
         except Exception:
             pass
         raise HTTPException(status_code=503, detail="IFC import could not be finalized") from exc
+
+
+async def import_dwg_for_job(*, job_id: str, upload: UploadFile, user: dict) -> dict:
+    """Scan original DWG, convert locally, then scan and persist genuine DXF."""
+    from app.services.dwg_converter_service import dwg_converter_service, validate_dwg_header
+    if not user or not user.get("user_id"):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    try:
+        uuid.UUID(str(job_id))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="Invalid job ID") from exc
+    job = await get_job(job_id, user)
+    project = await get_project(str(job["project_id"]), user) if job else None
+    if not project:
+        raise HTTPException(status_code=404, detail="Project job not found")
+    if project.get("workspace_id") or project.get("archived_at"):
+        raise HTTPException(status_code=409, detail="Project is archived or requires regional processing")
+    name = upload.filename or ""
+    if not name.lower().endswith(".dwg") or len(name)>250 or "/" in name or chr(92) in name:
+        raise HTTPException(status_code=415, detail="Select a DWG file")
+    raw = await upload.read(MAX_DXF_BYTES+1)
+    if len(raw)>MAX_DXF_BYTES:
+        raise HTTPException(status_code=413, detail="DWG exceeds 25 MB")
+    try:
+        validate_dwg_header(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    def convert():
+        with tempfile.TemporaryDirectory(prefix="krafzen-dwg-scan-") as folder:
+            source = Path(folder)/"source.dwg"
+            source.write_bytes(raw)
+            _scan_file(source)
+            try:
+                return dwg_converter_service.convert_dwg_bytes_to_dxf(raw)
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail="Local DWG converter unavailable or conversion failed") from exc
+    converted = await run_in_threadpool(convert)
+    wrapped = UploadFile(file=BytesIO(converted), filename=name[:-4]+".dxf")
+    try:
+        return await import_dxf_for_job(job_id=job_id,upload=wrapped,user=user,
+            conversion_metadata={"type":"cad","source_format":"dwg","source_name":name,
+                "source_sha256":hashlib.sha256(raw).hexdigest(),
+                "converted_sha256":hashlib.sha256(converted).hexdigest(),
+                "conversion_method":"oda_local_dwg_to_dxf","original_binary_retained":False,
+                "fidelity_independently_verified":False})
+    finally:
+        await wrapped.close()
 
 
 # Document/file classes use the SAME authenticated job/project, malware scanner,
