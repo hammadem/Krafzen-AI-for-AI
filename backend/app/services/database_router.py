@@ -66,7 +66,10 @@ class RegionalDatabaseRouter:
         return client
 
     def resolve_for_organization(self, organization_id: UUID) -> Client:
-        """Use central only when the organization has no residency assignment."""
+        return self.resolve_context(organization_id)[0]
+
+    def resolve_context(self, organization_id: UUID) -> tuple[Client, str]:
+        """Resolve one authoritative assignment snapshot for DB and storage."""
         try:
             response = (
                 self.central_client.table("organization_residency")
@@ -74,12 +77,14 @@ class RegionalDatabaseRouter:
                 .eq("organization_id", str(organization_id))
                 .execute()
             )
-            record = response.data[0] if response and response.data else None
+            if response is None or response.data is None or not isinstance(response.data, list) or len(response.data) > 1:
+                raise RuntimeError("Invalid residency lookup response")
+            record = response.data[0] if response.data else None
         except Exception as exc:
             raise self._unavailable("unknown", f"residency lookup failed: {type(exc).__name__}") from exc
 
         if record is None:
-            return self.central_client
+            return self.central_client, "global"
 
         region = str(record.get("region_code") or "unknown").strip().lower()
         state = str(record.get("status") or "").strip().lower()
@@ -91,4 +96,4 @@ class RegionalDatabaseRouter:
         if region in ("global", "unknown"):
             raise self._unavailable(region, "active residency has no sovereign region")
 
-        return self._get_client_for_region(region)
+        return self._get_client_for_region(region), region

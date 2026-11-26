@@ -866,3 +866,14 @@ export async function getComplianceReportPdf(
     }
     return blob;
 }
+
+export async function getPlatformResidencyEvidence(user: User | null) {
+    return apiClient("GET", "/api/v1/enterprise/region/evidence", user);
+}
+
+export async function getOrganizationResidency(user: User | null, organizationId: string) {
+    return apiClient("GET", `/api/v1/enterprise/region/?organization_id=${encodeURIComponent(organizationId)}`, user);
+}
+export async function requestOrganizationUsResidency(user: User | null, organizationId: string) {
+    return apiClient("POST", `/api/v1/enterprise/region/request?organization_id=${encodeURIComponent(organizationId)}`, user, {region_code: "us"});
+}

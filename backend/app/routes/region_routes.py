@@ -8,6 +8,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.permissions import EnterprisePermission
+from app.core.config import settings
+from fastapi.concurrency import run_in_threadpool
 from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.middlewares.permissions import require_permission
@@ -32,6 +34,13 @@ async def get_current_region(
 ) -> Dict[str, Any]:
     """Retrieve the authoritative active data residency for an organization."""
     return service.get_organization_residency(organization_id=organization_id)
+
+
+@router.get("/evidence")
+async def get_platform_residency_evidence(current_user=Depends(require_auth)):
+    """Current platform evidence, not a contractual sovereignty certificate."""
+    from app.services.residency_evidence import platform_evidence
+    return await run_in_threadpool(platform_evidence)
 
 
 @router.get("/available", status_code=status.HTTP_200_OK)

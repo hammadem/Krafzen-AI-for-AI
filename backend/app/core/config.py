@@ -175,6 +175,12 @@ class Settings(BaseSettings):
     RENDER_SERVICE_ID_PRODUCTION: str = ""
     RENDER_SERVICE_ID_STAGING: str = ""
 
+    # Non-secret, operator-recorded provider metadata (never a guarantee).
+    RESIDENCY_EVIDENCE_PROJECT_ID: str = ""
+    RESIDENCY_EVIDENCE_DATABASE_REGION: str = ""
+    RESIDENCY_EVIDENCE_RENDER_REGION: str = ""
+    RESIDENCY_EVIDENCE_RECORDED_AT: str = ""
+
     # Enterprise: US Sovereign Region Secret References
     # Supabase REST API client uses the HTTPS URL and service role key.
     SUPABASE_URL_US: Optional[str] = None
