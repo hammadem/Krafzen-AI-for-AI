@@ -863,3 +863,7 @@ export async function getComplianceReportPdf(
     }
     return blob;
 }
+
+export async function getPlatformResidencyEvidence(user: User | null) {
+    return apiClient("GET", "/api/v1/enterprise/region/evidence", user);
+}
