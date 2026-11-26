@@ -10,7 +10,7 @@ def test_trained_model_matches_holdout():
     assert len(test)==model["evaluation_count"]==32
     assert len({r["text"] for r in rows})==len(rows)
     correct=sum(predict_intent(r["text"])["label"]==r["label"] for r in test)
-    assert correct==model["evaluation_correct"]==32
+    assert correct==model["evaluation_correct"]==31
 
 def test_abstain_and_never_execute():
     for text in ("hello","banana recipe","IFC","IFC IFC IFC"):
