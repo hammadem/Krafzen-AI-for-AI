@@ -1,5 +1,6 @@
 "use client"
 
+import AecIntentPreview from "@/components/AecIntentPreview";
 import { downloadRasterImage } from "@/lib/downloadRasterImage";
 import { useState, useRef, useEffect } from "react"
 import { Send, Loader2, Download, Maximize2, FileCode, FileText, Mic, ChevronsLeft, ThumbsUp, ThumbsDown } from "lucide-react"
@@ -544,6 +545,7 @@ export function ChatInterface({
                             </SelectContent>
                         </Select>
                     </div>
+                    <AecIntentPreview user={user} text={inputValue}/>
                     <div className="bg-zinc-900/90 border border-gray-700/50 rounded-3xl p-2 pl-4 pr-2 flex items-end shadow-2xl backdrop-blur-md transition-all duration-200">
                         <textarea
                             ref={textareaRef}
