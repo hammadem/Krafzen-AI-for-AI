@@ -37,7 +37,7 @@ async def get_stuck_jobs(threshold_minutes: int = STUCK_JOB_THRESHOLD_MINUTES) -
     try:
         for state in IN_FLIGHT_STATES:
             result = await run_in_threadpool(
-                lambda s=state: db.table("jobs")
+                lambda s=state: db.table("export_jobs")
                     .select("id, project_id, status, updated_at, created_at")
                     .eq("status", s.value)
                     .lt("updated_at", cutoff)
@@ -71,7 +71,7 @@ async def get_queue_health() -> dict[str, Any]:
     """
     try:
         result = await run_in_threadpool(
-            lambda: db.table("jobs")
+            lambda: db.table("export_jobs")
                 .select("status")
                 .execute()
         )
@@ -127,8 +127,9 @@ async def get_customer_queue_health(user_id: str) -> dict[str, Any]:
     max_rows = 10000
     for offset in range(0, max_rows + 1, page_size):
         result = await run_in_threadpool(
-            lambda: db.table("jobs")
-                .select("id,status,updated_at,projects!inner(user_id)")
+            lambda: db.table("export_jobs")
+                .select("id,status,updated_at,requested_by,projects!inner(user_id)")
+                .eq("requested_by", user_id)
                 .eq("projects.user_id", user_id)
                 .order("id")
                 .range(offset, offset + page_size - 1)
@@ -142,7 +143,8 @@ async def get_customer_queue_health(user_id: str) -> dict[str, Any]:
         for row in rows:
             # Defense in depth: never trust a malformed or unscoped response.
             project = row.get("projects")
-            if not isinstance(project, dict) or project.get("user_id") != user_id:
+            if (not isinstance(project, dict) or project.get("user_id") != user_id
+                    or row.get("requested_by") != user_id):
                 raise RuntimeError("Queue ownership could not be verified")
             try:
                 state = ExportStatus(row["status"])
