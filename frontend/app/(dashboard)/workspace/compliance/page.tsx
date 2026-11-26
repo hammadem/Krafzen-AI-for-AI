@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, ClipboardCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import BuildingCodePanel from "@/components/compliance/BuildingCodePanel";
+import MultidisciplinePanel from "@/components/compliance/MultidisciplinePanel";
 import {
     createAdaAssessment, getAllFiles, getAllJobs, getAllProjects,
     getProjectAdaAssessments, getComplianceReportPdf,
@@ -315,13 +316,14 @@ export default function CompliancePage() {
                                     setSelected(record);
                                 }}/>
                         )}
+                        <MultidisciplinePanel key={projectId+":"+sourceFile} user={user} projectId={projectId} sourceFile={sourceFile} context={{state,municipality,project_address:address,occupancy,building_type:building}} onSaved={value=>{const record=value as Assessment;if(!record?.id||!record?.result?.rule_results)throw Error("No saved evidence returned");setHistory(previous=>[record,...previous.filter(r=>r.id!==record.id)]);setSelected(record);}}/>
                         <section className="rounded-xl border border-white/10 p-5 space-y-3">
                             <h2 className="font-semibold">Saved project screenings ({history.length})</h2>
                             {history.length === 0 && <p className="text-sm text-slate-400">No saved screenings.</p>}
                             {history.map(row => (
                                 <button key={row.id} type="button" onClick={() => setSelected(row)}
                                     className={`w-full rounded-lg border p-3 text-left text-sm ${row.id === selected?.id ? "border-emerald-300" : "border-white/10"}`}>
-                                    {row.created_at || row.id} · {row.result.assessment_kind === "ibc_nfpa_measurements_v1" ? "IBC/NFPA" : "ADA"} · {row.review_status}
+                                    {row.created_at || row.id} · {row.result.assessment_kind === "multidiscipline_v1" ? "Multidiscipline" : row.result.assessment_kind === "ibc_nfpa_measurements_v1" ? "IBC/NFPA" : "ADA"} · {row.review_status}
                                 </button>
                             ))}
                         </section>
