@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import FileManager from "@/components/FileManager";
+import RevitBridgeImport from "@/components/bim/RevitBridgeImport";
 import { useAuth } from "@/context/AuthContext";
 import { importDocumentFile, importDxfFile, importIfcFile } from "@/lib/api/api";
 
@@ -79,6 +80,7 @@ export default function FilesPanel({ jobId }: { jobId: string }) {
             </div>
             {error && <p role="alert" className="text-xs text-red-400">{error}</p>}
             {message && <p role="status" className="text-xs text-[#54e3b5]">{message}</p>}
+            <RevitBridgeImport key={jobId+":"+(user?.userId||"")} user={user} jobId={jobId} onSaved={()=>setRevision(v=>v+1)}/>
             <FileManager key={revision} jobId={jobId} />
         </div>
     );
