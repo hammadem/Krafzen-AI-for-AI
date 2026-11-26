@@ -1,7 +1,7 @@
 import uuid
-from datetime import UTC, datetime
 from typing import Any
 
+from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 from httpx import HTTPError
 from postgrest.exceptions import APIError
@@ -86,7 +86,7 @@ async def get_jobs(
             if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 10_101:
                 raise ValueError("Job limit must be between 1 and 10101")
             query = (
-                query.order("updated_at", desc=True)
+                query.order("created_at", desc=True)
                 .order("id", desc=True)
                 .range(0, limit - 1)
             )
@@ -98,7 +98,7 @@ async def get_jobs(
 
     except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[get_jobs] Error", project_id=project_id, error=str(e), exc_info=True)
-        return []
+        raise HTTPException(status_code=503, detail="Unable to retrieve project jobs") from e
 
 # GET SINGLE JOB
 async def get_job(job_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
@@ -145,8 +145,12 @@ async def update_job(job_id: str, update_data: dict[str, Any], user: dict[str, A
         if not job:
             return {"error": "Unauthorized or job not found"}
 
-        update_payload = {k: v for k, v in update_data.items() if v is not None}
-        update_payload["updated_at"] = datetime.now(UTC).isoformat()
+        # Source jobs have created_at only; export_jobs owns lifecycle timestamps.
+        allowed = {"transcript", "status", "error_message"}
+        update_payload = {
+            k: v for k, v in update_data.items()
+            if k in allowed and (v is not None or k != "status")
+        }
 
         if not update_payload:
             return {"error": "No valid update fields provided"}
@@ -155,6 +159,7 @@ async def update_job(job_id: str, update_data: dict[str, Any], user: dict[str, A
             lambda: db.table("jobs")
                 .update(update_payload)
                 .eq("id", job_id)
+                .eq("project_id", job["project_id"])
                 .execute()
         )
 
@@ -167,7 +172,7 @@ async def update_job(job_id: str, update_data: dict[str, Any], user: dict[str, A
 
     except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[update_job] Error", job_id=job_id, error=str(e), exc_info=True)
-        return {"error": str(e)}
+        return {"error": "Unable to update job"}
 
 # DELETE JOB
 async def delete_job(job_id: str, user: dict[str, Any]) -> bool:  
