@@ -9,3 +9,6 @@ def test_registry_matches_real_artifacts():
     assert models["offline_experiment"]["runtime_available"] is False
     assert models["offline_experiment"]["correct"]==6
     assert any(s["name"]=="CubiCasa5K" and s["training_use"]=="excluded" for s in r["datasets"])
+    assert models["offline_geometry_experiment"]["runtime_available"] is False
+    assert models["offline_geometry_experiment"]["evaluation_count"]==8140
+    assert models["offline_geometry_experiment"]["correct"]==5954
