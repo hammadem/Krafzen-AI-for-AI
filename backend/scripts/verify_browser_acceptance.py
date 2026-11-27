@@ -234,8 +234,11 @@ def main():
                     expect(page.get_by_text("lines checked",exact=False)).to_be_visible()
                     # Actual browser-local inference, not a request mock.
                     from PIL import Image, ImageDraw, ImageFont
-                    symbol=Image.new("RGB",(240,240),"white")
-                    ImageDraw.Draw(symbol).ellipse((68,68,172,172),outline="black",width=12)
+                    import math
+                    symbol=Image.new("RGB",(24,24),"white")
+                    for index in range(576):
+                        if abs(math.hypot((index%24+.5)/12-1,(index//24+.5)/12-1)-.43)<.06:
+                            symbol.putpixel((index%24,index//24),(0,0,0))
                     png=io.BytesIO();symbol.save(png,format="PNG")
                     page.get_by_label("Symbol crop",exact=True).set_input_files({"name":"circle.png","mimeType":"image/png","buffer":png.getvalue()})
                     expect(page.get_by_text("Experimental suggestion: pipe circle.",exact=False)).to_be_visible()
@@ -284,7 +287,11 @@ def main():
                         expect(page.get_by_role("img",name="Actual IFC 3D triangle geometry viewport",exact=True)).to_be_visible(timeout=90000)
                         page.get_by_label("IFC section axis",exact=True).select_option("z")
                         expect(page.get_by_label("IFC section position",exact=True)).to_be_visible()
-                        page.get_by_label("IFC section position",exact=True).fill("25")
+                        slider=page.get_by_label("IFC section position",exact=True)
+                        slider.focus()
+                        slider.press("Home")
+                        slider.press("ArrowRight")
+                        expect(slider).to_have_value("1")
                         note("Browser imports real IFC, loads native triangle mesh and adjusts section cut")
                     else:
                         note("Browser OCR/IFC imports: scanner not available","BLOCKED")
