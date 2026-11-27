@@ -568,6 +568,15 @@ async def preview_aec_intent(request: IntentPreviewRequest,user_data:dict=Depend
     except Exception as exc:
         raise HTTPException(status_code=503,detail="AEC intent model unavailable") from exc
 
+@router.get("/chat/model-registry")
+async def get_aec_model_registry(user_data: dict = Depends(require_auth)):
+    from app.services.aec_model_registry import model_registry
+    try:
+        return await run_in_threadpool(model_registry)
+    except (ValueError, OSError, RuntimeError, KeyError) as exc:
+        raise HTTPException(status_code=503,detail="AI model evidence unavailable") from exc
+
+
 @router.get("/chat/reference-register")
 async def get_reference_register(user_data: dict = Depends(require_auth)):
     try:

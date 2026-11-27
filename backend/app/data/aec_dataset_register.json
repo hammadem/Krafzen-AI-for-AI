@@ -82,12 +82,12 @@
       "name": "Swiss Dwellings",
       "url": "https://zenodo.org/records/7788422",
       "license": "CC BY 4.0",
-      "commercial_use": "candidate; review privacy/geolocation and selected fields before ingestion",
+      "commercial_use": "CC BY 4.0, attributed geometry feature experiment only; review downstream product use before release",
       "format": "CSV geometry",
       "category": "architecture",
       "version": "3.0.0",
-      "processing": "not downloaded",
-      "training_use": "pending"
+      "processing": "Downloaded and checksum verified in isolated CI; extracted 18,176 deduplicated polygon feature rows across 322 building groups; raw layouts/location not retained in artifact",
+      "training_use": "Random Forest experimental model; 10,036 training rows, 8,140 test rows, building-disjoint; not production approved"
     },
     {
       "name": "BIM Open Data",
