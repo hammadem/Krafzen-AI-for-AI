@@ -35,10 +35,10 @@ export default function MultidisciplinePanel({user,projectId,sourceFile,context,
  <label>Reviewer name<input className={style} value={reviewer} onChange={e=>setReviewer(e.target.value)}/></label>
  <label>Reviewer credential / jurisdiction (asserted)<input className={style} value={credential} onChange={e=>setCredential(e.target.value)}/></label>
  </div><label className="flex gap-2 text-sm"><input type="checkbox" checked={amendments} onChange={e=>setAmendments(e.target.checked)}/>Reviewer checked adoption and local amendments; no conflict with selected rules.</label>
- <label>Rule<select className={style} value={id} onChange={e=>{setId(e.target.value);reset();}}><option value="">Select a rule</option>{rules.map(r=><option key={r.rule_id} value={r.rule_id}>{r.code_family} {r.edition} §{r.section_reference} — {r.title}</option>)}</select></label>
+ <label>Rule<select aria-label="Compliance catalog rule" className={style} value={id} onChange={e=>{setId(e.target.value);reset();}}><option value="">Select a rule</option>{rules.map(r=><option key={r.rule_id} value={r.rule_id}>{r.code_family} {r.edition} §{r.section_reference} — {r.title}</option>)}</select></label>
  {rule&&<div className="space-y-3"><p className="text-sm">{rule.applicability} <a href={rule.source_url} target="_blank" rel="noreferrer" className="underline">Source</a></p>
  <div className="grid gap-3 sm:grid-cols-2">
- <label>Adopted edition<select className={style} value={edition} onChange={e=>setEdition(e.target.value)}><option value="">Unknown / other edition</option><option value={rule.edition}>{rule.edition}</option></select></label>
+ <label>Adopted edition<select aria-label="Adopted edition" className={style} value={edition} onChange={e=>setEdition(e.target.value)}><option value="">Unknown / other edition</option><option value={rule.edition}>{rule.edition}</option></select></label>
  <label>Element / drawing reference<input className={style} value={element} onChange={e=>setElement(e.target.value)}/></label>
  <label>{rule.code_family==="ASCE 7"?"Declared design resistance":"Measured value"} ({rule.unit})<input className={style} type="number" min="0" step="any" value={measured} onChange={e=>setMeasured(e.target.value)}/></label>
  {rule.extra_input&&<label>{rule.extra_input}<input className={style} type="number" min="0" step="any" value={extra} onChange={e=>setExtra(e.target.value)}/></label>}
