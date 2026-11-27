@@ -31,7 +31,7 @@ jobs:
           # preinstalled vendor repository can fail with HTTP 403 on hosted runners.
           test -f /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- update
-          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- install -y clamav clamav-freshclam potrace
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- install -y clamav clamav-freshclam potrace tesseract-ocr tesseract-ocr-eng fonts-dejavu-core
           sudo systemctl stop clamav-freshclam || true
           sudo timeout 120 freshclam || echo "::warning::Signature refresh failed; scan availability will be tested without bypass"
       - name: Start disposable Supabase

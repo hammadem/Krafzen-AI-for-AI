@@ -235,16 +235,21 @@ async def detailed_health_check():
 
 @router.get("/dwg")
 async def dwg_health_check():
-    """Verify that the production ODA bundle includes a usable Qt platform plugin."""
+    """Report converter availability and exact scope of the bundled sample test."""
     from app.services.dwg_converter_service import dwg_converter_service
-    from app.services.oda_bundle import ensure_oda_bundle, get_last_oda_error
+    from pathlib import Path
+    from app.services.oda_bundle import backend_root
 
     ready = dwg_converter_service.is_configured()
+    tools = dwg_converter_service._libredwg_tools() if ready and dwg_converter_service.converter_type == "LIBREDWG" else (None, None)
+    bundled = backend_root() / "bin" / "libredwg" / "bin"
+    verified = all(tools) and all(Path(tool).resolve().parent == bundled.resolve() for tool in tools) and (bundled / "roundtrip_verified").is_file()
     payload = {
         "status": "healthy" if ready else "unavailable",
         "service": "DWG converter",
         "engine": dwg_converter_service.converter_type,
-        "roundtrip_verified": False,
+        "roundtrip_verified": bool(verified),
+        "verification_scope": "Synthetic R2000 LINE/CIRCLE, units and layers" if verified else None,
         "detail": None if ready else "Selected native converter unavailable or not authorized",
     }
     if ready:

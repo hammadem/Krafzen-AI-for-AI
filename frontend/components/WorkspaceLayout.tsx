@@ -1,4 +1,5 @@
 "use client";
+import AecIntentPreview from "@/components/AecIntentPreview";
 import { downloadRasterImage } from "@/lib/downloadRasterImage";
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/context/ChatContext';
@@ -1030,7 +1031,7 @@ export default function WorkspaceLayout() {
                         </div>
                         <div className="flex-1 space-y-1">
                           <p>OBJECT: FLOOR_PLAN_V2</p>
-                          <p>BOUNDS: {projectMetadata.location || "12'x10'"}</p>
+                          <p>Source dimensions: not verified</p>
                           <p>ENTITIES: 24</p>
                           <p>LAYERS: WALLS, WINDOWS, DOORS, APPLIANCES</p>
                           <p className="mt-4 text-white/40">Fetching geometric primitives...</p>
@@ -1533,9 +1534,8 @@ export default function WorkspaceLayout() {
         </div>
 
         <div className="workspace-right-foot">
-          <div className="check-row"><span className="ok">All clearances pass {chatJurisdiction === 'US_IRC_BASELINE' ? 'IRC 2024' : 'Standard'}</span></div>
-          <div className="check-row"><span className="ok">ADA turning radius verified</span></div>
-          <div className="check-row"><span className="ok">Egress path under 75ft</span></div>
+          <div className="check-row">Compliance is not established by a generated drawing.</div>
+          <Link href="/workspace/compliance" className="text-xs underline">Open traceable project compliance assessments</Link>
         </div>
       </aside>
 
@@ -1561,6 +1561,7 @@ export default function WorkspaceLayout() {
             </SelectContent>
           </Select>
         </div>
+        <AecIntentPreview user={user} text={inputValue}/>
         <div className="workspace-prompt-shell">
           <textarea 
             ref={promptInputRef}
@@ -1594,9 +1595,7 @@ export default function WorkspaceLayout() {
         </div>
       </form>
       
-      <div className="workspace-demo-state">
-        DEMO STATE: <span>populated</span>
-      </div>
+
 
       <ShareModal 
         isOpen={isShareModalOpen} 

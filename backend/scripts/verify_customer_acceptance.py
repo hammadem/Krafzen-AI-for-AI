@@ -167,7 +167,15 @@ def main():
         check(client.get(base+"/chat/history/"+linked["id"],headers=headers,params={"limit":101}),422)
         note("Chat","Existing project links to persistent owner-scoped design session; reuse and tenant isolation verified without paid AI calls")
         register = check(client.get(base+"/chat/reference-register",headers=headers)).json()
-        assert register["dataset_count"] >= 6
+        assert register["dataset_count"] >= 13
+        intent=check(client.post(base+"/chat/intent-preview",headers=headers,json={"text":"count IFC model elements and IFC quantities"})).json()
+        assert intent["label"]=="bim" and intent["advisory_only"] is True
+        assert check(client.post(base+"/chat/intent-preview",headers=headers,json={"text":"banana recipe"})).json()["label"]=="unknown"
+        check(client.post(base+"/chat/intent-preview",json={"text":"IFC model"}),401)
+        residency=check(client.get(base+"/enterprise/region/evidence",headers=headers)).json()
+        assert residency["residency_verified"] is False
+        assert any(row["name"]=="Storage CDN and downloads" and row["status"]=="unverified" for row in residency["paths"])
+        note("AI/Residency","Real authenticated trained intent endpoint, unknown abstention, expanded source register and non-certified residency evidence")
         ref_answer = check(client.post(base+"/chat/reference",headers=headers,json={"session_id":linked["id"],"question":"IFC wall opening window"})).json()
         assert ref_answer["mode"] == "local_approved_reference_retrieval" and ref_answer["references"]
         assert "CC BY 4.0" in ref_answer["validated_response"] and "buildingSMART" in ref_answer["validated_response"]
@@ -218,6 +226,10 @@ def main():
         check(client.get(workspace, headers=other),403)
         invite = check(client.post(workspace+"/invites",headers=headers,
             json={"email":invite_email,"role":"viewer"}),201).json()
+        assert invite["email_delivery"]=="not_configured"
+        check(client.post(workspace+"/invites/"+invite["id"]+"/email",headers=other),403)
+        assert check(client.post(workspace+"/invites/"+invite["id"]+"/email",headers=headers)).json()["email_delivery"]=="not_configured"
+        note("Email","Real invitation email retry reports missing provider configuration and denies non-owner; no external mail sent")
         check(client.post(workspace+"/invites",headers=headers,
             json={"email":invite_email,"role":"viewer"}),409)
         revoke_path = workspace+"/invites/"+invite["id"]+"/revoke"
@@ -375,6 +387,29 @@ def main():
         assert assessment["result"]["counts"]["pass"]==3
         assert any(x["id"]==assessment["id"] for x in check(client.get(base+"/compliance/projects/"+p+"/ada-measurements",headers=headers)).json())
         note("A","ADA measurement screening and persisted findings (test applicability only)")
+        catalog=check(client.get(base+"/compliance/multidiscipline/catalog",headers=headers)).json()["rules"]
+        assert len(catalog)>=22 and len({row["code_family"] for row in catalog})==9
+        entries=[{"rule_id":"ADA-305.3-width","adopted_edition":"2010","element_reference":"QA clear space","applicability_confirmed":True,"measured":30},
+                 {"rule_id":"NEC-110.26A2-width","adopted_edition":"2023","element_reference":"QA panel","applicability_confirmed":True,"measured":30,"extra_value":40},
+                 {"rule_id":"IPC-405.3.1-front","adopted_edition":"unknown","element_reference":"QA fixture","applicability_confirmed":True,"measured":21}]
+        payload={"project_id":p,"source_file_id":fid,"jurisdiction":{"state":"QA State","municipality":"QA City","project_address":"123 QA Test Street","occupancy":"B","building_type":"Office","adoption_reference":"Synthetic QA reference only","reviewer_name":"QA reviewer","reviewer_credential":"Synthetic test, not a professional credential","local_amendments_reviewed_no_conflict":True},"entries":entries}
+        path=base+"/compliance/multidiscipline/assessments"
+        multi=check(client.post(path,headers=headers,json=payload),201).json()
+        assert multi["result"]["counts"]=={"pass":1,"fail":1,"unknown":1}
+        assert multi["result"]["rule_results"][0]["evidence"]["source_file_version"]==1
+        assert client.post(path,headers=other,json=payload).status_code in (403,404)
+        check(client.post(path,headers=headers,json={**payload,"entries":[entries[0],entries[0]]}),422)
+        review_path=base+"/compliance/assessments/"+multi["id"]+"/review"
+        declaration={"disposition":"reviewed","reviewer_name":"QA reviewer","reviewer_credential":"Synthetic QA only","review_reference":"QA-REVIEW-001","notes":"Isolated acceptance fixture, not professional approval.","record_is_reviewer_supplied":True}
+        assert client.post(review_path,headers=other,json=declaration).status_code in (403,404)
+        reviewed=check(client.post(review_path,headers=headers,json=declaration)).json()
+        assert reviewed["result"]["rule_results"]==multi["result"]["rule_results"]
+        assert reviewed["result"]["review_attestation"]["credential_independently_verified"] is False
+        check(client.post(review_path,headers=headers,json=declaration),409)
+        report=check(client.get(base+"/compliance/assessments/"+multi["id"]+"/report.pdf",headers=headers))
+        extracted=" ".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(report.content)).pages)
+        assert "QA-REVIEW-001" in extracted and "QA reviewer" in extracted
+        note("Compliance","Real catalog, pass/fail/unknown, duplicate rejection, owner isolation, atomic review declaration, retained rules and report PDF")
         # Additional compliance routes become available after their separate PR is merged.
         paths=client.get("/openapi.json").json()["paths"]
         if base+"/compliance/assessments/{assessment_id}/report.pdf" in paths:
@@ -392,6 +427,26 @@ def main():
             a=upload(j,"original.dxf",drawing())
             b=upload(j,"revised.dxf",drawing(100,-50,True))
             note("A/D","Actual scanned original and revised DXF imports")
+            from PIL import Image,ImageDraw,ImageFont
+            crop=Image.new("RGB",(1000,400),"white")
+            ImageDraw.Draw(crop).text((80,80),"ROOM 101 WIDTH 3200 MM",font=ImageFont.truetype("DejaVuSans.ttf",42),fill="black")
+            buf=io.BytesIO();crop.save(buf,format="PNG")
+            image=check(client.post(base+"/files/import-document",headers=headers,data={"job_id":j},files={"upload":("ocr-fixture.png",buf.getvalue(),"image/png")}),201).json()
+            meta=check(client.get(base+"/files/"+image["id"],headers=headers)).json()["import_metadata"]
+            assert meta["optical_character_recognition_performed"] and "3200" in meta["ocr_text_excerpt"] and meta["ocr_measurements_verified"] is False
+            assert client.get(base+"/files/"+image["id"],headers=other).status_code in (403,404)
+            note("OCR","Actual scanned drawing image, Tesseract evidence and persisted text; source remains unverified")
+            invalid=client.post(base+"/files/import-revit-bridge",headers=headers,data={"job_id":j,"confirmed":"true"},files={"source":("invalid.rvt",b"not a Revit file"*80,"application/octet-stream"),"upload":("invalid.ifc",b"not IFC","application/octet-stream")})
+            check(invalid,422)
+            note("RVT","Invalid native source rejected; real Autodesk desktop export remains NOT_RUN")
+            duplicate=ezdxf.new("R2000");duplicate.header["$INSUNITS"]=4
+            duplicate.modelspace().add_line((0,0),(1000,0));duplicate.modelspace().add_line((1000,0),(0,0))
+            stream=io.StringIO();duplicate.write(stream)
+            did=upload(j,"duplicate-lines.dxf",stream.getvalue().encode())
+            found=check(client.get(base+"/reviews/files/"+did+"/findings",headers=headers)).json()
+            assert found["finding_count"]==1 and found["findings"][0]["kind"]=="coincident_line"
+            assert client.get(base+"/reviews/files/"+did+"/findings",headers=other).status_code in (403,404)
+            note("Reviews","Real scanned duplicate-line drawing with exact source-backed diagnostic and tenant denial")
             inbox_path = base + "/dashboard/notifications"
             unread = check(client.get(inbox_path,headers=headers,params={"unread_only":True,"limit":1})).json()
             assert unread["total"] >= 2 and len(unread["notifications"]) == 1
