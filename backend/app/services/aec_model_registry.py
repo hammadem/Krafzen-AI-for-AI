@@ -16,6 +16,7 @@ def model_registry():
     intent=load_model()
     symbol=_read("cad_symbol_evaluation.json")
     llm=_read("aec_llm_experiment_evidence.json")
+    swiss=_read("swiss_geometry_experiment_evidence.json")
     dataset=_read("aec_dataset_register.json")
     reference=reference_register()
     return {
@@ -38,6 +39,11 @@ def model_registry():
              "correct":llm["after_correct"],"baseline_correct":llm["before_correct"],"scope":llm["scope"],
              "workflow_run":llm["workflow_run"],"artifact":llm["artifact"],
              "artifact_retention_days":llm["artifact_retention_days"],"source_sha256":llm["source_sha256"]},
+            {"name":"Swiss Dwellings polygon model","mode":"offline_geometry_experiment","runtime_available":False,
+             "training_count":swiss["train_rows"],"evaluation_count":swiss["test_rows"],
+             "correct":round(swiss["accuracy"]*swiss["test_rows"]),"scope":swiss["scope"],
+             "workflow_run":swiss["workflow_run"],"artifact":swiss["artifact"],
+             "artifact_retention_days":swiss["artifact_retention_days"],"source_sha256":swiss["source_archive_sha256"]},
         ],
         "scope":"Evidence of bounded training and reference processing, not professional verification. No customer data enters the public corpus."
     }
