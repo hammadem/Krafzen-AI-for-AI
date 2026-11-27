@@ -135,6 +135,26 @@ async def list_files(
     return files
 
 
+@router.get("/capabilities")
+async def import_runtime_capabilities(user=Depends(require_auth)):
+    """Actual runtime checks; no claim that customer files have been processed."""
+    import shutil
+    from fastapi.concurrency import run_in_threadpool
+    from app.services.scanner_readiness import scanner_status
+    from app.services.dwg_converter_service import dwg_converter_service
+    scanner=await run_in_threadpool(scanner_status)
+    return {
+        "scanner_prerequisites_detected":bool(scanner.get("scanner_binary_detected") and scanner.get("scanner_signature_metadata_current")),
+        "private_scanner_self_test_verified":bool(scanner.get("private_scanner_verified")),
+        "dwg_engine":dwg_converter_service.converter_type,
+        "dwg_runtime_available":dwg_converter_service.is_configured(),
+        "ocr_engine_detected":bool(shutil.which("tesseract")),
+        "revit_native_conversion_available":False,
+        "revit_ifc_bridge_implemented":True,
+        "customer_upload_verified":False,
+    }
+
+
 @router.get("/{file_id}", response_model=FileResponse)
 async def get_file_route(
     file_id: str,
