@@ -903,3 +903,7 @@ export async function recordComplianceReview(user:User|null,assessmentId:string,
 export async function previewAecIntent(user: User | null, text: string) {
     return apiClient("POST", "/api/v1/chat/intent-preview", user, {text});
 }
+
+export async function getAecModelRegistry(user: User | null) {
+    return apiClient("GET", "/api/v1/chat/model-registry", user);
+}
