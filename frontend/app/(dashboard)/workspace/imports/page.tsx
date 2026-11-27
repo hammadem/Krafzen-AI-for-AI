@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, FileUp, Loader2, RefreshCw } from "lucide-react";
 import FilesPanel from "@/components/FilesPanel";
+import ImportRuntimeEvidence from "@/components/ImportRuntimeEvidence";
 import { useAuth } from "@/context/AuthContext";
 import { createJob, getAllJobs, getAllProjects } from "@/lib/api/api";
 
@@ -145,12 +146,11 @@ export default function ImportsPage() {
                 </div>
 
                 <div className="rounded-xl border border-[#54e3b5]/20 bg-[#54e3b5]/5 p-4 text-sm text-[#c9d8d2]">
-                    Supported: ASCII DXF (25 MB), IFC (40 MB), PDF, DOCX, XLSX, CSV,
+                    Supported: ASCII DXF and DWG (25 MB), IFC (40 MB), PDF, DOCX, XLSX, CSV,
                     PNG/JPEG/WebP images and ZIP packages (25 MB each). The backend
                     scans, validates, extracts source metadata and stores every file
-                    in the selected project job. Document text/metadata extraction
-                    does not constitute engineering interpretation or OCR.
-                    DWG imports require the local ODA converter and malware scanner; output is a genuine DXF with source provenance. Revit models can be imported through the local RVT-to-IFC bridge below. Native server RVT conversion and sovereign-tenant imports remain unavailable.
+                    in the selected project job. Document text/metadata extraction and optional local image OCR do not constitute verified engineering measurements.
+                    DWG imports require a native converter and malware scanner; output is a genuine DXF with source provenance. Revit models can be imported through the local RVT-to-IFC bridge below. Native server RVT conversion and sovereign-tenant imports remain unavailable.
                 </div>
 
                 {error && <div role="alert" className="flex gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
@@ -164,6 +164,7 @@ export default function ImportsPage() {
                     </div>
                 ) : (
                     <>
+                        <ImportRuntimeEvidence/>
                         <section className="space-y-4 rounded-xl border border-white/10 bg-white/5 p-5">
                             <div className="flex items-center gap-2">
                                 <FileUp className="h-5 w-5 text-[#54e3b5]" />

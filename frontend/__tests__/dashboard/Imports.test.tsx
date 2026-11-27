@@ -1,7 +1,8 @@
 import ImportsPage from "@/app/(dashboard)/workspace/imports/page";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-const { getAllProjects, getAllJobs, createJob } = vi.hoisted(() => ({
+const { getAllProjects, getAllJobs, createJob, apiClient } = vi.hoisted(() => ({
+    apiClient: vi.fn(),
     getAllProjects: vi.fn(),
     getAllJobs: vi.fn(),
     createJob: vi.fn(),
@@ -12,6 +13,7 @@ vi.mock("@/context/AuthContext", () => ({
         user: { userId: "user-1", access_token: "auth-token" },
     }),
 }));
+vi.mock("@/lib/api/utils", () => ({apiClient}));
 vi.mock("@/lib/api/api", () => ({
     getAllProjects, getAllJobs, createJob,
 }));
@@ -21,6 +23,7 @@ vi.mock("@/components/FilesPanel", () => ({
 
 describe("Workspace Imports", () => {
     beforeEach(() => {
+        apiClient.mockReset().mockResolvedValue({ok:true,data:{scanner_prerequisites_detected:false,private_scanner_self_test_verified:false,dwg_engine:"LIBREDWG",dwg_runtime_available:true,ocr_engine_detected:false,revit_native_conversion_available:false,revit_ifc_bridge_implemented:true,customer_upload_verified:false}});
         getAllProjects.mockReset().mockResolvedValue({
             ok: true, data: [{ id: "project-1", input_text: "Residential plan" }],
         });
@@ -40,6 +43,14 @@ describe("Workspace Imports", () => {
         expect(getAllJobs).toHaveBeenCalledWith(
             { userId: "user-1", access_token: "auth-token" }, "project-1"
         );
+    });
+
+    it("shows actual capability responses without pretending uploads are verified", async () => {
+        render(<ImportsPage />);
+        expect(await screen.findByText(/Scanner unavailable or signatures unverified/)).toBeVisible();
+        expect(screen.getByText(/LIBREDWG · native runtime detected/)).toBeVisible();
+        expect(screen.getByText(/Drawing OCR: engine unavailable/)).toBeVisible();
+        expect(apiClient).toHaveBeenCalledWith("GET","/api/v1/files/capabilities",{userId:"user-1",access_token:"auth-token"});
     });
 
     it("creates a queued import job and immediately selects it", async () => {
