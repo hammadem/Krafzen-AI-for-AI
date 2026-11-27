@@ -295,8 +295,16 @@ def main():
                         note("Browser imports real IFC, loads native triangle mesh and adjusts section cut")
                     else:
                         note("Browser OCR/IFC imports: scanner not available","BLOCKED")
+                    registry=requests.get(API+"/api/v1/chat/model-registry",headers=headers,timeout=20)
+                    assert registry.status_code==200,registry.status_code
+                    assert registry.json()["reference_count"]==13
+                    expect.set_options(timeout=60000)
                     page.goto(WEB+"/workspace/ai-knowledge",wait_until="domcontentloaded")
-                    expect(page.get_by_role("heading",name="Approved IFC references (13)",exact=True)).to_be_visible()
+                    try:
+                        expect(page.get_by_role("heading",name="Approved IFC references (13)",exact=True)).to_be_visible()
+                    except AssertionError:
+                        print("AI registry browser diagnostics:",urlsplit(page.url).path,page.locator("main").inner_text()[:1200],flush=True)
+                        raise
                     for model,score in [("AEC intent classifier","31/32"),("CAD symbol classifier","206/240"),("Experimental AEC language model","6/8"),("Swiss Dwellings polygon model","5954/8140")]:
                         card=page.locator("article").filter(has=page.get_by_role("heading",name=model,exact=True))
                         expect(card).to_contain_text(score)
