@@ -50,10 +50,10 @@ def main():
         "GEMINI_API_KEY", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"}}
     output = Path(os.environ["BROWSER_ACCEPTANCE_RESULT"])
     evidence = []
-    def note(step):
-        evidence.append({"step": step, "status": "PASS"})
+    def note(step,status="PASS"):
+        evidence.append({"step": step, "status": status})
         output.write_text(json.dumps({"scope": "isolated real Chromium frontend acceptance; local QA entitlement", "checks": evidence}, indent=2))
-        print("BROWSER PASS: " + step, flush=True)
+        print("BROWSER "+status+": " + step, flush=True)
     def account(paid=False):
         email = "browser-acceptance-" + secrets.token_hex(12) + "@example.com"
         password = "Qa!" + secrets.token_urlsafe(32) + "9a"
@@ -178,6 +178,116 @@ def main():
                     doc=ezdxf.read(io.StringIO(raw.content.decode("utf-8")))
                     assert doc.header["$INSUNITS"]==6 and len(doc.modelspace().query("DIMENSION"))>=2
                     note("Browser creates real dimensioned DXF and downloads verified private bytes")
+                    saved_files=requests.get(API+"/api/v1/files/",headers=headers,params={"job_id":jid},timeout=20)
+                    assert saved_files.status_code==200
+                    fid=next(row["id"] for row in saved_files.json() if row["name"]=="Browser measured room.dxf")
+                    # Main workspace, not the legacy ChatInterface.
+                    page.goto(WEB+"/workspace",wait_until="domcontentloaded")
+                    page.get_by_placeholder("Describe a design, or type /reference IFC walls to search references",exact=True).fill("count IFC model elements and IFC quantities")
+                    page.get_by_role("button",name="Suggest AEC task",exact=True).click()
+                    expect(page.get_by_text("Suggested task: bim · advisory only",exact=True)).to_be_visible()
+                    assert page.get_by_text("ADA turning radius verified",exact=True).count()==0
+                    note("Main workspace calls actual trained-model API; no hardcoded compliance pass")
+                    page.goto(WEB+"/workspace/residency",wait_until="domcontentloaded")
+                    expect(page.get_by_role("heading",name="USA Data Residency",exact=True)).to_be_visible()
+                    expect(page.get_by_role("heading",name="Storage CDN and downloads",exact=True)).to_be_visible()
+                    expect(page.get_by_text("End-to-end USA data residency is not certified.",exact=False)).to_be_visible()
+                    note("Residency UI reads actual backend evidence and never certifies incomplete paths")
+                    page.goto(WEB+"/workspace/compliance",wait_until="domcontentloaded")
+                    page.get_by_label("Compliance project",exact=True).select_option(pid)
+                    page.get_by_label("Compliance source file",exact=True).select_option(fid)
+                    for label,value in [("State","QA State"),("Municipality","QA City"),("Project address","123 QA Road"),("Occupancy","B"),("Building type","Office")]:
+                        page.get_by_label(label,exact=True).fill(value)
+                    panel=page.locator("section").filter(has=page.get_by_role("heading",name="Multidiscipline code measurement catalog",exact=True))
+                    expect(panel).to_be_visible()
+                    panel.get_by_label("Adoption / ordinance reference",exact=True).fill("QA ordinance fixture")
+                    panel.get_by_label("Reviewer name",exact=True).fill("Browser QA reviewer")
+                    panel.get_by_label("Reviewer credential / jurisdiction (asserted)",exact=True).fill("Synthetic test only")
+                    panel.get_by_label("Reviewer checked adoption and local amendments; no conflict with selected rules.",exact=True).check()
+                    panel.get_by_label("Rule",exact=True).select_option("ADA-305.3-width")
+                    panel.get_by_label("Adopted edition",exact=True).select_option("2010")
+                    panel.get_by_label("Element / drawing reference",exact=True).fill("Browser A101")
+                    panel.get_by_label("Measured value (in)",exact=True).fill("30")
+                    panel.get_by_label("Qualified reviewer confirms the stated scope and exclusions.",exact=True).check()
+                    panel.get_by_role("button",name="Add measurement to assessment",exact=True).click()
+                    panel.get_by_role("button",name="Evaluate and save multidisciplinary evidence",exact=True).click()
+                    expect(page.get_by_text("Element: Browser A101 · Source version: 1",exact=True)).to_be_visible()
+                    expect(page.get_by_role("heading",name="Qualified reviewer declaration",exact=True)).to_be_visible()
+                    for label,value in [("Declared reviewer name","Browser QA reviewer"),("Declared credential and jurisdiction","Synthetic QA fixture"),("Review reference (e.g. signed report ID)","BROWSER-REVIEW-001"),("Reviewer notes and unresolved provisions","Browser acceptance only, not a professional approval.")]:
+                        page.get_by_label(label,exact=True).fill(value)
+                    page.get_by_label("This is the reviewer's actual supplied declaration; credentials are not verified by KRAFZEN.",exact=True).check()
+                    page.get_by_role("button",name="Record review declaration",exact=True).click()
+                    expect(page.get_by_text("Recorded: reviewed · Browser QA reviewer",exact=True)).to_be_visible()
+                    with page.expect_download() as download:
+                        page.get_by_role("button",name="Download compliance PDF",exact=True).click()
+                    from pypdf import PdfReader
+                    text=" ".join(p.extract_text() or "" for p in PdfReader(str(download.value.path())).pages)
+                    assert "BROWSER-REVIEW-001" in text
+                    page.reload(wait_until="domcontentloaded")
+                    page.get_by_label("Compliance project",exact=True).select_option(pid)
+                    expect(page.get_by_text("Recorded: reviewed · Browser QA reviewer",exact=True)).to_be_visible()
+                    note("Browser creates multidiscipline assessment, records review, downloads real PDF and reloads evidence")
+                    page.goto(WEB+"/workspace/reviews",wait_until="domcontentloaded")
+                    page.get_by_label("Review project",exact=True).select_option(pid)
+                    page.get_by_label("Review drawing",exact=True).select_option(fid)
+                    page.get_by_role("button",name="Inspect drawing geometry",exact=True).click()
+                    expect(page.get_by_text("lines checked",exact=False)).to_be_visible()
+                    # Actual browser-local inference, not a request mock.
+                    from PIL import Image, ImageDraw, ImageFont
+                    symbol=Image.new("RGB",(240,240),"white")
+                    ImageDraw.Draw(symbol).ellipse((68,68,172,172),outline="black",width=12)
+                    png=io.BytesIO();symbol.save(png,format="PNG")
+                    page.get_by_label("Symbol crop",exact=True).set_input_files({"name":"circle.png","mimeType":"image/png","buffer":png.getvalue()})
+                    expect(page.get_by_text("Experimental suggestion: pipe circle.",exact=False)).to_be_visible()
+                    note("Reviews frontend calls real source diagnostic and executes local trained symbol inference")
+                    page.goto(WEB+"/workspace/imports",wait_until="domcontentloaded")
+                    page.get_by_label("Project for import",exact=True).select_option(pid)
+                    page.get_by_label("Job for import",exact=True).select_option(jid)
+                    expect(page.get_by_role("heading",name="Revit (RVT) desktop bridge",exact=True)).to_be_visible()
+                    expect(page.get_by_role("button",name="Import Revit model through IFC",exact=True)).to_be_disabled()
+                    page.get_by_label("Original RVT",exact=True).set_input_files({"name":"invalid.rvt","mimeType":"application/octet-stream","buffer":b"not a native Revit file"*40})
+                    page.get_by_label("Revit-exported IFC",exact=True).set_input_files({"name":"invalid.ifc","mimeType":"application/octet-stream","buffer":b"invalid IFC"})
+                    page.get_by_label("I confirm that the IFC was exported from this exact saved RVT revision.",exact=True).check()
+                    page.get_by_role("button",name="Import Revit model through IFC",exact=True).click()
+                    expect(page.get_by_text("Unsupported RVT container signature",exact=False)).to_be_visible()
+                    note("Revit browser upload reaches backend, requires confirmation and rejects invalid native source; no Autodesk export claimed")
+                    # Native scanner and OCR are prerequisites for genuine imports.
+                    try:
+                        scanner=subprocess.run(["clamscan","--version"],capture_output=True,timeout=10).returncode==0
+                    except (OSError,subprocess.TimeoutExpired):
+                        scanner=False
+                    if scanner:
+                        crop=Image.new("RGB",(1000,400),"white")
+                        ImageDraw.Draw(crop).text((80,80),"ROOM 101 WIDTH 3200 MM",font=ImageFont.truetype("DejaVuSans.ttf",42),fill="black")
+                        png=io.BytesIO();crop.save(png,format="PNG")
+                        page.get_by_label("Choose a CAD, BIM or document file",exact=True).set_input_files({"name":"browser-ocr.png","mimeType":"image/png","buffer":png.getvalue()})
+                        expect(page.get_by_text("Document scanned, parsed and saved to this project job.",exact=True)).to_be_visible(timeout=90000)
+                        expect(page.get_by_text("OCR text (unverified)",exact=True)).to_be_visible()
+                        page.get_by_text("OCR text (unverified)",exact=True).click()
+                        expect(page.get_by_text("ROOM 101 WIDTH 3200 MM",exact=False)).to_be_visible()
+                        note("Real browser image upload, native scanner, OCR persistence and visible recognized text")
+                        from tests.unit.test_ifc_native_coordination import create_real_solid
+                        import tempfile
+                        with tempfile.TemporaryDirectory() as temp:
+                            raw,_=create_real_solid(Path(temp)/"browser.ifc")
+                        bp,bj=projects[2]
+                        page.get_by_label("Project for import",exact=True).select_option(bp)
+                        page.get_by_label("Job for import",exact=True).select_option(bj)
+                        page.get_by_label("Choose a CAD, BIM or document file",exact=True).set_input_files({"name":"browser.ifc","mimeType":"application/octet-stream","buffer":raw})
+                        expect(page.get_by_text("IFC model imported with parsed project and element metadata.",exact=True)).to_be_visible(timeout=90000)
+                        response=requests.get(API+"/api/v1/files/",headers=headers,params={"job_id":bj},timeout=20)
+                        model_id=next(row["id"] for row in response.json() if row["name"]=="browser.ifc")
+                        page.goto(WEB+"/workspace/models",wait_until="domcontentloaded")
+                        page.get_by_label("BIM project",exact=True).select_option(bp)
+                        page.get_by_label("IFC model",exact=True).select_option(model_id)
+                        page.get_by_role("button",name="Load actual 3D model",exact=True).click()
+                        expect(page.get_by_role("img",name="Actual IFC 3D triangle geometry viewport",exact=True)).to_be_visible(timeout=90000)
+                        page.get_by_label("IFC section axis",exact=True).select_option("z")
+                        expect(page.get_by_label("IFC section position",exact=True)).to_be_visible()
+                        page.get_by_label("IFC section position",exact=True).fill("25")
+                        note("Browser imports real IFC, loads native triangle mesh and adjusts section cut")
+                    else:
+                        note("Browser OCR/IFC imports: scanner not available","BLOCKED")
                     page.goto(WEB+"/workspace/projects")
                     page.get_by_role("button",name="Archive "+names[0],exact=True).click()
                     page.get_by_role("button",name="Confirm archive",exact=True).click()
