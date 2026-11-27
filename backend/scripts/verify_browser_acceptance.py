@@ -204,7 +204,7 @@ def main():
                     panel.get_by_label("Reviewer name",exact=True).fill("Browser QA reviewer")
                     panel.get_by_label("Reviewer credential / jurisdiction (asserted)",exact=True).fill("Synthetic test only")
                     panel.get_by_label("Reviewer checked adoption and local amendments; no conflict with selected rules.",exact=True).check()
-                    panel.get_by_label("Rule",exact=True).select_option("ADA-305.3-width")
+                    panel.get_by_label("Compliance catalog rule",exact=True).select_option("ADA-305.3-width")
                     panel.get_by_label("Adopted edition",exact=True).select_option("2010")
                     panel.get_by_label("Element / drawing reference",exact=True).fill("Browser A101")
                     panel.get_by_label("Measured value (in)",exact=True).fill("30")
