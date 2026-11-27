@@ -382,7 +382,7 @@ def main():
                     expect(page.get_by_text("not configured",exact=True)).to_be_visible()
                     note("Browser creates workspace and invitation; provider absence is displayed without claiming delivery")
                     page.goto(WEB+"/workspace/notifications",wait_until="domcontentloaded")
-                    expect(page.get_by_role("heading",name="Notifications",exact=True)).to_be_visible()
+                    expect(page.locator("main").get_by_role("heading",name="Notifications",exact=True)).to_be_visible()
                     unread=page.get_by_role("button",name=__import__("re").compile(r", unread, mark as read$")).first
                     expect(unread).to_be_visible()
                     label=unread.get_attribute("aria-label")
@@ -390,7 +390,7 @@ def main():
                     expect(page.get_by_role("button",name=label.replace(", unread, mark as read",", read, mark as unread"),exact=True).first).to_be_visible()
                     note("Browser notification inbox performs real read transition")
                     page.goto(WEB+"/workspace/activity",wait_until="domcontentloaded")
-                    expect(page.get_by_role("heading",name="Activity",exact=True)).to_be_visible()
+                    expect(page.locator("main").get_by_role("heading",name="Activity",exact=True)).to_be_visible()
                     page.get_by_label("Filter by project",exact=True).select_option(pid)
                     expect(page.get_by_role("region",name="Activity timeline",exact=True)).to_be_visible()
                     note("Browser filters real persisted activity by project")
