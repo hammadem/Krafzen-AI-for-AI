@@ -26,6 +26,7 @@ const MAIN: NavItem[] = [
     { label: "Members", href: "/workspace/members", icon: Users },
     { label: "Notifications", href: "/workspace/notifications", icon: Bell },
     { label: "Billing", href: "/workspace/billings", icon: CreditCard },
+    { label: "AI & Knowledge", href: "/workspace/ai-knowledge", icon: Box },
     { label: "USA Data Residency", href: "/workspace/residency", icon: Globe },
 ];
 
@@ -127,7 +128,7 @@ export default function AppSidebar({ mobile = false, onNavigate }: { mobile?: bo
                 <GroupLabel>CAD / BIM</GroupLabel>
                 <div className="flex flex-col gap-0.5">
                     {CAD_BIM.map((item) => (
-                        <NavRow key={item.label} item={item} active={false} />
+                        <NavRow key={item.label} item={item} active={isActive(item.href)} onNavigate={onNavigate} />
                     ))}
                 </div>
             </nav>
