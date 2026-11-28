@@ -1,0 +1,26 @@
+{
+  "train_rows": 10036,
+  "test_rows": 8140,
+  "train_buildings": 240,
+  "test_buildings": 82,
+  "accuracy": 0.7314496314496315,
+  "labels": [
+    "BATHROOM",
+    "BEDROOM",
+    "COLUMN",
+    "DOOR",
+    "KITCHEN",
+    "LIVING_ROOM",
+    "WALL",
+    "WINDOW"
+  ],
+  "source_archive_sha256": "382e528fae3220b7747f4e6bc7d79261fee1b5d4d7902f18c548c0e6f22ef80a",
+  "source_url": "https://zenodo.org/records/7788422",
+  "license": "CC BY 4.0",
+  "attribution": "Standfest et al., Archilyse AG, Swiss Dwellings v3.0.0 (2022), DOI 10.5281/zenodo.7788422, CC BY 4.0.",
+  "scope": "Real public vector polygon feature classification. Not symbol detection, pixel segmentation, building-code or drawing approval. No raw layout or location released.",
+  "workflow_run": "https://github.com/hammadem/Krafzen-AI-for-AI/actions/runs/46058779327",
+  "artifact": "https://github.com/hammadem/Krafzen-AI-for-AI/actions/runs/46058779327/artifacts/15228241061",
+  "artifact_retention_days": 7,
+  "production_approved": false
+}

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # class FileBase(BaseModel): 
 #     job_id: str = Field(..., description="Foreign key reference to job")
@@ -22,11 +22,9 @@ class FileCreate(BaseModel):
 
 
 class FileUpdate(BaseModel):
-    """Schema for updating existing file entries"""
-    #file_url: Optional[str] = Field(None, description="Updated file URL")
-    file_type: str | None = Field(None, description="Updated file type")
-    path: str | None = None
-    name: str | None = None
+    """Only display names are editable by customers. Storage metadata is immutable."""
+    model_config = ConfigDict(extra="forbid")
+    name: str | None = Field(default=None, min_length=1, max_length=255)
 
 # class FileInDB(FileBase):
 #     """Internal DB model"""
@@ -52,6 +50,7 @@ class FileResponse(BaseModel):
     reviewed_at: datetime | None = None
     mime_type: str | None = None
     size_bytes: int | None = None
+    import_metadata: dict | None = None
     created_at: datetime | None = None
 
     class Config: 

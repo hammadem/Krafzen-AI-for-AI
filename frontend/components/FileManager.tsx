@@ -284,6 +284,28 @@ export default function FileManager({ jobId }: { jobId: string }) {
                                     {` · ${formatBytes(file.size_bytes)}`}
                                     {file.created_at ? ` · ${formatDate(file.created_at)}` : ""}
                                 </span>
+                                {["png","jpg","jpeg","webp"].includes(file.file_type?.toLowerCase()||"") && (()=>{
+                                    const evidence=(file as FileDetails & {import_metadata?:{ocr_status?:string;ocr_text_excerpt?:string;ocr_words?:{text:string;confidence:number;bbox_px:number[]}[]}}).import_metadata;
+                                    return evidence?.ocr_status==="completed"?<details className="text-xs text-slate-300"><summary className="cursor-pointer">OCR text (unverified)</summary><p className="whitespace-pre-wrap break-words max-w-sm">{evidence.ocr_text_excerpt||"No recognized text."}</p><p className="text-slate-400">Text recognition only; review the source drawing.</p></details>:evidence?.ocr_status?<span className="text-xs text-slate-400">OCR {evidence.ocr_status.replaceAll("_"," ")}</span>:null;
+                                })()}
+                                {file.file_type?.toLowerCase() === "ifc" && (() => {
+                                    const summary = (file as FileDetails & {
+                                        import_metadata?: {
+                                            schema?: string;
+                                            project_name?: string;
+                                            product_count?: number;
+                                            element_count?: number;
+                                        }
+                                    }).import_metadata;
+                                    return summary && summary.schema ? (
+                                        <span className="text-[#94a3b8] text-xs truncate" title="IFC entity metadata only; geometry and clash detection not verified">
+                                            {summary.schema}
+                                            {summary.project_name ? ` · ${summary.project_name}` : ""}
+                                            {` · ${summary.product_count ?? 0} products`}
+                                            {` · ${summary.element_count ?? 0} elements`}
+                                        </span>
+                                    ) : null;
+                                })()}
                             </div>
 
                             <div className="flex items-center gap-1 shrink-0">

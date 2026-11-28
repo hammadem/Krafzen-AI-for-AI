@@ -6,11 +6,16 @@ import shutil
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
+from app.db.queries.project_queries import get_project
 from fastapi.responses import FileResponse, StreamingResponse
 from httpx import HTTPError
 from postgrest.exceptions import APIError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from uuid import UUID
+from fastapi.concurrency import run_in_threadpool
+from app.services.reference_retrieval import retrieve_reference, format_reference_answer, reference_register
+from app.services.aec_intent_model import predict_intent
 
 from app.compliance.extraction_fallback import merge_heuristic_layout
 from app.compliance.models import LayoutExtract
@@ -56,7 +61,11 @@ async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_au
         # Validate auth
         user_data["user_id"]
         
-        from app.services.local_dxf_service import local_dxf_service
+        from app.services.local_dxf_service import local_dxf_service, validate_image_source
+        try:
+            validate_image_source(request.image_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         logger.info("Requesting Local DXF Conversion (Potrace)...")
         file_path = await local_dxf_service.convert_to_dxf(request.image_url)
 
@@ -70,9 +79,11 @@ async def generate_dxf(request: DxfRequest, user_data: dict = Depends(require_au
             media_type='application/dxf'
         )
 
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         logger.exception("DXF Generation Error")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="DXF generation failed")
 
 
 def _safe_unlink(path: str) -> None:
@@ -115,7 +126,11 @@ async def generate_design_file(
         if file_type not in ("dxf", "dwg"):
             raise HTTPException(status_code=400, detail="file_type must be 'dxf' or 'dwg'")
 
-        from app.services.local_dxf_service import local_dxf_service
+        from app.services.local_dxf_service import local_dxf_service, validate_image_source
+        try:
+            validate_image_source(request.image_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
         logger.info("Generating DXF from image (local Potrace)...")
         dxf_path = await local_dxf_service.convert_to_dxf(request.image_url)
@@ -197,12 +212,18 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             sessions = await chat_history_service.get_user_sessions(user_id)
             session_record = next((s for s in sessions if s["id"] == session_id), None)
             if not session_record:
-                # Session doesn't exist or doesn't belong to user, create a new one
-                logger.warning(f"Session {session_id} not found for user {user_id}, creating new session")
-                session_id = await chat_history_service.create_session(user_id, title=request.message[:30] + "...")
+                # Never silently reuse or replace a client-supplied foreign session.
+                raise HTTPException(status_code=404, detail="Chat session not found")
             else:
                 session_project_id = session_record.get("project_id")
         
+        if session_project_id:
+            linked_project = await get_project(session_project_id, user_data)
+            if not linked_project or linked_project.get("archived_at"):
+                raise HTTPException(status_code=409, detail="Restore the linked project before generating a design")
+            if linked_project.get("workspace_id"):
+                raise HTTPException(status_code=503, detail="Organization AI processing requires verified regional inference and storage")
+
         # 2. Persist User Message
         await chat_history_service.add_message(session_id, "user", request.message)
 
@@ -358,6 +379,8 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
             image_url = image_result
         else:
             generation_stage = "image_generation"
+            if gemini_service is None:
+                raise HTTPException(status_code=503, detail="Image generation provider unavailable")
             image_url = await gemini_service.generate_image(
                 cad_dsl,
                 original_prompt=request.message,
@@ -365,7 +388,7 @@ async def generate_chat_response(request: ChatRequest, user_data: dict = Depends
                 drawing_standard=drawing_standard,
             )
 
-        if image_url.startswith("https://placehold.co/"):
+        if not isinstance(image_url, str) or not image_url.strip() or image_url.startswith("https://placehold.co/"):
             raise HTTPException(
                 status_code=502,
                 detail="Image generation failed. Check the backend logs and Gemini configuration.",
@@ -490,54 +513,113 @@ async def _record_generation_failure(
 
 @router.post("/chat/generate/stream")
 async def generate_chat_response_stream(request: ChatRequest, user_data: dict = Depends(require_auth)):
-    """
-    Process chat message and stream AI response tokens in real-time using Server-Sent Events (SSE).
-    Fulfills Acceptance Test 7.
+    """SSE delivery of the same verified, persisted generation as /chat/generate.
+
+    Providers currently return complete output, not a token stream. Emit a
+    progress event while the shared pipeline runs; only deliver generated
+    content after it has passed validation, persistence and request deduction.
     """
     user_id = user_data["user_id"]
     balance_info = await subscription_service.check_request_balance(user_id)
     if not balance_info.get("can_make_request"):
         raise HTTPException(status_code=402, detail="Insufficient requests.")
+    if request.session_id:
+        sessions = await chat_history_service.get_user_sessions(user_id)
+        if not any(str(row.get("id")) == request.session_id for row in sessions):
+            raise HTTPException(status_code=404, detail="Chat session not found")
 
-    session_id = request.session_id
-    if not session_id:
-        session_id = await chat_history_service.create_session(user_id, title=request.message[:30] + "...")
-
-    await chat_history_service.add_message(session_id, "user", request.message)
+    def event(data):
+        return "data: " + json.dumps(data, ensure_ascii=False, allow_nan=False) + "\n\n"
 
     async def sse_generator():
+        yield event({"type": "progress", "stage": "generating"})
         try:
-            # Event 1: Session initialization
-            yield f"data: {json.dumps({'type': 'init', 'session_id': session_id})}\n\n"
+            result = await generate_chat_response(request, user_data)
+            payload = result.model_dump(mode="json")
+            yield event({"type": "init", "session_id": payload["session_id"]})
+            if payload.get("validated_response"):
+                yield event({"type": "token", "token": payload["validated_response"]})
+            yield event({**payload, "type": "complete"})
+        except HTTPException as exc:
+            logger.warning("Shared chat generation failed with HTTP %s", exc.status_code)
+            yield event({"type": "error", "error": "Generation could not complete. Check access, available requests, and AI configuration.", "status": exc.status_code})
+        except Exception:
+            logger.exception("Streaming generation failed")
+            yield event({"type": "error", "error": "Generation failed."})
 
-            dxf_instruction = request.message
-            cad_dsl = await cadllm_service.enhance_prompt(dxf_instruction) if cadllm_service else dxf_instruction
+    return StreamingResponse(sse_generator(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-store", "X-Accel-Buffering": "no",
+    })
 
-            # Stream tokens chunk by chunk
-            words = (cad_dsl or "").split(" ")
-            accumulated = ""
-            for word in words:
-                chunk = word + " "
-                accumulated += chunk
-                yield f"data: {json.dumps({'type': 'token', 'token': chunk})}\n\n"
-                await asyncio.sleep(0.02)
 
-            # Generate image / compliance
-            image_url = await gemini_service.generate_image(cad_dsl, original_prompt=request.message) if gemini_service else ""
+class ReferenceRequest(BaseModel):
+    session_id: UUID
+    question: str = Field(min_length=1, max_length=500)
 
-            assistant_msg = await chat_history_service.add_message(
-                session_id, "assistant", cad_dsl, image_url=image_url
-            )
-            message_id = assistant_msg.get("id") if assistant_msg else None
 
-            await subscription_service.deduct_request(user_id)
+class IntentPreviewRequest(BaseModel):
+    text: str = Field(min_length=1,max_length=2000)
 
-            yield f"data: {json.dumps({'type': 'complete', 'session_id': session_id, 'message_id': message_id, 'image_url': image_url, 'validated_response': cad_dsl})}\n\n"
-        except Exception as err:
-            logger.exception("Streaming error")
-            yield f"data: {json.dumps({'type': 'error', 'error': str(err)})}\n\n"
+@router.post("/chat/intent-preview")
+async def preview_aec_intent(request: IntentPreviewRequest,user_data:dict=Depends(require_auth)):
+    """Local trained model advisory; cannot trigger generation or calculations."""
+    try:
+        return await run_in_threadpool(predict_intent,request.text)
+    except Exception as exc:
+        raise HTTPException(status_code=503,detail="AEC intent model unavailable") from exc
 
-    return StreamingResponse(sse_generator(), media_type="text/event-stream")
+@router.get("/chat/model-registry")
+async def get_aec_model_registry(user_data: dict = Depends(require_auth)):
+    from app.services.aec_model_registry import model_registry
+    try:
+        return await run_in_threadpool(model_registry)
+    except (ValueError, OSError, RuntimeError, KeyError) as exc:
+        raise HTTPException(status_code=503,detail="AI model evidence unavailable") from exc
+
+
+@router.get("/chat/reference-register")
+async def get_reference_register(user_data: dict = Depends(require_auth)):
+    try:
+        return await run_in_threadpool(reference_register)
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail="Approved reference index unavailable") from exc
+
+
+@router.post("/chat/reference")
+async def answer_reference_question(request: ReferenceRequest, user_data: dict = Depends(require_auth)):
+    """Retrieve approved sources locally; no external inference or customer indexing."""
+    question = request.question.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="Enter a technical reference question")
+    session_id = str(request.session_id)
+    try:
+        sessions = await chat_history_service.get_user_sessions(user_data["user_id"])
+        session = next((s for s in sessions if str(s["id"]) == session_id), None)
+        if not session:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+        if session.get("project_id"):
+            project = await get_project(session["project_id"], user_data)
+            if not project or project.get("archived_at"):
+                raise HTTPException(status_code=409, detail="Restore project before writing chat messages")
+            if project.get("workspace_id"):
+                raise HTTPException(status_code=503, detail="Organization chat persistence requires verified regional storage")
+        hits = await run_in_threadpool(retrieve_reference, question)
+        answer = format_reference_answer(hits)
+        user_message = await chat_history_service.add_message(session_id, "user", "/reference " + question)
+        if not user_message.get("id"):
+            raise RuntimeError("Reference question was not saved")
+        assistant = await chat_history_service.add_message(session_id, "assistant", answer)
+        if not assistant.get("id"):
+            raise RuntimeError("Reference response was not saved")
+        return {"session_id":session_id, "message_id":assistant["id"], "original_prompt":question,
+                "ollama_response":"", "validated_response":answer, "image_url":"",
+                "references":hits, "mode":"local_approved_reference_retrieval"}
+    except HTTPException:
+        raise
+    except (APIError, HTTPError, KeyError, TypeError, ValueError, OSError, RuntimeError) as exc:
+        logger.exception("Reference retrieval unavailable")
+        raise HTTPException(status_code=503, detail="Approved reference retrieval or persistence unavailable") from exc
+
 
 @router.post("/chat/session")
 async def create_chat_session(request: CreateSessionRequest, user_data: dict = Depends(require_auth)):
@@ -546,16 +628,33 @@ async def create_chat_session(request: CreateSessionRequest, user_data: dict = D
     """
     user_id = user_data["user_id"]
     try:
-        session_id = await chat_history_service.create_session(user_id, title=request.title or "New Chat")
+        project_id = str(request.project_id) if request.project_id else None
+        if project_id:
+            project = await get_project(project_id, user_data)
+            if not project:
+                raise HTTPException(status_code=404, detail="Project not found")
+            if project.get("archived_at"):
+                raise HTTPException(status_code=409, detail="Restore project before editing")
+            if project.get("workspace_id"):
+                raise HTTPException(status_code=503, detail="Organization chat requires verified regional storage")
+            sessions = await chat_history_service.get_user_sessions(user_id)
+            existing = next((s for s in sessions if s.get("project_id") == project_id), None)
+            if existing:
+                return existing
+            session_id = await chat_history_service.create_session(user_id, title=(project.get("title") or project.get("input_text") or "Project")[:200], project_id=project_id)
+        else:
+            session_id = await chat_history_service.create_session(user_id, title=request.title or "New Chat")
         sessions = await chat_history_service.get_user_sessions(user_id)
         # Return the newly created session
         new_session = next((s for s in sessions if s["id"] == session_id), None)
         if new_session:
             return new_session
-        return {"id": session_id, "title": request.title or "New Chat", "created_at": None, "updated_at": None}
-    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
+        raise RuntimeError("Created chat session could not be read")
+    except HTTPException:
+        raise
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError):
         logger.exception("Error creating session")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=503, detail="Chat session unavailable")
 
 @router.get("/chat/history")
 async def get_chat_history(user_data: dict = Depends(require_auth)):
@@ -563,14 +662,17 @@ async def get_chat_history(user_data: dict = Depends(require_auth)):
     Get all chat sessions for the user.
     """
     user_id = user_data["user_id"]
-    return await chat_history_service.get_user_sessions(user_id)
+    try:
+        return await chat_history_service.get_user_sessions(user_id)
+    except (APIError, HTTPError, RuntimeError, TypeError, ValueError):
+        raise HTTPException(status_code=503, detail="Chat history unavailable")
 
 @router.get("/chat/history/{session_id}")
 async def get_session_history(
     session_id: str,
     response: Response,
-    limit: int = 30,
-    before: str | None = None,
+    limit: int = Query(30, ge=1, le=100),
+    before: str | None = Query(None, max_length=100),
     user_data: dict = Depends(require_auth)
 ):
     """
@@ -587,7 +689,10 @@ async def get_session_history(
     if not any(s['id'] == session_id for s in sessions):
         raise HTTPException(status_code=403, detail="Access denied")
 
-    result = await chat_history_service.get_session_messages(session_id, limit=limit, before=before)
+    try:
+        result = await chat_history_service.get_session_messages(session_id, limit=limit, before=before)
+    except RuntimeError:
+        raise HTTPException(status_code=503, detail="Chat messages unavailable")
 
     t_end = time.perf_counter()
     auth_ms = round((t_auth - t_start) * 1000, 2)

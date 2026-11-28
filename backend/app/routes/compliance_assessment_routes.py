@@ -1,0 +1,355 @@
+"""Paid, owner-scoped measurements screening with immutable evidence history."""
+from typing import Literal
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
+
+from app.db.queries.file_queries import get_file
+from app.db.queries.project_queries import get_project
+from app.db.supabase_client import db
+from app.middlewares.auth import require_auth
+from app.services.ada_measurement_rules import evaluate_ada_measurements
+from app.services.building_code_measurement_rules import evaluate_building_code_measurements
+from app.services.compliance_pdf_service import build_compliance_pdf
+
+router = APIRouter(prefix="/compliance", tags=["Measured Compliance"])
+
+
+class JurisdictionInput(BaseModel):
+    state: str = Field(min_length=2, max_length=100)
+    municipality: str = Field(min_length=2, max_length=100)
+    project_address: str = Field(min_length=5, max_length=250)
+    occupancy: str = Field(min_length=2, max_length=100)
+    building_type: str = Field(min_length=2, max_length=100)
+    standard_edition: str
+    ada_applicability_confirmed: bool = False
+
+
+class MeasurementsInput(BaseModel):
+    door_kind: Literal["manual_swinging", "sliding", "automatic"] | None = None
+    door_clear_width_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    doorway_depth_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    door_measured_at_90_degrees: bool | None = None
+    accessible_route_clear_width_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    route_exception_applies: bool | None = None
+    ramp_rise_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    ramp_horizontal_run_in: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
+    new_construction: bool | None = None
+    ramp_alteration_exception_applies: bool | None = None
+    extended_ramp_checks: bool = False
+    ramp_run_405_applies_no_exception_confirmed: bool | None = None
+    ramp_cross_slope_percent: float | None = Field(default=None, ge=0, le=100, allow_inf_nan=False)
+    ramp_clear_width_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+
+
+class NewAssessment(BaseModel):
+    project_id: UUID
+    source_file_id: UUID | None = None
+    jurisdiction: JurisdictionInput
+    measurements: MeasurementsInput
+
+
+async def _owned_nonsovereign_project(project_id: str, user: dict) -> dict:
+    project = await get_project(project_id, user)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.get("workspace_id"):
+        raise HTTPException(
+            status_code=503,
+            detail="Organization compliance evidence needs verified regional processing",
+        )
+    return project
+
+
+@router.post("/ada-measurements", status_code=201)
+async def create_ada_measurement_assessment(
+    body: NewAssessment, user: dict = Depends(require_auth),
+):
+    project_id = str(body.project_id)
+    await _owned_nonsovereign_project(project_id, user)
+    if body.source_file_id is not None:
+        source_file = await get_file(str(body.source_file_id), user)
+        if not source_file or str(source_file.get("project_id") or "") != project_id:
+            raise HTTPException(
+                status_code=404, detail="Evidence file not found in the selected project"
+            )
+        if source_file.get("archived_at"):
+            raise HTTPException(status_code=409, detail="Cannot cite an archived evidence file")
+
+    # No LLM, no jurisdiction assumptions; results cite the official reference
+    # and retain full user-entered measurement provenance in the DB row.
+    context = body.jurisdiction.model_dump()
+    measures = body.measurements.model_dump()
+    result = evaluate_ada_measurements(context=context, measurements=measures)
+    payload = {
+        "project_id": project_id,
+        "source_file_id": str(body.source_file_id) if body.source_file_id else None,
+        "created_by": user["user_id"],
+        "jurisdiction": context,
+        "measurements": measures,
+        "result": result,
+        "review_status": "pending_qualified_review",
+    }
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("compliance_assessments").insert(payload).execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503, detail="Compliance assessment could not be persisted"
+        ) from exc
+    if not response or not response.data:
+        raise HTTPException(status_code=503, detail="Assessment was not saved")
+    return response.data[0]
+
+
+@router.get("/projects/{project_id}/ada-measurements")
+async def list_ada_measurement_assessments(
+    project_id: UUID, user: dict = Depends(require_auth),
+    limit: int = Query(default=40, ge=1, le=100),
+):
+    pid = str(project_id)
+    await _owned_nonsovereign_project(pid, user)
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("compliance_assessments")
+            .select("*")
+            .eq("project_id", pid)
+            .eq("created_by", user["user_id"])
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Assessment history unavailable") from exc
+    return response.data if response and response.data else []
+
+
+@router.get("/ada-measurements/{assessment_id}")
+async def get_ada_measurement_assessment(
+    assessment_id: UUID, user: dict = Depends(require_auth),
+):
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("compliance_assessments")
+            .select("*")
+            .eq("id", str(assessment_id))
+            .eq("created_by", user["user_id"])
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Assessment unavailable") from exc
+    record = response.data if response else None
+    if not record:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    await _owned_nonsovereign_project(str(record["project_id"]), user)
+    return record
+
+
+class BuildingCodeJurisdiction(BaseModel):
+    state: str = Field(min_length=2, max_length=100)
+    municipality: str = Field(min_length=2, max_length=100)
+    project_address: str = Field(min_length=5, max_length=250)
+    occupancy: str = Field(min_length=1, max_length=100)
+    building_type: str = Field(min_length=2, max_length=100)
+    construction_type: str = Field(min_length=1, max_length=100)
+    building_height_ft: float | None = Field(default=None, gt=0, le=10000, allow_inf_nan=False)
+    building_area_sqft: float | None = Field(default=None, gt=0, le=1e9, allow_inf_nan=False)
+    ibc_edition: str = Field(max_length=30)
+    nfpa101_edition: str = Field(max_length=30)
+    ibc_applicability_confirmed: bool = False
+    nfpa101_applicability_confirmed: bool = False
+    local_amendments_reviewed_no_conflict: bool = False
+    adoption_reference: str = Field(default="", max_length=1000)
+    reviewer_name: str = Field(default="", max_length=150)
+
+
+class BuildingCodeMeasurements(BaseModel):
+    extended_stair_checks: bool = False
+    ordinary_straight_stair_no_exceptions_confirmed: bool | None = None
+    stair_min_riser_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    stair_max_riser_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    stair_min_tread_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    stair_min_headroom_in: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    egress_factor_basis: Literal["standard_confirmed", "sprinkler_voice_exception_confirmed", "unknown_or_other"] = "unknown_or_other"
+    qualifying_sprinkler_system_confirmed: bool | None = None
+    qualifying_voice_alarm_confirmed: bool | None = None
+    other_egress_exceptions_excluded: bool | None = None
+    stair_occupant_load: int | None = Field(default=None, gt=0, le=1000000, strict=True)
+    stair_clear_width_in: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
+    other_occupant_load: int | None = Field(default=None, gt=0, le=1000000, strict=True)
+    other_clear_width_in: float | None = Field(default=None, gt=0, le=100000, allow_inf_nan=False)
+    emergency_lighting_required_confirmed: bool | None = None
+    floor_level_egress_photometry_confirmed: bool | None = None
+    emergency_duration_minutes: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    initial_average_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    initial_minimum_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    final_average_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    final_minimum_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    measured_maximum_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    measured_minimum_fc: float | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+
+
+class NewBuildingCodeAssessment(BaseModel):
+    project_id: UUID
+    source_file_id: UUID | None = None
+    jurisdiction: BuildingCodeJurisdiction
+    measurements: BuildingCodeMeasurements
+
+
+@router.post("/building-code-measurements", status_code=201)
+async def create_building_code_measurement_assessment(
+    body: NewBuildingCodeAssessment, user: dict = Depends(require_auth),
+):
+    """Save versioned IBC/NFPA numerical findings for professional review."""
+    pid = str(body.project_id)
+    await _owned_nonsovereign_project(pid, user)
+    source_id = str(body.source_file_id) if body.source_file_id else None
+    if source_id:
+        evidence = await get_file(source_id, user)
+        if not evidence or str(evidence.get("project_id") or "") != pid:
+            raise HTTPException(status_code=404, detail="Evidence file not found in this project")
+        if evidence.get("archived_at"):
+            raise HTTPException(status_code=409, detail="Cannot cite an archived evidence file")
+    context = body.jurisdiction.model_dump()
+    measurements = body.measurements.model_dump()
+    result = evaluate_building_code_measurements(
+        context=context, measurements=measurements, source_file_id=source_id,
+    )
+    payload = {
+        "project_id": pid, "source_file_id": source_id,
+        "created_by": user["user_id"], "jurisdiction": context,
+        "measurements": measurements, "result": result,
+        "review_status": "pending_qualified_review",
+    }
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("compliance_assessments").insert(payload).execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Code assessment could not be saved") from exc
+    if not response or not response.data:
+        raise HTTPException(status_code=503, detail="Code assessment was not persisted")
+    return response.data[0]
+
+
+@router.get("/assessments/{assessment_id}/report.pdf")
+async def download_compliance_report(
+    assessment_id: UUID, user: dict = Depends(require_auth),
+):
+    record = await get_ada_measurement_assessment(assessment_id, user=user)
+    try:
+        pdf = await run_in_threadpool(build_compliance_pdf, record)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="Assessment evidence is incomplete or inconsistent") from exc
+    return Response(content=pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="compliance-{assessment_id}.pdf"',
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
+
+
+from app.services.multidiscipline_rules import RULES, CATALOG, evaluate_multidiscipline
+
+class MultidisciplineContext(BaseModel):
+    state: str = Field(min_length=2,max_length=100)
+    municipality: str = Field(min_length=2,max_length=100)
+    project_address: str = Field(min_length=5,max_length=250)
+    occupancy: str = Field(min_length=1,max_length=100)
+    building_type: str = Field(min_length=2,max_length=100)
+    adoption_reference: str = Field(default="",max_length=1000)
+    reviewer_name: str = Field(default="",max_length=150)
+    reviewer_credential: str = Field(default="",max_length=250)
+    local_amendments_reviewed_no_conflict: bool = False
+
+class MultidisciplineEntry(BaseModel):
+    rule_id: str = Field(min_length=1,max_length=100)
+    adopted_edition: str = Field(default="",max_length=30)
+    element_reference: str = Field(default="",max_length=300)
+    applicability_confirmed: bool = False
+    measured: float | None = Field(default=None,ge=0,le=1e9,allow_inf_nan=False)
+    extra_value: float | None = Field(default=None,ge=0,le=1e9,allow_inf_nan=False)
+
+class MultidisciplineAssessment(BaseModel):
+    project_id: UUID
+    source_file_id: UUID | None = None
+    jurisdiction: MultidisciplineContext
+    entries: list[MultidisciplineEntry] = Field(min_length=1,max_length=50)
+
+@router.get("/multidiscipline/catalog")
+async def multidisciplinary_catalog(user: dict = Depends(require_auth)):
+    return {"version":"multidiscipline_v1","rules":RULES}
+
+@router.post("/multidiscipline/assessments",status_code=201)
+async def save_multidiscipline_assessment(body: MultidisciplineAssessment,user: dict=Depends(require_auth)):
+    pid=str(body.project_id)
+    project=await _owned_nonsovereign_project(pid,user)
+    if project.get("archived_at"):
+        raise HTTPException(status_code=409,detail="Project archived")
+    source_id=str(body.source_file_id) if body.source_file_id else None
+    source_version=None
+    if source_id:
+        evidence=await get_file(source_id,user)
+        if not evidence or str(evidence.get("project_id"))!=pid:
+            raise HTTPException(status_code=404,detail="Evidence file not found in project")
+        if evidence.get("archived_at"):
+            raise HTTPException(status_code=409,detail="Evidence file archived")
+        source_version=int(evidence.get("version") or 1)
+    entries=[entry.model_dump() for entry in body.entries]
+    if any(entry["rule_id"] not in CATALOG for entry in entries):
+        raise HTTPException(status_code=422,detail="Unknown catalog rule")
+    if len({(e["rule_id"],e["element_reference"].strip().casefold()) for e in entries})!=len(entries):
+        raise HTTPException(status_code=422,detail="Duplicate rule and element reference")
+    context=body.jurisdiction.model_dump()
+    result=evaluate_multidiscipline(context=context,entries=entries,source_file_id=source_id,source_version=source_version)
+    payload={"project_id":pid,"source_file_id":source_id,"created_by":user["user_id"],"jurisdiction":context,
+             "measurements":{"entries":entries,"source_file_version":source_version},"result":result,
+             "review_status":"pending_qualified_review"}
+    try:
+        response=await run_in_threadpool(lambda:db.table("compliance_assessments").insert(payload).execute())
+    except Exception as exc:
+        raise HTTPException(status_code=503,detail="Assessment could not be saved") from exc
+    if not response or not response.data:
+        raise HTTPException(status_code=503,detail="Assessment was not persisted")
+    return response.data[0]
+
+
+class ReviewDeclaration(BaseModel):
+    disposition: Literal["reviewed","rejected"]
+    reviewer_name: str = Field(min_length=2,max_length=150)
+    reviewer_credential: str = Field(min_length=2,max_length=250)
+    review_reference: str = Field(min_length=3,max_length=300)
+    notes: str = Field(min_length=10,max_length=2000)
+    record_is_reviewer_supplied: bool = False
+
+@router.post("/assessments/{assessment_id}/review")
+async def record_review_declaration(assessment_id: UUID, body: ReviewDeclaration,user: dict=Depends(require_auth)):
+    """Append a single review declaration; never certify a professional license."""
+    from datetime import UTC,datetime
+    record=await get_ada_measurement_assessment(assessment_id,user=user)
+    project=await _owned_nonsovereign_project(str(record["project_id"]),user)
+    if project.get("archived_at"):
+        raise HTTPException(status_code=409,detail="Project archived")
+    if not body.record_is_reviewer_supplied or not all(value.strip() for value in (body.reviewer_name,body.reviewer_credential,body.review_reference,body.notes)):
+        raise HTTPException(status_code=422,detail="Explicit reviewer-supplied declaration required")
+    result=record.get("result")
+    if not isinstance(result,dict) or result.get("complete_code_compliance_determined") is not False:
+        raise HTTPException(status_code=409,detail="Invalid assessment evidence")
+    if record.get("review_status")!="pending_qualified_review" or result.get("review_attestation"):
+        raise HTTPException(status_code=409,detail="Review declaration already recorded")
+    declaration={**body.model_dump(),"recorded_by":user["user_id"],"recorded_at":datetime.now(UTC).isoformat(),
+                 "credential_independently_verified":False,"authority_approval":False,"complete_compliance_certified":False}
+    # Preserve all original numerical evidence; append the declaration atomically.
+    try:
+        response=await run_in_threadpool(lambda: db.table("compliance_assessments")
+            .update({"result":{**result,"review_attestation":declaration},"review_status":body.disposition})
+            .eq("id",str(assessment_id)).eq("created_by",user["user_id"])
+            .eq("review_status","pending_qualified_review").execute())
+    except Exception as exc:
+        raise HTTPException(status_code=503,detail="Review declaration could not be recorded") from exc
+    if not response or not response.data:
+        raise HTTPException(status_code=409,detail="Assessment state changed; reload")
+    return response.data[0]

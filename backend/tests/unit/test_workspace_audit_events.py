@@ -256,6 +256,31 @@ async def test_invite_creation_records_inviter_as_actor():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("status,expires_at", [
+    ("revoked", None),
+    ("expired", None),
+    ("pending", (datetime.now(UTC) - timedelta(days=1)).isoformat()),
+])
+async def test_reissue_inactive_invite_rotates_token(status, expires_at):
+    old = make_invite(status=status, expires_at=expires_at)
+    database = FakeDatabase({"workspace_invites": [old]})
+    record_event = AsyncMock()
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "get_workspace", new=AsyncMock(return_value={"owner_id": ACTOR_ID})), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(invite_queries, "record_workspace_event", new=record_event):
+        result = await invite_queries.create_invite(WORKSPACE_ID, "invitee@example.com", "viewer", ACTOR_ID)
+        assert (await invite_queries.validate_invite(INVITE_TOKEN))["valid"] is False
+        assert (await invite_queries.validate_invite(result["token"]))["valid"] is True
+    assert len(database.tables["workspace_invites"]) == 1
+    assert result["id"] == INVITE_ID
+    assert result["token"] != INVITE_TOKEN
+    assert result["status"] == "pending" and result["role"] == "viewer"
+    assert datetime.fromisoformat(result["expires_at"]) > datetime.now(UTC)
+    record_event.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_invite_revocation_records_inviter_as_actor():
     database = FakeDatabase({"workspace_invites": [make_invite()]})
     record_event = AsyncMock()
@@ -263,13 +288,41 @@ async def test_invite_revocation_records_inviter_as_actor():
     with patch.object(invite_queries, "db", database), \
          patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
          patch.object(invite_queries, "record_workspace_event", new=record_event):
-        revoked = await invite_queries.revoke_invite(INVITE_ID, ACTOR_ID)
+        revoked = await invite_queries.revoke_invite(WORKSPACE_ID, INVITE_ID, ACTOR_ID)
 
     assert revoked is True
     record_event.assert_awaited_once()
     assert record_event.await_args.kwargs["event_name"] == "permissions.access_revoked"
     assert record_event.await_args.kwargs["actor_user_id"] == ACTOR_ID
     assert record_event.await_args.kwargs["metadata"]["access_scope"] == "pending_invitation"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("workspace_id,actor_id,expected_status", [
+    ("00000000-0000-0000-0000-000000000099", ACTOR_ID, 404),
+    (WORKSPACE_ID, TARGET_ID, 403),
+    ("invalid", ACTOR_ID, 400),
+])
+async def test_invite_revocation_rejects_wrong_scope_or_actor(workspace_id, actor_id, expected_status):
+    database = FakeDatabase({"workspace_invites": [make_invite()]})
+    record_event = AsyncMock()
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(invite_queries, "record_workspace_event", new=record_event):
+        with pytest.raises(HTTPException) as error:
+            await invite_queries.revoke_invite(workspace_id, INVITE_ID, actor_id)
+    assert error.value.status_code == expected_status
+    assert database.tables["workspace_invites"][0]["status"] == "pending"
+    record_event.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_expired_invite_status_cannot_validate_even_with_future_expiry():
+    database = FakeDatabase({"workspace_invites": [make_invite(status="expired")]})
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)):
+        result = await invite_queries.validate_invite(INVITE_TOKEN)
+    assert result["valid"] is False
 
 
 @pytest.mark.asyncio
@@ -362,3 +415,66 @@ async def test_workspace_event_requires_actor_and_persists_scope():
             workspace_id=WORKSPACE_ID,
             actor_user_id="",
         )
+
+
+@pytest.mark.asyncio
+async def test_concurrent_role_change_rejects_stale_update_without_audit():
+    database = FakeDatabase(
+        {"workspace_members": [{
+            "workspace_id": WORKSPACE_ID,
+            "user_id": TARGET_ID,
+            "role": "member",
+        }]}
+    )
+    record_event = AsyncMock()
+    original_execute = FakeQuery.execute
+
+    def concurrent_execute(query):
+        if query.table_name == "workspace_members" and query.operation == "update":
+            database.tables["workspace_members"][0]["role"] = "viewer"
+        return original_execute(query)
+
+    with patch.object(workspace_queries, "db", database), \
+         patch.object(workspace_queries, "get_workspace", new=AsyncMock(return_value={"owner_id": ACTOR_ID})), \
+         patch.object(workspace_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(workspace_queries, "record_workspace_event", new=record_event), \
+         patch.object(FakeQuery, "execute", concurrent_execute):
+        with pytest.raises(HTTPException) as error:
+            await workspace_queries.update_role_member(WORKSPACE_ID, TARGET_ID, "admin", ACTOR_ID)
+
+    assert error.value.status_code == 409
+    assert database.tables["workspace_members"][0]["role"] == "viewer"
+    record_event.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_recipient_decline_invalidates_code_and_never_grants_membership():
+    database = FakeDatabase({"workspace_invites": [make_invite()]})
+    audit = AsyncMock()
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(invite_queries, "record_workspace_event", audit):
+        result = await invite_queries.decline_invite(INVITE_TOKEN, TARGET_ID)
+        assert result["message"] == "Invitation declined"
+        assert not (await invite_queries.validate_invite(INVITE_TOKEN))["valid"]
+        with pytest.raises(HTTPException) as error:
+            await invite_queries.accept_invite(INVITE_TOKEN, TARGET_ID)
+        assert error.value.status_code == 409
+    assert database.tables["workspace_invites"][0]["status"] == "revoked"
+    assert not database.tables.get("workspace_members")
+    assert audit.await_args.kwargs["event_name"] == "team.invitation_declined"
+    assert audit.await_args.kwargs["actor_user_id"] == TARGET_ID
+
+
+@pytest.mark.asyncio
+async def test_other_email_cannot_decline_invitation():
+    database = FakeDatabase({"workspace_invites": [make_invite()]}, user_email="other@example.com")
+    audit = AsyncMock()
+    with patch.object(invite_queries, "db", database), \
+         patch.object(invite_queries, "run_in_threadpool", new=AsyncMock(side_effect=run_inline)), \
+         patch.object(invite_queries, "record_workspace_event", audit):
+        with pytest.raises(HTTPException) as error:
+            await invite_queries.decline_invite(INVITE_TOKEN, TARGET_ID)
+    assert error.value.status_code == 403
+    assert database.tables["workspace_invites"][0]["status"] == "pending"
+    audit.assert_not_awaited()

@@ -79,6 +79,23 @@ async def create_export(
         if not owns:
             raise HTTPException(status_code=403, detail={"error": "Access denied"})
 
+        # A caller may attach only a job belonging to the same owned project.
+        # A UUID format check alone allows cross-project/cross-tenant job refs.
+        if source_job_id:
+            source_res = await run_in_threadpool(
+                lambda: db.table("jobs")
+                .select("project_id")
+                .eq("id", source_job_id)
+                .maybe_single()
+                .execute()
+            )
+            source = source_res.data if source_res else None
+            if not source or str(source.get("project_id") or "") != str(project_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail={"error": "Source job is not part of the requested project"},
+                )
+
         existing = await run_in_threadpool(
             lambda: db.table("export_jobs")
             .select("id, status")
@@ -183,6 +200,8 @@ async def update_export_status(
     export_id: str,
     update_data: dict[str, Any],
     user_id: str,
+    *,
+    expected_status: str | None = None,
 ) -> dict[str, Any] | None:
     if not _valid_uuid(export_id):
         raise HTTPException(status_code=400, detail={"error": "Invalid export_id"})
@@ -197,11 +216,19 @@ async def update_export_status(
         payload = {k: v for k, v in update_data.items() if v is not None}
         payload["updated_at"] = datetime.now(UTC).isoformat()
 
-        res = await run_in_threadpool(
-            lambda: db.table("export_jobs").update(payload).eq("id", export_id).execute()
-        )
+        def _update():
+            query = db.table("export_jobs").update(payload).eq("id", export_id)
+            if expected_status is not None:
+                # Compare-and-swap is a single PostgREST UPDATE statement. Two
+                # workers cannot both transition queued -> processing.
+                query = query.eq("status", expected_status)
+            return query.execute()
+
+        res = await run_in_threadpool(_update)
 
         if not res or not res.data:
+            if expected_status is not None:
+                return None  # Another worker claimed or transitioned the row.
             raise HTTPException(status_code=404, detail={"error": "Export not found"})
 
         return res.data[0]
@@ -211,6 +238,79 @@ async def update_export_status(
     except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
         logger.error("[update_export_status] Error", error=str(e), exc_info=True)
         raise HTTPException(status_code=500, detail={"error": "Server error"})
+
+
+MAX_EXPORT_RETRIES = 3
+
+
+async def list_user_exports(
+    user_id: str, *, page: int = 1, limit: int = 100
+) -> list[dict[str, Any]]:
+    """Page through export history belonging to the authenticated requester."""
+    offset = (page - 1) * limit
+    try:
+        response = await run_in_threadpool(
+            lambda: db.table("export_jobs")
+            .select("*")
+            .eq("requested_by", user_id)
+            .order("created_at", desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+        return response.data if response and response.data else []
+    except (APIError, HTTPError, RuntimeError, ValueError, TypeError) as exc:
+        logger.error("[list_user_exports] Query failed", error=str(exc))
+        raise HTTPException(status_code=503, detail="Export history is unavailable") from exc
+
+
+async def retry_export(export_id: str, user_id: str) -> dict[str, Any]:
+    """Atomically retry an owned failed/cancelled export; clear stale artifacts."""
+    export = await get_export(export_id, user_id)
+    current = str(export.get("status") or "").lower()
+    if current == ExportStatus.QUEUED.value:
+        return export  # Duplicate retry request; nothing to change.
+    if current not in (ExportStatus.FAILED.value, ExportStatus.CANCELLED.value):
+        raise HTTPException(status_code=409, detail="Export is not retryable")
+
+    retries = int(export.get("retry_count") or 0)
+    if retries >= MAX_EXPORT_RETRIES:
+        raise HTTPException(status_code=409, detail="Export retry limit reached")
+
+    metadata = dict(export.get("metadata") or {})
+    for key in ("stage", "artifact_url", "artifact_file_id", "file_path",
+                "generation_method", "engineering_accuracy_verified", "requires_review"):
+        metadata.pop(key, None)
+
+    payload = {
+        "status": ExportStatus.QUEUED.value,
+        "retry_count": retries + 1,
+        "progress_percent": 0,
+        "artifact_file_id": None,
+        "file_path": None,
+        "bucket": None,
+        "error_code": None,
+        "error_message": None,
+        "errors": None,
+        "metadata": metadata,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    try:
+        # The requester and prior terminal state are checked in the UPDATE,
+        # not just a preceding SELECT. Concurrent retries cannot both win.
+        result = await run_in_threadpool(
+            lambda: db.table("export_jobs")
+            .update(payload)
+            .eq("id", export_id)
+            .eq("requested_by", user_id)
+            .eq("status", current)
+            .execute()
+        )
+    except (APIError, HTTPError, RuntimeError, ValueError, TypeError) as exc:
+        logger.error("[retry_export] Update failed", export_id=export_id, error=str(exc))
+        raise HTTPException(status_code=503, detail="Export retry is unavailable") from exc
+    if not result or not result.data:
+        raise HTTPException(status_code=409, detail="Export changed before retry was applied")
+    return result.data[0]
 
 
 async def get_export_artifact(export_id: str, user_id: str) -> dict[str, Any] | None:

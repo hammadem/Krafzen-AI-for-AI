@@ -11,7 +11,7 @@ export default function Layout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, loading } = useAuth();
+  const { user, loading, accessError, refreshSubscription } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -31,6 +31,10 @@ export default function Layout({
 
   if (!user) {
     return null; // Or a loading spinner while redirecting
+  }
+
+  if (accessError) {
+    return <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-black px-6 text-white text-center"><h1 className="text-xl font-semibold">Account verification unavailable</h1><p role="alert">{accessError}</p><button className="underline" onClick={() => void refreshSubscription()}>Retry verification</button><Link href="/logincred" className="underline">Sign in again</Link></div>;
   }
 
   // Paid workspace restriction is mirrored by the API's server-side gate.

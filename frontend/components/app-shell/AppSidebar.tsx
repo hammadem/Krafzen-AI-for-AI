@@ -2,16 +2,16 @@
 
 // Shared left rail for the workspace app shell (CEO redesign, PR #1).
 // Visual reference: krafzen-product/style-guide.html + projects.html.
-// Real routes are active nav; CAD/BIM items are disabled "Soon" per Kiru's scope
-// (Imports / Reviews / Models / As-Built belong to the upcoming CAD/BIM track).
+// Real project-linked drawing previews and manual DXF redlines are active;
+// automated review intelligence remains a separate pending workstream.
 // No fake counts — data-driven badges come later when the backend exposes them.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
-    FolderKanban, Archive, Activity, FileDown, Users, Bell,
-    Upload, ClipboardCheck, Box, Ruler, Settings, Plus,
+    FolderKanban, Archive, Activity, FileDown, Users, Bell, CreditCard, ClipboardList,
+    Upload, ClipboardCheck, Box, Ruler, DraftingCompass, Settings, Plus, Globe,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -21,20 +21,23 @@ const MAIN: NavItem[] = [
     { label: "Projects", href: "/workspace/projects", icon: FolderKanban },
     { label: "Archive", href: "/workspace/archive", icon: Archive },
     { label: "Activity", href: "/workspace/activity", icon: Activity },
+    { label: "Field", href: "/workspace/field", icon: ClipboardList },
     { label: "Exports", href: "/workspace/exports", icon: FileDown },
     { label: "Members", href: "/workspace/members", icon: Users },
     { label: "Notifications", href: "/workspace/notifications", icon: Bell },
-    // Billing hidden until the Stripe integration ships (CEO request, 2026-08) — the page
-    // isn't functional yet (billing history / payment methods / upgrade flow). To restore:
-    // re-add the `CreditCard` import and { label: "Billing", href: "/workspace/billings", icon: CreditCard }.
+    { label: "Billing", href: "/workspace/billings", icon: CreditCard },
+    { label: "AI & Knowledge", href: "/workspace/ai-knowledge", icon: Box },
+    { label: "USA Data Residency", href: "/workspace/residency", icon: Globe },
 ];
 
-// Upcoming CAD/BIM track — visible but disabled until backend contracts exist.
+// Reviews support manual markups; IFC Models support inspected metadata, not 3D.
 const CAD_BIM: NavItem[] = [
-    { label: "Imports", href: "#", icon: Upload, soon: true },
-    { label: "Reviews", href: "#", icon: ClipboardCheck, soon: true },
-    { label: "Models", href: "#", icon: Box, soon: true },
-    { label: "As-Built", href: "#", icon: Ruler, soon: true },
+    { label: "CAD Room", href: "/workspace/cad", icon: DraftingCompass },
+    { label: "Imports", href: "/workspace/imports", icon: Upload },
+    { label: "Reviews", href: "/workspace/reviews", icon: ClipboardCheck },
+    { label: "Models", href: "/workspace/models", icon: Box },
+    { label: "As-Built", href: "/workspace/as-built", icon: Ruler },
+    { label: "Compliance", href: "/workspace/compliance", icon: ClipboardCheck },
 ];
 
 function NavRow({ item, active, onNavigate }: { item: NavItem; active: boolean; onNavigate?: () => void }) {
@@ -125,7 +128,7 @@ export default function AppSidebar({ mobile = false, onNavigate }: { mobile?: bo
                 <GroupLabel>CAD / BIM</GroupLabel>
                 <div className="flex flex-col gap-0.5">
                     {CAD_BIM.map((item) => (
-                        <NavRow key={item.label} item={item} active={false} />
+                        <NavRow key={item.label} item={item} active={isActive(item.href)} onNavigate={onNavigate} />
                     ))}
                 </div>
             </nav>

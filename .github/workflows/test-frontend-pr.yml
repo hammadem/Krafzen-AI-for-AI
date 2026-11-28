@@ -34,3 +34,12 @@ jobs:
       - name: Test
         working-directory: frontend
         run: npm run test -- --run
+      - name: Build frontend without deployment
+        working-directory: frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          # Compile-only placeholders. No real Supabase project or secrets used.
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-public-placeholder-not-a-real-key
+          NEXT_PUBLIC_API_URL: https://ci-placeholder.invalid
+        run: npm run build

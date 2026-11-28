@@ -32,11 +32,13 @@ function labelFor(m: WorkspaceMember): string {
 export default function MembersList({
     members,
     currentUserId,
+    canManage = true,
     onRoleChange,
     onRemove,
 }: {
     members: WorkspaceMember[];
     currentUserId?: string;
+    canManage?: boolean;
     onRoleChange: (userId: string, role: string) => void;
     onRemove: (userId: string) => void;
 }) {
@@ -45,7 +47,7 @@ export default function MembersList({
             {members.map((m) => {
                 const isSelf = m.user_id === currentUserId;
                 const isOwner = m.role?.toLowerCase() === "owner";
-                const locked = isSelf || isOwner; // protect self + owner
+                const locked = !canManage || isSelf || isOwner; // protect self + owner
                 const name = labelFor(m);
 
                 return (

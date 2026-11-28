@@ -14,13 +14,15 @@ class ChatHistoryService:
     Service to manage persistent chat history in Supabase.
     """
 
-    async def create_session(self, user_id: str, title: str = "New Chat") -> str:
+    async def create_session(self, user_id: str, title: str = "New Chat", project_id: str | None = None) -> str:
         """Creates a new chat session and returns its ID."""
         try:
             data = {
                 "user_id": user_id,
                 "title": title,
             }
+            if project_id:
+                data["project_id"] = project_id
             response = db.table("chat_sessions").insert(data).execute()
             if response.data:
                 return response.data[0]["id"]
@@ -43,7 +45,9 @@ class ChatHistoryService:
         """
         try:
             # 1. If linked project already exists, return it.
-            existing = db.table("chat_sessions").select("project_id").eq("id", session_id).limit(1).execute()
+            existing = db.table("chat_sessions").select("project_id").eq("id", session_id).eq("user_id", user_id).limit(1).execute()
+            if not existing.data:
+                return None
             if existing.data and existing.data[0].get("project_id"):
                 project_id = existing.data[0]["project_id"]
                 update_payload: dict[str, Any] = {}
@@ -52,7 +56,7 @@ class ChatHistoryService:
                 if parsed_json is not None:
                     update_payload["parsed_json"] = parsed_json
                 if update_payload:
-                    db.table("projects").update(update_payload).eq("id", project_id).execute()
+                    db.table("projects").update(update_payload).eq("id", project_id).eq("user_id", user_id).execute()
                 return project_id
 
             # 2. No project yet — create one from the real user prompt.
@@ -71,7 +75,7 @@ class ChatHistoryService:
             project_id = project_response.data[0]["id"]
 
             # 3. Link it back to the session.
-            db.table("chat_sessions").update({"project_id": project_id}).eq("id", session_id).execute()
+            db.table("chat_sessions").update({"project_id": project_id}).eq("id", session_id).eq("user_id", user_id).execute()
             logger.info(f"[ensure_project_for_session] linked project {project_id} to session {session_id}")
             return project_id
         except (APIError, HTTPError, KeyError, TypeError, ValueError):
@@ -83,10 +87,12 @@ class ChatHistoryService:
         try:
             # Order by updated_at descending
             response = db.table("chat_sessions").select("*").eq("user_id", user_id).order("updated_at", desc=True).execute()
-            return response.data
-        except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
-            logger.error(f"Error fetching sessions: {e}")
-            return []
+            if response is None:
+                raise RuntimeError("Missing chat session response")
+            return response.data or []
+        except (APIError, HTTPError, KeyError, TypeError, ValueError, RuntimeError):
+            logger.exception("Error fetching sessions")
+            raise
 
     async def get_session_messages(
         self,
@@ -109,7 +115,7 @@ class ChatHistoryService:
                 cursor_timestamp = before
                 # If before is a UUID message ID, retrieve its created_at timestamp
                 if len(before) == 36 and "-" in before:
-                    cursor_row = db.table("chat_messages").select("created_at").eq("id", before).limit(1).execute()
+                    cursor_row = db.table("chat_messages").select("created_at").eq("id", before).eq("session_id", session_id).limit(1).execute()
                     if cursor_row.data:
                         cursor_timestamp = cursor_row.data[0]["created_at"]
                 query = query.lt("created_at", cursor_timestamp)
@@ -157,12 +163,7 @@ class ChatHistoryService:
             }
         except Exception as e:
             logger.exception("Error fetching messages")
-            return {
-                "messages": [],
-                "has_more": False,
-                "next_cursor": None,
-                "metrics": {"error": str(e)},
-            }
+            raise RuntimeError("Chat history unavailable") from e
 
 
     async def _get_feedback_for_message_ids(self, message_ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -286,7 +287,7 @@ class ChatHistoryService:
                 "updated_at": datetime.now().isoformat()
             }).eq("id", session_id).execute()
 
-            return response.data is not None
+            return bool(response.data)
         except Exception:
             logger.exception("Error updating session title")
             raise

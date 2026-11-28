@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 import re
 import threading
 import traceback
@@ -16,13 +17,18 @@ from app.core.config import settings
 from app.core.logging_config import init_sentry
 from app.routes import (
     activity_routes,
+    asbuilt_routes,
     architecture_routes,
+    bim_geometry_routes,
     branding_routes,
+    cad_generation_routes,
     chat_routes,
+    compliance_assessment_routes,
     dashboard_routes,
     export_routes,
     export_validation_routes,
     file_routes,
+    field_routes,
     invite_routes,
     job_routes,
     notification_routes,
@@ -30,8 +36,10 @@ from app.routes import (
     project_routes,
     region_routes,
     report_routes,
+    review_routes,
     user_routes,
     workspace_routes,
+    assignment_routes,
 )
 from app.middlewares.paid_access import require_paid_subscription
 from app.services.worker_service import _poll_export_jobs
@@ -46,9 +54,10 @@ def _bootstrap_oda_bundle() -> None:
         from app.services.dwg_converter_service import dwg_converter_service
         from app.services.oda_bundle import warm_dwg_runtime
 
-        warm_dwg_runtime()
+        if dwg_converter_service.converter_type == "ODA" and settings.DWG_ODA_USE_AUTHORIZED:
+            warm_dwg_runtime()
         if dwg_converter_service.is_configured():
-            logger.info("DWG: ODA converter ready after bundle bootstrap")
+            logger.info("DWG: selected converter executable available")
         else:
             logger.warning(
                 "DWG: converter not configured after bootstrap "
@@ -68,10 +77,17 @@ async def lifespan(app: FastAPI):
 
     # 2. Check Supabase JWT environment
     if not (getattr(settings, "SUPABASE_JWT_SECRET", None) or "").strip():
-        logger.warning(
-            "SUPABASE_JWT_SECRET is not set. Authenticated API calls will return 401. "
-            "Set SUPABASE_JWT_SECRET (and SUPABASE_PROJECT_ID) on Render to match your Supabase project."
-        )
+        if (getattr(settings, "SUPABASE_ANON_KEY", None) or "").strip():
+            logger.info(
+                "Legacy user tokens will be verified by Supabase Auth over HTTPS; "
+                "asymmetric sessions use the project's public JWKS."
+            )
+        else:
+            logger.warning(
+                "Supabase authentication has neither a legacy JWT secret nor "
+                "a public key for HTTPS Auth-server verification. Private API "
+                "access will fail closed."
+            )
     if not (getattr(settings, "SUPABASE_PROJECT_ID", None) or "").strip():
         logger.warning(
             "SUPABASE_PROJECT_ID is not set. JWT issuer check will fail; authenticated calls may return 401. "
@@ -90,18 +106,33 @@ async def lifespan(app: FastAPI):
         target=_bootstrap_oda_bundle, daemon=True, name="oda-bundle-bootstrap"
     ).start()
 
-    # 5. Start background export job poller
-    poll_task = asyncio.create_task(_poll_export_jobs())
-    logger.info("[startup] Export job poller registered")
+    # 5. Avoid repeatedly polling a database that has no connection credentials.
+    # Environment changes cause a fresh deployment and the worker starts then.
+    poll_task = None
+    # An HTTP API process must not start destructive background work simply
+    # because it has database credentials. Staging may share infrastructure
+    # with another environment; only dedicated, explicitly configured workers
+    # are permitted to dequeue exports.
+    worker_enabled = os.getenv("KRAFZEN_EXPORT_WORKER_ENABLED", "").strip().lower() in {
+        "1", "true", "yes"
+    }
+    if worker_enabled and settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY:
+        poll_task = asyncio.create_task(_poll_export_jobs())
+        logger.info("[startup] Export worker explicitly enabled")
+    elif worker_enabled:
+        logger.error("[startup] Export worker requested but Supabase credentials are missing")
+    else:
+        logger.info("[startup] Export worker disabled by default (safe API-only mode)")
 
     yield
 
     # Clean shutdown
-    poll_task.cancel()
-    try:
-        await poll_task
-    except asyncio.CancelledError:
-        logger.info("[shutdown] Export job poller cancelled successfully")
+    if poll_task is not None:
+        poll_task.cancel()
+        try:
+            await poll_task
+        except asyncio.CancelledError:
+            logger.info("[shutdown] Export job poller cancelled successfully")
 
 
 app = FastAPI(
@@ -140,15 +171,16 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
             response = Response()
             if is_allowed:
                 response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Vary"] = "Origin"
                 response.headers["Access-Control-Allow-Credentials"] = "true"
                 response.headers["Access-Control-Allow-Methods"] = (
                     "GET, POST, PUT, DELETE, OPTIONS, PATCH"
                 )
                 response.headers["Access-Control-Allow-Headers"] = (
-                    "Authorization, Content-Type, Idempotency-Key, If-Match, Accept"
+                    "Authorization, Content-Type, Idempotency-Key, If-Match, Accept, apikey"
                 )
                 response.headers["Access-Control-Expose-Headers"] = (
-                    "Idempotency-Key, ETag"
+                    "Idempotency-Key, ETag, Content-Disposition"
                 )
                 response.headers["Access-Control-Max-Age"] = "600"
             return response
@@ -164,15 +196,16 @@ class WildcardCORSMiddleware(BaseHTTPMiddleware):
 
         if is_allowed:
             response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = (
                 "GET, POST, PUT, DELETE, OPTIONS, PATCH"
             )
             response.headers["Access-Control-Allow-Headers"] = (
-                "Authorization, Content-Type, Idempotency-Key, If-Match, Accept"
+                "Authorization, Content-Type, Idempotency-Key, If-Match, Accept, apikey"
             )
             response.headers["Access-Control-Expose-Headers"] = (
-                "Idempotency-Key, ETag"
+                "Idempotency-Key, ETag, Content-Disposition"
             )
 
         return response
@@ -188,6 +221,12 @@ paid_access = [Depends(require_paid_subscription)]
 app.include_router(project_routes.router, prefix="/api/v1", tags=["Projects"], dependencies=paid_access)
 app.include_router(job_routes.router, prefix="/api/v1", tags=["Jobs"], dependencies=paid_access)
 app.include_router(file_routes.router, prefix="/api/v1", tags=["Files"], dependencies=paid_access)
+app.include_router(asbuilt_routes.router, prefix="/api/v1", tags=["As-Built"], dependencies=paid_access)
+app.include_router(cad_generation_routes.router, prefix="/api/v1", tags=["CAD Generation"], dependencies=paid_access)
+app.include_router(compliance_assessment_routes.router, prefix="/api/v1", tags=["Measured Compliance"], dependencies=paid_access)
+app.include_router(bim_geometry_routes.router, prefix="/api/v1", tags=["IFC 3D Geometry"], dependencies=paid_access)
+app.include_router(review_routes.router, prefix="/api/v1", tags=["Reviews and Redlines"], dependencies=paid_access)
+app.include_router(field_routes.router, prefix="/api/v1", tags=["Field Inspections"], dependencies=paid_access)
 app.include_router(chat_routes.router, prefix="/api/v1", tags=["Chat"], dependencies=paid_access)
 app.include_router(payment_routes.router, prefix="/api/v1", tags=["Payments"])
 app.include_router(user_routes.router, prefix="/api/v1", tags=["Users"])
@@ -196,6 +235,7 @@ app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(transcriber.router, prefix="/api/v1", tags=["Transcriber"], dependencies=paid_access)
 app.include_router(dashboard_routes.router, prefix="/api/v1", tags=["Dashboard"], dependencies=paid_access)
 app.include_router(workspace_routes.router, prefix="/api/v1", tags=["Workspaces"], dependencies=paid_access)
+app.include_router(assignment_routes.router, prefix="/api/v1", tags=["Project assignments"], dependencies=paid_access)
 app.include_router(activity_routes.router, prefix="/api/v1", tags=["Activity"], dependencies=paid_access)
 app.include_router(notification_routes.router, prefix="/api/v1", tags=["Notifications"], dependencies=paid_access)
 app.include_router(export_validation_routes.router, prefix="/api/v1", tags=["Export Validation"], dependencies=paid_access)

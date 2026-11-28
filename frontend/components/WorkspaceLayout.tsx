@@ -1,4 +1,6 @@
 "use client";
+import AecIntentPreview from "@/components/AecIntentPreview";
+import { downloadRasterImage } from "@/lib/downloadRasterImage";
 import React, { useState, useEffect, useRef } from 'react';
 import { useChat } from '@/context/ChatContext';
 import { useAuth } from '@/context/AuthContext';
@@ -133,6 +135,8 @@ export default function WorkspaceLayout() {
   const { user, logout, session } = useAuth();
   
   const [activeTab, setActiveTab] = useState('parameters');
+  const [designSearch, setDesignSearch] = useState('');
+  const filteredSessions = sessions.filter(s => s.title.toLowerCase().includes(designSearch.trim().toLowerCase()));
   const [isRecording, setIsRecording] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -217,39 +221,8 @@ export default function WorkspaceLayout() {
   }, [messages.length, currentSessionId]);
 
   const handleDownloadMessageImage = async (imageUrl: string) => {
-    try {
-        let blob: Blob;
-        try {
-            const response = await fetch(imageUrl);
-            if (response.ok) {
-                blob = await response.blob();
-            } else {
-                throw new Error("Direct fetch failed");
-            }
-        } catch (e) {
-            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Proxy fetch failed");
-            blob = await response.blob();
-        }
-
-        const blobUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `design-${new Date().getTime()}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-    } catch (error) {
-        console.error("Download failed:", error);
-        const link = document.createElement('a');
-        link.href = imageUrl;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
+      try { await downloadRasterImage(imageUrl); }
+      catch (error) { alert(error instanceof Error ? error.message : "Image download failed."); }
   };
 
   // Compliance & Generation toggles
@@ -560,7 +533,7 @@ export default function WorkspaceLayout() {
           </button>
           <div className="workspace-rail-search">
             <Search className="w-3.5 h-3.5" />
-            <input type="search" placeholder="Search designs…" aria-label="Search designs" />
+            <input type="search" placeholder="Search designs…" aria-label="Search designs" value={designSearch} onChange={e=>setDesignSearch(e.target.value)} />
           </div>
         </div>
 
@@ -570,11 +543,11 @@ export default function WorkspaceLayout() {
             const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const yesterdayStart = new Date(todayStart.getTime() - 86400000);
             const groups: { label: string; items: typeof sessions }[] = [
-              { label: 'Today', items: sessions.filter(s => new Date(s.updated_at) >= todayStart) },
-              { label: 'Yesterday', items: sessions.filter(s => { const d = new Date(s.updated_at); return d >= yesterdayStart && d < todayStart; }) },
-              { label: 'Earlier', items: sessions.filter(s => new Date(s.updated_at) < yesterdayStart) },
+              { label: 'Today', items: filteredSessions.filter(s => new Date(s.updated_at) >= todayStart) },
+              { label: 'Yesterday', items: filteredSessions.filter(s => { const d = new Date(s.updated_at); return d >= yesterdayStart && d < todayStart; }) },
+              { label: 'Earlier', items: filteredSessions.filter(s => new Date(s.updated_at) < yesterdayStart) },
             ].filter(g => g.items.length > 0);
-            if (groups.length === 0) groups.push({ label: 'Recent', items: sessions });
+            if (groups.length === 0) return <p className="px-3 text-xs text-gray-400">{designSearch ? 'No matching designs' : 'No saved designs'}</p>;
             return groups.map(group => (
               <React.Fragment key={group.label}>
                 <div className="workspace-rail-group-label">{group.label} <span className="count">{group.items.length}</span></div>
@@ -1058,7 +1031,7 @@ export default function WorkspaceLayout() {
                         </div>
                         <div className="flex-1 space-y-1">
                           <p>OBJECT: FLOOR_PLAN_V2</p>
-                          <p>BOUNDS: {projectMetadata.location || "12'x10'"}</p>
+                          <p>Source dimensions: not verified</p>
                           <p>ENTITIES: 24</p>
                           <p>LAYERS: WALLS, WINDOWS, DOORS, APPLIANCES</p>
                           <p className="mt-4 text-white/40">Fetching geometric primitives...</p>
@@ -1561,9 +1534,8 @@ export default function WorkspaceLayout() {
         </div>
 
         <div className="workspace-right-foot">
-          <div className="check-row"><span className="ok">All clearances pass {chatJurisdiction === 'US_IRC_BASELINE' ? 'IRC 2024' : 'Standard'}</span></div>
-          <div className="check-row"><span className="ok">ADA turning radius verified</span></div>
-          <div className="check-row"><span className="ok">Egress path under 75ft</span></div>
+          <div className="check-row">Compliance is not established by a generated drawing.</div>
+          <Link href="/workspace/compliance" className="text-xs underline">Open traceable project compliance assessments</Link>
         </div>
       </aside>
 
@@ -1589,13 +1561,14 @@ export default function WorkspaceLayout() {
             </SelectContent>
           </Select>
         </div>
+        <AecIntentPreview user={user} text={inputValue}/>
         <div className="workspace-prompt-shell">
           <textarea 
             ref={promptInputRef}
             className="workspace-prompt-input" 
             id="promptInput" 
             rows={1} 
-            placeholder="Iterate on this design... e.g. 'add a kitchen island 6 feet wide'" 
+            placeholder="Describe a design, or type /reference IFC walls to search references" 
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(selectedMsg?.imageUrl || undefined); } }}
@@ -1622,9 +1595,7 @@ export default function WorkspaceLayout() {
         </div>
       </form>
       
-      <div className="workspace-demo-state">
-        DEMO STATE: <span>populated</span>
-      </div>
+
 
       <ShareModal 
         isOpen={isShareModalOpen} 

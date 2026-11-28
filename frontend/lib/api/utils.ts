@@ -1,5 +1,6 @@
-// modifying code creating requests
-import { apiCache, getCache } from "./cache";
+// Authenticated API data must never be shared through a URL-only cache.
+// User-switches, role changes, paid entitlements and file permissions require
+// fresh server authorization on every request.
 
 /** Prefer NEXT_PUBLIC_API_URL; otherwise infer from hostname so production never calls staging API. */
 export function getApiBaseUrl(): string {
@@ -9,7 +10,9 @@ export function getApiBaseUrl(): string {
     const h = window.location.hostname;
     if (h === "krafzen.com" || h === "www.krafzen.com") return "https://backend.krafzen.com";
     if (h === "staging.krafzen.com" || h === "www.staging.krafzen.com") return "https://backend.staging.krafzen.com";
-    return "http://localhost:8000";
+    if (h === "krafzen-integration-ui.onrender.com") return "https://krafzen-integration-staging.onrender.com";
+    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]") return "http://localhost:8000";
+    throw new Error("API URL is not configured for this deployment.");
 }
 
 export async function apiClient(
@@ -27,11 +30,9 @@ export async function apiClient(
         }
     };
 
-    const cacheKey = `${method}:${url}`;
-    const cached = getCache(cacheKey);
-    if (cached !== undefined) return cached; // TypeScript now knows cached is ApiRes
-
-    // const timeout = setTimeout(() => controller.abort(), 20000);
+    // Intentionally no global authenticated-response cache: its previous key
+    // (method + URL) leaked data between users in the same browser session.
+    // Reintroduce caching only with audited principal-scoped invalidation.
 
     const headers: Record<string, string> = {
         ...(!(body instanceof FormData) && { "Content-Type": contentType }),
@@ -39,9 +40,8 @@ export async function apiClient(
         "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     };
 
-    const baseUrl = getApiBaseUrl();
-
     try {
+        const baseUrl = getApiBaseUrl();
         const response = await fetch(`${baseUrl}${url}`, {
             method,
             headers,
@@ -51,24 +51,39 @@ export async function apiClient(
                     body: body instanceof FormData ? body : JSON.stringify(body)
                 }
                 : {}),
-            ...(controller ? { signal: controller.signal } : {}),
+            cache: "no-store",
+            ...(controller ? { signal: controller.signal } : {signal: AbortSignal.timeout(120000)}),
         });
 
-        const data = await response.json();
+        let data;
+        try { data = await response.json(); }
+        catch { return {ok:false,data:null,error:{type:"APIERROR",message:"The service returned an invalid response ("+response.status+")."}}; }
 
         let result: ApiRes;
         if (response.ok) {
             result = { ok: response.ok, data, error: data?.message }
-            if (method === "GET") apiCache.set(cacheKey, result);
+            // No global API response caching for private data.
         } else {
             // FastAPI returns 401/4xx with { detail: string | { error: string } }
             const detail = data?.detail;
             const serverMessage =
-                typeof detail === "string"
+                typeof detail === "string" && detail.trim()
                     ? detail
-                    : detail && typeof detail === "object" && "error" in detail
-                        ? (detail as { error?: string }).error
-                        : data?.message;
+                    : Array.isArray(detail)
+                        ? detail.map((issue: unknown) => {
+                            if (!issue || typeof issue !== "object") return "";
+                            const { loc, msg } = issue as { loc?: unknown; msg?: unknown };
+                            if (typeof msg !== "string") return "";
+                            const field = Array.isArray(loc)
+                                ? loc.filter((part) => typeof part === "string" || typeof part === "number").slice(1).join(".")
+                                : "";
+                            return field ? field + ": " + msg : msg;
+                        }).filter(Boolean).join("; ") || "Please check the submitted fields."
+                        : detail && typeof detail === "object" && typeof detail.error === "string"
+                            ? detail.error
+                            : detail && typeof detail === "object" && typeof detail.message === "string"
+                                ? detail.message
+                                : typeof data?.message === "string" ? data.message : undefined;
 
             // SU5 — centralized error handling. Normalize auth/forbidden failures
             // in one place so pages get a consistent AppError + the right UX.

@@ -1,7 +1,7 @@
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 from app.db.queries.file_queries import (
@@ -18,6 +18,8 @@ from app.db.queries.file_queries import (
 )
 from app.middlewares.auth import require_auth
 from app.models.file_model import FileCreate, FileResponse, FileUpdate
+from app.services.import_service import import_document_for_job, import_dwg_for_job, import_dxf_for_job, import_ifc_for_job, import_revit_bridge_for_job
+from app.services.notification_service import create_notification
 
 router = APIRouter(prefix="/files", tags=["Files"])
 
@@ -31,10 +33,97 @@ async def create_file_route(
     file: FileCreate,
     user=Depends(require_auth)  # enforce authentication
 ):
-    result = await create_file(file.model_dump(), user)
-    if not result or result.get("error"):
-        raise HTTPException(status_code=400, detail={"error": result.get("error", "File creation failed") if result else "File creation failed"})
-    return result
+    # Never register arbitrary customer-supplied bucket/path metadata.
+    # A service-role storage client could otherwise sign another tenant's file.
+    raise HTTPException(
+        status_code=403,
+        detail="Direct file metadata registration is disabled. Use /files/import-dxf.",
+    )
+
+
+@router.post("/import-dxf", response_model=FileResponse, status_code=201)
+async def import_dxf_route(
+    job_id: str = Form(...),
+    upload: UploadFile = File(...),
+    user=Depends(require_auth),
+):
+    """Accept a DXF into a verified project/job after mandatory scanning."""
+    try:
+        record = await import_dxf_for_job(job_id=job_id, upload=upload, user=user)
+        await create_notification(
+            user_id=user["user_id"], notification_type="import_completed",
+            message="Imported and validated " + record["name"],
+            project_id=record["project_id"], metadata={"file_id": record["id"]},
+        )
+        return record
+    finally:
+        await upload.close()
+
+
+@router.post("/import-dwg", response_model=FileResponse, status_code=201)
+async def import_dwg_route(job_id: str = Form(...), upload: UploadFile = File(...), user=Depends(require_auth)):
+    try:
+        record = await import_dwg_for_job(job_id=job_id, upload=upload, user=user)
+        await create_notification(user_id=user["user_id"], notification_type="import_completed",
+            message="DWG converted and validated as DXF: " + record["name"],
+            project_id=record["project_id"], metadata={"file_id":record["id"]})
+        return record
+    finally:
+        await upload.close()
+
+
+@router.post("/import-ifc", response_model=FileResponse, status_code=201)
+async def import_ifc_route(
+    job_id: str = Form(...),
+    upload: UploadFile = File(...),
+    user=Depends(require_auth),
+):
+    """Import scanned and parsed IFC models with stored BIM metadata."""
+    try:
+        record = await import_ifc_for_job(job_id=job_id, upload=upload, user=user)
+        await create_notification(
+            user_id=user["user_id"], notification_type="import_completed",
+            message="Imported and validated " + record["name"],
+            project_id=record["project_id"], metadata={"file_id": record["id"]},
+        )
+        return record
+    finally:
+        await upload.close()
+
+
+@router.post("/import-revit-bridge", response_model=FileResponse, status_code=201)
+async def import_revit_bridge_route(job_id: str = Form(...), source: UploadFile = File(...),
+    upload: UploadFile = File(...), confirmed: bool = Form(...), user=Depends(require_auth)):
+    try:
+        if not confirmed:
+            raise HTTPException(status_code=422, detail="Confirm the RVT and IFC source relationship")
+        record = await import_revit_bridge_for_job(job_id=job_id,source=source,upload=upload,user=user)
+        await create_notification(user_id=user["user_id"],notification_type="import_completed",
+            message="Revit-exported IFC imported: "+record["name"],project_id=record["project_id"],
+            metadata={"file_id":record["id"]})
+        return record
+    finally:
+        await source.close()
+        await upload.close()
+
+
+@router.post("/import-document", response_model=FileResponse, status_code=201)
+async def import_document_route(
+    job_id: str = Form(...),
+    upload: UploadFile = File(...),
+    user=Depends(require_auth),
+):
+    """Import an authenticated, scanned and parsed project document."""
+    try:
+        record = await import_document_for_job(job_id=job_id, upload=upload, user=user)
+        await create_notification(
+            user_id=user["user_id"], notification_type="import_completed",
+            message="Imported and validated " + record["name"],
+            project_id=record["project_id"], metadata={"file_id": record["id"]},
+        )
+        return record
+    finally:
+        await upload.close()
 
 
 @router.get("/", response_model=list[FileResponse])
@@ -44,6 +133,26 @@ async def list_files(
 ):
     files = await get_files(job_id, user)
     return files
+
+
+@router.get("/capabilities")
+async def import_runtime_capabilities(user=Depends(require_auth)):
+    """Actual runtime checks; no claim that customer files have been processed."""
+    import shutil
+    from fastapi.concurrency import run_in_threadpool
+    from app.services.scanner_readiness import scanner_status
+    from app.services.dwg_converter_service import dwg_converter_service
+    scanner=await run_in_threadpool(scanner_status)
+    return {
+        "scanner_prerequisites_detected":bool(scanner.get("scanner_binary_detected") and scanner.get("scanner_signature_metadata_current")),
+        "private_scanner_self_test_verified":bool(scanner.get("private_scanner_verified")),
+        "dwg_engine":dwg_converter_service.converter_type,
+        "dwg_runtime_available":dwg_converter_service.is_configured(),
+        "ocr_engine_detected":bool(shutil.which("tesseract")),
+        "revit_native_conversion_available":False,
+        "revit_ifc_bridge_implemented":True,
+        "customer_upload_verified":False,
+    }
 
 
 @router.get("/{file_id}", response_model=FileResponse)
@@ -123,6 +232,27 @@ async def mark_revision_reviewed_route(
     if not revision:
         raise HTTPException(status_code=404, detail={"error": "Revision not found"})
     return revision
+
+
+@router.get("/{file_id}/bim-summary")
+async def get_ifc_model_summary(
+    file_id: str,
+    user=Depends(require_auth),
+):
+    """Read only verified IFC summary saved at import, after ownership checks."""
+    record = await get_file(file_id, user)
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
+    if str(record.get("file_type") or "").lower() != "ifc":
+        raise HTTPException(status_code=415, detail="This file is not an IFC model")
+    summary = record.get("import_metadata")
+    if not isinstance(summary, dict) or summary.get("type") != "ifc":
+        raise HTTPException(
+            status_code=409,
+            detail="This IFC file has no verified parsed metadata",
+        )
+    # Do not return storage URL, bucket, raw object bytes or user-controlled paths.
+    return {"file_id": record["id"], "project_id": record["project_id"], "model": summary}
 
 
 @router.get("/{file_id}/signed-url")

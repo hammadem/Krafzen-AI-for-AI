@@ -2,6 +2,7 @@ import asyncio
 import base64
 import logging
 import os
+import re
 import subprocess
 import uuid
 from io import BytesIO
@@ -10,6 +11,29 @@ import httpx
 from PIL import Image, ImageOps, ImageStat
 
 logger = logging.getLogger(__name__)
+
+_IMAGE_HEADER = re.compile(r"^data:image/(png|jpeg|webp);base64,", re.IGNORECASE)
+_MAX_IMAGE_BYTES = 16 * 1024 * 1024
+
+
+def validate_image_source(image_url: str) -> bytes:
+    """Accept bounded inline raster images only; never fetch untrusted URLs."""
+    if not isinstance(image_url, str):
+        raise ValueError("Image must be an inline PNG, JPEG or WebP data URI")
+    match = _IMAGE_HEADER.match(image_url)
+    if not match:
+        raise ValueError("Only inline PNG, JPEG or WebP data URIs are supported")
+    encoded = image_url[match.end():]
+    if not encoded or len(encoded) > (_MAX_IMAGE_BYTES + 2) // 3 * 4:
+        raise ValueError("Image data is missing or exceeds the size limit")
+    try:
+        decoded = base64.b64decode(encoded, validate=True)
+    except (ValueError, base64.binascii.Error) as exc:
+        raise ValueError("Invalid image base64 encoding") from exc
+    if not decoded or len(decoded) > _MAX_IMAGE_BYTES:
+        raise ValueError("Image data exceeds the size limit")
+    return decoded
+
 
 # Raster tracing targets (Gemini floor plans are often ~1–2k px; thin strokes need more pixels for Potrace.)
 _TRACE_LONG_SIDE_MIN_PX = 2560
@@ -232,20 +256,13 @@ class LocalDxfService:
                     logger.warning("Failed to remove temporary BMP %s: %s", bmp_path, exc)
 
     async def _get_image_data(self, image_url: str) -> Image.Image:
-        if image_url.startswith("data:"):
-            # Format: "data:image/png;base64,..."
-            try:
-                _header, encoded = image_url.split(",", 1)
-                file_bytes = base64.b64decode(encoded)
-                return Image.open(BytesIO(file_bytes))
-            except Exception as e:
-                raise ValueError(f"Invalid Base64 image data: {e}") from e
-        else:
-            # Download from converted URL
-            async with httpx.AsyncClient() as client:
-                response = await client.get(image_url)
-                response.raise_for_status()
-                return Image.open(BytesIO(response.content))
+        file_bytes = validate_image_source(image_url)
+        try:
+            image = Image.open(BytesIO(file_bytes))
+            image.load()
+        except (OSError, ValueError) as exc:
+            raise ValueError("Image data is not a readable raster image") from exc
+        return image
 
     def _save_as_bmp(self, image: Image.Image) -> str:
         # Potrace needs a BMP bitmap (black linework on white). PNG previews often look sharper than DXF

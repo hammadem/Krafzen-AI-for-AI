@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.export_contracts import ExportStatus
 
@@ -16,16 +17,14 @@ class JobBase(BaseModel):
 
 
 class JobCreate(JobBase):
-    pass
+    """The client can enqueue a job, not forge a completed/failed job."""
+    status: Literal[ExportStatus.QUEUED] = ExportStatus.QUEUED
 
 
 class JobUpdate(BaseModel):
-    status: ExportStatus | None = Field(
-        None,
-        description="Contract-aligned status only — see /api/v1/contracts/export-lifecycle"
-    )
+    """Customers may correct transcript text, but not lifecycle or worker errors."""
+    model_config = ConfigDict(extra="forbid")
     transcript: str | None = None
-    error_message: str | None = None
 
 
 class JobInDB(JobBase):

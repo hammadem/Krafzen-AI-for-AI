@@ -89,3 +89,11 @@ def test_stairs_rise_fail():
     )
     r = validate_us_irc_baseline(layout, raw_for_response=False)
     assert any(v.rule_id == "stair_max_rise" for v in r.violations)
+
+
+def test_unadopted_irc_chat_scoring_is_disabled_in_default_settings():
+    # A local evaluative prototype must not silently become a legal or
+    # engineering "compliant/not-compliant" claim for customer chat.
+    from app.core.config import Settings
+
+    assert Settings.model_fields["COMPLIANCE_US_IRC_ENABLED"].default is False

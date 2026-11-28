@@ -43,8 +43,9 @@ def _issue(
         message=message,
         element_ref=element_ref,
         suggested_fix=suggested_fix,
-        jurisdiction="US_IRC_BASELINE",
-        rule_version="us_irc_baseline@1",
+        # Technical export checks are not building-code determinations.
+        jurisdiction=None,
+        rule_version=None,
     )
 
 
@@ -194,12 +195,15 @@ async def run_postflight(export_context: dict[str, Any]) -> PostflightReport:
 
     metadata = export_context.get("metadata") or {}
     stage = metadata.get("stage")
-    if stage and stage != PipelineStage.ARTIFACT_STORAGE.value:
+    if stage != PipelineStage.ARTIFACT_STORAGE.value:
         issues.append(
             _issue(
                 "EXPORT_INCOMPLETE_PIPELINE",
-                f"Pipeline stopped at stage '{stage}' before artifact_storage.",
-                severity=ValidationSeverity.WARNING,
+                (
+                    "Export has not reached verified artifact_storage stage "
+                    f"(current stage: '{stage or 'missing'}')."
+                ),
+                severity=ValidationSeverity.ERROR,
             )
         )
 

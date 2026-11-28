@@ -22,10 +22,9 @@ from fastapi import (
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.config import settings
-from app.db.queries.project_queries import update_project
+from app.db.queries.project_queries import get_project, update_generated_project_assets
 from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
-from app.models.project_model import ProjectUpdate
 from app.schemas.parser import (
     CADFileType,
     ParsingRequest,
@@ -273,6 +272,17 @@ async def generate_and_store_dxf(
     user: dict = Depends(require_auth),
 ):
     """Generate DXF/DWG from text and optionally store on project."""
+    # Verify the project belongs to the caller before sending source text to
+    # external AI providers, processing CAD or uploading a generated artifact.
+    owned_project = None
+    if project_id:
+        owned_project = await get_project(project_id, user)
+        if not owned_project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        if owned_project.get("archived_at"):
+            raise HTTPException(status_code=409, detail="Restore archived project before CAD generation")
+        if owned_project.get("workspace_id"):
+            raise HTTPException(status_code=503, detail="Enterprise CAD generation requires verified regional processing")
     if not cadllm_service:
         raise HTTPException(status_code=503, detail="CADLLM service unavailable.")
     if not gemini_service:
@@ -334,7 +344,9 @@ async def generate_and_store_dxf(
             if not user_id:
                 raise HTTPException(status_code=401, detail="User ID not found")
 
-            org_id = await _resolve_project_org_id(project_id)
+            # Personal-project storage only until region-isolated enterprise
+            # processing is certified. No privileged project-region lookup.
+            org_id = None
 
             # Pass organization_id to target regional bucket
             dxf_url = await storage_service.upload_cad_file(
@@ -354,18 +366,15 @@ async def generate_and_store_dxf(
                     organization_id=org_id,
                 )
 
-            update_payload = ProjectUpdate(
-                image_url=image_public_url,
-                dxf_url=dxf_url,
-                dwg_url=dwg_url,
-            )
             if dxf_url or dwg_url or image_public_url:
-                await update_project(
+                await update_generated_project_assets(
                     project_id=project_id,
-                    update_data=update_payload,
                     user=user,
+                    image_url=image_public_url,
+                    dxf_url=dxf_url,
+                    dwg_url=dwg_url,
                 )
-                logger.info("✅ CAD files stored and project updated: %s", project_id)
+                logger.info("CAD artifacts persisted to owned project: %s", project_id)
 
         return {
             "status": "success",
@@ -417,8 +426,13 @@ async def download_project_dxf(
         if not user_id:
             raise HTTPException(status_code=401, detail="User ID not found")
 
+        owned_project = await get_project(project_id, user)
+        if not owned_project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        if owned_project.get("workspace_id"):
+            raise HTTPException(status_code=503, detail="Enterprise CAD download requires verified regional processing")
         ext = "dwg" if file_type == CADFileType.DWG else "dxf"
-        org_id = await _resolve_project_org_id(project_id)
+        org_id = None
 
         file_bytes = await storage_service.download_cad_file(
             project_id=project_id,

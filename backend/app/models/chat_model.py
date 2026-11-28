@@ -1,10 +1,18 @@
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+from uuid import UUID
 
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=20000)
+
+    @field_validator("message")
+    @classmethod
+    def nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Message cannot be blank")
+        return value
     session_id: str | None = None
     # maintained for backward compatibility but ignored if session_id is used for persistence
     history: list[dict[str, Any]] = []
@@ -34,10 +42,11 @@ class DesignFileRequest(BaseModel):
     prompt: str | None = None
 
 class CreateSessionRequest(BaseModel):
-    title: str | None = "New Chat"
+    title: str | None = Field(default="New Chat", max_length=200)
+    project_id: UUID | None = None
 
 class UpdateSessionTitleRequest(BaseModel):
-    title: str
+    title: str = Field(min_length=1, max_length=200)
 
 class MessageFeedbackRequest(BaseModel):
     reaction: str  # 'up' | 'down'

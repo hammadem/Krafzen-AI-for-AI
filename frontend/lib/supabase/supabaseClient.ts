@@ -15,6 +15,9 @@ export function createClient() {
         signOut: async () => ({ error: null }),
         signInWithPassword: async () => ({ data: { user: null, session: null }, error: new Error("Supabase keys missing") }),
         signUp: async () => ({ data: { user: null, session: null }, error: new Error("Supabase keys missing") }),
+        resend: async () => ({ data: null, error: new Error("Supabase keys missing") }),
+        resetPasswordForEmail: async () => ({ data: null, error: new Error("Supabase keys missing") }),
+        updateUser: async () => ({ data: null, error: new Error("Supabase keys missing") }),
         signInWithOAuth: async () => ({ data: { provider: "", url: "" }, error: new Error("Supabase keys missing") }),
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

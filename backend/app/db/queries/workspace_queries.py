@@ -11,6 +11,39 @@ from app.utils.logger import logger
 from app.utils.validators import _valid_uuid
 
 
+async def list_accessible_workspaces(user_id: str) -> list[dict[str, Any]]:
+    """List only owned and joined organizations using server-side identity."""
+    try:
+        owned = await run_in_threadpool(lambda: db.table("workspaces").select("*").eq("owner_id", user_id).order("created_at").limit(1000).execute())
+        memberships = await run_in_threadpool(lambda: db.table("workspace_members").select("workspace_id").eq("user_id", user_id).limit(1000).execute())
+        if owned is None or memberships is None:
+            raise RuntimeError("Workspace query returned no response")
+        rows = {row["id"]: row for row in (owned.data or [])}
+        ids = list({row["workspace_id"] for row in (memberships.data or [])} - rows.keys())
+        for offset in range(0, len(ids), 100):
+            joined = await run_in_threadpool(lambda: db.table("workspaces").select("*").in_("id", ids[offset:offset+100]).execute())
+            if joined is None:
+                raise RuntimeError("Joined workspace query returned no response")
+            rows.update({row["id"]: row for row in (joined.data or [])})
+        return sorted(rows.values(), key=lambda row: (row["owner_id"] != user_id, row.get("created_at") or "", row["id"]))
+    except (APIError, HTTPError, KeyError, TypeError, ValueError, RuntimeError) as exc:
+        logger.exception("Workspace catalog unavailable")
+        raise HTTPException(status_code=503, detail="Workspace catalog unavailable") from exc
+
+
+async def create_workspace(name: str, user_id: str) -> dict[str, Any]:
+    """Create an actual workspace; the authenticated actor is its owner."""
+    try:
+        response = await run_in_threadpool(lambda: db.table("workspaces").insert({"name": name, "owner_id": user_id}).execute())
+        if response is None or not response.data:
+            raise RuntimeError("Workspace creation returned no row")
+        row = response.data[0]
+    except (APIError, HTTPError, KeyError, TypeError, ValueError, RuntimeError) as exc:
+        logger.exception("Workspace creation unavailable")
+        raise HTTPException(status_code=503, detail="Workspace creation unavailable") from exc
+    return row
+
+
 #GET WORKSPACE
 async def get_workspace(workspace_id:str, user_id: str) -> dict[str, Any] | None:
     if not _valid_uuid(workspace_id):
@@ -58,6 +91,8 @@ async def get_my_workspace(user_id: str) -> dict[str, Any] | None:
             lambda: db.table("workspaces")
                 .select("*")
                 .eq("owner_id", user_id)
+                .order("created_at")
+                .limit(1)
                 .maybe_single()
                 .execute()
         )
@@ -70,6 +105,8 @@ async def get_my_workspace(user_id: str) -> dict[str, Any] | None:
             lambda: db.table("workspace_members")
                 .select("workspace_id")
                 .eq("user_id", user_id)
+                .order("joined_at")
+                .limit(1)
                 .maybe_single()
                 .execute()
         )
@@ -111,6 +148,8 @@ async def  get_workspace_members(workspace_id: str,user_id: str,page: int = 1,pa
             lambda: db.table("workspace_members")
                 .select("*", count="exact")
                 .eq("workspace_id", workspace_id)
+                .order("joined_at")
+                .order("id")
                 .range(offset, offset + page_size - 1)
                 .execute()
         )
@@ -158,6 +197,8 @@ async def update_role_member(workspace_id: str, target_user_id: str, new_role: s
 
         if workspace["owner_id"] != user_id:
             raise HTTPException(status_code=403, detail={"error": "Only owner can update roles"})
+        if target_user_id == workspace["owner_id"]:
+            raise HTTPException(status_code=400, detail={"error": "Owner role cannot be changed"})
 
         member_res = await run_in_threadpool(
             lambda: db.table("workspace_members")
@@ -179,11 +220,12 @@ async def update_role_member(workspace_id: str, target_user_id: str, new_role: s
                 .update({"role": new_role})
                 .eq("workspace_id", workspace_id)
                 .eq("user_id", target_user_id)
+                .eq("role", previous_role)
                 .execute()
         )
 
         if not res or not res.data:
-            raise HTTPException(status_code=404, detail={"error": "Member not found"})
+            raise HTTPException(status_code=409, detail={"error": "Member changed; reload and try again"})
 
         metadata = {
             "target_user_id": target_user_id,

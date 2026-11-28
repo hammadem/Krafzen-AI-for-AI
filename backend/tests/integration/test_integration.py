@@ -69,7 +69,9 @@ def test_file_create_contract():
         "size_bytes": 100,
         "created_at": "2026-07-05T00:00:00Z",
     }
-    with patch("app.routes.file_routes.create_file", AsyncMock(return_value=file_record)):
+    # The browser cannot register arbitrary paths using a privileged storage
+    # signer. Files must be uploaded and scanned through /files/import-dxf.
+    with patch("app.routes.file_routes.create_file", AsyncMock(return_value=file_record)) as create:
         response = client.post(
             "/api/v1/files/",
             json={
@@ -80,8 +82,8 @@ def test_file_create_contract():
             },
         )
 
-    assert response.status_code == 201
-    assert response.json()["path"] == file_record["path"]
+    assert response.status_code == 403
+    create.assert_not_awaited()
 
 
 def test_invalid_job_status_is_rejected():

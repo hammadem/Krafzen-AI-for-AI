@@ -48,12 +48,18 @@ export async function sendChatMessage(
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const body: Record<string, unknown> = { message, history };
-    if (sessionId) body.session_id = sessionId;
-    if (jurisdiction === "US_IRC_BASELINE") body.jurisdiction = "US_IRC_BASELINE";
-    if (previousImageUrl) body.previous_image_url = previousImageUrl;
+    const reference = /^\/reference(?:\s|$)/i.test(message.trim());
+    if (reference && !sessionId) throw new Error("Open a saved design session first.");
+    const body: Record<string, unknown> = reference
+        ? {session_id:sessionId, question:message.trim().replace(/^\/reference\s*/i,"")}
+        : { message, history };
+    if (!reference) {
+        if (sessionId) body.session_id = sessionId;
+        if (jurisdiction === "US_IRC_BASELINE") body.jurisdiction = "US_IRC_BASELINE";
+        if (previousImageUrl) body.previous_image_url = previousImageUrl;
+    }
 
-    const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/generate`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/chat/${reference ? "reference" : "generate"}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
@@ -75,7 +81,7 @@ export async function sendChatMessage(
     return response.json();
 }
 
-export async function createChatSession(title: string = "New Chat", token: string) {
+export async function createChatSession(title: string = "New Chat", token: string, projectId?: string) {
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
@@ -83,9 +89,9 @@ export async function createChatSession(title: string = "New Chat", token: strin
     const res = await fetch(`${getApiBaseUrl()}/api/v1/chat/session`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ title })
+        body: JSON.stringify({ title, ...(projectId ? {project_id: projectId} : {}) })
     });
-    if (!res.ok) throw new Error("Failed to create session");
+    if (!res.ok) throw new Error("Could not open design session (" + res.status + ").");
     return res.json();
 }
 
@@ -94,13 +100,6 @@ export async function fetchChatHistory(token: string): Promise<Array<{ id: strin
     const url = `${getApiBaseUrl()}/api/v1/chat/history`;
     const res = await fetch(url, { headers });
     if (!res.ok) {
-        // 401: token invalid/expired or backend auth mismatch — return empty so chat still works with a new session
-        if (res.status === 401) {
-            if (typeof window !== "undefined") {
-                console.warn("Chat history: unauthorized (401). Using empty history. Check backend Supabase JWT config if this persists.");
-            }
-            return [];
-        }
         let detail = `Failed to fetch history (${res.status})`;
         try {
             const body = await res.json();
@@ -118,7 +117,8 @@ export async function fetchChatHistory(token: string): Promise<Array<{ id: strin
         throw new Error(detail);
     }
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    if (!Array.isArray(data)) throw new Error("Invalid chat history response");
+    return data;
 }
 
 export interface SessionMessageFromApi {

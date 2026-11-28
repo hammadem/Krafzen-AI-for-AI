@@ -35,7 +35,9 @@ def require_permission(required_perm: EnterprisePermission) -> Callable:
 
         # Fast path: use cached tenant & role verification if within 60s TTL
         cached = _PERM_CACHE.get(cache_key)
-        if cached and cached[1] > now:
+        # Residency operations are sensitive: recheck membership and plan live.
+        residency_permission = required_perm in (EnterprisePermission.RESIDENCY_READ, EnterprisePermission.RESIDENCY_MANAGE)
+        if cached and cached[1] > now and not residency_permission:
             user_role = cached[0]
         else:
             client = supabase_service.client or db
@@ -61,8 +63,8 @@ def require_permission(required_perm: EnterprisePermission) -> Callable:
             # 2. Verify Enterprise Subscription
             sub_res = (
                 client.table("user_subscriptions")
-                .select("plan_name, plan_tier, subscription_status")
-                .eq("user_id", user_id)
+                .select("*")
+                .eq("user_id", str(ws_res.data[0]["owner_id"]) if residency_permission else user_id)
                 .execute()
             )
             is_enterprise = False
@@ -70,7 +72,10 @@ def require_permission(required_perm: EnterprisePermission) -> Callable:
                 row = sub_res.data[0]
                 plan = (row.get("plan_name") or row.get("plan_tier") or "").lower()
                 status_val = (row.get("subscription_status") or "").lower()
-                if plan in ("enterprise", "enterprise_plus") and status_val in ("active", "trial"):
+                if residency_permission:
+                    from app.services.subscription_service import subscription_service
+                    is_enterprise = plan in ("enterprise", "enterprise_plus") and subscription_service._is_paid_subscriber(row)
+                elif plan in ("enterprise", "enterprise_plus") and status_val in ("active", "trial"):
                     is_enterprise = True
 
             if not is_enterprise:

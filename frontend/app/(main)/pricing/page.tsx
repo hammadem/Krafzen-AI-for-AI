@@ -4,6 +4,7 @@ import { Check, Shield, Zap, Globe, MessageSquare, Layers } from 'lucide-react';
 import CalendlyBooking from '@/components/CalendlyBooking';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { createCheckoutSession } from '@/lib/api/payment';
 
 interface PricingPlan {
     id: string;
@@ -16,10 +17,6 @@ interface PricingPlan {
     cta: string;
     featured: boolean;
     popular?: boolean;
-    links?: {
-        monthly: string;
-        annual: string;
-    };
 }
 
 const pricingPlans: PricingPlan[] = [
@@ -37,13 +34,9 @@ const pricingPlans: PricingPlan[] = [
             "Project workspace",
             "Email support"
         ],
-        trial: "15 free requests · no card required",
+        trial: "Verified paid subscription required",
         cta: "Get Started",
-        featured: false,
-        links: {
-            monthly: "https://checkout.dodopayments.com/buy/pdt_0NptIUxBB6ax8M2pe8Jc2?quantity=1",
-            annual: "https://checkout.dodopayments.com/buy/pdt_0NptIUnfunV7bYoJ9dtUE?quantity=1"
-        }
+        featured: false
     },
     {
         id: "professional",
@@ -60,14 +53,10 @@ const pricingPlans: PricingPlan[] = [
             "Up to 10 team members",
             "Priority email support"
         ],
-        trial: "15 free requests · no card required",
+        trial: "Verified paid subscription required",
         cta: "Get Started",
         featured: true,
-        popular: true,
-        links: {
-            monthly: "https://checkout.dodopayments.com/buy/pdt_0NptIUuKMySW5tuz5FgRk?quantity=1",
-            annual: "https://checkout.dodopayments.com/buy/pdt_0NptIUjvCnzjEpS7tZdLo?quantity=1"
-        }
+        popular: true
     },
     {
         id: "enterprise",
@@ -85,13 +74,9 @@ const pricingPlans: PricingPlan[] = [
             "Up to 25 team members",
             "Dedicated support"
         ],
-        trial: "15 free requests · no card required",
+        trial: "Verified paid subscription required",
         cta: "Get Started",
-        featured: false,
-        links: {
-            monthly: "https://checkout.dodopayments.com/buy/pdt_0NptIUsLytgIvdbPve7kh?quantity=1",
-            annual: "https://checkout.dodopayments.com/buy/pdt_0NptIUqA05KZHkdnENr3r?quantity=1"
-        }
+        featured: false
     },
     {
         id: "enterprise_plus",
@@ -121,32 +106,35 @@ export default function PricingPage() {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
     const [isCalendlyOpen, setIsCalendlyOpen] = useState(false);
 
-    const handlePlanAction = (plan: PricingPlan) => {
+    const [checkoutError, setCheckoutError] = useState<string | null>(null);
+    const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+
+    const handlePlanAction = async (plan: PricingPlan) => {
         if (plan.id === 'enterprise_plus') {
             setIsCalendlyOpen(true);
             return;
         }
-
-        if (!user) {
-            router.push(`/login?redirect=/pricing`);
+        if (!user?.access_token) {
+            router.push('/login?redirect=/pricing');
             return;
         }
-
-        let paymentLink = plan.links?.[billingCycle];
-        if (paymentLink) {
-            try {
-                const url = new URL(paymentLink);
-                if (user.email) {
-                    url.searchParams.set("customer_email", user.email);
-                }
-                if (user.userId) {
-                    url.searchParams.set("metadata_user_id", user.userId);
-                }
-                paymentLink = url.toString();
-            } catch {
-                // Keep base payment link if URL parsing fails
+        if (checkoutLoading) return;
+        setCheckoutError(null);
+        setCheckoutLoading(plan.id);
+        try {
+            // Server-authenticated checkout binds payment metadata to the real
+            // user. Never construct external payment links or user IDs in the browser.
+            const session = await createCheckoutSession(user, plan.id, billingCycle);
+            const destination = new URL(session.url);
+            if (destination.protocol !== 'https:' ||
+                !destination.hostname.endsWith('.stripe.com')) {
+                throw new Error('Payment provider returned an invalid checkout URL.');
             }
-            window.open(paymentLink, '_blank', 'noopener,noreferrer');
+            window.location.assign(destination.toString());
+        } catch (error) {
+            setCheckoutError(error instanceof Error ? error.message : 'Unable to start checkout.');
+        } finally {
+            setCheckoutLoading(null);
         }
     };
 
@@ -160,8 +148,14 @@ export default function PricingPage() {
                     Plans That Scale With You
                 </h1>
                 <p className="text-xl text-[#cbd5e1]/70 max-w-2xl mx-auto mb-12">
-                    Get 15 free workspace requests on any plan. No credit card required. Choose the cycle that fits your budget.
+                    Workspace access begins with a verified paid subscription. Choose the cycle that fits your budget.
                 </p>
+
+                {checkoutError && (
+                    <div role="alert" className="max-w-2xl mx-auto mb-7 rounded-xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">
+                        {checkoutError}
+                    </div>
+                )}
 
                 {/* Billing Toggle */}
                 <div className="flex justify-center items-center gap-4 mb-16">
@@ -183,7 +177,7 @@ export default function PricingPage() {
                     >
                         Annual
                         <span className="text-[10px] bg-green-500/20 px-2 py-0.5 rounded-full text-green-400 font-bold uppercase tracking-tight">
-                            2 Months Free
+                            Annual savings
                         </span>
                     </button>
                 </div>
@@ -218,13 +212,14 @@ export default function PricingPage() {
                             </p>
 
                             <button
-                                onClick={() => handlePlanAction(plan)}
-                                className={`w-full py-3 rounded-xl font-bold text-sm transition-all mb-8 flex items-center justify-center gap-2 ${plan.featured
+                                onClick={() => void handlePlanAction(plan)}
+                                disabled={checkoutLoading !== null}
+                                className={`w-full py-3 rounded-xl font-bold text-sm transition-all mb-8 flex items-center justify-center gap-2 disabled:opacity-50 ${plan.featured
                                         ? 'bg-gradient-to-r from-[#54e3b5] to-[#3fc89c] text-zinc-950 hover:shadow-[0_0_30px_rgba(84,227,181,0.4)]'
                                         : 'bg-white/10 text-white hover:bg-white/20'
                                     }`}
                             >
-                                {plan.cta}
+                                {checkoutLoading === plan.id ? 'Opening checkout…' : plan.cta}
                             </button>
 
                             <ul className="space-y-4 text-left">

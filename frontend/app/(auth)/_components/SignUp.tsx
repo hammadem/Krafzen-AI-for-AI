@@ -61,7 +61,7 @@ export default function SignUp() {
             });
 
             if (Array.isArray(signUpData?.user?.identities) && signUpData?.user?.identities?.length <= 0) {
-                toast.error("Email Already In Use Please Login");
+                toast.success("Check your email for the verification link. If you already have an account, sign in or reset your password.");
                 return;
             }
             if (error) {
@@ -69,10 +69,10 @@ export default function SignUp() {
                 return;
             }
 
-            toast.error("Account created! Check your email to verify.");
+            toast.success("Check your email for the verification link. If you already have an account, sign in or reset your password.");
             setLoading(false);
         } catch (err) {
-            console.log(err);
+            console.error("Sign-up request failed");
             toast.error("Server Error");
             setLoading(false);
         } finally {
@@ -219,6 +219,7 @@ export default function SignUp() {
 
                     <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
                         <p>Continue with your work mail - SSO login</p>
+                        <Link href="/resend-verification" className="text-white underline">Resend verification email</Link>
                         <p>Already have an account? {" "}
                             <Link
                                 href="/login"

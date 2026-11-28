@@ -1,9 +1,10 @@
 "use client";
 import { Archive, Folder, Clock, RefreshCw, AlertCircle, Search, Lock } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { getArchivedProjects } from "@/lib/api/api";
-import { useApiResource } from "@/hooks/useApiResource";
+import { restoreArchivedProject } from "@/lib/api/api";
+import { useAuth } from "@/context/AuthContext";
+import { useFetchProjects } from "@/hooks/useFetchProjects";
 import { formatDate } from "@/lib/utils";
 
 // Reference layout (krafzen-product/archive.html): tabbed archive with table rows.
@@ -24,32 +25,33 @@ const TABS: { key: TabKey; label: string; soon?: boolean }[] = [
 export default function ArchivePage() {
     const [tab, setTab] = useState<TabKey>("projects");
     const [search, setSearch] = useState("");
+    const { user } = useAuth();
+    const [restoring, setRestoring] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
 
-    const {
-        data: projects,
-        isLoading,
-        isError,
-        error,
-        refetch,
-    } = useApiResource<ProjectDetails[]>({
-        fetcher: (user) => getArchivedProjects(user, user.userId ?? ""),
-        select: (raw) => {
-            if (Array.isArray(raw)) return raw as ProjectDetails[];
-            if (raw && typeof raw === "object") {
-                const obj = raw as Record<string, unknown>;
-                const arr = obj.projects ?? obj.data ?? obj.items ?? [];
-                return Array.isArray(arr) ? (arr as ProjectDetails[]) : [];
+    const { projects, status, apiError: error, forceRefetch: refetch, page, hasMore, nextPage, prevPage, firstPage } = useFetchProjects(1, search, true);
+    const isLoading = status === "inprogress";
+    const isError = status === "error";
+
+    const restore = async (projectId: string) => {
+        if (restoring) return;
+        setRestoring(projectId);
+        setActionError(null);
+        try {
+            const result = await restoreArchivedProject(user, projectId);
+            if (!result.ok) {
+                setActionError(result.error?.message || "Unable to restore project.");
+                return;
             }
-            return [];
-        },
-        fallback: [],
-    });
+            refetch();
+        } catch {
+            setActionError("Unable to restore project. Please retry.");
+        } finally {
+            setRestoring(null);
+        }
+    };
 
-    const visible = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        if (!q) return projects;
-        return projects.filter((p) => p.input_text?.toLowerCase().includes(q));
-    }, [projects, search]);
+    const visible = projects;
 
     return (
         <div className="flex-1 flex flex-col p-8 gap-6 overflow-y-auto custom-scrollbar">
@@ -98,7 +100,8 @@ export default function ArchivePage() {
                 <input
                     type="text"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    maxLength={200}
+                    onChange={(e) => { firstPage(); setSearch(e.target.value); }}
                     placeholder="Search archived projects..."
                     className="bg-transparent border-none text-sm text-white focus:ring-0 outline-none placeholder:text-[#94a3b8]/50 flex-1"
                 />
@@ -133,6 +136,8 @@ export default function ArchivePage() {
                 </div>
             )}
 
+            {actionError && <p role="alert" className="text-sm text-red-400">{actionError}</p>}
+
             {/* Table of archived projects */}
             {!isLoading && !isError && visible.length > 0 && (
                 <div className="border border-white/10 rounded-2xl overflow-hidden animate-in fade-in-0 duration-300">
@@ -142,31 +147,43 @@ export default function ArchivePage() {
                         <span />
                     </div>
                     {visible.map((p) => (
-                        <Link
+                        <div
                             key={p.id}
-                            href={`/workspace/id/${p.id}`}
                             className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_auto] gap-2 sm:gap-4 px-4 py-3 border-b border-white/5 last:border-0 items-center hover:bg-white/[0.02] transition-colors group"
                         >
-                            <span className="flex items-center gap-3 min-w-0">
+                            <Link href={`/workspace/id/${p.id}`} className="flex items-center gap-3 min-w-0">
                                 <span className="w-8 h-8 rounded-lg bg-white/5 grid place-items-center shrink-0 group-hover:bg-[#54e3b5]/10 transition-colors">
                                     <Folder className="w-4 h-4 text-[#94a3b8] group-hover:text-[#54e3b5]" />
                                 </span>
                                 <span className="text-sm text-white truncate group-hover:text-[#54e3b5] transition-colors">
-                                    {p.input_text || "Untitled Project"}
+                                    {p.title || p.input_text || "Untitled Project"}
                                 </span>
-                            </span>
+                            </Link>
                             <span className="text-[11px] font-mono text-[#94a3b8] flex items-center gap-1.5 uppercase">
                                 <Clock className="w-3 h-3" />
-                                {formatDate(p.created_at)}
+                                {formatDate((p as ProjectDetails & { archived_at?: string }).archived_at || p.created_at)}
                             </span>
-                            <span className="text-[11px] font-semibold text-[#54e3b5] uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity justify-self-end">
-                                Open
-                            </span>
-                        </Link>
+                            <button
+                                type="button"
+                                disabled={restoring === p.id}
+                                onClick={() => void restore(p.id)}
+                                className="text-[11px] font-semibold text-[#54e3b5] uppercase tracking-wider justify-self-end hover:underline disabled:opacity-50"
+                                aria-label={`Restore ${p.title || p.input_text || "Untitled Project"}`}
+                            >
+                                {restoring === p.id ? "Restoring…" : "Restore"}
+                            </button>
+                        </div>
                     ))}
                 </div>
             )}
 
+            {!isLoading && !isError && (page > 1 || hasMore) && (
+                <div className="flex items-center justify-between text-sm text-white">
+                    <button type="button" disabled={page <= 1 || !!restoring} onClick={prevPage} className="underline disabled:opacity-40">Previous archived projects</button>
+                    <span>Page {page}</span>
+                    <button type="button" disabled={!hasMore || !!restoring} onClick={nextPage} className="underline disabled:opacity-40">Next archived projects</button>
+                </div>
+            )}
             {/* Empty */}
             {!isLoading && !isError && visible.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20 gap-4 border-2 border-dashed border-white/5 rounded-3xl">
@@ -175,12 +192,10 @@ export default function ArchivePage() {
                     </div>
                     <div className="text-center">
                         <h3 className="text-white font-semibold text-lg">
-                            {projects.length === 0 ? "Nothing archived" : "No matches"}
+                            {search.trim() ? "No matches" : "Nothing archived"}
                         </h3>
                         <p className="text-[#94a3b8] text-sm mt-1">
-                            {projects.length === 0
-                                ? "Projects you archive will be kept here."
-                                : "Try a different search."}
+                            {search.trim() ? "Try a different search." : "Projects you archive will be kept here."}
                         </p>
                     </div>
                 </div>

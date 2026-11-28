@@ -80,7 +80,7 @@ async def test_create_file_records_upload_with_authoritative_project():
 
 
 @pytest.mark.asyncio
-async def test_update_file_records_rename_and_metadata_update():
+async def test_update_file_records_rename_without_modifying_format():
     old_file = {
         "id": FILE_ID,
         "job_id": JOB_ID,
@@ -90,7 +90,7 @@ async def test_update_file_records_rename_and_metadata_update():
         "file_type": "dwg",
         "version": 1,
     }
-    updated_file = {**old_file, "name": "floor-plan-final.dwg", "file_type": "dxf"}
+    updated_file = {**old_file, "name": "floor-plan-final.dwg"}
 
     with (
         patch.object(file_queries, "get_file", AsyncMock(return_value=old_file)),
@@ -105,22 +105,19 @@ async def test_update_file_records_rename_and_metadata_update():
     ):
         result = await file_queries.update_file(
             FILE_ID,
-            {"name": "floor-plan-final.dwg", "file_type": "dxf"},
+            {"name": "floor-plan-final.dwg"},
             {"user_id": USER_ID},
         )
 
     assert result == updated_file
     assert [call.kwargs["action"] for call in record_event.await_args_list] == [
         "file.renamed",
-        "file.updated",
     ]
     rename_metadata = record_event.await_args_list[0].kwargs["metadata"]
     assert rename_metadata["old_name"] == "floor-plan.dwg"
     assert rename_metadata["new_name"] == "floor-plan-final.dwg"
     assert "path" not in rename_metadata
-    assert record_event.await_args_list[1].kwargs["metadata"]["changed_fields"] == [
-        "file_type"
-    ]
+    assert result["file_type"] == "dwg"
 
 
 @pytest.mark.asyncio

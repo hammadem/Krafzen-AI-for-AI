@@ -18,9 +18,8 @@ import { loginCredSchema } from "@/lib/validation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/supabaseClient";
 import { toast } from "react-toastify";
-import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 
@@ -32,9 +31,10 @@ export default function LoginWithCred() {
             password: "",
         },
     });
-    const { setUser } = useAuth();
     const router = useRouter();
     const [loading, setLoading] = useState(false);
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => setHydrated(true), []);
     const [showPassword, setShowPassword] = useState(false);
 
     async function onSubmit(data: z.infer<typeof loginCredSchema>) {
@@ -53,19 +53,12 @@ export default function LoginWithCred() {
                 return;
             }
 
-            setUser({
-                userId: user?.user?.id,
-                email: user?.user?.user_metadata?.email,
-                firstname: user?.user?.user_metadata?.firstname,
-                lastname: user?.user?.user_metadata?.lastname,
-                avatar_url: user?.user?.user_metadata?.avatar_url,
-                subscription_plan: user?.user?.user_metadata?.subscription_plan || "Free Trial",
-                access_token: user?.session?.access_token,
-                remaining_minutes: 0,
-                total_minutes_purchased: 0
-            })
-
-            router.push("/auth/callback");
+            if (!user?.session?.access_token) {
+                toast.error("No authenticated session returned");
+                return;
+            }
+            // The AuthProvider owns session state; avoid racing its navigation.
+            router.replace("/auth/callback");
         } catch (err) {
             console.log(err);
             toast.error("Server Error");
@@ -137,7 +130,7 @@ export default function LoginWithCred() {
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4">
                     <Field orientation="horizontal" className="w-full">
-                        <Button disabled={loading} type="submit" form="form-rhf-demo" variant="secondary" className="rounded-full w-full h-12 cursor-pointer bg-green-400 hover:bg-green-500 text-black font-bold">
+                        <Button disabled={!hydrated || loading} type="submit" form="form-rhf-demo" variant="secondary" className="rounded-full w-full h-12 cursor-pointer bg-green-400 hover:bg-green-500 text-black font-bold">
                             {loading ? "Submitting..." : "Submit"}
                         </Button>
                     </Field>
@@ -154,6 +147,7 @@ export default function LoginWithCred() {
                             </Link>
                         </p>
 
+                        <Link href="/resend-verification" className="text-white underline">Resend verification email</Link>
                         <p>Forgot Password? {" "}
                             <Link
                                 href="/forgot"

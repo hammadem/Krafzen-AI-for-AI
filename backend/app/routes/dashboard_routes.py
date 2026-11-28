@@ -5,6 +5,7 @@ Owner: Tazwar (queue_owner). Feeds Sunny's UI shells (Step 4/5).
 
 import asyncio
 from datetime import UTC, datetime
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
@@ -17,8 +18,9 @@ from app.db.queries.project_queries import get_projects
 from app.db.supabase_client import db
 from app.middlewares.auth import require_auth
 from app.schemas.export_contracts import ExportStatus
+from app.services.notification_service import get_notification_page, mark_as_read, set_read_state
 from app.utils.logger import logger
-from app.utils.queue_monitor import get_queue_health
+from app.utils.queue_monitor import get_customer_queue_health
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -127,6 +129,8 @@ async def get_activity_feed(
         for row in activity_rows:
             event_name = row.get("event_name") or row.get("action") or "activity.updated"
             row_project_id = row.get("project_id")
+            if row_project_id and str(row_project_id) not in project_by_id:
+                continue  # workspace membership alone is not project authorization
             if project_id and str(row_project_id or "") != project_id:
                 continue
             project = project_by_id.get(str(row_project_id)) if row_project_id else None
@@ -445,35 +449,30 @@ async def get_workspace_summary(user=Depends(require_auth)):
 
 # ── Notifications ────────────────────────────────────────────────────────────
 
-# Notification type derives from job status
-_STATUS_TO_NOTIF_TYPE = {
-    ExportStatus.COMPLETED:       "success",
-    ExportStatus.FAILED:          "error",
-    ExportStatus.REQUIRES_REVIEW: "warning",
-    ExportStatus.QUEUED:          "info",
-    ExportStatus.PROCESSING:      "info",
-    ExportStatus.VALIDATING:      "info",
-    ExportStatus.CANCELLED:       "info",
-}
-
-_STATUS_TO_NOTIF_TITLE = {
-    ExportStatus.COMPLETED:       "Export completed",
-    ExportStatus.FAILED:          "Export failed",
-    ExportStatus.REQUIRES_REVIEW: "Review required",
-    ExportStatus.QUEUED:          "Export queued",
-    ExportStatus.PROCESSING:      "Processing started",
-    ExportStatus.VALIDATING:      "Validation in progress",
-    ExportStatus.CANCELLED:       "Export cancelled",
+# The dashboard and direct notification routes share the persisted inbox.
+_NOTIFICATION_TYPES = {
+    "export_completed": ("Export completed", "success"),
+    "export_failed": ("Export failed", "error"),
+    "export_requires_review": ("Review required", "warning"),
+    "validation_update": ("Validation update", "info"),
+    "import_completed": ("Import completed", "success"),
+    "project_invitation": ("Project invitation", "info"),
+    "member_joined": ("Member joined", "info"),
+    "project_assignment": ("Project assignment", "info"),
+    "field_update": ("Field observation", "info"),
+    "review_update": ("Drawing review", "info"),
+    "compliance_update": ("Compliance screening saved", "warning"),
+    "bim_validation": ("IFC validation saved", "info"),
 }
 
 
 class NotificationItem(BaseModel):
-    id: str                    # job_id — stable identifier Sunny can key on
-    title: str                 # e.g. "Export completed"
-    message: str               # same human label as activity feed
-    read: bool                 # always False on creation; toggled via PATCH below
+    id: str
+    title: str
+    message: str
+    read: bool
     created_at: datetime | None
-    type: str                  # "success" | "error" | "warning" | "info"
+    type: str
 
 
 class NotificationsResponse(BaseModel):
@@ -484,91 +483,34 @@ class NotificationsResponse(BaseModel):
 @router.get("/notifications", response_model=NotificationsResponse)
 async def get_notifications(
     limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0, le=10000),
     unread_only: bool = Query(False, description="Return only unread notifications"),
     user=Depends(require_auth),
 ):
-    """
-    Notification feed for the authenticated user.
-    Derived from job lifecycle events. Used by Sunny's notification UI shell.
-    Response: { notifications: [{ id, title, message, read, created_at, type }], total }
-    """
-    try:
-        projects = await get_projects(user)
-        all_jobs = []
-        for p in projects:
-            jobs = await get_jobs(p["id"], user)
-            all_jobs.extend(jobs)
-
-        # Sort by most recent first
-        all_jobs.sort(
-            key=lambda j: j.get("updated_at") or j.get("created_at") or "",
-            reverse=True,
-        )
-
-        notifications = []
-        for job in all_jobs:
-            try:
-                status = ExportStatus(job["status"])
-            except ValueError:
-                continue
-
-            # Only surface statuses that are meaningful as notifications
-            if status not in _STATUS_TO_NOTIF_TYPE:
-                continue
-
-            # read state: completed/failed/requires_review/cancelled are "unread" by default
-            # processing/validating/queued are informational — mark as read (not alerting)
-            is_unread = status in {
-                ExportStatus.COMPLETED,
-                ExportStatus.FAILED,
-                ExportStatus.REQUIRES_REVIEW,
-                ExportStatus.CANCELLED,
-            }
-
-            if unread_only and not is_unread:
-                continue
-
-            notifications.append(NotificationItem(
-                id=job["id"],
-                title=_STATUS_TO_NOTIF_TITLE.get(status, status.value),
-                message=_STATUS_LABELS.get(status, status.value),
-                read=not is_unread,
-                created_at=job.get("updated_at") or job.get("created_at"),
-                type=_STATUS_TO_NOTIF_TYPE.get(status, "info"),
-            ))
-
-        notifications = notifications[:limit]
-        return NotificationsResponse(notifications=notifications, total=len(notifications))
-
-    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    rows, total = await get_notification_page(user["user_id"], unread_only, limit, offset)
+    notifications = []
+    for row in rows:
+        kind = row["type"]
+        title, severity = _NOTIFICATION_TYPES.get(kind, (kind.replace("_", " ").capitalize(), "info"))
+        notifications.append(NotificationItem(
+            id=row["id"], title=title, message=row["message"],
+            read=row["is_read"], created_at=row.get("created_at"), type=severity,
+        ))
+    return NotificationsResponse(notifications=notifications, total=total)
 
 
 @router.patch("/notifications/{notification_id}/read")
-async def mark_notification_read(
-    notification_id: str,
-    user=Depends(require_auth),
-):
-    """
-    Mark a notification (job event) as read.
-    notification_id is the job_id (same as the id field in NotificationItem).
-    Week 1: stores read state on the job's error_message field is NOT correct —
-    this is a stub that returns 200 so Sunny can wire the UI now.
-    Week 2: add a notifications table with per-user read state.
-    """
-    # Verify the job exists and belongs to this user before returning 200
-    from app.db.queries.job_queries import get_job
-    job = await get_job(notification_id, user)
-    if not job:
+async def mark_notification_read(notification_id: UUID, user=Depends(require_auth)):
+    if not await mark_as_read(str(notification_id), user["user_id"]):
         raise HTTPException(status_code=404, detail="Notification not found")
+    return {"id": str(notification_id), "read": True}
 
-    # Week 2: persist read=True to notifications table here
-    logger.info(
-        "[mark_notification_read] Read state acknowledged (persistence in Week 2)",
-        notification_id=notification_id,
-        user_id=user["user_id"],
-    )
-    return {"id": notification_id, "read": True}
+
+@router.patch("/notifications/{notification_id}/unread")
+async def mark_notification_unread(notification_id: UUID, user=Depends(require_auth)):
+    if not await set_read_state(str(notification_id), user["user_id"], False):
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"id": str(notification_id), "read": False}
 
 
 # ── Members list ─────────────────────────────────────────────────────────────
@@ -630,7 +572,8 @@ async def queue_health_endpoint(user=Depends(require_auth)):
     Week 3 will expand with avg processing time, failure rate, retry frequency.
     Owner: Tazwar — monitoring foundation per Week 1 Step 6.
     """
-    result = await get_queue_health()
-    if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    try:
+        return await get_customer_queue_health(user["user_id"])
+    except (APIError, HTTPError, KeyError, TypeError, ValueError, RuntimeError) as exc:
+        logger.error("Customer queue snapshot unavailable")
+        raise HTTPException(status_code=503, detail="Queue health temporarily unavailable") from exc

@@ -1,13 +1,16 @@
 "use client";
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useFetchProjects } from '@/hooks/useFetchProjects';
 import { useAuth } from '@/context/AuthContext';
+import { archiveProject, saveProjectMetadata, deleteAProject } from '@/lib/api/api';
+import ProjectMetadataForm from '@/components/ProjectMetadataForm';
+import ProjectAssignmentsPanel from '@/components/ProjectAssignmentsPanel';
 import {
+  Archive,
   Folder,
   Plus,
   Search,
-  MoreVertical,
-  Clock,
+   Clock,
   AlertCircle,
   RefreshCw,
   FileCheck,
@@ -34,18 +37,41 @@ function ReadyBadge({ ready }: { ready: boolean }) {
 }
 
 export default function ProjectsDashboard() {
-  const { projects, status, apiError, forceRefetch } = useFetchProjects();
   const { user } = useAuth();
   const [query, setQuery] = useState('');
+  const [projectType, setProjectType] = useState<ProjectType | ''>('');
+  const [stage, setStage] = useState<ProjectStage | ''>('');
+  const [editing, setEditing] = useState<ProjectDetails | 'new' | null>(null);
+  const [deleting, setDeleting] = useState<ProjectDetails | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [mutationError, setMutationError] = useState('');
+  const { projects, status, apiError, forceRefetch, page, hasMore, nextPage, prevPage, firstPage } = useFetchProjects(1, query, false, projectType || undefined, stage || undefined);
+  const [archiveTarget, setArchiveTarget] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
-  // Client-side filter over the already-loaded list (frontend-only, API-safe).
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => (p.input_text || '').toLowerCase().includes(q));
-  }, [projects, query]);
+  const confirmArchive = async () => {
+    if (!archiveTarget || archiving) return;
+    setArchiving(true);
+    setArchiveError(null);
+    try {
+      const response = await archiveProject(user, archiveTarget);
+      if (!response.ok) {
+        setArchiveError(response.error?.message || "Could not archive the project.");
+        return;
+      }
+      setArchiveTarget(null);
+      forceRefetch();
+    } catch {
+      setArchiveError("Archive failed. Please retry.");
+    } finally {
+      setArchiving(false);
+    }
+  };
 
-  if (status === 'inprogress') {
+  const visible = projects;
+
+  if (status === 'inprogress' && !query && projects.length === 0) {
     return (
       <div className="flex-1 flex flex-col p-8 gap-8 overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between">
@@ -112,13 +138,12 @@ export default function ProjectsDashboard() {
           <h1 className="text-2xl font-bold text-white">Your Projects</h1>
           <p className="text-[#94a3b8] mt-1 text-sm">Manage and organize your AI-generated CAD designs.</p>
         </div>
-        <Link
-          href="/workspace"
+        <button type="button" onClick={() => { setEditing('new'); setMutationError(''); }}
           className="flex items-center gap-2 px-5 py-2.5 bg-[#54e3b5] text-[#06080d] rounded-xl font-bold text-sm transition-all hover:shadow-[0_0_20px_rgba(84,227,181,0.3)] hover:scale-105 active:scale-95 shrink-0"
         >
           <Plus className="w-4 h-4" />
           New Project
-        </Link>
+        </button>
       </div>
 
       {/* Stats — real fields only */}
@@ -128,7 +153,7 @@ export default function ProjectsDashboard() {
             <Folder className="w-5 h-5 text-[#54e3b5]" />
           </div>
           <div className="text-2xl font-bold text-white">{projects.length}</div>
-          <div className="text-xs text-[#94a3b8] uppercase tracking-wider mt-1">Total Projects</div>
+          <div className="text-xs text-[#94a3b8] uppercase tracking-wider mt-1">Projects on this page</div>
         </div>
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
           <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center mb-3 border border-blue-500/20">
@@ -155,15 +180,30 @@ export default function ProjectsDashboard() {
             <input
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              maxLength={200}
+              onChange={(e) => { firstPage(); setQuery(e.target.value); }}
               placeholder="Search projects..."
               className="bg-transparent border-none text-sm text-white focus:ring-0 outline-none placeholder:text-[#94a3b8]/50 w-40 sm:w-56"
             />
           </div>
         </div>
 
+        <div className="flex flex-wrap gap-3">
+          <label className="text-sm text-slate-300">Project type
+            <select aria-label="Filter project type" className="ml-2 bg-black border border-white/20 rounded p-2" value={projectType} onChange={e=>{firstPage();setProjectType(e.target.value as ProjectType | '');}}>
+              <option value="">All types</option>{['residential','commercial','industrial','institutional','infrastructure','mixed_use','other'].map(t=><option key={t} value={t}>{t.replaceAll('_',' ')}</option>)}
+            </select>
+          </label>
+          <label className="text-sm text-slate-300">Stage
+            <select aria-label="Filter project stage" className="ml-2 bg-black border border-white/20 rounded p-2" value={stage} onChange={e=>{firstPage();setStage(e.target.value as ProjectStage | '');}}>
+              <option value="">All stages</option>{['draft','in_progress','in_review','completed'].map(t=><option key={t} value={t}>{t.replaceAll('_',' ')}</option>)}
+            </select>
+          </label>
+        </div>
         {/* Empty (no projects at all) */}
-        {projects.length === 0 ? (
+        {status === 'inprogress' ? (
+          <p role="status" className="text-sm text-[#94a3b8]">Loading projects…</p>
+        ) : projects.length === 0 && !query.trim() && !projectType && !stage ? (
           <div className="flex-1 py-20 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-3xl gap-4">
             <div className="w-16 h-16 bg-[#54e3b5]/10 rounded-full flex items-center justify-center border border-[#54e3b5]/20">
               <Folder className="w-6 h-6 text-[#54e3b5]/60" />
@@ -197,25 +237,29 @@ export default function ProjectsDashboard() {
                   className="group relative bg-[#0a0e17] border border-white/10 rounded-2xl p-[18px] flex flex-col gap-3.5 transition-all hover:-translate-y-0.5 hover:border-[#54e3b5]/40 hover:bg-white/[0.03]"
                 >
                   <button
-                    className="absolute top-3 right-3 w-6 h-6 grid place-items-center rounded-md text-[#94a3b8] opacity-0 group-hover:opacity-100 hover:text-white hover:bg-white/5 transition-all"
-                    aria-label="Project actions"
-                    onClick={(e) => e.preventDefault()}
+                    type="button"
+                    className="absolute top-3 right-3 flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[#94a3b8] hover:text-[#54e3b5] hover:bg-white/5 transition-all"
+                    aria-label={`Archive ${project.title || project.input_text || 'Untitled Project'}`}
+                    onClick={() => { setArchiveError(null); setArchiveTarget(project.id); }}
                   >
-                    <MoreVertical className="w-3.5 h-3.5" />
+                    <Archive className="w-3.5 h-3.5" />
+                    Archive
                   </button>
                   <Link href={`/workspace/id/${project.id}`} className="flex flex-col gap-3.5">
                     <div className="flex items-start justify-between gap-3 pr-5">
                       <div className="min-w-0">
                         <div className="text-[15px] font-semibold text-white leading-snug line-clamp-2 group-hover:text-[#54e3b5] transition-colors">
-                          {project.input_text || 'Untitled Project'}
+                          {project.title || project.input_text || 'Untitled Project'}
                         </div>
                       </div>
                       <ReadyBadge ready={ready} />
                     </div>
+                    {(project.project_type || project.lifecycle_stage) && <p className="text-xs text-slate-400 capitalize">{(project.project_type || 'Unclassified').replaceAll('_',' ')} · {(project.lifecycle_stage || 'draft').replaceAll('_',' ')}</p>}
+                    {project.description && <p className="text-xs text-slate-300 line-clamp-2">{project.description}</p>}
                     <div className="flex items-center justify-between pt-3 border-t border-white/5 text-[11px] text-[#94a3b8] font-mono">
                       <span className="flex items-center gap-1.5">
                         {ready ? <FileCheck className="w-3 h-3 text-[#54e3b5]" /> : <Loader className="w-3 h-3" />}
-                        {ready ? 'CAD ready' : 'In progress'}
+                        {ready ? 'CAD ready' : 'Draft'}
                       </span>
                       <span className="flex items-center gap-1.5 uppercase">
                         <Clock className="w-3 h-3" />
@@ -223,12 +267,57 @@ export default function ProjectsDashboard() {
                       </span>
                     </div>
                   </Link>
+                  <div className="flex gap-4 text-xs">
+                    <button type="button" onClick={()=>{setEditing(project);setMutationError('');}} className="text-[#54e3b5] underline">Edit details</button>
+                    <button type="button" onClick={()=>{setDeleting(project);setMutationError('');}} className="text-red-300 underline">Delete project</button>
+                  </div>
                 </article>
               );
             })}
           </div>
         )}
       </div>
+      {status === 'success' && ((page ?? 1) > 1 || hasMore) && (
+        <div className="flex items-center justify-between text-sm text-white">
+          <button type="button" disabled={(page ?? 1) <= 1} onClick={prevPage} className="underline disabled:opacity-40">Previous projects</button>
+          <span>Page {page}</span>
+          <button type="button" disabled={!hasMore} onClick={nextPage} className="underline disabled:opacity-40">Next projects</button>
+        </div>
+      )}
+      <ProjectAssignmentsPanel key={user?.userId || 'signed-out'} user={user} projects={projects}/>
+      {editing && <ProjectMetadataForm key={editing === 'new' ? 'new' : editing.id} project={editing === 'new' ? undefined : editing}
+        onClose={()=>setEditing(null)}
+        onSave={async (data)=>{
+          const result = await saveProjectMetadata(user, data, editing === 'new' ? undefined : editing.id);
+          if (!result.ok) throw new Error(result.error?.message || 'Project could not be saved');
+          setEditing(null); firstPage(); forceRefetch();
+        }}/>}
+      {deleting && <div className="fixed inset-0 z-50 bg-black/70 grid place-items-center p-4">
+        <div role="alertdialog" aria-modal="true" aria-label="Delete project" className="rounded-xl bg-[#111722] p-6 max-w-md text-white space-y-4">
+          <h2 className="text-lg font-semibold">Permanently delete {deleting.title || deleting.input_text}?</h2>
+          <p className="text-sm text-slate-300">This cannot be undone. Archive instead if you need to preserve the project.</p>
+          {mutationError && <p role="alert" className="text-red-300">{mutationError}</p>}
+          <div className="flex justify-end gap-4"><button disabled={busy} onClick={()=>setDeleting(null)}>Cancel</button>
+          <button disabled={busy} className="text-red-300" onClick={async ()=>{
+            setBusy(true);setMutationError('');
+            try { const r=await deleteAProject(user,deleting.id); if(!r.ok) throw new Error(r.error?.message || 'Delete failed');setDeleting(null);forceRefetch(); }
+            catch(e){setMutationError(e instanceof Error?e.message:'Delete failed');}finally{setBusy(false);}
+          }}>{busy?'Deleting…':'Confirm delete'}</button></div>
+        </div>
+      </div>}
+      {archiveTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="archive-dialog-title" className="w-full max-w-md rounded-2xl border border-white/15 bg-[#101722] p-6 shadow-2xl">
+            <h2 id="archive-dialog-title" className="text-lg font-semibold text-white">Archive this project?</h2>
+            <p className="mt-2 text-sm text-[#94a3b8]">The project and its files will be preserved. You can restore it from Archive.</p>
+            {archiveError && <p role="alert" className="mt-3 text-sm text-red-400">{archiveError}</p>}
+            <div className="mt-5 flex justify-end gap-3">
+              <button type="button" disabled={archiving} onClick={() => { setArchiveTarget(null); setArchiveError(null); }} className="rounded-lg border border-white/20 px-4 py-2 text-sm text-white">Cancel</button>
+              <button type="button" disabled={archiving} onClick={() => void confirmArchive()} className="rounded-lg bg-[#54e3b5] px-4 py-2 text-sm font-semibold text-[#06080d] disabled:opacity-50">{archiving ? 'Archiving…' : 'Confirm archive'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

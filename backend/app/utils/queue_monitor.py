@@ -37,7 +37,7 @@ async def get_stuck_jobs(threshold_minutes: int = STUCK_JOB_THRESHOLD_MINUTES) -
     try:
         for state in IN_FLIGHT_STATES:
             result = await run_in_threadpool(
-                lambda s=state: db.table("jobs")
+                lambda s=state: db.table("export_jobs")
                     .select("id, project_id, status, updated_at, created_at")
                     .eq("status", s.value)
                     .lt("updated_at", cutoff)
@@ -71,7 +71,7 @@ async def get_queue_health() -> dict[str, Any]:
     """
     try:
         result = await run_in_threadpool(
-            lambda: db.table("jobs")
+            lambda: db.table("export_jobs")
                 .select("status")
                 .execute()
         )
@@ -109,3 +109,62 @@ def _minutes_since(iso_timestamp: str | None) -> float | None:
         return round((datetime.now(UTC) - dt).total_seconds() / 60, 1)
     except (TypeError, ValueError, OverflowError):
         return None
+
+async def get_customer_queue_health(user_id: str) -> dict[str, Any]:
+    """Customer snapshot, scoped at the database join to owned projects.
+
+    Global worker monitoring remains internal. A bounded read must fail
+    explicitly instead of reporting partial data as a complete snapshot.
+    """
+    if not user_id:
+        raise ValueError("Authenticated user required")
+    counts = {state.value: 0 for state in ExportStatus}
+    stuck_ids = []
+    unknown = 0
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(minutes=STUCK_JOB_THRESHOLD_MINUTES)
+    page_size = 500
+    max_rows = 10000
+    for offset in range(0, max_rows + 1, page_size):
+        result = await run_in_threadpool(
+            lambda: db.table("export_jobs")
+                .select("id,status,updated_at,requested_by,projects!inner(user_id)")
+                .eq("requested_by", user_id)
+                .eq("projects.user_id", user_id)
+                .order("id")
+                .range(offset, offset + page_size - 1)
+                .execute()
+        )
+        if result is None or result.data is None:
+            raise RuntimeError("Queue data unavailable")
+        rows = result.data
+        if offset + len(rows) > max_rows:
+            raise RuntimeError("Customer queue exceeds supported snapshot size")
+        for row in rows:
+            # Defense in depth: never trust a malformed or unscoped response.
+            project = row.get("projects")
+            if (not isinstance(project, dict) or project.get("user_id") != user_id
+                    or row.get("requested_by") != user_id):
+                raise RuntimeError("Queue ownership could not be verified")
+            try:
+                state = ExportStatus(row["status"])
+            except (ValueError, TypeError):
+                unknown += 1
+                continue
+            counts[state.value] += 1
+            if state in IN_FLIGHT_STATES and row.get("updated_at"):
+                updated = datetime.fromisoformat(row["updated_at"])
+                if updated.tzinfo is None:
+                    updated = updated.replace(tzinfo=UTC)
+                if updated < cutoff:
+                    stuck_ids.append(row["id"])
+        if len(rows) < page_size:
+            break
+    return {
+        "counts_by_status": counts,
+        "stuck_jobs": len(stuck_ids),
+        "stuck_job_ids": stuck_ids,
+        "unknown_status_rows": unknown,
+        "threshold_minutes": STUCK_JOB_THRESHOLD_MINUTES,
+        "assessed_at": now.isoformat(),
+    }

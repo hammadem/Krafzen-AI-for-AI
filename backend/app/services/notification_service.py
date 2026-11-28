@@ -10,6 +10,7 @@ Coordinate with Sunny: she reads GET /notifications and unread count.
 from datetime import UTC, datetime
 from typing import Any
 
+from fastapi import HTTPException
 from fastapi.concurrency import run_in_threadpool
 from httpx import HTTPError
 from postgrest.exceptions import APIError
@@ -22,6 +23,8 @@ VALID_NOTIFICATION_TYPES = {
     "export_failed",
     "export_requires_review",
     "validation_update",
+    "import_completed",
+    "project_assignment",
 }
 
 
@@ -58,33 +61,54 @@ async def create_notification(
             logger.info("[notification_service] Notification created", type=notification_type, user_id=user_id[:8])
             return response.data[0]
         return None
-    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as e:
         logger.error("[notification_service] Insert failed", error=str(e), exc_info=True)
         return None
 
 
-async def get_notifications(user_id: str, unread_only: bool = False) -> list:
+async def get_notification_page(
+    user_id: str, unread_only: bool = False, limit: int = 20, offset: int = 0
+) -> tuple[list[dict[str, Any]], int]:
+    """Read persisted notifications only, with an authenticated ownership filter."""
+    if not 1 <= limit <= 100 or not 0 <= offset <= 10000:
+        raise HTTPException(status_code=422, detail="Invalid notification pagination")
     try:
-        query = db.table("notifications").select("*").eq("user_id", user_id).order("created_at", desc=True)
-        if unread_only:
-            query = query.eq("is_read", False)
-        response = await run_in_threadpool(lambda: query.execute())
-        return response.data if response and response.data else []
-    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
-        logger.error("[notification_service] Fetch failed", error=str(e), exc_info=True)
-        return []
+        def fetch():
+            query = db.table("notifications").select("*", count="exact").eq("user_id", user_id)
+            if unread_only:
+                query = query.eq("is_read", False)
+            return query.order("created_at", desc=True).order("id", desc=True).range(offset, offset + limit - 1).execute()
+        response = await run_in_threadpool(fetch)
+        if response is None or response.count is None:
+            raise HTTPException(status_code=503, detail="Notification history unavailable")
+        return response.data or [], response.count
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as exc:
+        logger.error("[notification_service] Fetch failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=503, detail="Notification history unavailable") from exc
+
+
+async def get_notifications(user_id: str, unread_only: bool = False) -> list:
+    rows, _ = await get_notification_page(user_id, unread_only, limit=100)
+    return rows
 
 
 async def mark_as_read(notification_id: str, user_id: str) -> bool:
+    return await set_read_state(notification_id, user_id, True)
+
+
+async def set_read_state(notification_id: str, user_id: str, is_read: bool) -> bool:
+    """Change only the authenticated recipient's persisted notification."""
     try:
         response = await run_in_threadpool(
             lambda: db.table("notifications")
-                .update({"is_read": True})
+                .update({"is_read": is_read})
                 .eq("id", notification_id)
-                .eq("user_id", user_id)  # ownership guard
+                .eq("user_id", user_id)
                 .execute()
         )
-        return bool(response and response.data)
-    except (APIError, HTTPError, KeyError, TypeError, ValueError) as e:
-        logger.error("[notification_service] Mark-read failed", error=str(e), exc_info=True)
-        return False
+        if response is None:
+            raise HTTPException(status_code=503, detail="Notification update unavailable")
+        return bool(response.data)
+    except (APIError, HTTPError, KeyError, RuntimeError, TypeError, ValueError) as exc:
+        logger.error("[notification_service] Mark-read failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=503, detail="Notification update unavailable") from exc

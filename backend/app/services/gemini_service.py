@@ -1,8 +1,9 @@
+import base64
 import binascii
+import io
 import json
 import logging
-
-import google.generativeai as genai
+import re
 import httpx
 from PIL import Image
 
@@ -77,15 +78,101 @@ def _raster_export_constraints() -> str:
 """
 
 
+
+MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_RESPONSE_BYTES = 24 * 1024 * 1024
+IMAGE_FORMATS = {"image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP"}
+
+
+def _validated_inline_image(mime, encoded):
+    if mime not in IMAGE_FORMATS or not isinstance(encoded, str) or len(encoded) > ((MAX_IMAGE_BYTES + 2) // 3) * 4:
+        raise ValueError("Unsupported or oversized image")
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+        if not raw or len(raw) > MAX_IMAGE_BYTES:
+            raise ValueError("Unsupported or oversized image")
+        with Image.open(io.BytesIO(raw)) as image:
+            if image.format != IMAGE_FORMATS[mime] or image.width * image.height > 16_777_216:
+                raise ValueError("Image format or dimensions are invalid")
+            image.verify()
+    except (binascii.Error, OSError, Image.DecompressionBombError) as exc:
+        raise ValueError("Invalid image data") from exc
+    return {"mimeType": mime, "data": encoded}
+
+
+def _reference_part(value):
+    # A caller-supplied remote URL is not proof of access or US data residency.
+    # Only actual inline raster evidence is accepted; no arbitrary URL fetch.
+    if not isinstance(value, str) or not value.startswith("data:"):
+        raise ValueError("Reference image must be verified inline raster data")
+    header, sep, encoded = value.partition(",")
+    if not sep or not header.endswith(";base64"):
+        raise ValueError("Invalid reference image")
+    mime = header[5:-7]
+    return {"inlineData": _validated_inline_image(mime, encoded)}
+
+
+async def _generate_content(model, parts, generation_config):
+    name = str(model or "").removeprefix("models/")
+    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}", name):
+        raise ValueError("Invalid configured Gemini model identifier")
+    if not settings.GEMINI_API_KEY:
+        raise RuntimeError("Gemini API key is not configured")
+    # Fixed provider origin; no user-controlled host or key in the URL.
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{name}:generateContent"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0),
+                                      follow_redirects=False) as client:
+            async with client.stream(
+                "POST", url, headers={"x-goog-api-key": settings.GEMINI_API_KEY},
+                json={"contents": [{"role": "user", "parts": parts}],
+                      "generationConfig": generation_config},
+            ) as response:
+                if response.status_code != 200:
+                    raise RuntimeError(f"Gemini provider returned HTTP {response.status_code}")
+                raw = bytearray()
+                async for chunk in response.aiter_bytes():
+                    if len(raw) + len(chunk) > MAX_RESPONSE_BYTES:
+                        raise RuntimeError("Gemini response exceeds the supported limit")
+                    raw.extend(chunk)
+        payload = json.loads(raw)
+        if not isinstance(payload, dict):
+            raise RuntimeError("Invalid Gemini response")
+        return payload
+    except (httpx.HTTPError, json.JSONDecodeError) as exc:
+        # Do not include prompts, provider response bodies or API credentials.
+        raise RuntimeError("Gemini provider request failed") from exc
+
+
+def _candidate_parts(payload):
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list):
+        raise RuntimeError("Gemini produced no usable candidate")
+    for candidate in candidates:
+        if not isinstance(candidate, dict) or candidate.get("finishReason") != "STOP":
+            continue
+        content = candidate.get("content") or {}
+        if not isinstance(content, dict):
+            continue
+        for part in content.get("parts") or []:
+            if isinstance(part, dict) and not part.get("thought"):
+                yield part
+
+
+def _image_result(payload):
+    for part in _candidate_parts(payload):
+        inline = part.get("inlineData")
+        if isinstance(inline, dict):
+            image = _validated_inline_image(inline.get("mimeType"), inline.get("data"))
+            return f"data:{image['mimeType']};base64,{image['data']}"
+    raise RuntimeError("Gemini did not return a usable image")
+
+
 class GeminiService:
     def __init__(self):
         if not settings.GEMINI_API_KEY:
             logger.warning("GEMINI_API_KEY is not set. Gemini features will fail.")
-        else:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-        
-        # Use model from credentials/settings
-        self.model_name = settings.GEMINI_MODEL 
+        self.model_name = settings.GEMINI_MODEL
 
 
     async def generate_image(
@@ -102,11 +189,11 @@ class GeminiService:
         Returns a base64 data URL.
         """
         if not settings.GEMINI_API_KEY:
-             raise RuntimeError("Gemini API key is not configured")
+            raise RuntimeError("Gemini API key is not configured")
+        if not settings.GEMINI_ALLOW_PAID_IMAGE_GENERATION:
+            raise RuntimeError("Image generation requires explicit paid-provider authorization")
 
         try:
-            # Use specific image generation model
-            model = genai.GenerativeModel(settings.GEMINI_IMAGE_MODEL)
             
             # Smart Prompt Construction with Integrated Validation
             validation_instruction = ""
@@ -159,76 +246,18 @@ class GeminiService:
             
             logger.info(f"Generating image with model {settings.GEMINI_IMAGE_MODEL}...")
             
-            # Configure safety settings to strict minimal blocking (CAD drawings are safe)
-            from google.generativeai.types import HarmBlockThreshold, HarmCategory
-            safety_settings = {
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-            }
-
-            logger.info(f"--- GEMINI IMAGE GENERATION PROMPT ---\n{enhanced_prompt}\n----------------------------------")
-            
-            # Prepare content parts
-            content_parts = [enhanced_prompt]
-            
-            # If previous image functionality is desired and supported by the model (e.g. Gemini 1.5 Pro/Flash)
-            # We can download and convert the previous image to include in the prompt context
+            parts = [{"text": enhanced_prompt}]
             if previous_image_url:
-                try:
-                    import base64
-                    import io
-
-                    image_data = None
-                    if previous_image_url.startswith("data:"):
-                        encoded = previous_image_url.split(",")[1]
-                        image_bytes = base64.b64decode(encoded)
-                        image_data = Image.open(io.BytesIO(image_bytes))
-                    else:
-                         async with httpx.AsyncClient() as client:
-                            resp = await client.get(previous_image_url)
-                            if resp.status_code == 200:
-                                image_data = Image.open(io.BytesIO(resp.content))
-                    
-                    if image_data:
-                        logger.info("Including previous image in generation context.")
-                        content_parts.append(image_data)
-                except (binascii.Error, IndexError, OSError, ValueError, httpx.HTTPError) as e:
-                    logger.warning(f"Failed to process previous image for context: {e}")
-
-            response = await model.generate_content_async(content_parts, safety_settings=safety_settings)
-            
-            # Check for refusal/empty candidates before accessing parts
-            if not response.candidates:
-                logger.warning("Gemini returned NO CANDIDATES.")
-                logger.warning("Full Response Feedback: %s", getattr(response, "prompt_feedback", None))
-                
-                return "https://placehold.co/600x400?text=Gemini+Refused+Generation"
-            
-            # Extract image from response
-            for part in response.parts:
-                if hasattr(part, 'inline_data') and part.inline_data:
-                    mime_type = part.inline_data.mime_type
-                    image_data = part.inline_data.data
-                    
-                    # Convert to base64
-                    import base64
-                    base64_str = base64.b64encode(image_data).decode('utf-8')
-                    return f"data:{mime_type};base64,{base64_str}"
-            
-            # If no inline data found, check for text (maybe SVG code?)
-            if response.text:
-                logger.warning(f"Gemini returned text instead of image data. Content: {response.text[:200]}")
-                # Fallback: if it returns SVG code, we might want to handle it, but for now just log it.
-                return "https://placehold.co/600x400?text=Generation+returned+text+not+image"
-            
-            raise ValueError("No image data found in Gemini response")
-
+                parts.append(_reference_part(previous_image_url))
+            payload = await _generate_content(
+                settings.GEMINI_IMAGE_MODEL, parts,
+                {"responseModalities": ["IMAGE"], "candidateCount": 1},
+            )
+            return _image_result(payload)
         except Exception:
-            logger.exception("Gemini image generation error")
-            # Fallback to placeholder on error to keep UI functional
-            return "https://placehold.co/600x400?text=Image+Generation+Failed"
+            # Failure is explicit; callers must never save or charge a placeholder.
+            logger.warning("Gemini image generation failed")
+            raise
 
     async def extract_layout_metrics_json(self, user_prompt: str, cad_dsl: str) -> dict:
         """
@@ -269,18 +298,13 @@ Return ONLY valid JSON with this shape (no markdown):
 """
 
         try:
-            model = genai.GenerativeModel(settings.GEMINI_MODEL)
-            gen_cfg = genai.GenerationConfig(
-                temperature=0.2,
-                response_mime_type="application/json",
+            payload = await _generate_content(
+                settings.GEMINI_MODEL, [{"text": prompt}],
+                {"temperature": 0.2, "responseMimeType": "application/json",
+                 "maxOutputTokens": 4096, "candidateCount": 1},
             )
-            response = await model.generate_content_async(prompt, generation_config=gen_cfg)
-
-            if not response.candidates:
-                logger.warning("Gemini layout extraction returned no candidates")
-                return {}
-
-            text = response.text or ""
+            text = "".join(part["text"] for part in _candidate_parts(payload)
+                           if isinstance(part.get("text"), str))
             if not text.strip():
                 return {}
             data = json.loads(text)

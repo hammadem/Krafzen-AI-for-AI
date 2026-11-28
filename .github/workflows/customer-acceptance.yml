@@ -1,0 +1,105 @@
+name: Isolated customer acceptance checkpoints
+
+on:
+  pull_request:
+    branches: ["fix/**"]
+    paths: ["backend/**", "frontend/**", "supabase/**", ".github/workflows/customer-acceptance.yml"]
+  push:
+    branches: ["fix/integration-p0-20261117"]
+    paths: ["backend/**", "frontend/**", "supabase/**", ".github/workflows/customer-acceptance.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: supabase/setup-cli@v1
+        with:
+          version: "3.3.0"
+      - name: Install application and real scanner
+        run: |
+          python -m pip install -r backend/requirements.txt
+          # Only Ubuntu's signed distro repositories are required. An unrelated
+          # preinstalled vendor repository can fail with HTTP 403 on hosted runners.
+          test -f /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- update
+          sudo apt-get -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/ubuntu.sources -o Dir::Etc::sourceparts=- install -y clamav clamav-freshclam potrace tesseract-ocr tesseract-ocr-eng fonts-dejavu-core
+          sudo systemctl stop clamav-freshclam || true
+          sudo timeout 120 freshclam || echo "::warning::Signature refresh failed; scan availability will be tested without bypass"
+      - name: Start disposable Supabase
+        id: local_stack
+        env:
+          SUPABASE_EXPERIMENTAL_STACK: "1"
+        run: |
+          supabase start --runtime native --exclude studio,mail,analytics,realtime,functions,pooler --eager
+          supabase status --env > "$RUNNER_TEMP/local-supabase.env"
+      - name: Apply proposed ACL and verify real browser write denials
+        working-directory: backend
+        env:
+          LOCAL_SUPABASE_STATUS_FILE: ${{ runner.temp }}/local-supabase.env
+          PYTHONPATH: .
+        run: python scripts/verify_paid_api_acl.py
+      - name: Execute real application acceptance checkpoints
+        working-directory: backend
+        env:
+          LOCAL_SUPABASE_STATUS_FILE: ${{ runner.temp }}/local-supabase.env
+          ACCEPTANCE_RESULT_FILE: ${{ runner.temp }}/customer-acceptance.json
+          PYTHONPATH: .
+        run: python scripts/verify_customer_acceptance.py
+      - uses: actions/setup-node@v4
+        if: always() && steps.local_stack.outcome == 'success'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install real frontend and browser
+        id: browser_dependencies
+        if: always() && steps.local_stack.outcome == 'success'
+        run: |
+          npm ci --prefix frontend
+          python -m pip install playwright==1.51.0
+          python -m playwright install --with-deps chromium
+      - name: Real browser acceptance with local API and Supabase
+        if: always() && steps.browser_dependencies.outcome == 'success'
+        working-directory: backend
+        env:
+          LOCAL_SUPABASE_STATUS_FILE: ${{ runner.temp }}/local-supabase.env
+          BROWSER_ACCEPTANCE_RESULT: ${{ runner.temp }}/browser-acceptance.json
+          PYTHONPATH: .
+        run: python scripts/verify_browser_acceptance.py
+      - name: Read-only staging smoke
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, urllib.request, urllib.error
+          base = "https://krafzen-integration-staging.onrender.com"
+          for path in ["/health", "/health/ready", "/health/imports"]:
+              try:
+                  with urllib.request.urlopen(base+path, timeout=90) as r:
+                      print(path, r.status, r.read(8192).decode())
+              except urllib.error.HTTPError as e:
+                  print(path, e.code, e.read(8192).decode())
+              except Exception:
+                  print(path, "unreachable; not verified")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: customer-acceptance-checkpoints
+          path: |
+            ${{ runner.temp }}/customer-acceptance.json
+            ${{ runner.temp }}/browser-acceptance.json
+          if-no-files-found: warn
+      - name: Stop disposable stack
+        if: always()
+        env:
+          SUPABASE_EXPERIMENTAL_STACK: "1"
+        run: supabase stop || true

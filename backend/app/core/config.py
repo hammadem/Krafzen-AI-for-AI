@@ -82,18 +82,26 @@ class Settings(BaseSettings):
 
     # Gemini Configuration
     GEMINI_API_KEY: str | None = None
-    GEMINI_MODEL: str = "gemini-2.0-flash-exp" # Keep the smart tex model
-    GEMINI_IMAGE_MODEL: str = "models/nano-banana-pro-preview" # Restoring the working image model
+    GEMINI_MODEL: str = "gemini-3.1-flash-lite"
+    GEMINI_IMAGE_MODEL: str = "gemini-3.1-flash-lite-image"
+    GEMINI_ALLOW_PAID_IMAGE_GENERATION: bool = False
 
-    # USA IRC baseline screening (LLM JSON + rule engine). Disabled entirely when False.
-    COMPLIANCE_US_IRC_ENABLED: bool = True
+    # A six-threshold IRC-style prototype is NOT adopted jurisdictional code
+    # compliance and currently lacks verified code-edition/section provenance.
+    # Keep disabled for customer chat by default. The prototype may be
+    # explicitly enabled only in isolated evaluation environments until a
+    # licensed, jurisdiction-aware rule engine has qualified evidence.
+    COMPLIANCE_US_IRC_ENABLED: bool = False
     
     # Stable Diffusion / Image Config
     USE_GEMINI_FOR_IMAGE: bool = True
 
     # DWG export (DXF → DWG conversion)
     # Recommended local converter: ODA File Converter (command often: ODAFileConverter)
-    DWG_CONVERTER_TYPE: str = "ODA"
+    DWG_CONVERTER_TYPE: str = "LIBREDWG"
+    DWG_ODA_USE_AUTHORIZED: bool = False  # operator confirms appropriate usage rights
+    DWG_LIBREDWG_DWG2DXF: str = "dwg2dxf"
+    DWG_LIBREDWG_DXF2DWG: str = "dxf2dwg"
     DWG_CONVERTER_CMD: str = ""  # e.g. "ODAFileConverter"
     DWG_ODA_DEB_URL: str | None = None  # HTTPS presigned URL to Linux x64 .deb (fallback)
     # Preferred on Render: direct R2 API download (avoids presign 400 issues)
@@ -154,6 +162,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = ""
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     FRONTEND_URL: str = "http://localhost:3000"
+    # Optional HTTPS transactional email; never put sending credentials in frontend.
+    INVITE_EMAIL_ENABLED: bool = False
+    RESEND_API_KEY: str = ""
+    INVITE_EMAIL_FROM: str = ""
     
     # Render
     PORT: int = 8000
@@ -165,6 +177,12 @@ class Settings(BaseSettings):
     # Render Configuration (optional)
     RENDER_SERVICE_ID_PRODUCTION: str = ""
     RENDER_SERVICE_ID_STAGING: str = ""
+
+    # Non-secret, operator-recorded provider metadata (never a guarantee).
+    RESIDENCY_EVIDENCE_PROJECT_ID: str = ""
+    RESIDENCY_EVIDENCE_DATABASE_REGION: str = ""
+    RESIDENCY_EVIDENCE_RENDER_REGION: str = ""
+    RESIDENCY_EVIDENCE_RECORDED_AT: str = ""
 
     # Enterprise: US Sovereign Region Secret References
     # Supabase REST API client uses the HTTPS URL and service role key.

@@ -1,0 +1,17 @@
+{
+  "base_model": "HuggingFaceTB/SmolLM2-135M-Instruct",
+  "revision": "ee72e5415c002e8fc0566a191a07c0b2b708875a",
+  "license": "Apache-2.0 base; CC BY 4.0 IFC corpus attribution retained",
+  "training_rows": 101,
+  "evaluation_rows": 8,
+  "optimizer_steps": 24,
+  "before_correct": 0,
+  "after_correct": 6,
+  "source_sha256": "e7b5e2a924289684ed0d3dc20f913abb19d2c3939e5454a5d3311dbcd5966bd6",
+  "workflow_run": "https://github.com/hammadem/Krafzen-AI-for-AI/actions/runs/46058268275",
+  "artifact": "https://github.com/hammadem/Krafzen-AI-for-AI/actions/runs/46058268275/artifacts/15226789651",
+  "artifact_retention_days": 7,
+  "source_revision": "cb1830ef41ed1248acd6572b52ae341f31c50b94",
+  "production_approved": false,
+  "scope": "Held-out IFC reference answer extraction, not independent engineering evaluation. No runtime inference on staging."
+}

@@ -4,6 +4,7 @@
 // Revoke is optimistic in the parent, so a confirmed row disappears instantly.
 
 import { Mail, X } from "lucide-react";
+import { toast } from "react-toastify";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -28,9 +29,11 @@ function expiryLabel(iso: string): string {
 export default function PendingInvites({
     invites,
     onRevoke,
+    onEmail,
 }: {
     invites: WorkspaceInvite[];
     onRevoke: (inviteId: string) => void;
+    onEmail?: (inviteId: string) => void;
 }) {
     if (invites.length === 0) return null;
 
@@ -59,6 +62,9 @@ export default function PendingInvites({
                             Pending
                         </span>
 
+                        {onEmail && <button type="button" className="text-xs underline" onClick={()=>onEmail(inv.id)}>Send / retry email</button>}
+                        {inv.email_delivery && <span className="text-xs text-slate-300">{inv.email_delivery.replaceAll("_", " ")}</span>}
+                        {inv.token && <button type="button" className="text-xs underline" onClick={async()=>{try{await navigator.clipboard.writeText(inv.token);toast.success("Invitation code copied.");}catch{toast.error("Could not copy invitation code.");}}}>Copy invitation code</button>}
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <button

@@ -39,6 +39,7 @@ interface ChatContextType {
     setChatJurisdiction: (j: ChatJurisdiction) => void;
     handleSendMessage: (previousImageUrl?: string) => Promise<void>;
     createNewChat: () => void;
+    openProjectChat: (projectId: string) => Promise<void>;
     deleteSession: (id: string) => Promise<void>;
     onMessageFeedback: (messageId: string, reaction: 'up' | 'down', reason?: string) => Promise<void>;
     onSuggestionDecision: (messageId: string, decision: 'accepted' | 'rejected') => Promise<void>;
@@ -50,7 +51,6 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
     const {
         sessions: storeSessions,
         activeSessionId,
-        createSession,
         switchSession,
         addMessage,
         deleteSession: removeSession,
@@ -70,7 +70,14 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
     const [errorModalOpen, setErrorModalOpen] = useState(false);
     const [errorModalMessage, setErrorModalMessage] = useState("");
     const { user } = useAuth();
-    const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const epoch = useRef(0);
+    const creating = useRef(false);
+    const loadingSession = useRef<string | null>(null);
+    const currentIdentity = useRef<string | undefined>(undefined);
+    const paid = user?.can_access_workspace === true;
+    const identity = paid ? user?.userId : undefined;
+    currentIdentity.current = identity;
+    const reportError = (message: string) => { setErrorModalMessage(message); setErrorModalOpen(true); };
 
     // Map store sessions to ChatSession interface
     const sessionsList: SidebarSession[] = Object.values(storeSessions)
@@ -109,119 +116,55 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
 
 
 
-    // --- Persistence & Hydration Logic ---
+    // A genuine empty history is not a failed request. Do not synthesize sessions.
     useEffect(() => {
-        if (!user?.access_token) return;
-
-        // Clear store when user/token changes so we don't show previous user's sessions
-        useChatStore.getState().clearAllSessions();
-
-        const RETRY_DELAY_MS = 600;
-        const MAX_ATTEMPTS = 3; // initial + 2 retries so history has time to be available after login
-
-        const loadHistory = async (attempt = 0) => {
-            if (!user?.access_token) return;
-
+        const generation = ++epoch.current;
+        const store = useChatStore.getState();
+        store.clearAllSessions();
+        setInputValue("");
+        setErrorModalOpen(false);
+        setIsLoadingMessages(false);
+        creating.current = false;
+        loadingSession.current = null;
+        if (!identity || !user?.access_token) return;
+        const token = user.access_token;
+        setIsLoadingMessages(true);
+        const loadHistory = async () => {
             try {
-                const historyData = await fetchChatHistory(user.access_token);
-
-                if (historyData && historyData.length > 0) {
-                    const hydratedSessions: Record<string, ChatSession> = {};
-
-                    // Convert API sessions to Store sessions
-                    historyData.forEach((s: { id: string; title?: string; created_at: string; updated_at: string }) => {
-                        hydratedSessions[s.id] = {
-                            id: s.id,
-                            title: s.title || "Untitled Session",
-                            messages: [], // Will load eagerly or lazily
-                            createdAt: new Date(s.created_at).getTime(),
-                            lastActive: new Date(s.updated_at).getTime(),
-                            isBackground: false
-                        };
-                    });
-
-                    // Update store with sessions
-                    useChatStore.getState().setSessions(hydratedSessions);
-
-                    // 2. Fetch Messages for the most recent session (Auto-select)
-                    const mostRecentSessionId = historyData[0].id; // API sort is usually desc
-                    if (mostRecentSessionId) {
-                        setIsLoadingMessages(true);
-                        try {
-                            const res = await import("@/lib/api/chat").then(mod => mod.fetchSessionMessages(mostRecentSessionId, user.access_token!, 30));
-
-                            // Convert API messages to Store messages (include feedback)
-                            const storeMessages = res.messages.map((m: { id: string; role: string; content?: string; image_url?: string; created_at: string; feedback?: { reaction: 'up' | 'down'; reason?: string }; compliance?: CompliancePayload | null }) => ({
-                                id: m.id,
-                                role: m.role as 'user' | 'assistant' | 'system',
-                                content: m.content || "",
-                                imageUrl: m.image_url,
-                                timestamp: new Date(m.created_at).getTime(),
-                                feedback: m.feedback,
-                                compliance: m.compliance ?? undefined,
-                            }));
-
-                            useChatStore.getState().setSessionMessages(mostRecentSessionId, storeMessages, res.has_more, res.next_cursor);
-                            useChatStore.getState().switchSession(mostRecentSessionId);
-                        } catch (err) {
-                            console.error("Failed to load initial session messages:", err);
-                        } finally {
-                            setIsLoadingMessages(false);
-                        }
-                    }
-
-                } else if (!historyData || historyData.length === 0) {
-                    // Empty: retry a few times before showing a new session (avoids showing empty while token propagates)
-                    if (attempt < MAX_ATTEMPTS - 1 && user?.access_token) {
-                        const delay = attempt === 0 ? RETRY_DELAY_MS : RETRY_DELAY_MS * 2;
-                        retryTimeoutRef.current = setTimeout(() => loadHistory(attempt + 1), delay);
-                    } else if (!activeSessionId && user?.access_token) {
-                        try {
-                            const newSession = await createChatSession("New Secure Chat", user.access_token);
-                            const sessionId = newSession.id;
-                            const hydratedSession: ChatSession = {
-                                id: sessionId,
-                                title: newSession.title || "New Secure Chat",
-                                messages: [],
-                                createdAt: new Date(newSession.created_at).getTime(),
-                                lastActive: new Date(newSession.updated_at).getTime(),
-                                isBackground: false
-                            };
-                            useChatStore.getState().setSessions({
-                                [sessionId]: hydratedSession
-                            });
-                            useChatStore.getState().switchSession(sessionId);
-                        } catch (err) {
-                            console.error("Failed to create initial session:", err);
-                            createSession("New Secure Chat");
-                        }
-                    } else if (!activeSessionId) {
-                        createSession("New Secure Chat");
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to load chat history:", err);
-                if (attempt < MAX_ATTEMPTS - 1 && user?.access_token) {
-                    const delay = attempt === 0 ? RETRY_DELAY_MS : RETRY_DELAY_MS * 2;
-                    retryTimeoutRef.current = setTimeout(() => loadHistory(attempt + 1), delay);
-                } else if (!activeSessionId && user?.access_token) {
-                    createSession("New Secure Chat");
-                }
+                const records = await fetchChatHistory(token);
+                if (generation !== epoch.current || currentIdentity.current !== identity) return;
+                const sessions: Record<string, ChatSession> = {};
+                for (const row of records) sessions[row.id] = {
+                    id: row.id, title: row.title || "Untitled design", messages: [],
+                    createdAt: new Date(row.created_at).getTime(), lastActive: new Date(row.updated_at).getTime(),
+                    isBackground: false,
+                };
+                useChatStore.getState().setSessions(sessions);
+                const id = records[0]?.id;
+                if (!id) return;
+                const res = await fetchSessionMessages(id, token, 30);
+                if (generation !== epoch.current || currentIdentity.current !== identity) return;
+                useChatStore.getState().setSessionMessages(id, res.messages.map(m => ({
+                    id: m.id, role: m.role as 'user' | 'assistant' | 'system',
+                    content: m.content || "", imageUrl: m.image_url, timestamp: new Date(m.created_at).getTime(),
+                    feedback: m.feedback, compliance: m.compliance ?? undefined,
+                })), res.has_more, res.next_cursor);
+            } catch {
+                if (generation === epoch.current && currentIdentity.current === identity) reportError("Could not load saved design history. Refresh the page to retry.");
+            } finally {
+                if (generation === epoch.current && currentIdentity.current === identity) setIsLoadingMessages(false);
             }
         };
-
-        loadHistory(0);
-        return () => {
-            if (retryTimeoutRef.current) {
-                clearTimeout(retryTimeoutRef.current);
-                retryTimeoutRef.current = null;
-            }
-        };
+        void loadHistory();
+        return () => { ++epoch.current; useChatStore.getState().clearAllSessions(); };
+        // A token refresh does not erase the current user's design sessions.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.access_token]); // Depend on user token to reload on login/switch
+    }, [identity]);
 
     const handleSwitchSession = async (id: string | null) => {
-        if (!id) return;
+        if (!id || !paid || !storeSessions[id]) return;
+        const generation = epoch.current;
+        loadingSession.current = id;
         
         // Switch to the session immediately (Instant cache display)
         switchSession(id);
@@ -244,11 +187,11 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                     compliance: m.compliance ?? undefined,
                 }));
                 
-                useChatStore.getState().setSessionMessages(id, storeMessages, res.has_more, res.next_cursor);
+                if (generation === epoch.current) useChatStore.getState().setSessionMessages(id, storeMessages, res.has_more, res.next_cursor);
             } catch (err) {
-                console.error("Failed to load session messages:", err);
+                if (generation === epoch.current) reportError("Could not load design messages. Select the design to retry.");
             } finally {
-                setIsLoadingMessages(false);
+                if (generation === epoch.current && loadingSession.current === id) setIsLoadingMessages(false);
             }
         } else {
             // If messages are already cached in store, render instantly without blocking spinner
@@ -258,6 +201,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
 
     const loadMoreMessages = async () => {
         if (!activeSessionId || !activeSession?.hasMore || !user?.access_token) return;
+        const generation = epoch.current;
         const cursor = activeSession.nextCursor || activeSession.messages[0]?.id;
         if (!cursor) return;
 
@@ -272,16 +216,22 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 feedback: m.feedback,
                 compliance: m.compliance ?? undefined,
             }));
-            useChatStore.getState().prependMessages(activeSessionId, storeMessages, res.has_more, res.next_cursor);
+            if (generation === epoch.current && currentIdentity.current === identity) useChatStore.getState().prependMessages(activeSessionId, storeMessages, res.has_more, res.next_cursor);
         } catch (err) {
             console.error("Failed to load older messages:", err);
         }
     };
 
     const handleSendMessage = async (previousImageUrl?: string) => {
-        if (!inputValue.trim() || !activeSessionId) return;
+        if (!inputValue.trim() || !paid || !user?.access_token || isLoadingMessages || creating.current) return;
+        const generation = epoch.current;
+        let selectedId = activeSessionId;
+        if (!selectedId) {
+            try { selectedId = await openSavedSession(); } catch (err) { reportError(err instanceof Error ? err.message : "Could not start a design"); return; }
+        }
+        if (!selectedId || generation !== epoch.current || useChatStore.getState().sessions[selectedId]?.isGenerating) return;
 
-        const currentId = activeSessionId;
+        const currentId = selectedId;
         const userContent = inputValue;
         setInputValue("");
 
@@ -316,11 +266,13 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
             const supabase = createClient();
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token;
+            if (generation !== epoch.current || session?.user.id !== identity) return;
 
             if (token) {
                 // Pass the sessionId to ensure messages are saved to the correct session
                 const response = await sendChatMessage(userContent, [], token, currentId, chatJurisdiction, previousImageUrl);
 
+                if (generation !== epoch.current || currentIdentity.current !== identity) return;
                 // Update session ID if backend created a new one (shouldn't happen if we pass sessionId)
                 if (response.session_id && response.session_id !== currentId) {
                     // If backend returned a different session ID, we need to handle this
@@ -337,63 +289,51 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                     compliance: response.compliance ?? undefined,
                 });
             } else {
-                setTimeout(() => {
-                    addMessage(currentId, {
-                        role: 'assistant',
-                        content: "[Secure Demo] Please login to use the AI features. I received: " + userContent
-                    });
-                    setGenerating(currentId, false);
-                }, 1000);
+                throw new Error("Your session expired. Sign in again.");
             }
         } catch (e) {
+            if (generation !== epoch.current || currentIdentity.current !== identity) return;
             console.error(e);
             const message = e instanceof Error ? e.message : "Could not connect to secure agent.";
-            const displayMessage = message.startsWith("Error:") ? message : `Error: ${message}`;
-            addMessage(currentId, {
-                role: 'assistant',
-                content: displayMessage
-            });
             setErrorModalMessage(message.replace(/^Error:\s*/i, ""));
             setErrorModalOpen(true);
         } finally {
-            setGenerating(currentId, false);
+            if (generation === epoch.current) setGenerating(currentId, false);
         }
     };
 
-    const createNewChat = async () => {
-        if (!user?.access_token) {
-            // If not authenticated, create local session only
-            createSession();
-            return;
-        }
-        
+    const openSavedSession = async (projectId?: string): Promise<string> => {
+        if (!paid || !user?.access_token || !identity) throw new Error("A verified paid session is required.");
+        if (creating.current || isLoadingMessages) throw new Error("Design history is loading. Try again.");
+        const generation = epoch.current;
+        creating.current = true;
         try {
-            // Create session in backend first
-            const newSession = await createChatSession("New Secure Chat", user.access_token);
-            
-            // Create session in store with backend session ID
-            const sessionId = newSession.id;
-            const hydratedSession: ChatSession = {
-                id: sessionId,
-                title: newSession.title || "New Secure Chat",
-                messages: [],
-                createdAt: new Date(newSession.created_at).getTime(),
-                lastActive: new Date(newSession.updated_at).getTime(),
-                isBackground: false
-            };
-            
-            // Add to store and switch to it
-            useChatStore.getState().setSessions({
-                ...storeSessions,
-                [sessionId]: hydratedSession
-            });
-            switchSession(sessionId);
-        } catch (err) {
-            console.error("Failed to create session in backend, creating local session:", err);
-            // Fallback to local session if backend fails
-            createSession();
-        }
+            const row = await createChatSession("New design", user.access_token, projectId);
+            if (generation !== epoch.current || currentIdentity.current !== identity) throw new Error("Account changed.");
+            if (!row?.id || !row.created_at || !row.updated_at) throw new Error("Incomplete design session.");
+            const store = useChatStore.getState();
+            if (!store.sessions[row.id]) store.setSessions({...store.sessions, [row.id]: {
+                id: row.id, title: row.title || "New design", messages: [],
+                createdAt: new Date(row.created_at).getTime(), lastActive: new Date(row.updated_at).getTime(), isBackground: false,
+            }});
+            store.switchSession(row.id);
+            if (projectId) {
+                const messages = await fetchSessionMessages(row.id, user.access_token, 30);
+                if (generation !== epoch.current || currentIdentity.current !== identity) throw new Error("Account changed.");
+                useChatStore.getState().setSessionMessages(row.id, messages.messages.map(m => ({
+                    id: m.id, role: m.role as 'user' | 'assistant' | 'system', content: m.content || "", imageUrl: m.image_url,
+                    timestamp: new Date(m.created_at).getTime(), feedback: m.feedback, compliance: m.compliance ?? undefined,
+                })), messages.has_more, messages.next_cursor);
+            }
+            return row.id;
+        } finally { if (generation === epoch.current) creating.current = false; }
     };
+
+    const createNewChat = async () => {
+        try { await openSavedSession(); }
+        catch (err) { reportError(err instanceof Error ? err.message : "Could not create a saved design"); }
+    };
+    const openProjectChat = async (projectId: string) => { await openSavedSession(projectId); };
 
     const deleteSession = async (id: string) => {
         try {
@@ -401,10 +341,9 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token;
 
-            if (token) {
-                await deleteChatSession(id, token);
-            }
-            removeSession(id);
+            if (!token || session?.user.id !== identity) throw new Error("Sign in again.");
+            await deleteChatSession(id, token);
+            if (currentIdentity.current === identity) removeSession(id);
         } catch (error) {
             console.error("Failed to delete session:", error);
         }
@@ -448,6 +387,7 @@ const SecureChatProviderInternal = ({ children }: { children: ReactNode }) => {
                 setChatJurisdiction,
                 handleSendMessage,
                 createNewChat,
+                openProjectChat,
                 deleteSession,
                 onMessageFeedback: handleMessageFeedback,
                 onSuggestionDecision: handleSuggestionDecision,

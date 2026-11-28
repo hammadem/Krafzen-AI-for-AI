@@ -1,9 +1,10 @@
 "use client";
 import { Bell, RefreshCw, AlertCircle } from "lucide-react";
-import { getDashboardNotifications, markNotificationRead } from "@/lib/api/api";
+import { useEffect, useRef, useState } from "react";
+import { getDashboardNotifications, markNotificationRead, markNotificationUnread } from "@/lib/api/api";
 import { useAuth } from "@/context/AuthContext";
+import NotificationPreferences from "@/components/NotificationPreferences";
 import { useApiResource } from "@/hooks/useApiResource";
-import { apiCache } from "@/lib/api/cache";
 
 // Wired to Tazwar's endpoint (dashboard_routes.py)
 // GET /api/v1/dashboard/notifications  (auth-scoped; supports ?unread_only=true & ?limit=N)
@@ -18,43 +19,55 @@ interface NotificationItem {
     type: string;
 }
 
+const PAGE_SIZE = 20;
+type NotificationPage = { notifications: NotificationItem[]; total: number };
+
 export default function NotificationsPage() {
     const { user } = useAuth();
+    return <NotificationInbox key={user?.userId || "signed-out"} />;
+}
+
+function NotificationInbox() {
+    const { user } = useAuth();
+    const [offset, setOffset] = useState(0);
+    const [unreadOnly, setUnreadOnly] = useState(false);
+    const [markError, setMarkError] = useState<string | null>(null);
+    const [pending, setPending] = useState<string | null>(null);
+    const active = useRef(true);
+    useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
     const {
-        data: notifications,
-        setData: setNotifications,
-        isLoading,
-        isError,
-        error,
-        refetch,
-    } = useApiResource<NotificationItem[]>({
-        fetcher: (u) => getDashboardNotifications(u),
-        select: (raw) =>
-            raw && typeof raw === "object" && "notifications" in raw
-                ? (raw as { notifications?: NotificationItem[] }).notifications ?? []
-                : [],
-        fallback: [],
+        data, isLoading, isError, error, refetch,
+    } = useApiResource<NotificationPage>({
+        fetcher: (u) => getDashboardNotifications(u, { limit: PAGE_SIZE, offset, unreadOnly }),
+        select: (raw) => raw as unknown as NotificationPage,
+        fallback: { notifications: [], total: 0 },
+        resourceKey: `${unreadOnly}:${offset}`,
     });
+    const notifications = data.notifications;
 
     const handleMarkRead = async (id: string) => {
         const target = notifications.find((n) => n.id === id);
-        if (!target || target.read) return;
-
-        // Optimistic update
-        setNotifications((prev) =>
-            prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-        );
-
-        const { ok } = await markNotificationRead(user, id);
-        if (ok) {
-            // Keep cache fresh for next mount
-            apiCache.delete(`GET:/api/v1/dashboard/notifications`);
-        } else {
-            // Rollback on failure
-            setNotifications((prev) =>
-                prev.map((n) => (n.id === id ? { ...n, read: false } : n))
-            );
+        if (!target || pending) return;
+        setPending(id);
+        setMarkError(null);
+        try {
+            const result = target.read ? await markNotificationUnread(user, id) : await markNotificationRead(user, id);
+            if (!result.ok) throw new Error(result.error?.message || "Could not update notification read status.");
+            if (active.current) {
+                if (unreadOnly && notifications.length === 1 && offset > 0) setOffset(Math.max(0, offset - PAGE_SIZE));
+                refetch();
+            }
+        } catch (cause) {
+            if (active.current) setMarkError(cause instanceof Error ? cause.message : "Could not update notification read status.");
+        } finally {
+            if (active.current) setPending(null);
         }
+    };
+
+    const changePage = (next: number) => {
+        setOffset(next);
+        setMarkError(null);
+        refetch();
     };
 
     return (
@@ -62,7 +75,13 @@ export default function NotificationsPage() {
             <div className="w-full sm:w-[80%] p-2 sm:p-4 gap-4 flex flex-col">
 
                 <h1 className="text-white font-semibold text-2xl sm:text-[4vh]">Notifications</h1>
-                <p className="text-[#8F8F8F]">Stay updated on your project generations and account activity.</p>
+                <p className="text-[#8F8F8F]">Stay updated on saved project notifications.</p>
+                <div className="flex flex-wrap items-center gap-4 text-sm">
+                    <label className="flex items-center gap-2"><input type="checkbox" checked={unreadOnly} disabled={isLoading || !!pending} onChange={(e) => { setUnreadOnly(e.target.checked); changePage(0); }} /> Unread only</label>
+                    <button type="button" disabled={isLoading || !!pending} onClick={refetch} className="underline">Refresh notifications</button>
+                </div>
+                <NotificationPreferences user={user} onReadAll={()=>{setOffset(0);refetch();}}/>
+                {markError && <p role="alert" className="text-red-300 text-sm">{markError}</p>}
 
                 {/* Error state */}
                 {isError && (
@@ -106,7 +125,9 @@ export default function NotificationsPage() {
                         {notifications.map((n) => (
                             <button
                                 key={n.id}
-                                onClick={() => handleMarkRead(n.id)}
+                                onClick={() => void handleMarkRead(n.id)}
+                                disabled={!!pending}
+                                aria-label={`${n.title}${n.read ? ", read, mark as unread" : ", unread, mark as read"}`}
                                 className={`text-left rounded-[10px] p-4 flex items-start gap-4 transition-all border ${
                                     n.read
                                         ? "bg-[#2F2F2F] border-transparent"
@@ -123,6 +144,7 @@ export default function NotificationsPage() {
                                     <p className={`text-sm ${n.read ? "text-[#cfcfcf] font-normal" : "text-white font-semibold"}`}>
                                         {n.title}
                                     </p>
+                                    <span className="text-xs text-[#54e3b5]">{n.read ? "Mark as unread" : "Mark as read"}</span>
                                     <p className="text-[#94a3b8] text-sm">{n.message}</p>
                                     <span className="text-[#8F8F8F] text-xs capitalize">
                                         {n.type}
@@ -131,6 +153,14 @@ export default function NotificationsPage() {
                                 </div>
                             </button>
                         ))}
+                    </div>
+                )}
+
+                {!isLoading && !isError && (data.total > 0 || offset > 0) && (
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                        <button type="button" disabled={offset === 0 || !!pending} onClick={() => changePage(Math.max(0, offset - PAGE_SIZE))} className="underline disabled:opacity-40">Previous</button>
+                        <span>{notifications.length ? `${offset + 1}–${Math.min(offset + notifications.length, data.total)} of ${data.total}` : `${data.total} notifications`}</span>
+                        <button type="button" disabled={offset + PAGE_SIZE >= data.total || !!pending} onClick={() => changePage(offset + PAGE_SIZE)} className="underline disabled:opacity-40">Next</button>
                     </div>
                 )}
 
@@ -143,7 +173,7 @@ export default function NotificationsPage() {
                         <div className="text-center">
                             <h3 className="text-white font-semibold text-lg">No notifications yet</h3>
                             <p className="text-[#94a3b8] text-sm mt-1">
-                                You&apos;ll be notified when your CAD files are ready or your plan changes.
+                                {unreadOnly ? "No unread notifications in this history." : "New saved notifications will appear here."}
                             </p>
                         </div>
                     </div>
