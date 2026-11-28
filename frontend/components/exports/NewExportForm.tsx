@@ -129,7 +129,7 @@ export default function NewExportForm({ onCreated }: { onCreated: () => void }) 
                 <h2 className="text-lg font-semibold">Export an imported CAD drawing</h2>
                 <p className="text-sm text-slate-400 mt-1">
                     Uses the selected scanned DXF directly, preserving its modelspace, layers and declared units.
-                    DWG requires a working licensed ODA converter; no format renaming is used.
+                    DWG requires an available native converter (LibreDWG or authorized ODA); no format renaming is used.
                 </p>
             </div>
             {error && <p role="alert" className="text-red-300 text-sm">{error}</p>}
@@ -170,7 +170,7 @@ export default function NewExportForm({ onCreated }: { onCreated: () => void }) 
                                 onChange={(event) => setFormat(event.target.value as "dxf" | "dwg")}
                                 className="mt-1 block w-full p-2 rounded bg-slate-900 border border-white/20">
                                 <option value="dxf">DXF — original verified geometry</option>
-                                <option value="dwg">DWG — real ODA conversion required</option>
+                                <option value="dwg">DWG — native conversion required</option>
                             </select>
                         </label>
                     </div>
